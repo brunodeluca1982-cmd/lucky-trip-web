@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef, useState } from "react";
 import {
   Dimensions,
   Image,
@@ -16,19 +16,30 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { destinos } from "@/data/mockData";
+import { IllustratedMap, MapPlace } from "@/components/IllustratedMap";
 
 const C = Colors.light;
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-const MAP_H = Math.round(SCREEN_HEIGHT * 0.30);
 const CARD_IMAGE_H = 210;
 
-// ── Curated place data per city ─────────────────────────────────────────────
+// ── Illustrated map image ────────────────────────────────────────────────────
+// A curated 3D isometric illustration of Rio de Janeiro.
+// Pin coordinates (xPct, yPct) are calibrated to the image's geography.
+const MAP_RIO = require("../../assets/images/map-rio.png");
 
-interface Place {
-  id: string;
-  titulo: string;
-  localizacao: string;
-  categoria: string;
+// Fallback for cities that don't yet have an illustrated map
+const MAP_FALLBACK = MAP_RIO;
+
+function getMapImage(cityId: string): ImageSourcePropType {
+  switch (cityId) {
+    case "rio": return MAP_RIO;
+    default: return MAP_FALLBACK;
+  }
+}
+
+// ── Place data ───────────────────────────────────────────────────────────────
+
+interface Place extends MapPlace {
   descricao: string;
   image: ImageSourcePropType;
   preco?: string;
@@ -44,6 +55,9 @@ const LUGARES: Record<string, Place[]> = {
       descricao:
         "O encontro perfeito entre o mar e a alma carioca. Cheia de vida do nascer ao pôr do sol.",
       image: require("../../assets/images/ipanema.png"),
+      // Ipanema beach — lower-center of the illustrated map
+      xPct: 46,
+      yPct: 70,
     },
     {
       id: "2",
@@ -54,6 +68,9 @@ const LUGARES: Record<string, Place[]> = {
         "Ícone belle époque do centro histórico com doces tradicionais e ambiente majestoso.",
       image: require("../../assets/images/restaurante1.png"),
       preco: "$$",
+      // Centro Histórico — upper right, past Glória
+      xPct: 76,
+      yPct: 26,
     },
     {
       id: "3",
@@ -64,6 +81,9 @@ const LUGARES: Record<string, Place[]> = {
         "O endereço mais icônico do Rio. Elegância à beira-mar desde 1923.",
       image: require("../../assets/images/hotel1.png"),
       preco: "$$$",
+      // Copacabana beachfront — lower right of the illustrated map
+      xPct: 62,
+      yPct: 74,
     },
     {
       id: "4",
@@ -73,6 +93,9 @@ const LUGARES: Record<string, Place[]> = {
       descricao:
         "Ruelas históricas onde cariocas se reúnem ao pôr do sol para petiscos e cerveja gelada.",
       image: require("../../assets/images/secret1.png"),
+      // Centro area, near Glória / Laranjeiras
+      xPct: 70,
+      yPct: 35,
     },
     {
       id: "5",
@@ -82,6 +105,9 @@ const LUGARES: Record<string, Place[]> = {
       descricao:
         "Mosaico de azulejos de mais de 60 países, criado por Jorge Selarón ao longo de décadas.",
       image: require("../../assets/images/secret2.png"),
+      // Lapa neighborhood — center-right of map
+      xPct: 64,
+      yPct: 44,
     },
   ],
 };
@@ -102,6 +128,8 @@ const DEFAULT_LUGARES: Place[] = [
     categoria: "EXPERIÊNCIA",
     descricao: "Uma das experiências mais memoráveis desta cidade.",
     image: require("../../assets/images/ipanema.png"),
+    xPct: 50,
+    yPct: 50,
   },
 ];
 
@@ -110,17 +138,7 @@ const DEFAULT_DESCRICAO = [
   "A verdadeira experiência começa quando você abandona o roteiro previsível e segue o instinto. Esta seleção foi pensada para guiar sem restringir.",
 ];
 
-// ── Map pin positions (static decorative, simulates placed markers) ───────────
-
-const PIN_POSITIONS = [
-  { top: "28%", left: "22%" },
-  { top: "45%", left: "55%" },
-  { top: "60%", left: "32%" },
-  { top: "38%", left: "74%" },
-  { top: "70%", left: "62%" },
-];
-
-// ── Screen ───────────────────────────────────────────────────────────────────
+// ── Screen ────────────────────────────────────────────────────────────────────
 
 export default function OQueFazerScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -132,103 +150,99 @@ export default function OQueFazerScreen() {
   const lugares = LUGARES[destino.id] ?? DEFAULT_LUGARES;
   const descricao = DESCRICOES[destino.id] ?? DEFAULT_DESCRICAO;
 
+  // ── Controlled pin selection ──
+  const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
+
+  // ── Scroll-to-card ──
+  const scrollRef = useRef<ScrollView>(null);
+  const cardsSectionY = useRef(0);       // y of cardsSection within scroll content
+  const cardYOffsets = useRef<Record<string, number>>({});  // y of each card within cardsSection
+
+  function scrollToCard(placeId: string) {
+    const sectionY = cardsSectionY.current;
+    const cardY = cardYOffsets.current[placeId] ?? 0;
+    scrollRef.current?.scrollTo({ y: sectionY + cardY - 16, animated: true });
+  }
+
+  function handlePinPress(pinId: string | null) {
+    setSelectedPinId(pinId);
+  }
+
+  function handlePopupPress(placeId: string) {
+    scrollToCard(placeId);
+  }
+
+  // "Ver no mapa" tapped on a card → select that pin (map is at top, always visible)
+  function handleVerNoMapa(placeId: string) {
+    setSelectedPinId(placeId);
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  }
+
+  // Map places (only id + titulo + localizacao + categoria + coords needed by map)
+  const mapPlaces: MapPlace[] = lugares.map(({ id, titulo, localizacao, categoria, xPct, yPct }) => ({
+    id, titulo, localizacao, categoria, xPct, yPct,
+  }));
+
   return (
     <View style={s.root}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* ════ MAP SECTION — ~30% height, reduced visual dominance ════ */}
-      <View style={[s.map, { height: MAP_H }]}>
-        {/* City image, desaturated to a warm muted map-like tone */}
-        <Image source={destino.image} style={s.mapImage} />
+      {/* ════════════════════════════════════════════════════
+          ILLUSTRATED MAP — fixed at top, always visible.
+          Uses the curated Rio illustration as the base layer.
+          Pins are interactive; tapping reveals a popup card.
+      ════════════════════════════════════════════════════ */}
+      <IllustratedMap
+        mapImage={getMapImage(destino.id)}
+        places={mapPlaces}
+        selectedId={selectedPinId}
+        onPinPress={handlePinPress}
+        onPopupPress={handlePopupPress}
+        onBack={() => router.back()}
+        topInset={topInset}
+        locaisLabel={`${lugares.length} locais`}
+      />
 
-        {/* Warm cream overlay — desaturates & tones the image like a map tile */}
-        <View style={s.mapWarmOverlay} />
-
-        {/* Edge darkening for depth and frame */}
-        <LinearGradient
-          colors={[
-            "rgba(10,5,2,0.45)",
-            "rgba(10,5,2,0.05)",
-            "rgba(10,5,2,0.05)",
-            "rgba(10,5,2,0.30)",
-          ]}
-          locations={[0, 0.20, 0.75, 1]}
-          style={StyleSheet.absoluteFill}
-        />
-
-        {/* Soft bottom fade into the description block */}
-        <LinearGradient
-          colors={["transparent", "rgba(16,10,6,0.70)"]}
-          locations={[0.55, 1]}
-          style={StyleSheet.absoluteFill}
-        />
-
-        {/* Decorative map pin markers */}
-        {PIN_POSITIONS.map((pos, i) => (
-          <View key={i} style={[s.mapPin, { top: pos.top as any, left: pos.left as any }]}>
-            <View style={s.mapPinDot} />
-            <View style={s.mapPinTail} />
-          </View>
-        ))}
-
-        {/* Back button */}
-        <Pressable
-          onPress={() => router.back()}
-          style={[s.backBtn, { top: topInset + 10 }]}
-          hitSlop={8}
-        >
-          <Feather name="arrow-left" size={16} color={C.darkBrown} />
-          <Text style={s.backLabel}>Voltar</Text>
-        </Pressable>
-
-        {/* "N locais" badge */}
-        <View style={[s.localsBadge, { top: topInset + 10 }]}>
-          <Feather name="map-pin" size={11} color={C.darkBrown} />
-          <Text style={s.localsBadgeText}>{lugares.length} locais</Text>
-        </View>
-
-        {/* Zoom controls */}
-        <View style={s.zoomControls}>
-          <Pressable style={s.zoomBtn}>
-            <Text style={s.zoomBtnText}>+</Text>
-          </Pressable>
-          <View style={s.zoomDivider} />
-          <Pressable style={s.zoomBtn}>
-            <Text style={s.zoomBtnText}>−</Text>
-          </Pressable>
-        </View>
-      </View>
-
-      {/* ════ SCROLLABLE CONTENT ════ */}
+      {/* ════════════════════════════════════════════════════
+          SCROLLABLE CONTENT — editorial text + place cards
+      ════════════════════════════════════════════════════ */}
       <ScrollView
+        ref={scrollRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: bottomPad + 40 }}
       >
-        {/* ── Description block — dark editorial background ── */}
+        {/* ── Description block ── */}
         <View style={s.descBlock}>
-          <Text style={s.descTitle}>
-            O que fazer em {destino.cidade}
-          </Text>
+          <Text style={s.descTitle}>O que fazer em {destino.cidade}</Text>
           {descricao.map((para, i) => (
-            <Text key={i} style={s.descPara}>
-              {para}
-            </Text>
+            <Text key={i} style={s.descPara}>{para}</Text>
           ))}
-          {/* Editorial note icon */}
           <View style={s.descNoteWrap}>
             <View style={s.descNoteDot} />
-            <Text style={s.descNoteText}>
-              Seleção curada · {lugares.length} lugares
-            </Text>
+            <Text style={s.descNoteText}>Seleção curada · {lugares.length} lugares</Text>
           </View>
         </View>
 
-        {/* ── Place cards — generous spacing, curated feel ── */}
-        <View style={s.cardsSection}>
+        {/* ── Place cards ── */}
+        <View
+          style={s.cardsSection}
+          onLayout={(e) => {
+            cardsSectionY.current = e.nativeEvent.layout.y;
+          }}
+        >
           <Text style={s.cardsSectionLabel}>Locais selecionados</Text>
 
           {lugares.map((place, index) => (
-            <View key={place.id} style={s.card}>
+            <View
+              key={place.id}
+              style={[
+                s.card,
+                selectedPinId === place.id && s.cardHighlighted,
+              ]}
+              onLayout={(e) => {
+                cardYOffsets.current[place.id] = e.nativeEvent.layout.y;
+              }}
+            >
               {/* Image area */}
               <View style={s.cardImageWrap}>
                 <Image source={place.image} style={s.cardImage} />
@@ -238,19 +252,16 @@ export default function OQueFazerScreen() {
                   style={StyleSheet.absoluteFill}
                 />
 
-                {/* Bookmark button */}
                 <Pressable style={s.bookmarkBtn} hitSlop={8}>
                   <Feather name="bookmark" size={15} color={C.white} />
                 </Pressable>
 
-                {/* Price badge */}
                 {place.preco && (
                   <View style={s.priceBadge}>
                     <Text style={s.priceText}>{place.preco}</Text>
                   </View>
                 )}
 
-                {/* Order number */}
                 <View style={s.orderBadge}>
                   <Text style={s.orderText}>{String(index + 1).padStart(2, "0")}</Text>
                 </View>
@@ -269,9 +280,12 @@ export default function OQueFazerScreen() {
                 <Text style={s.cardTitulo}>{place.titulo}</Text>
                 <Text style={s.cardDesc}>{place.descricao}</Text>
 
-                {/* Ver no mapa button */}
-                <Pressable style={s.verNoMapaBtn}>
-                  <Feather name="map-pin" size={13} color="rgba(255,255,255,0.65)" />
+                {/* Ver no mapa — selects the pin and scrolls back up to the map */}
+                <Pressable
+                  style={s.verNoMapaBtn}
+                  onPress={() => handleVerNoMapa(place.id)}
+                >
+                  <Feather name="map-pin" size={13} color={C.terracotta} />
                   <Text style={s.verNoMapaText}>Ver no mapa</Text>
                 </Pressable>
               </View>
@@ -291,7 +305,7 @@ export default function OQueFazerScreen() {
   );
 }
 
-// ── Styles ───────────────────────────────────────────────────────────────────
+// ── Styles ────────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
   root: {
@@ -299,131 +313,12 @@ const s = StyleSheet.create({
     backgroundColor: "#100A06",
   },
 
-  // ── Map ──
-  map: {
-    width: SCREEN_WIDTH,
-    position: "relative",
-    overflow: "hidden",
-  },
-  mapImage: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "cover",
-    opacity: 0.72,
-  },
-  mapWarmOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(218, 200, 172, 0.52)",
-  },
-
-  // Map pin markers
-  mapPin: {
-    position: "absolute",
-    alignItems: "center",
-  },
-  mapPinDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: C.terracotta,
-    borderWidth: 2,
-    borderColor: C.white,
-    shadowColor: C.darkBrown,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.4,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  mapPinTail: {
-    width: 2,
-    height: 5,
-    backgroundColor: C.terracotta,
-    borderRadius: 1,
-    marginTop: 0,
-  },
-
-  // Map controls
-  backBtn: {
-    position: "absolute",
-    left: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    backgroundColor: "rgba(255,255,255,0.90)",
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.14,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  backLabel: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 13,
-    color: C.darkBrown,
-    letterSpacing: 0.1,
-  },
-  localsBadge: {
-    position: "absolute",
-    left: 110,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    backgroundColor: "rgba(255,255,255,0.90)",
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  localsBadgeText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 13,
-    color: C.darkBrown,
-  },
-  zoomControls: {
-    position: "absolute",
-    right: 16,
-    bottom: 20,
-    backgroundColor: "rgba(255,255,255,0.90)",
-    borderRadius: 10,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.14,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  zoomBtn: {
-    width: 36,
-    height: 36,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  zoomBtnText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 20,
-    color: C.darkBrown,
-    lineHeight: 24,
-  },
-  zoomDivider: {
-    height: 1,
-    marginHorizontal: 6,
-    backgroundColor: C.border,
-  },
-
-  // ── Description block ──
+  // ── Description ──
   descBlock: {
     backgroundColor: "#100A06",
     paddingHorizontal: 24,
     paddingTop: 28,
     paddingBottom: 30,
-    gap: 0,
   },
   descTitle: {
     fontFamily: "PlayfairDisplay_700Bold",
@@ -460,13 +355,12 @@ const s = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // ── Cards ──
+  // ── Cards section ──
   cardsSection: {
     backgroundColor: C.cream,
     paddingTop: 28,
     paddingHorizontal: 20,
     paddingBottom: 8,
-    gap: 0,
   },
   cardsSectionLabel: {
     fontFamily: "Inter_500Medium",
@@ -476,19 +370,19 @@ const s = StyleSheet.create({
     textTransform: "uppercase",
     marginBottom: 20,
   },
+
+  // ── Card ──
   card: {
     backgroundColor: "#1C1410",
     borderRadius: 18,
     overflow: "hidden",
     marginBottom: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.22,
-    shadowRadius: 16,
-    elevation: 8,
+  },
+  cardHighlighted: {
+    borderWidth: 1.5,
+    borderColor: "rgba(196,112,74,0.55)",
   },
 
-  // Card image area
   cardImageWrap: {
     height: CARD_IMAGE_H,
     position: "relative",
@@ -540,11 +434,9 @@ const s = StyleSheet.create({
     letterSpacing: 1,
   },
 
-  // Card text area
   cardBody: {
     padding: 18,
     paddingTop: 16,
-    gap: 0,
   },
   cardMeta: {
     flexDirection: "row",
@@ -584,21 +476,21 @@ const s = StyleSheet.create({
     marginBottom: 16,
   },
 
-  // Ver no mapa
   verNoMapaBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 7,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
+    borderColor: "rgba(196,112,74,0.30)",
     borderRadius: 10,
     paddingVertical: 11,
+    backgroundColor: "rgba(196,112,74,0.06)",
   },
   verNoMapaText: {
     fontFamily: "Inter_500Medium",
     fontSize: 13,
-    color: "rgba(255,255,255,0.65)",
+    color: C.terracotta,
     letterSpacing: 0.2,
   },
 
