@@ -45,8 +45,13 @@ interface Place extends MapPlace {
   preco?: string;
 }
 
+// ── Category constants ───────────────────────────────────────────────────────
+// Each screen renders ONLY its own category.
+// "o_que_fazer" → this screen  |  "comer" → Comer bem  |  "ficar" → Ficar bem
+
 const LUGARES: Record<string, Place[]> = {
   rio: [
+    // ── categoria: "o_que_fazer" only ────────────────────────────────────────
     {
       id: "1",
       titulo: "Praia de Ipanema",
@@ -61,29 +66,27 @@ const LUGARES: Record<string, Place[]> = {
     },
     {
       id: "2",
-      titulo: "Confeitaria Colombo",
-      localizacao: "Centro Histórico",
-      categoria: "RESTAURANTE",
+      titulo: "Cristo Redentor",
+      localizacao: "Corcovado",
+      categoria: "MONUMENTO",
       descricao:
-        "Ícone belle époque do centro histórico com doces tradicionais e ambiente majestoso.",
-      image: require("../../assets/images/restaurante1.png"),
-      preco: "$$",
-      // Centro Histórico — upper right, past Glória
-      xPct: 76,
-      yPct: 26,
+        "A sétima maravilha do mundo moderna abraça o Rio de braços abertos. A vista do topo para a Guanabara é inesquecível.",
+      image: require("../../assets/images/cristo.png"),
+      // Cristo Redentor on Corcovado mountain — center of the illustrated map
+      xPct: 37,
+      yPct: 37,
     },
     {
       id: "3",
-      titulo: "Copacabana Palace",
-      localizacao: "Copacabana",
-      categoria: "HOTEL",
+      titulo: "Pão de Açúcar",
+      localizacao: "Urca",
+      categoria: "EXPERIÊNCIA",
       descricao:
-        "O endereço mais icônico do Rio. Elegância à beira-mar desde 1923.",
-      image: require("../../assets/images/hotel1.png"),
-      preco: "$$$",
-      // Copacabana beachfront — lower right of the illustrated map
-      xPct: 62,
-      yPct: 74,
+        "Dois picos, dois bondilhos e uma das vistas mais dramáticas do planeta. O Rio em panorama completo.",
+      image: require("../../assets/images/pao-acucar.png"),
+      // Pão de Açúcar — far right of the illustrated map, coastal peak
+      xPct: 79,
+      yPct: 52,
     },
     {
       id: "4",
@@ -93,7 +96,7 @@ const LUGARES: Record<string, Place[]> = {
       descricao:
         "Ruelas históricas onde cariocas se reúnem ao pôr do sol para petiscos e cerveja gelada.",
       image: require("../../assets/images/secret1.png"),
-      // Centro area, near Glória / Laranjeiras
+      // Centro area, near Laranjeiras / Glória
       xPct: 70,
       yPct: 35,
     },
