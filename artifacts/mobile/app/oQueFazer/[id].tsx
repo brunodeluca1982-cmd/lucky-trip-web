@@ -22,19 +22,80 @@ const C = Colors.light;
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const CARD_IMAGE_H = 210;
 
-// ── Illustrated map image ────────────────────────────────────────────────────
-// A curated 3D isometric illustration of Rio de Janeiro.
-// Pin coordinates (xPct, yPct) are calibrated to the image's geography.
+// ── Illustrated map images ────────────────────────────────────────────────────
 const MAP_RIO = require("../../assets/images/map-rio.png");
-
-// Fallback for cities that don't yet have an illustrated map
-const MAP_FALLBACK = MAP_RIO;
 
 function getMapImage(cityId: string): ImageSourcePropType {
   switch (cityId) {
     case "rio": return MAP_RIO;
-    default: return MAP_FALLBACK;
+    default:    return MAP_RIO;
   }
+}
+
+// ── Neighborhood zone table ───────────────────────────────────────────────────
+// Defines the VISUAL CENTER of each bairro on the illustrated map image.
+// Coordinates are percentages of image width/height — not geographic precision.
+// This is a curated map: markers belong to a neighborhood zone, not a lat/lng.
+//
+// To add a new city: create a separate zone table (e.g. SANTORINI_ZONES).
+// To add new places: only the "localizacao" field is needed — no manual coords.
+//
+// Future Supabase integration: store bairro on the place row; zone table stays here.
+
+type ZoneMap = Record<string, { xPct: number; yPct: number }>;
+
+const RIO_ZONES: ZoneMap = {
+  // ── Beaches (bottom coastline) ──
+  "Ipanema":          { xPct: 48, yPct: 73 },
+  "Leblon":           { xPct: 41, yPct: 72 },
+  "Arpoador":         { xPct: 55, yPct: 76 },
+  "Copacabana":       { xPct: 62, yPct: 73 },
+  "Leme":             { xPct: 68, yPct: 71 },
+  "Barra da Tijuca":  { xPct: 13, yPct: 73 },
+  "São Conrado":      { xPct: 28, yPct: 79 },
+
+  // ── Mountains / parks ──
+  "Corcovado":        { xPct: 36, yPct: 26 },  // "Cristo Redentor" label
+  "Floresta da Tijuca": { xPct: 20, yPct: 30 },
+  "Pedra da Gávea":   { xPct: 34, yPct: 64 },
+  "Morro Dois Irmãos": { xPct: 36, yPct: 60 },
+
+  // ── South Zone (Zona Sul) ──
+  "Urca":             { xPct: 80, yPct: 55 },  // Pão de Açúcar area
+  "Botafogo":         { xPct: 60, yPct: 47 },
+  "Flamengo":         { xPct: 68, yPct: 47 },
+  "Catete":           { xPct: 68, yPct: 42 },
+  "Glória":           { xPct: 69, yPct: 38 },
+  "Jardim Botânico":  { xPct: 46, yPct: 57 },
+  "Lagoa":            { xPct: 51, yPct: 59 },
+  "Gávea":            { xPct: 45, yPct: 48 },
+  "Laranjeiras":      { xPct: 63, yPct: 41 },
+
+  // ── Santa Teresa & Lapa ──
+  "Santa Teresa":     { xPct: 55, yPct: 30 },
+  "Lapa":             { xPct: 63, yPct: 40 },  // "LAPA" label on map
+
+  // ── Centro & surroundings ──
+  "Centro":           { xPct: 76, yPct: 24 },  // near "Museu do Amanhã" label
+  "Saúde":            { xPct: 79, yPct: 20 },
+  "Gamboa":           { xPct: 77, yPct: 21 },
+  "Caju":             { xPct: 80, yPct: 17 },
+
+  // ── North Zone (Zona Norte) ──
+  "Maracanã":         { xPct: 51, yPct: 19 },
+  "Tijuca":           { xPct: 44, yPct: 22 },
+  "São Cristóvão":    { xPct: 63, yPct: 24 },
+
+  // ── West Zone ──
+  "Recreio":          { xPct: 5,  yPct: 67 },
+  "Parque Olímpico":  { xPct: 10, yPct: 58 },
+};
+
+// Helper: resolve a place's pin position from its bairro zone.
+// Falls back to map center if the bairro isn't defined yet.
+function zone(cityId: string, bairro: string): { xPct: number; yPct: number } {
+  const table = cityId === "rio" ? RIO_ZONES : RIO_ZONES;
+  return table[bairro] ?? { xPct: 50, yPct: 50 };
 }
 
 // ── Place data ───────────────────────────────────────────────────────────────
@@ -45,13 +106,12 @@ interface Place extends MapPlace {
   preco?: string;
 }
 
-// ── Category constants ───────────────────────────────────────────────────────
-// Each screen renders ONLY its own category.
+// ── Category separation ───────────────────────────────────────────────────────
 // "o_que_fazer" → this screen  |  "comer" → Comer bem  |  "ficar" → Ficar bem
+// Pin positions come from the zone table above — not hardcoded per-place.
 
 const LUGARES: Record<string, Place[]> = {
   rio: [
-    // ── categoria: "o_que_fazer" only ────────────────────────────────────────
     {
       id: "1",
       titulo: "Praia de Ipanema",
@@ -60,9 +120,7 @@ const LUGARES: Record<string, Place[]> = {
       descricao:
         "O encontro perfeito entre o mar e a alma carioca. Cheia de vida do nascer ao pôr do sol.",
       image: require("../../assets/images/ipanema.png"),
-      // "Ipanema" label visible at lower-center coastline of the illustrated map
-      xPct: 48,
-      yPct: 74,
+      ...zone("rio", "Ipanema"),
     },
     {
       id: "2",
@@ -72,9 +130,7 @@ const LUGARES: Record<string, Place[]> = {
       descricao:
         "A sétima maravilha do mundo moderna abraça o Rio de braços abertos. A vista do topo para a Guanabara é inesquecível.",
       image: require("../../assets/images/cristo.png"),
-      // "Cristo Redentor" label visible on the mountain, center-left of the illustrated map
-      xPct: 36,
-      yPct: 26,
+      ...zone("rio", "Corcovado"),
     },
     {
       id: "3",
@@ -84,9 +140,7 @@ const LUGARES: Record<string, Place[]> = {
       descricao:
         "Dois picos, dois bondilhos e uma das vistas mais dramáticas do planeta. O Rio em panorama completo.",
       image: require("../../assets/images/pao-acucar.png"),
-      // "Pão de Açúcar" label visible at the far-right coastal peak of the illustrated map
-      xPct: 82,
-      yPct: 55,
+      ...zone("rio", "Urca"),
     },
     {
       id: "4",
@@ -96,9 +150,7 @@ const LUGARES: Record<string, Place[]> = {
       descricao:
         "Ruelas históricas onde cariocas se reúnem ao pôr do sol para petiscos e cerveja gelada.",
       image: require("../../assets/images/secret1.png"),
-      // Centro Histórico — near "Museu do Amanhã" label, upper far-right of the illustrated map
-      xPct: 79,
-      yPct: 22,
+      ...zone("rio", "Centro"),
     },
     {
       id: "5",
@@ -108,9 +160,7 @@ const LUGARES: Record<string, Place[]> = {
       descricao:
         "Mosaico de azulejos de mais de 60 países, criado por Jorge Selarón ao longo de décadas.",
       image: require("../../assets/images/secret2.png"),
-      // "LAPA" label visible center-right of the illustrated map
-      xPct: 63,
-      yPct: 40,
+      ...zone("rio", "Lapa"),
     },
   ],
 };
