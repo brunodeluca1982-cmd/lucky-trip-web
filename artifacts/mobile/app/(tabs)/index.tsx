@@ -1,6 +1,6 @@
 import React from "react";
 import {
-  Dimensions,
+  Animated,
   Platform,
   ScrollView,
   StyleSheet,
@@ -14,6 +14,7 @@ import { DestaquesCard } from "@/components/DestaquesCard";
 import { HeroCarousel } from "@/components/HeroCarousel";
 import { HorizontalScroll } from "@/components/HorizontalScroll";
 import { HotelCard } from "@/components/HotelCard";
+import { PeriodoSwitcher } from "@/components/PeriodoSwitcher";
 import { PlaceCard } from "@/components/PlaceCard";
 import { RestauranteCard } from "@/components/RestauranteCard";
 import { SectionHeader } from "@/components/SectionHeader";
@@ -22,13 +23,14 @@ import {
   destaques,
   heroDestinos,
   hoteis,
-  oQueFazer,
+  oQueFazerPorMomento,
+  periodoMeta,
   restaurantes,
   segredos,
 } from "@/data/mockData";
+import { useTimeOfDay } from "@/hooks/useTimeOfDay";
 
 const C = Colors.light;
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 function Divider() {
   return <View style={styles.divider} />;
@@ -37,6 +39,9 @@ function Divider() {
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const { periodo, setPeriodo, fadeAnim } = useTimeOfDay();
+  const currentItems = oQueFazerPorMomento[periodo];
+  const currentMeta = periodoMeta[periodo];
 
   return (
     <View style={styles.root}>
@@ -72,23 +77,26 @@ export default function HomeScreen() {
 
         <Divider />
 
-        {/* O QUE FAZER */}
+        {/* O QUE FAZER — context-aware */}
         <View style={styles.section}>
           <SectionHeader
             title="O que fazer agora"
-            subtitle="Tarde no Rio — o melhor para este momento."
+            subtitle={currentMeta.subtitle}
           />
-          <HorizontalScroll>
-            {oQueFazer.map((item) => (
-              <PlaceCard
-                key={item.id}
-                titulo={item.titulo}
-                localizacao={item.localizacao}
-                image={item.image}
-                size="medium"
-              />
-            ))}
-          </HorizontalScroll>
+          <PeriodoSwitcher active={periodo} onChange={setPeriodo} />
+          <Animated.View style={{ opacity: fadeAnim }}>
+            <HorizontalScroll>
+              {currentItems.map((item) => (
+                <PlaceCard
+                  key={item.id}
+                  titulo={item.titulo}
+                  localizacao={item.localizacao}
+                  image={item.image}
+                  size="medium"
+                />
+              ))}
+            </HorizontalScroll>
+          </Animated.View>
         </View>
 
         <Divider />

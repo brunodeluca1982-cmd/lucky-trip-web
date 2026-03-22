@@ -80,6 +80,102 @@ export const oQueFazer = [
   },
 ];
 
+export type Periodo = "manha" | "tarde" | "noite";
+
+export function detectPeriodo(): Periodo {
+  const h = new Date().getHours();
+  if (h >= 6 && h < 12) return "manha";
+  if (h >= 12 && h < 18) return "tarde";
+  return "noite";
+}
+
+export const periodoMeta: Record<
+  Periodo,
+  { label: string; subtitle: string; icon: string }
+> = {
+  manha: {
+    label: "Manhã",
+    icon: "sunrise",
+    subtitle: "Manhã no Rio — comece o dia com leveza.",
+  },
+  tarde: {
+    label: "Tarde",
+    icon: "sun",
+    subtitle: "Tarde no Rio — o melhor para este momento.",
+  },
+  noite: {
+    label: "Noite",
+    icon: "moon",
+    subtitle: "Noite no Rio — a cidade que nunca dorme.",
+  },
+};
+
+export const oQueFazerPorMomento: Record<
+  Periodo,
+  { id: string; titulo: string; localizacao: string; image: any }[]
+> = {
+  manha: [
+    {
+      id: "m1",
+      titulo: "Praia de Ipanema",
+      localizacao: "Ipanema",
+      image: require("../assets/images/ipanema.png"),
+    },
+    {
+      id: "m2",
+      titulo: "Caminhada ao Cristo",
+      localizacao: "Cosme Velho",
+      image: require("../assets/images/cristo.png"),
+    },
+    {
+      id: "m3",
+      titulo: "Café na Colombo",
+      localizacao: "Centro Histórico",
+      image: require("../assets/images/restaurante1.png"),
+    },
+  ],
+  tarde: [
+    {
+      id: "t1",
+      titulo: "Pão de Açúcar",
+      localizacao: "Urca",
+      image: require("../assets/images/pao-acucar.png"),
+    },
+    {
+      id: "t2",
+      titulo: "Escadaria Selarón",
+      localizacao: "Lapa",
+      image: require("../assets/images/secret2.png"),
+    },
+    {
+      id: "t3",
+      titulo: "Santa Teresa",
+      localizacao: "Santa Teresa",
+      image: require("../assets/images/hotel2.png"),
+    },
+  ],
+  noite: [
+    {
+      id: "n1",
+      titulo: "Beco das Sardinhas",
+      localizacao: "Centro",
+      image: require("../assets/images/secret1.png"),
+    },
+    {
+      id: "n2",
+      titulo: "Oro Restaurant",
+      localizacao: "Leblon",
+      image: require("../assets/images/restaurante2.png"),
+    },
+    {
+      id: "n3",
+      titulo: "Arcos da Lapa",
+      localizacao: "Lapa",
+      image: require("../assets/images/lapa.png"),
+    },
+  ],
+};
+
 export const restaurantes = [
   {
     id: "1",
