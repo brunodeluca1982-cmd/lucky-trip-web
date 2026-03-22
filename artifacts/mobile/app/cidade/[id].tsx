@@ -31,9 +31,6 @@ import { HotelCard } from "@/components/HotelCard";
 const C = Colors.light;
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
-// Hero takes ~45% of screen — enough to showcase the image + city name
-const HERO_H = Math.round(SCREEN_HEIGHT * 0.45);
-
 const ESSENTIALS: Record<string, string> = {
   rio: "do Rio",
   santorini: "de Santorini",
@@ -106,61 +103,63 @@ export default function CidadeScreen() {
     <View style={s.root}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* ══════════════════════════════════════════════════════
-          SECTION 1 — HERO
-          Fixed height. Contains ONLY: background image + city identity.
-          No buttons, no cards, no overlap.
-      ══════════════════════════════════════════════════════ */}
-      <View style={[s.hero, { height: HERO_H }]}>
-        <Image source={destino.image} style={s.heroImage} />
+      {/* ── Fullscreen background image — fixed behind everything ── */}
+      <Image source={destino.image} style={s.bgImage} />
 
-        {/* Cinematic gradient: subtle top burn, clear middle, deep fade at bottom
-            Bottom fade matches the dark content section below — seamless join */}
-        <LinearGradient
-          colors={[
-            "rgba(10,5,2,0.55)",
-            "rgba(10,5,2,0.08)",
-            "rgba(10,5,2,0.08)",
-            "rgba(10,5,2,0.88)",
-          ]}
-          locations={[0, 0.22, 0.60, 1]}
-          style={StyleSheet.absoluteFill}
-        />
+      {/* ── Cinematic gradient overlay — full screen, fixed ──
+          Designed in three zones:
+            Top 20%  → dark burn (back button readable)
+            20–48%   → clears out (city name reads on image)
+            48–100%  → deepens to near-black (buttons float on dark canvas) */}
+      <LinearGradient
+        colors={[
+          "rgba(8,4,2,0.62)",
+          "rgba(8,4,2,0.14)",
+          "rgba(8,4,2,0.08)",
+          "rgba(8,4,2,0.72)",
+          "rgba(8,4,2,0.96)",
+        ]}
+        locations={[0, 0.20, 0.42, 0.62, 1]}
+        style={StyleSheet.absoluteFill}
+      />
 
-        {/* Back button — absolute, top-left */}
-        <Pressable
-          onPress={() => router.back()}
-          style={[s.backBtn, { top: topInset + 12 }]}
-          hitSlop={8}
-        >
-          <Feather name="arrow-left" size={20} color={C.white} />
-        </Pressable>
+      {/* ── Back button — fixed, does not scroll ── */}
+      <Pressable
+        onPress={() => router.back()}
+        style={[s.backBtn, { top: topInset + 12 }]}
+        hitSlop={8}
+      >
+        <Feather name="arrow-left" size={20} color={C.white} />
+      </Pressable>
 
-        {/* City identity — absolutely centered within the hero rectangle */}
+      {/* ── Scrollable content — transparent, floats over the fixed image ──
+          Everything here is in normal vertical flow: title → spacing → buttons.
+          No absolute positioning between siblings → no overlap possible. */}
+      <ScrollView
+        style={s.scroll}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          s.scrollContent,
+          { paddingTop: topInset + 56, paddingBottom: bottomPad + 40 },
+        ]}
+      >
+        {/* City identity — in flow, sits in the clear zone of the gradient */}
         <View style={s.identity}>
           <Text style={s.pais}>{destino.pais}</Text>
           <Text style={s.cidade}>{destino.cidade}</Text>
         </View>
-      </View>
 
-      {/* ══════════════════════════════════════════════════════
-          SECTION 2 — CONTENT
-          Starts immediately below the hero. No overlap possible.
-          Dark background matches the hero's bottom fade.
-          Contains all action buttons + editorial content.
-      ══════════════════════════════════════════════════════ */}
-      <ScrollView
-        style={s.contentScroll}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          s.contentContainer,
-          { paddingBottom: bottomPad + 40 },
-        ]}
-      >
-        {/* ── Action buttons — normal flow, no absolute positioning ── */}
+        {/* Spacer — pushes buttons into the dark lower zone, prevents collision */}
+        <View style={{ height: SCREEN_HEIGHT * 0.14 }} />
+
+        {/* ── Action buttons — normal flow inside scroll ── */}
         <View style={s.menu}>
-          {/* 1. PRIMARY — "Comece por aqui" */}
-          <GlassButton onPress={() => {}} bright style={s.btnPrimary}>
+          {/* 1. PRIMARY */}
+          <GlassButton
+            bright
+            style={s.btnPrimary}
+            onPress={() => {}}
+          >
             <View style={s.btnPrimaryInner}>
               <View style={s.btnPrimaryLeft}>
                 <Text style={s.eyebrow}>Comece por aqui</Text>
@@ -174,7 +173,7 @@ export default function CidadeScreen() {
             </View>
           </GlassButton>
 
-          {/* 2. EXPERIENCE — "Experiência do momento" */}
+          {/* 2. EXPERIENCE */}
           <GlassButton style={s.btnExperience}>
             <View style={s.btnExperienceInner}>
               <View style={s.expIconWrap}>
@@ -187,7 +186,7 @@ export default function CidadeScreen() {
             </View>
           </GlassButton>
 
-          {/* 3–5. Standard category buttons */}
+          {/* 3. O que fazer */}
           <GlassButton
             style={s.btnStandard}
             onPress={() =>
@@ -200,6 +199,7 @@ export default function CidadeScreen() {
             </View>
           </GlassButton>
 
+          {/* 4. Comer bem */}
           <GlassButton style={s.btnStandard}>
             <View style={s.btnStandardInner}>
               <Feather name="coffee" size={16} color="rgba(255,255,255,0.70)" />
@@ -207,6 +207,7 @@ export default function CidadeScreen() {
             </View>
           </GlassButton>
 
+          {/* 5. Ficar bem */}
           <GlassButton style={s.btnStandard}>
             <View style={s.btnStandardInner}>
               <Feather name="moon" size={16} color="rgba(255,255,255,0.70)" />
@@ -214,7 +215,7 @@ export default function CidadeScreen() {
             </View>
           </GlassButton>
 
-          {/* 6. Lucky List */}
+          {/* 6. Sua Lucky List */}
           <GlassButton style={[s.btnStandard, s.btnLucky]}>
             <View style={s.btnStandardInner}>
               <Text style={s.luckyIcon}>✦</Text>
@@ -231,9 +232,8 @@ export default function CidadeScreen() {
           </GlassButton>
         </View>
 
-        {/* ── Editorial content — cream background below ── */}
+        {/* ── Editorial content — cream section, scrolls naturally below ── */}
         <View style={s.editorial}>
-          {/* Destaques */}
           <View style={s.section}>
             <SectionHeader
               title={isRio ? "Destaques do destino" : "Em destaque"}
@@ -258,7 +258,6 @@ export default function CidadeScreen() {
 
           <View style={s.divider} />
 
-          {/* O que fazer */}
           <View style={s.section}>
             <SectionHeader
               title="O que fazer"
@@ -281,7 +280,6 @@ export default function CidadeScreen() {
 
           <View style={s.divider} />
 
-          {/* Comer bem */}
           <View style={s.section}>
             <SectionHeader
               title="Comer bem"
@@ -303,7 +301,6 @@ export default function CidadeScreen() {
 
           <View style={s.divider} />
 
-          {/* Ficar bem */}
           <View style={s.section}>
             <SectionHeader
               title="Ficar bem"
@@ -325,7 +322,6 @@ export default function CidadeScreen() {
 
           <View style={s.divider} />
 
-          {/* Segredos locais */}
           <View style={s.section}>
             <SectionHeader
               title="Segredos locais"
@@ -345,7 +341,6 @@ export default function CidadeScreen() {
             ))}
           </View>
 
-          {/* Footer */}
           <View style={s.footer}>
             <Text style={s.footerL}>L.</Text>
             <Text style={s.footerText}>
@@ -358,29 +353,25 @@ export default function CidadeScreen() {
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
-
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#0A0502",
+    backgroundColor: "#080402",
   },
 
-  // ── SECTION 1: Hero ──
-  // Fixed height, no overflow, contains ONLY image + title
-  hero: {
-    width: SCREEN_WIDTH,
-    overflow: "hidden",
-    position: "relative",
-  },
-  heroImage: {
+  // Fullscreen background — sits behind everything
+  bgImage: {
+    ...StyleSheet.absoluteFillObject,
     width: "100%",
     height: "100%",
     resizeMode: "cover",
   },
+
+  // Back button — fixed position, does not participate in scroll flow
   backBtn: {
     position: "absolute",
     left: 20,
+    zIndex: 20,
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -389,16 +380,21 @@ const s = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.18)",
     alignItems: "center",
     justifyContent: "center",
-    zIndex: 10,
   },
-  // City identity — centered within the hero rectangle
+
+  // Transparent scroll layer — floats above the fixed image
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    // paddingTop set dynamically to topInset + 56
+  },
+
+  // City identity — in normal flow, sits in the clear zone
   identity: {
-    ...StyleSheet.absoluteFillObject,
     alignItems: "center",
-    justifyContent: "center",
     gap: 6,
     paddingHorizontal: 24,
-    paddingBottom: 20, // Slight downward bias feels more balanced
   },
   pais: {
     fontFamily: "Inter_500Medium",
@@ -409,30 +405,17 @@ const s = StyleSheet.create({
   },
   cidade: {
     fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 44,
+    fontSize: 46,
     color: "#FFFFFF",
-    lineHeight: 50,
+    lineHeight: 52,
     letterSpacing: -0.6,
     textAlign: "center",
   },
 
-  // ── SECTION 2: Content ──
-  // Fills remaining space, scrolls independently of hero
-  contentScroll: {
-    flex: 1,
-    backgroundColor: "#0A0502",
-  },
-  contentContainer: {
-    // No padding here — menu and editorial handle their own padding
-  },
-
-  // Action buttons — normal document flow, cannot overlap hero
+  // Buttons — in normal flow, below the spacer
   menu: {
     paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 28,
     gap: 10,
-    backgroundColor: "#0A0502",
   },
 
   // Glass button base
@@ -441,14 +424,12 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.22)",
     borderRadius: 18,
-    overflow: "hidden",
   },
   glassBtnBright: {
     backgroundColor: "rgba(255,255,255,0.20)",
     borderColor: "rgba(255,255,255,0.38)",
   },
 
-  // 1. Primary
   btnPrimary: {
     borderRadius: 20,
   },
@@ -486,7 +467,6 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
 
-  // 2. Experience
   btnExperience: {
     borderColor: "rgba(201,168,76,0.38)",
   },
@@ -528,7 +508,6 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
   },
 
-  // 3–7. Standard
   btnStandard: {
     borderRadius: 16,
   },
@@ -545,8 +524,6 @@ const s = StyleSheet.create({
     color: "rgba(255,255,255,0.88)",
     flex: 1,
   },
-
-  // Lucky List
   btnLucky: {
     borderColor: "rgba(196,112,74,0.40)",
   },
@@ -561,9 +538,12 @@ const s = StyleSheet.create({
     flex: 1,
   },
 
-  // ── Editorial content ──
+  // Editorial content — cream block, scrolls in naturally
   editorial: {
+    marginTop: 32,
     backgroundColor: C.cream,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
   },
   section: {
     paddingTop: 28,
