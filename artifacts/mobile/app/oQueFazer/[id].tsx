@@ -37,65 +37,101 @@ function getMapImage(cityId: string): ImageSourcePropType {
 // Coordinates are percentages of image width/height — not geographic precision.
 // This is a curated map: markers belong to a neighborhood zone, not a lat/lng.
 //
-// To add a new city: create a separate zone table (e.g. SANTORINI_ZONES).
-// To add new places: only the "localizacao" field is needed — no manual coords.
+// Zone format: { xMin, xMax, yMin, yMax } — visual bounding box on the image,
+// all values as % of image dimensions. Pins are placed at the center of the
+// zone by default. When multiple places share a bairro, they are spread across
+// the zone using an offset pattern so they never overlap.
 //
-// Future Supabase integration: store bairro on the place row; zone table stays here.
+// To add a new city: create a separate zone table (e.g. SANTORINI_ZONES).
+// To add new places: set the "localizacao" to a bairro name — no manual coords.
+// Future Supabase integration: place rows just need a "bairro" field.
 
-type ZoneMap = Record<string, { xPct: number; yPct: number }>;
+interface Zone {
+  xMin: number; xMax: number;
+  yMin: number; yMax: number;
+}
+type ZoneMap = Record<string, Zone>;
 
 const RIO_ZONES: ZoneMap = {
-  // ── Beaches (bottom coastline) ──
-  "Ipanema":          { xPct: 48, yPct: 73 },
-  "Leblon":           { xPct: 41, yPct: 72 },
-  "Arpoador":         { xPct: 55, yPct: 76 },
-  "Copacabana":       { xPct: 62, yPct: 73 },
-  "Leme":             { xPct: 68, yPct: 71 },
-  "Barra da Tijuca":  { xPct: 13, yPct: 73 },
-  "São Conrado":      { xPct: 28, yPct: 79 },
+  // ── Beaches — bottom coastline, horizontal strips ──────────────────────────
+  "Barra da Tijuca":    { xMin:  4, xMax: 23, yMin: 66, yMax: 80 },
+  "São Conrado":        { xMin: 22, xMax: 33, yMin: 71, yMax: 83 },
+  "Leblon":             { xMin: 35, xMax: 45, yMin: 67, yMax: 77 },
+  "Ipanema":            { xMin: 43, xMax: 53, yMin: 67, yMax: 77 },
+  "Arpoador":           { xMin: 52, xMax: 58, yMin: 71, yMax: 79 },
+  "Copacabana":         { xMin: 57, xMax: 67, yMin: 67, yMax: 77 },
+  "Leme":               { xMin: 65, xMax: 72, yMin: 64, yMax: 74 },
 
-  // ── Mountains / parks ──
-  "Corcovado":        { xPct: 36, yPct: 26 },  // "Cristo Redentor" label
-  "Floresta da Tijuca": { xPct: 20, yPct: 30 },
-  "Pedra da Gávea":   { xPct: 34, yPct: 64 },
-  "Morro Dois Irmãos": { xPct: 36, yPct: 60 },
+  // ── Mountains & parks ──────────────────────────────────────────────────────
+  "Corcovado":          { xMin: 31, xMax: 42, yMin: 19, yMax: 34 }, // Cristo Redentor
+  "Floresta da Tijuca": { xMin: 13, xMax: 27, yMin: 21, yMax: 38 },
+  "Pedra da Gávea":     { xMin: 29, xMax: 38, yMin: 57, yMax: 70 },
+  "Morro Dois Irmãos":  { xMin: 32, xMax: 40, yMin: 53, yMax: 64 },
 
-  // ── South Zone (Zona Sul) ──
-  "Urca":             { xPct: 80, yPct: 55 },  // Pão de Açúcar area
-  "Botafogo":         { xPct: 60, yPct: 47 },
-  "Flamengo":         { xPct: 68, yPct: 47 },
-  "Catete":           { xPct: 68, yPct: 42 },
-  "Glória":           { xPct: 69, yPct: 38 },
-  "Jardim Botânico":  { xPct: 46, yPct: 57 },
-  "Lagoa":            { xPct: 51, yPct: 59 },
-  "Gávea":            { xPct: 45, yPct: 48 },
-  "Laranjeiras":      { xPct: 63, yPct: 41 },
+  // ── Zona Sul ───────────────────────────────────────────────────────────────
+  "Urca":               { xMin: 74, xMax: 88, yMin: 47, yMax: 62 }, // Pão de Açúcar
+  "Botafogo":           { xMin: 54, xMax: 66, yMin: 41, yMax: 54 },
+  "Flamengo":           { xMin: 63, xMax: 72, yMin: 41, yMax: 52 },
+  "Catete":             { xMin: 64, xMax: 72, yMin: 36, yMax: 46 },
+  "Glória":             { xMin: 65, xMax: 73, yMin: 31, yMax: 42 },
+  "Jardim Botânico":    { xMin: 42, xMax: 51, yMin: 51, yMax: 63 },
+  "Lagoa":              { xMin: 47, xMax: 56, yMin: 53, yMax: 65 },
+  "Gávea":              { xMin: 41, xMax: 50, yMin: 42, yMax: 54 },
+  "Laranjeiras":        { xMin: 58, xMax: 67, yMin: 35, yMax: 46 },
 
-  // ── Santa Teresa & Lapa ──
-  "Santa Teresa":     { xPct: 55, yPct: 30 },
-  "Lapa":             { xPct: 63, yPct: 40 },  // "LAPA" label on map
+  // ── Santa Teresa & Lapa ────────────────────────────────────────────────────
+  "Santa Teresa":       { xMin: 50, xMax: 61, yMin: 24, yMax: 36 },
+  "Lapa":               { xMin: 58, xMax: 68, yMin: 34, yMax: 46 }, // "LAPA" label
 
-  // ── Centro & surroundings ──
-  "Centro":           { xPct: 76, yPct: 24 },  // near "Museu do Amanhã" label
-  "Saúde":            { xPct: 79, yPct: 20 },
-  "Gamboa":           { xPct: 77, yPct: 21 },
-  "Caju":             { xPct: 80, yPct: 17 },
+  // ── Centro & port area ─────────────────────────────────────────────────────
+  "Centro":             { xMin: 71, xMax: 83, yMin: 17, yMax: 30 }, // Museu do Amanhã
+  "Saúde":              { xMin: 74, xMax: 83, yMin: 13, yMax: 23 },
+  "Gamboa":             { xMin: 73, xMax: 81, yMin: 15, yMax: 24 },
 
-  // ── North Zone (Zona Norte) ──
-  "Maracanã":         { xPct: 51, yPct: 19 },
-  "Tijuca":           { xPct: 44, yPct: 22 },
-  "São Cristóvão":    { xPct: 63, yPct: 24 },
+  // ── Zona Norte ─────────────────────────────────────────────────────────────
+  "Maracanã":           { xMin: 46, xMax: 57, yMin: 12, yMax: 24 },
+  "Tijuca":             { xMin: 39, xMax: 50, yMin: 15, yMax: 27 },
+  "São Cristóvão":      { xMin: 58, xMax: 70, yMin: 17, yMax: 28 },
 
-  // ── West Zone ──
-  "Recreio":          { xPct: 5,  yPct: 67 },
-  "Parque Olímpico":  { xPct: 10, yPct: 58 },
+  // ── Zona Oeste ─────────────────────────────────────────────────────────────
+  "Recreio":            { xMin:  1, xMax: 10, yMin: 60, yMax: 72 },
+  "Parque Olímpico":    { xMin:  6, xMax: 16, yMin: 50, yMax: 63 },
 };
 
-// Helper: resolve a place's pin position from its bairro zone.
-// Falls back to map center if the bairro isn't defined yet.
-function zone(cityId: string, bairro: string): { xPct: number; yPct: number } {
-  const table = cityId === "rio" ? RIO_ZONES : RIO_ZONES;
-  return table[bairro] ?? { xPct: 50, yPct: 50 };
+// Offset pattern for multiple pins inside the same zone.
+// Each entry is a fraction of the zone's width/height, applied from center.
+// Pattern ensures no two pins land on the same spot up to 6 places per bairro.
+const ZONE_OFFSETS = [
+  { dx:  0.00, dy:  0.00 },  // 1st → zone center
+  { dx:  0.28, dy: -0.20 },  // 2nd → upper-right quadrant
+  { dx: -0.28, dy:  0.20 },  // 3rd → lower-left quadrant
+  { dx:  0.28, dy:  0.22 },  // 4th → lower-right quadrant
+  { dx: -0.28, dy: -0.22 },  // 5th → upper-left quadrant
+  { dx:  0.00, dy:  0.28 },  // 6th → bottom-center
+];
+
+// Resolve pin coordinates for a place.
+//   bairro       — neighborhood name matching a key in the zone table
+//   indexInZone  — 0-based rank of this place among others in the same bairro
+//                  (pass 0 when each bairro has only one place)
+function resolvePin(
+  cityId: string,
+  bairro: string,
+  indexInZone: number,
+): { xPct: number; yPct: number } {
+  const zones: ZoneMap = RIO_ZONES; // extend with other cities here
+  const z = zones[bairro] ?? { xMin: 45, xMax: 55, yMin: 45, yMax: 55 };
+
+  const cx = (z.xMin + z.xMax) / 2;
+  const cy = (z.yMin + z.yMax) / 2;
+  const zw = z.xMax - z.xMin;
+  const zh = z.yMax - z.yMin;
+
+  const off = ZONE_OFFSETS[indexInZone % ZONE_OFFSETS.length];
+  return {
+    xPct: Math.round(cx + off.dx * zw),
+    yPct: Math.round(cy + off.dy * zh),
+  };
 }
 
 // ── Place data ───────────────────────────────────────────────────────────────
@@ -110,6 +146,10 @@ interface Place extends MapPlace {
 // "o_que_fazer" → this screen  |  "comer" → Comer bem  |  "ficar" → Ficar bem
 // Pin positions come from the zone table above — not hardcoded per-place.
 
+// Each place calls resolvePin(cityId, bairro, indexInZone).
+// indexInZone = 0 when it's the only place in that bairro.
+// If two places share a bairro, use 0 and 1 — they'll be offset within the zone.
+
 const LUGARES: Record<string, Place[]> = {
   rio: [
     {
@@ -120,7 +160,7 @@ const LUGARES: Record<string, Place[]> = {
       descricao:
         "O encontro perfeito entre o mar e a alma carioca. Cheia de vida do nascer ao pôr do sol.",
       image: require("../../assets/images/ipanema.png"),
-      ...zone("rio", "Ipanema"),
+      ...resolvePin("rio", "Ipanema", 0),
     },
     {
       id: "2",
@@ -130,7 +170,7 @@ const LUGARES: Record<string, Place[]> = {
       descricao:
         "A sétima maravilha do mundo moderna abraça o Rio de braços abertos. A vista do topo para a Guanabara é inesquecível.",
       image: require("../../assets/images/cristo.png"),
-      ...zone("rio", "Corcovado"),
+      ...resolvePin("rio", "Corcovado", 0),
     },
     {
       id: "3",
@@ -140,7 +180,7 @@ const LUGARES: Record<string, Place[]> = {
       descricao:
         "Dois picos, dois bondilhos e uma das vistas mais dramáticas do planeta. O Rio em panorama completo.",
       image: require("../../assets/images/pao-acucar.png"),
-      ...zone("rio", "Urca"),
+      ...resolvePin("rio", "Urca", 0),
     },
     {
       id: "4",
@@ -150,7 +190,7 @@ const LUGARES: Record<string, Place[]> = {
       descricao:
         "Ruelas históricas onde cariocas se reúnem ao pôr do sol para petiscos e cerveja gelada.",
       image: require("../../assets/images/secret1.png"),
-      ...zone("rio", "Centro"),
+      ...resolvePin("rio", "Centro", 0),
     },
     {
       id: "5",
@@ -160,7 +200,7 @@ const LUGARES: Record<string, Place[]> = {
       descricao:
         "Mosaico de azulejos de mais de 60 países, criado por Jorge Selarón ao longo de décadas.",
       image: require("../../assets/images/secret2.png"),
-      ...zone("rio", "Lapa"),
+      ...resolvePin("rio", "Lapa", 0),
     },
   ],
 };
