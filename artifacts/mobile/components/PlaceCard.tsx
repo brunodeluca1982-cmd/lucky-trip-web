@@ -11,11 +11,15 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Tag } from "./Tag";
 import Colors from "@/constants/colors";
+import { BookmarkButton } from "@/components/BookmarkButton";
+import type { SavedCategory } from "@/context/GuiaContext";
 
 const C = Colors.light;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 interface PlaceCardProps {
+  id?: string;
+  saveCategoria?: SavedCategory;
   titulo: string;
   localizacao?: string;
   categoria?: string;
@@ -26,6 +30,8 @@ interface PlaceCardProps {
 }
 
 export function PlaceCard({
+  id,
+  saveCategoria,
   titulo,
   localizacao,
   categoria,
@@ -48,6 +54,8 @@ export function PlaceCard({
       ? cardWidth * 0.72
       : cardWidth * 1.18;
 
+  const showBookmark = !!id && !!saveCategoria && !!localizacao;
+
   if (variant === "secret") {
     return (
       <Pressable style={[styles.secretCard, { width: SCREEN_WIDTH - 48 }]}>
@@ -61,6 +69,19 @@ export function PlaceCard({
           <Text style={styles.secretTitle}>{titulo}</Text>
           {descricao ? <Text style={styles.secretDesc}>{descricao}</Text> : null}
         </View>
+        {showBookmark && (
+          <View style={styles.secretBookmark}>
+            <BookmarkButton
+              item={{
+                id: id!,
+                titulo,
+                localizacao: localizacao!,
+                image,
+                categoria: saveCategoria!,
+              }}
+            />
+          </View>
+        )}
       </Pressable>
     );
   }
@@ -88,6 +109,19 @@ export function PlaceCard({
           {titulo}
         </Text>
       </View>
+      {showBookmark && (
+        <View style={styles.bookmark}>
+          <BookmarkButton
+            item={{
+              id: id!,
+              titulo,
+              localizacao: localizacao!,
+              image,
+              categoria: saveCategoria!,
+            }}
+          />
+        </View>
+      )}
     </Pressable>
   );
 }
@@ -134,6 +168,11 @@ const styles = StyleSheet.create({
     color: C.white,
     lineHeight: 21,
   },
+  bookmark: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+  },
   secretCard: {
     borderRadius: 18,
     overflow: "hidden",
@@ -169,5 +208,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: C.warmGray,
     lineHeight: 18,
+  },
+  secretBookmark: {
+    position: "absolute",
+    top: 10,
+    right: 10,
   },
 });

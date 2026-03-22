@@ -10,19 +10,21 @@ import {
 import { Dimensions } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Colors from "@/constants/colors";
+import { BookmarkButton } from "@/components/BookmarkButton";
 
 const C = Colors.light;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CARD_W = SCREEN_WIDTH * 0.52;
 
 interface RestauranteCardProps {
+  id?: string;
   nome: string;
   bairro: string;
   categoria: string;
   image: ImageSourcePropType;
 }
 
-export function RestauranteCard({ nome, bairro, categoria, image }: RestauranteCardProps) {
+export function RestauranteCard({ id, nome, bairro, categoria, image }: RestauranteCardProps) {
   return (
     <Pressable
       style={({ pressed }) => [
@@ -43,6 +45,13 @@ export function RestauranteCard({ nome, bairro, categoria, image }: RestauranteC
         </Text>
         <Text style={styles.bairro}>{bairro}</Text>
       </View>
+      {id && (
+        <View style={styles.bookmark}>
+          <BookmarkButton
+            item={{ id, titulo: nome, localizacao: bairro, image, categoria: "restaurante" }}
+          />
+        </View>
+      )}
     </Pressable>
   );
 }
@@ -97,5 +106,10 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 11,
     color: "rgba(255,255,255,0.62)",
+  },
+  bookmark: {
+    position: "absolute",
+    top: 10,
+    right: 10,
   },
 });

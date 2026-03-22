@@ -10,12 +10,14 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Colors from "@/constants/colors";
+import { BookmarkButton } from "@/components/BookmarkButton";
 
 const C = Colors.light;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CARD_W = SCREEN_WIDTH * 0.58;
 
 interface HotelCardProps {
+  id?: string;
   nome: string;
   localizacao: string;
   tipo: string;
@@ -28,7 +30,7 @@ const TIPO_COLORS: Record<string, string> = {
   Conforto: "#C4704A",
 };
 
-export function HotelCard({ nome, localizacao, tipo, image }: HotelCardProps) {
+export function HotelCard({ id, nome, localizacao, tipo, image }: HotelCardProps) {
   const tipoColor = TIPO_COLORS[tipo] ?? C.terracotta;
 
   return (
@@ -55,6 +57,13 @@ export function HotelCard({ nome, localizacao, tipo, image }: HotelCardProps) {
         </Text>
         <Text style={styles.localizacao}>{localizacao}</Text>
       </View>
+      {id && (
+        <View style={styles.bookmark}>
+          <BookmarkButton
+            item={{ id, titulo: nome, localizacao, image, categoria: "hotel" }}
+          />
+        </View>
+      )}
     </Pressable>
   );
 }
@@ -87,7 +96,7 @@ const styles = StyleSheet.create({
   tipoContainer: {
     position: "absolute",
     top: 12,
-    right: 12,
+    left: 12,
   },
   tipoBadge: {
     borderRadius: 20,
@@ -118,5 +127,10 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 11,
     color: "rgba(255,255,255,0.65)",
+  },
+  bookmark: {
+    position: "absolute",
+    top: 10,
+    right: 10,
   },
 });

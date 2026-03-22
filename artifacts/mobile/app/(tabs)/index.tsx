@@ -66,6 +66,7 @@ export default function HomeScreen() {
           {destaques.map((d) => (
             <DestaquesCard
               key={d.id}
+              id={d.id}
               titulo={d.titulo}
               localizacao={d.localizacao}
               descricao={d.descricao}
@@ -89,6 +90,8 @@ export default function HomeScreen() {
               {currentItems.map((item) => (
                 <PlaceCard
                   key={item.id}
+                  id={item.id}
+                  saveCategoria="oQueFazer"
                   titulo={item.titulo}
                   localizacao={item.localizacao}
                   image={item.image}
@@ -111,6 +114,7 @@ export default function HomeScreen() {
             {restaurantes.map((r) => (
               <RestauranteCard
                 key={r.id}
+                id={r.id}
                 nome={r.nome}
                 bairro={r.bairro}
                 categoria={r.categoria}
@@ -132,6 +136,7 @@ export default function HomeScreen() {
             {hoteis.map((h) => (
               <HotelCard
                 key={h.id}
+                id={h.id}
                 nome={h.nome}
                 localizacao={h.localizacao}
                 tipo={h.tipo}
@@ -152,6 +157,8 @@ export default function HomeScreen() {
           {segredos.map((s) => (
             <PlaceCard
               key={s.id}
+              id={s.id}
+              saveCategoria="oQueFazer"
               titulo={s.titulo}
               localizacao={s.localizacao}
               descricao={s.descricao}

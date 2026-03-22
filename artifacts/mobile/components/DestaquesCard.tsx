@@ -12,23 +12,25 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 import type { DestaqueType } from "@/data/mockData";
 import Colors from "@/constants/colors";
+import { BookmarkButton } from "@/components/BookmarkButton";
+import type { SavedCategory } from "@/context/GuiaContext";
 
 const C = Colors.light;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CARD_W = SCREEN_WIDTH - 48;
 
 interface CardProps {
+  id: string;
   titulo: string;
   localizacao: string;
   descricao: string;
   image: ImageSourcePropType;
+  categoria: SavedCategory;
   onPress?: () => void;
 }
 
 // ─── Layout A: O que fazer ─────────────────────────────────────────────────
-// Tall cinematic frame. Category is a numbered editorial counter.
-// Gradient lives only in the bottom 55%. Photo breathes at top.
-function OQueFazerCard({ titulo, localizacao, descricao, image }: CardProps) {
+function OQueFazerCard({ id, titulo, localizacao, descricao, image, categoria }: CardProps) {
   return (
     <Pressable
       style={({ pressed }) => [
@@ -43,10 +45,15 @@ function OQueFazerCard({ titulo, localizacao, descricao, image }: CardProps) {
         style={styles.gradientBottom}
       />
 
-      {/* Top-right editorial counter */}
+      {/* Top-left editorial counter */}
       <View style={la.counter}>
         <Text style={la.counterNum}>01</Text>
         <View style={la.counterLine} />
+      </View>
+
+      {/* Bookmark — top right */}
+      <View style={styles.bookmarkTopRight}>
+        <BookmarkButton item={{ id, titulo, localizacao, image, categoria }} />
       </View>
 
       {/* Bottom block */}
@@ -79,8 +86,8 @@ const la = StyleSheet.create({
   counter: {
     position: "absolute",
     top: 18,
-    right: 18,
-    alignItems: "flex-end",
+    left: 18,
+    alignItems: "flex-start",
     gap: 4,
   },
   counterNum: {
@@ -137,9 +144,7 @@ const la = StyleSheet.create({
 });
 
 // ─── Layout B: Restaurante ────────────────────────────────────────────────
-// More intimate height. Warm amber gradient tint.
-// Category: thin horizontal rule that sits above the title — magazine section divider.
-function RestauranteCard({ titulo, localizacao, descricao, image }: CardProps) {
+function RestauranteCard({ id, titulo, localizacao, descricao, image, categoria }: CardProps) {
   return (
     <Pressable
       style={({ pressed }) => [
@@ -148,7 +153,6 @@ function RestauranteCard({ titulo, localizacao, descricao, image }: CardProps) {
       ]}
     >
       <Image source={image} style={styles.image} />
-      {/* Warm amber tint layer */}
       <View style={lb.tintLayer} />
       <LinearGradient
         colors={["transparent", "rgba(40,18,4,0.5)", "rgba(40,18,4,0.94)"]}
@@ -156,12 +160,17 @@ function RestauranteCard({ titulo, localizacao, descricao, image }: CardProps) {
         style={styles.gradientBottom}
       />
 
-      {/* Top-right label: subtle, italic feel */}
+      {/* Top-right label */}
       <View style={lb.topRight}>
         <Text style={lb.topRightText}>Restaurante</Text>
       </View>
 
-      {/* Bottom block with rule separator */}
+      {/* Bookmark — top left */}
+      <View style={styles.bookmarkTopLeft}>
+        <BookmarkButton item={{ id, titulo, localizacao, image, categoria }} />
+      </View>
+
+      {/* Bottom block */}
       <View style={lb.bottom}>
         <View style={lb.rule} />
         <Text style={lb.titulo}>{titulo}</Text>
@@ -196,7 +205,7 @@ const lb = StyleSheet.create({
   },
   topRight: {
     position: "absolute",
-    top: 16,
+    top: 18,
     right: 18,
   },
   topRightText: {
@@ -245,9 +254,7 @@ const lb = StyleSheet.create({
 });
 
 // ─── Layout C: Hotel ──────────────────────────────────────────────────────
-// Expansive tall card. Deep vignette. Title is massive.
-// Category: a paired `· Hotel ·` centered motif at top.
-function HotelCard({ titulo, localizacao, descricao, image }: CardProps) {
+function HotelCard({ id, titulo, localizacao, descricao, image, categoria }: CardProps) {
   return (
     <Pressable
       style={({ pressed }) => [
@@ -256,7 +263,6 @@ function HotelCard({ titulo, localizacao, descricao, image }: CardProps) {
       ]}
     >
       <Image source={image} style={styles.image} />
-      {/* Deep vignette: top + bottom */}
       <LinearGradient
         colors={["rgba(12,18,32,0.55)", "transparent"]}
         locations={[0, 0.4]}
@@ -271,6 +277,11 @@ function HotelCard({ titulo, localizacao, descricao, image }: CardProps) {
       {/* Top category centered */}
       <View style={lc.topCenter}>
         <Text style={lc.categoryText}>· HOTEL ·</Text>
+      </View>
+
+      {/* Bookmark — top right */}
+      <View style={styles.bookmarkTopRight}>
+        <BookmarkButton item={{ id, titulo, localizacao, image, categoria }} />
       </View>
 
       {/* Bottom block */}
@@ -357,10 +368,7 @@ const lc = StyleSheet.create({
 });
 
 // ─── Layout D: Lucky Pick ─────────────────────────────────────────────────
-// A colored accent stripe at the very top edge (brand mark).
-// Smaller height, warmer mood.
-// Category sits beside a star, all in amber.
-function LuckyCard({ titulo, localizacao, descricao, image }: CardProps) {
+function LuckyCard({ id, titulo, localizacao, descricao, image, categoria }: CardProps) {
   return (
     <Pressable
       style={({ pressed }) => [
@@ -382,6 +390,11 @@ function LuckyCard({ titulo, localizacao, descricao, image }: CardProps) {
       <View style={ld.topLabel}>
         <Feather name="star" size={10} color={C.gold} />
         <Text style={ld.topLabelText}>Lucky Pick</Text>
+      </View>
+
+      {/* Bookmark — top right */}
+      <View style={styles.bookmarkTopRight}>
+        <BookmarkButton item={{ id, titulo, localizacao, image, categoria }} />
       </View>
 
       {/* Bottom block */}
@@ -487,10 +500,21 @@ const styles = StyleSheet.create({
     top: 0,
     height: "45%",
   },
+  bookmarkTopRight: {
+    position: "absolute",
+    top: 14,
+    right: 14,
+  },
+  bookmarkTopLeft: {
+    position: "absolute",
+    top: 14,
+    left: 14,
+  },
 });
 
 // ─── Public component ──────────────────────────────────────────────────────
 interface DestaquesCardProps {
+  id: string;
   titulo: string;
   localizacao: string;
   descricao: string;
@@ -499,15 +523,16 @@ interface DestaquesCardProps {
 }
 
 export function DestaquesCard(props: DestaquesCardProps) {
-  const { tipo, ...rest } = props;
+  const { tipo, id, ...rest } = props;
+  const categoria = tipo as SavedCategory;
   switch (tipo) {
     case "oQueFazer":
-      return <OQueFazerCard {...rest} />;
+      return <OQueFazerCard id={id} categoria={categoria} {...rest} />;
     case "restaurante":
-      return <RestauranteCard {...rest} />;
+      return <RestauranteCard id={id} categoria={categoria} {...rest} />;
     case "hotel":
-      return <HotelCard {...rest} />;
+      return <HotelCard id={id} categoria={categoria} {...rest} />;
     case "lucky":
-      return <LuckyCard {...rest} />;
+      return <LuckyCard id={id} categoria={categoria} {...rest} />;
   }
 }
