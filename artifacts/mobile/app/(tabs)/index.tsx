@@ -55,15 +55,16 @@ export default function HomeScreen() {
         {/* DESTAQUES */}
         <View style={styles.section}>
           <SectionHeader
-            title={`Destaques do Rio`}
-            subtitle="O melhor da cidade, em um só lugar."
+            title="Destaques do destino"
+            subtitle="Uma seleção editorial dos melhores momentos."
           />
           {destaques.map((d) => (
             <DestaquesCard
               key={d.id}
               titulo={d.titulo}
               localizacao={d.localizacao}
-              categoria={d.categoria}
+              descricao={d.descricao}
+              tipo={d.tipo}
               image={d.image}
             />
           ))}

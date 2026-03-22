@@ -22,20 +22,40 @@ export const heroDestinos = [
   },
 ];
 
+export type DestaqueType = "oQueFazer" | "restaurante" | "hotel" | "lucky";
+
 export const destaques = [
   {
     id: "1",
-    titulo: "Cristo Redentor",
-    localizacao: "Alto da Boa Vista",
-    categoria: "Monumento",
-    image: require("../assets/images/cristo.png"),
+    titulo: "Praia de Ipanema",
+    localizacao: "Ipanema",
+    descricao: "O encontro perfeito entre o mar e a alma carioca.",
+    tipo: "oQueFazer" as DestaqueType,
+    image: require("../assets/images/ipanema.png"),
   },
   {
     id: "2",
-    titulo: "Pão de Açúcar",
-    localizacao: "Urca",
-    categoria: "Natureza",
-    image: require("../assets/images/pao-acucar.png"),
+    titulo: "Confeitaria Colombo",
+    localizacao: "Centro Histórico",
+    descricao: "Um século de elegância servido em cada xícara.",
+    tipo: "restaurante" as DestaqueType,
+    image: require("../assets/images/restaurante1.png"),
+  },
+  {
+    id: "3",
+    titulo: "Copacabana Palace",
+    localizacao: "Copacabana",
+    descricao: "O endereço mais icônico do Rio, com vista para o mar.",
+    tipo: "hotel" as DestaqueType,
+    image: require("../assets/images/hotel1.png"),
+  },
+  {
+    id: "4",
+    titulo: "Escadaria Selarón",
+    localizacao: "Lapa",
+    descricao: "Arte viva em cada azulejo, curada por décadas de paixão.",
+    tipo: "lucky" as DestaqueType,
+    image: require("../assets/images/secret2.png"),
   },
 ];
 
