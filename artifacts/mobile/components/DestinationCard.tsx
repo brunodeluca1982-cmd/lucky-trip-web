@@ -13,10 +13,10 @@ import Colors from "@/constants/colors";
 
 const C = Colors.light;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const GAP = 8;
-const H_PAD = 24;
+const H_PAD = 12;
+const GAP = 6;
 const CARD_W = (SCREEN_WIDTH - H_PAD * 2 - GAP * 2) / 3;
-const CARD_H = CARD_W * 1.3;
+const CARD_H = CARD_W * 1.35;
 
 interface DestinationCardProps {
   cidade: string;
@@ -38,13 +38,13 @@ export function DestinationCard({ cidade, pais, image, onPress, featured }: Dest
     >
       <Image source={image} style={styles.image} />
       <LinearGradient
-        colors={["transparent", "rgba(0,0,0,0.72)"]}
-        locations={[0.35, 1]}
+        colors={["transparent", "rgba(0,0,0,0.18)", "rgba(0,0,0,0.75)"]}
+        locations={[0.3, 0.6, 1]}
         style={styles.gradient}
       />
       {featured && (
         <View style={styles.featuredBadge}>
-          <Text style={styles.featuredText}>✓</Text>
+          <Text style={styles.featuredCheck}>✓</Text>
         </View>
       )}
       <View style={styles.info}>
@@ -64,12 +64,12 @@ const styles = StyleSheet.create({
     backgroundColor: C.sand,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.14,
+    shadowOpacity: 0.16,
     shadowRadius: 8,
     elevation: 4,
   },
   cardFeatured: {
-    borderWidth: 2,
+    borderWidth: 2.5,
     borderColor: C.white,
   },
   image: {
@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: "65%",
+    height: "70%",
   },
   featuredBadge: {
     position: "absolute",
@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  featuredText: {
+  featuredCheck: {
     fontSize: 11,
     color: C.darkBrown,
     fontWeight: "700",
@@ -105,20 +105,21 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    padding: 8,
-    paddingBottom: 10,
+    padding: 9,
+    paddingBottom: 11,
     gap: 2,
   },
   cidade: {
     fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 12,
+    fontSize: 13,
     color: C.white,
-    lineHeight: 16,
+    lineHeight: 17,
+    letterSpacing: -0.1,
   },
   pais: {
     fontFamily: "Inter_400Regular",
     fontSize: 10,
-    color: "rgba(255,255,255,0.72)",
+    color: "rgba(255,255,255,0.75)",
     lineHeight: 13,
   },
 });

@@ -17,8 +17,8 @@ import { destinos } from "@/data/mockData";
 
 const C = Colors.light;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const H_PAD = 24;
-const GAP = 8;
+const H_PAD = 12;
+const GAP = 6;
 const CARD_W = (SCREEN_WIDTH - H_PAD * 2 - GAP * 2) / 3;
 
 export default function DestinosScreen() {
@@ -38,12 +38,11 @@ export default function DestinosScreen() {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={[
           s.content,
-          { paddingTop: topPad + 8, paddingBottom: bottomPad + 96 },
+          { paddingTop: topPad + 4, paddingBottom: bottomPad + 96 },
         ]}
       >
         {/* ── Header ── */}
         <View style={s.header}>
-          <Text style={s.eyebrow}>Explorar</Text>
           <Text style={s.title}>Destinos</Text>
           <Text style={s.subtitle}>
             Explore lugares selecionados ao redor do mundo
@@ -51,33 +50,22 @@ export default function DestinosScreen() {
         </View>
 
         {/* ── Search ── */}
-        <View style={s.searchWrap}>
-          <View style={s.searchBar}>
-            <Feather name="search" size={16} color={C.warmGray} style={s.searchIcon} />
-            <TextInput
-              style={s.searchInput}
-              placeholder="Buscar destinos"
-              placeholderTextColor={C.warmGray}
-              editable={false}
-              pointerEvents="none"
-            />
-          </View>
+        <View style={s.searchBar}>
+          <Feather name="search" size={16} color={C.warmGray} />
+          <TextInput
+            style={s.searchInput}
+            placeholder="Buscar destinos"
+            placeholderTextColor={C.warmGray}
+            editable={false}
+            pointerEvents="none"
+          />
         </View>
 
-        {/* ── Divider ── */}
-        <View style={s.divider} />
-
-        {/* ── Editorial label ── */}
-        <View style={s.gridHeader}>
-          <Text style={s.gridEyebrow}>Curadoria</Text>
-          <Text style={s.gridTitle}>Lugares selecionados</Text>
-        </View>
-
-        {/* ── 3-column grid ── */}
+        {/* ── Grid ── */}
         <View style={s.grid}>
           {rows.map((row, ri) => (
             <View key={ri} style={s.row}>
-              {row.map((d, ci) => (
+              {row.map((d) => (
                 <DestinationCard
                   key={d.id}
                   cidade={d.cidade}
@@ -92,7 +80,6 @@ export default function DestinosScreen() {
                   }
                 />
               ))}
-              {/* fill empty slots in last row */}
               {row.length < 3 &&
                 Array.from({ length: 3 - row.length }).map((_, i) => (
                   <View key={`empty-${i}`} style={{ width: CARD_W }} />
@@ -122,48 +109,38 @@ const s = StyleSheet.create({
     paddingHorizontal: H_PAD,
   },
   header: {
-    marginBottom: 20,
-    gap: 6,
-  },
-  eyebrow: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 12,
-    color: C.terracotta,
-    letterSpacing: 2,
-    textTransform: "uppercase",
+    paddingHorizontal: 12,
+    marginBottom: 14,
+    gap: 4,
   },
   title: {
     fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 36,
+    fontSize: 32,
     color: C.darkBrown,
-    lineHeight: 42,
-    letterSpacing: -0.5,
+    lineHeight: 38,
+    letterSpacing: -0.3,
   },
   subtitle: {
     fontFamily: "Inter_400Regular",
     fontSize: 14,
     color: C.warmGray,
     lineHeight: 20,
-    maxWidth: 280,
-  },
-  searchWrap: {
-    marginBottom: 0,
   },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 10,
     backgroundColor: C.white,
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 14,
+    marginHorizontal: 12,
+    marginBottom: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
     shadowRadius: 6,
     elevation: 2,
-  },
-  searchIcon: {
-    marginRight: 10,
   },
   searchInput: {
     flex: 1,
@@ -171,28 +148,6 @@ const s = StyleSheet.create({
     fontSize: 15,
     color: C.darkBrown,
     padding: 0,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: C.border,
-    marginVertical: 24,
-  },
-  gridHeader: {
-    marginBottom: 16,
-    gap: 4,
-  },
-  gridEyebrow: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 11,
-    color: C.warmGray,
-    letterSpacing: 2,
-    textTransform: "uppercase",
-  },
-  gridTitle: {
-    fontFamily: "PlayfairDisplay_600SemiBold",
-    fontSize: 22,
-    color: C.darkBrown,
-    lineHeight: 28,
   },
   grid: {
     gap: GAP,
@@ -202,8 +157,9 @@ const s = StyleSheet.create({
     gap: GAP,
   },
   footer: {
-    marginTop: 40,
-    paddingTop: 24,
+    marginTop: 36,
+    marginHorizontal: 12,
+    paddingTop: 20,
     borderTopWidth: 1,
     borderTopColor: C.border,
     alignItems: "center",
@@ -211,7 +167,7 @@ const s = StyleSheet.create({
   },
   footerL: {
     fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 36,
+    fontSize: 32,
     color: C.terracotta,
   },
   footerText: {
@@ -220,6 +176,6 @@ const s = StyleSheet.create({
     color: C.warmGray,
     textAlign: "center",
     lineHeight: 20,
-    maxWidth: 240,
+    maxWidth: 220,
   },
 });
