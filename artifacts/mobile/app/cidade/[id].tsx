@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React from "react";
 import {
   Dimensions,
   Image,
@@ -31,7 +31,9 @@ import { HotelCard } from "@/components/HotelCard";
 const C = Colors.light;
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
-// City-specific short reference for the primary button
+// Hero takes ~45% of screen — enough to showcase the image + city name
+const HERO_H = Math.round(SCREEN_HEIGHT * 0.45);
+
 const ESSENTIALS: Record<string, string> = {
   rio: "do Rio",
   santorini: "de Santorini",
@@ -47,7 +49,6 @@ const ESSENTIALS: Record<string, string> = {
   ilhabela: "de Ilhabela",
 };
 
-// City-specific "experience of the moment"
 const EXPERIENCES: Record<string, string> = {
   rio: "Pôr do sol em Ipanema",
   santorini: "Nascer do sol no Aegeu",
@@ -78,8 +79,8 @@ function GlassButton({
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
-        styles.glassBtn,
-        bright && styles.glassBtnBright,
+        s.glassBtn,
+        bright && s.glassBtnBright,
         style,
         pressed && { opacity: 0.82 },
       ]}
@@ -92,8 +93,6 @@ function GlassButton({
 export default function CidadeScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
-  const scrollRef = useRef<ScrollView>(null);
-  const contentOffsetRef = useRef(0);
 
   const destino = destinos.find((d) => d.id === id) ?? destinos[0];
   const isRio = destino.id === "rio";
@@ -103,144 +102,139 @@ export default function CidadeScreen() {
   const experience = EXPERIENCES[destino.id] ?? "Descoberta local";
   const essentialRef = ESSENTIALS[destino.id] ?? `de ${destino.cidade}`;
 
-  // Scroll past the hero to reveal editorial content
-  function scrollToContent() {
-    scrollRef.current?.scrollTo({ y: SCREEN_HEIGHT - 10, animated: true });
-  }
-
   return (
-    <View style={styles.root}>
+    <View style={s.root}>
       <Stack.Screen options={{ headerShown: false }} />
 
+      {/* ══════════════════════════════════════════════════════
+          SECTION 1 — HERO
+          Fixed height. Contains ONLY: background image + city identity.
+          No buttons, no cards, no overlap.
+      ══════════════════════════════════════════════════════ */}
+      <View style={[s.hero, { height: HERO_H }]}>
+        <Image source={destino.image} style={s.heroImage} />
+
+        {/* Cinematic gradient: subtle top burn, clear middle, deep fade at bottom
+            Bottom fade matches the dark content section below — seamless join */}
+        <LinearGradient
+          colors={[
+            "rgba(10,5,2,0.55)",
+            "rgba(10,5,2,0.08)",
+            "rgba(10,5,2,0.08)",
+            "rgba(10,5,2,0.88)",
+          ]}
+          locations={[0, 0.22, 0.60, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+
+        {/* Back button — absolute, top-left */}
+        <Pressable
+          onPress={() => router.back()}
+          style={[s.backBtn, { top: topInset + 12 }]}
+          hitSlop={8}
+        >
+          <Feather name="arrow-left" size={20} color={C.white} />
+        </Pressable>
+
+        {/* City identity — absolutely centered within the hero rectangle */}
+        <View style={s.identity}>
+          <Text style={s.pais}>{destino.pais}</Text>
+          <Text style={s.cidade}>{destino.cidade}</Text>
+        </View>
+      </View>
+
+      {/* ══════════════════════════════════════════════════════
+          SECTION 2 — CONTENT
+          Starts immediately below the hero. No overlap possible.
+          Dark background matches the hero's bottom fade.
+          Contains all action buttons + editorial content.
+      ══════════════════════════════════════════════════════ */}
       <ScrollView
-        ref={scrollRef}
+        style={s.contentScroll}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: bottomPad + 40 }}
-        scrollEventThrottle={16}
+        contentContainerStyle={[
+          s.contentContainer,
+          { paddingBottom: bottomPad + 40 },
+        ]}
       >
-        {/* ════════════════════════════════════════
-            HERO — full-screen guided menu
-        ════════════════════════════════════════ */}
-        <View style={[styles.hero, { height: SCREEN_HEIGHT }]}>
-          {/* Background image */}
-          <Image source={destino.image} style={styles.heroImage} />
-
-          {/* Cinematic gradient: light burn top → clear middle → deep dark bottom */}
-          <LinearGradient
-            colors={[
-              "rgba(10,5,2,0.52)",
-              "rgba(10,5,2,0.12)",
-              "rgba(10,5,2,0.08)",
-              "rgba(10,5,2,0.78)",
-              "rgba(10,5,2,0.96)",
-            ]}
-            locations={[0, 0.18, 0.42, 0.68, 1]}
-            style={StyleSheet.absoluteFill}
-          />
-
-          {/* Back button */}
-          <Pressable
-            onPress={() => router.back()}
-            style={[styles.backBtn, { top: topInset + 12 }]}
-            hitSlop={8}
-          >
-            <Feather name="arrow-left" size={20} color={C.white} />
-          </Pressable>
-
-          {/* City identity — centered upper area */}
-          <View style={[styles.identity, { paddingTop: topInset + 64 }]}>
-            <Text style={styles.pais}>{destino.pais}</Text>
-            <Text style={styles.cidade}>{destino.cidade}</Text>
-          </View>
-
-          {/* ── Guided menu — bottom section ── */}
-          <View style={styles.menu}>
-            {/* 1. PRIMARY — "Comece por aqui" */}
-            <GlassButton onPress={scrollToContent} bright style={styles.btnPrimary}>
-              <View style={styles.btnPrimaryInner}>
-                <View style={styles.btnPrimaryLeft}>
-                  <Text style={styles.eyebrow}>Comece por aqui</Text>
-                  <Text style={styles.btnPrimaryLabel}>
-                    O essencial {essentialRef}
-                  </Text>
-                </View>
-                <View style={styles.btnPrimaryArrow}>
-                  <Feather name="arrow-right" size={18} color={C.white} />
-                </View>
+        {/* ── Action buttons — normal flow, no absolute positioning ── */}
+        <View style={s.menu}>
+          {/* 1. PRIMARY — "Comece por aqui" */}
+          <GlassButton onPress={() => {}} bright style={s.btnPrimary}>
+            <View style={s.btnPrimaryInner}>
+              <View style={s.btnPrimaryLeft}>
+                <Text style={s.eyebrow}>Comece por aqui</Text>
+                <Text style={s.btnPrimaryLabel}>
+                  O essencial {essentialRef}
+                </Text>
               </View>
-            </GlassButton>
-
-            {/* 2. EXPERIENCE — "Experiência do momento" */}
-            <GlassButton style={styles.btnExperience}>
-              <View style={styles.btnExperienceInner}>
-                <View style={styles.expIconWrap}>
-                  <Text style={styles.expIcon}>✦</Text>
-                </View>
-                <View style={styles.expTexts}>
-                  <Text style={styles.eyebrowGold}>Experiência do momento</Text>
-                  <Text style={styles.btnExperienceLabel}>{experience}</Text>
-                </View>
+              <View style={s.btnPrimaryArrow}>
+                <Feather name="arrow-right" size={18} color={C.white} />
               </View>
-            </GlassButton>
-
-            {/* 3-5. Standard options */}
-            <View style={styles.standardGroup}>
-              <GlassButton
-                style={styles.btnStandard}
-                onPress={() =>
-                  router.push({ pathname: "/oQueFazer/[id]", params: { id: destino.id } })
-                }
-              >
-                <View style={styles.btnStandardInner}>
-                  <Feather name="compass" size={16} color="rgba(255,255,255,0.70)" />
-                  <Text style={styles.btnStandardLabel}>O que fazer</Text>
-                </View>
-              </GlassButton>
-
-              <GlassButton style={styles.btnStandard}>
-                <View style={styles.btnStandardInner}>
-                  <Feather name="coffee" size={16} color="rgba(255,255,255,0.70)" />
-                  <Text style={styles.btnStandardLabel}>Comer bem</Text>
-                </View>
-              </GlassButton>
-
-              <GlassButton style={styles.btnStandard}>
-                <View style={styles.btnStandardInner}>
-                  <Feather name="moon" size={16} color="rgba(255,255,255,0.70)" />
-                  <Text style={styles.btnStandardLabel}>Ficar bem</Text>
-                </View>
-              </GlassButton>
             </View>
+          </GlassButton>
 
-            {/* 6. Lucky List — personal */}
-            <GlassButton style={styles.btnLucky}>
-              <View style={styles.btnStandardInner}>
-                <Text style={styles.luckyIcon}>✦</Text>
-                <Text style={styles.btnLuckyLabel}>Sua Lucky List</Text>
+          {/* 2. EXPERIENCE — "Experiência do momento" */}
+          <GlassButton style={s.btnExperience}>
+            <View style={s.btnExperienceInner}>
+              <View style={s.expIconWrap}>
+                <Text style={s.expIcon}>✦</Text>
               </View>
-            </GlassButton>
-
-            {/* 7. Como chegar — same system as above */}
-            <GlassButton style={styles.btnStandard}>
-              <View style={styles.btnStandardInner}>
-                <Feather name="map-pin" size={16} color="rgba(255,255,255,0.70)" />
-                <Text style={styles.btnStandardLabel}>Como chegar</Text>
+              <View style={s.expTexts}>
+                <Text style={s.eyebrowGold}>Experiência do momento</Text>
+                <Text style={s.btnExperienceLabel}>{experience}</Text>
               </View>
-            </GlassButton>
-          </View>
+            </View>
+          </GlassButton>
 
-          {/* Scroll cue — subtle down arrow */}
-          <Pressable onPress={scrollToContent} style={styles.scrollCue}>
-            <Feather name="chevron-down" size={18} color="rgba(255,255,255,0.35)" />
-          </Pressable>
+          {/* 3–5. Standard category buttons */}
+          <GlassButton
+            style={s.btnStandard}
+            onPress={() =>
+              router.push({ pathname: "/oQueFazer/[id]", params: { id: destino.id } })
+            }
+          >
+            <View style={s.btnStandardInner}>
+              <Feather name="compass" size={16} color="rgba(255,255,255,0.70)" />
+              <Text style={s.btnStandardLabel}>O que fazer</Text>
+            </View>
+          </GlassButton>
+
+          <GlassButton style={s.btnStandard}>
+            <View style={s.btnStandardInner}>
+              <Feather name="coffee" size={16} color="rgba(255,255,255,0.70)" />
+              <Text style={s.btnStandardLabel}>Comer bem</Text>
+            </View>
+          </GlassButton>
+
+          <GlassButton style={s.btnStandard}>
+            <View style={s.btnStandardInner}>
+              <Feather name="moon" size={16} color="rgba(255,255,255,0.70)" />
+              <Text style={s.btnStandardLabel}>Ficar bem</Text>
+            </View>
+          </GlassButton>
+
+          {/* 6. Lucky List */}
+          <GlassButton style={[s.btnStandard, s.btnLucky]}>
+            <View style={s.btnStandardInner}>
+              <Text style={s.luckyIcon}>✦</Text>
+              <Text style={s.btnLuckyLabel}>Sua Lucky List</Text>
+            </View>
+          </GlassButton>
+
+          {/* 7. Como chegar */}
+          <GlassButton style={s.btnStandard}>
+            <View style={s.btnStandardInner}>
+              <Feather name="map-pin" size={16} color="rgba(255,255,255,0.70)" />
+              <Text style={s.btnStandardLabel}>Como chegar</Text>
+            </View>
+          </GlassButton>
         </View>
 
-        {/* ════════════════════════════════════════
-            EDITORIAL CONTENT — scrolls below hero
-        ════════════════════════════════════════ */}
-        <View style={styles.contentRoot}>
-          {/* ── Destaques ── */}
-          <View style={styles.section}>
+        {/* ── Editorial content — cream background below ── */}
+        <View style={s.editorial}>
+          {/* Destaques */}
+          <View style={s.section}>
             <SectionHeader
               title={isRio ? "Destaques do destino" : "Em destaque"}
               subtitle={
@@ -262,10 +256,10 @@ export default function CidadeScreen() {
             ))}
           </View>
 
-          <View style={styles.divider} />
+          <View style={s.divider} />
 
-          {/* ── O que fazer ── */}
-          <View style={styles.section}>
+          {/* O que fazer */}
+          <View style={s.section}>
             <SectionHeader
               title="O que fazer"
               subtitle={`Experiências imperdíveis em ${destino.cidade}.`}
@@ -285,10 +279,10 @@ export default function CidadeScreen() {
             </HorizontalScroll>
           </View>
 
-          <View style={styles.divider} />
+          <View style={s.divider} />
 
-          {/* ── Comer bem ── */}
-          <View style={styles.section}>
+          {/* Comer bem */}
+          <View style={s.section}>
             <SectionHeader
               title="Comer bem"
               subtitle={`Restaurantes com alma em ${destino.cidade}.`}
@@ -307,10 +301,10 @@ export default function CidadeScreen() {
             </HorizontalScroll>
           </View>
 
-          <View style={styles.divider} />
+          <View style={s.divider} />
 
-          {/* ── Ficar bem ── */}
-          <View style={styles.section}>
+          {/* Ficar bem */}
+          <View style={s.section}>
             <SectionHeader
               title="Ficar bem"
               subtitle={`Hospedagem com personalidade em ${destino.cidade}.`}
@@ -329,10 +323,10 @@ export default function CidadeScreen() {
             </HorizontalScroll>
           </View>
 
-          <View style={styles.divider} />
+          <View style={s.divider} />
 
-          {/* ── Segredos locais ── */}
-          <View style={styles.section}>
+          {/* Segredos locais */}
+          <View style={s.section}>
             <SectionHeader
               title="Segredos locais"
               subtitle={`O que poucos sabem sobre ${destino.cidade}.`}
@@ -351,10 +345,10 @@ export default function CidadeScreen() {
             ))}
           </View>
 
-          {/* ── Footer ── */}
-          <View style={styles.footer}>
-            <Text style={styles.footerL}>L.</Text>
-            <Text style={styles.footerText}>
+          {/* Footer */}
+          <View style={s.footer}>
+            <Text style={s.footerL}>L.</Text>
+            <Text style={s.footerText}>
               Curadoria editorial para viajantes que entendem de beleza.
             </Text>
           </View>
@@ -364,17 +358,20 @@ export default function CidadeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+// ── Styles ────────────────────────────────────────────────────────────────────
+
+const s = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: "#0A0502",
   },
 
-  // ── Hero / menu ──
+  // ── SECTION 1: Hero ──
+  // Fixed height, no overflow, contains ONLY image + title
   hero: {
     width: SCREEN_WIDTH,
-    position: "relative",
     overflow: "hidden",
+    position: "relative",
   },
   heroImage: {
     width: "100%",
@@ -394,14 +391,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     zIndex: 10,
   },
-
-  // City identity block — upper portion
+  // City identity — centered within the hero rectangle
   identity: {
-    position: "absolute",
-    left: 0,
-    right: 0,
+    ...StyleSheet.absoluteFillObject,
     alignItems: "center",
+    justifyContent: "center",
     gap: 6,
+    paddingHorizontal: 24,
+    paddingBottom: 20, // Slight downward bias feels more balanced
   },
   pais: {
     fontFamily: "Inter_500Medium",
@@ -412,23 +409,30 @@ const styles = StyleSheet.create({
   },
   cidade: {
     fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 46,
+    fontSize: 44,
     color: "#FFFFFF",
-    lineHeight: 52,
+    lineHeight: 50,
     letterSpacing: -0.6,
     textAlign: "center",
-    paddingHorizontal: 24,
   },
 
-  // Guided menu — bottom portion
+  // ── SECTION 2: Content ──
+  // Fills remaining space, scrolls independently of hero
+  contentScroll: {
+    flex: 1,
+    backgroundColor: "#0A0502",
+  },
+  contentContainer: {
+    // No padding here — menu and editorial handle their own padding
+  },
+
+  // Action buttons — normal document flow, cannot overlap hero
   menu: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
     paddingHorizontal: 20,
-    paddingBottom: 32,
+    paddingTop: 24,
+    paddingBottom: 28,
     gap: 10,
+    backgroundColor: "#0A0502",
   },
 
   // Glass button base
@@ -524,10 +528,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.1,
   },
 
-  // 3-5. Standard group
-  standardGroup: {
-    gap: 10,
-  },
+  // 3–7. Standard
   btnStandard: {
     borderRadius: 16,
   },
@@ -545,10 +546,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // 6. Lucky List
+  // Lucky List
   btnLucky: {
     borderColor: "rgba(196,112,74,0.40)",
-    borderRadius: 16,
   },
   luckyIcon: {
     fontSize: 15,
@@ -561,16 +561,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Scroll cue
-  scrollCue: {
-    position: "absolute",
-    bottom: 140,
-    alignSelf: "center",
-    opacity: 0.6,
-  },
-
-  // ── Editorial content below ──
-  contentRoot: {
+  // ── Editorial content ──
+  editorial: {
     backgroundColor: C.cream,
   },
   section: {
