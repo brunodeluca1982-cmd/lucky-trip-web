@@ -215,11 +215,13 @@ export default function CidadeScreen() {
               </View>
             </GlassButton>
 
-            {/* 7. Utility — "Como chegar" — minimal, last */}
-            <Pressable style={styles.btnUtility} hitSlop={8}>
-              <Text style={styles.btnUtilityLabel}>Como chegar</Text>
-              <Feather name="map-pin" size={13} color="rgba(255,255,255,0.42)" />
-            </Pressable>
+            {/* 7. Como chegar — same system as above */}
+            <GlassButton style={styles.btnStandard}>
+              <View style={styles.btnStandardInner}>
+                <Feather name="map-pin" size={16} color="rgba(255,255,255,0.70)" />
+                <Text style={styles.btnStandardLabel}>Como chegar</Text>
+              </View>
+            </GlassButton>
           </View>
 
           {/* Scroll cue — subtle down arrow */}
@@ -552,21 +554,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "rgba(255,255,255,0.88)",
     flex: 1,
-  },
-
-  // 7. Utility
-  btnUtility: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
-    gap: 6,
-  },
-  btnUtilityLabel: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: "rgba(255,255,255,0.40)",
-    letterSpacing: 0.2,
   },
 
   // Scroll cue
