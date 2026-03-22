@@ -60,9 +60,9 @@ const LUGARES: Record<string, Place[]> = {
       descricao:
         "O encontro perfeito entre o mar e a alma carioca. Cheia de vida do nascer ao pôr do sol.",
       image: require("../../assets/images/ipanema.png"),
-      // Ipanema beach — lower-center of the illustrated map
-      xPct: 46,
-      yPct: 70,
+      // "Ipanema" label visible at lower-center coastline of the illustrated map
+      xPct: 48,
+      yPct: 74,
     },
     {
       id: "2",
@@ -72,9 +72,9 @@ const LUGARES: Record<string, Place[]> = {
       descricao:
         "A sétima maravilha do mundo moderna abraça o Rio de braços abertos. A vista do topo para a Guanabara é inesquecível.",
       image: require("../../assets/images/cristo.png"),
-      // Cristo Redentor on Corcovado mountain — center of the illustrated map
-      xPct: 37,
-      yPct: 37,
+      // "Cristo Redentor" label visible on the mountain, center-left of the illustrated map
+      xPct: 36,
+      yPct: 26,
     },
     {
       id: "3",
@@ -84,9 +84,9 @@ const LUGARES: Record<string, Place[]> = {
       descricao:
         "Dois picos, dois bondilhos e uma das vistas mais dramáticas do planeta. O Rio em panorama completo.",
       image: require("../../assets/images/pao-acucar.png"),
-      // Pão de Açúcar — far right of the illustrated map, coastal peak
-      xPct: 79,
-      yPct: 52,
+      // "Pão de Açúcar" label visible at the far-right coastal peak of the illustrated map
+      xPct: 82,
+      yPct: 55,
     },
     {
       id: "4",
@@ -96,9 +96,9 @@ const LUGARES: Record<string, Place[]> = {
       descricao:
         "Ruelas históricas onde cariocas se reúnem ao pôr do sol para petiscos e cerveja gelada.",
       image: require("../../assets/images/secret1.png"),
-      // Centro area, near Laranjeiras / Glória
-      xPct: 70,
-      yPct: 35,
+      // Centro Histórico — near "Museu do Amanhã" label, upper far-right of the illustrated map
+      xPct: 79,
+      yPct: 22,
     },
     {
       id: "5",
@@ -108,9 +108,9 @@ const LUGARES: Record<string, Place[]> = {
       descricao:
         "Mosaico de azulejos de mais de 60 países, criado por Jorge Selarón ao longo de décadas.",
       image: require("../../assets/images/secret2.png"),
-      // Lapa neighborhood — center-right of map
-      xPct: 64,
-      yPct: 44,
+      // "LAPA" label visible center-right of the illustrated map
+      xPct: 63,
+      yPct: 40,
     },
   ],
 };
