@@ -1,3 +1,98 @@
+export interface Destino {
+  id: string;
+  cidade: string;
+  pais: string;
+  descricao: string;
+  image: any;
+}
+
+export const destinos: Destino[] = [
+  {
+    id: "rio",
+    cidade: "Rio de Janeiro",
+    pais: "Brasil",
+    descricao: "A cidade maravilhosa — praias douradas, florestas urbanas e o carnaval mais famoso do mundo.",
+    image: require("../assets/images/hero-rio.png"),
+  },
+  {
+    id: "santorini",
+    cidade: "Santorini",
+    pais: "Grécia",
+    descricao: "Ilhas brancas sobre o Mar Egeu — pôr-do-sol em Oia que não se esquece.",
+    image: require("../assets/images/hero-santorini.png"),
+  },
+  {
+    id: "kyoto",
+    cidade: "Kyoto",
+    pais: "Japão",
+    descricao: "Templos milenares, cerejeiras em flor e a alma mais pura da cultura japonesa.",
+    image: require("../assets/images/hero-kyoto.png"),
+  },
+  {
+    id: "lisboa",
+    cidade: "Lisboa",
+    pais: "Portugal",
+    descricao: "Fado, pastéis de nata e becos iluminados à beira do Tejo.",
+    image: require("../assets/images/secret2.png"),
+  },
+  {
+    id: "buenosaires",
+    cidade: "Buenos Aires",
+    pais: "Argentina",
+    descricao: "Tango, arquitetura europeia e os melhores cortes de carne do continente.",
+    image: require("../assets/images/hotel2.png"),
+  },
+  {
+    id: "floripa",
+    cidade: "Florianópolis",
+    pais: "Brasil",
+    descricao: "A ilha da magia — 42 praias para todos os estilos e humores.",
+    image: require("../assets/images/ipanema.png"),
+  },
+  {
+    id: "paraty",
+    cidade: "Paraty",
+    pais: "Brasil",
+    descricao: "Centro histórico colonial à beira da Baía da Ilha Grande.",
+    image: require("../assets/images/lapa.png"),
+  },
+  {
+    id: "gramado",
+    cidade: "Gramado",
+    pais: "Brasil",
+    descricao: "Charme europeu encravado entre as montanhas gaúchas.",
+    image: require("../assets/images/hotel1.png"),
+  },
+  {
+    id: "miami",
+    cidade: "Miami",
+    pais: "Estados Unidos",
+    descricao: "Arte, design, sol e a energia única de South Beach.",
+    image: require("../assets/images/pao-acucar.png"),
+  },
+  {
+    id: "paris",
+    cidade: "Paris",
+    pais: "França",
+    descricao: "A capital do romance, da moda e da gastronomia mais refinada do mundo.",
+    image: require("../assets/images/restaurante1.png"),
+  },
+  {
+    id: "bali",
+    cidade: "Bali",
+    pais: "Indonésia",
+    descricao: "Templos entre arrozais, ondas perfeitas e a espiritualidade do povo balinês.",
+    image: require("../assets/images/restaurante2.png"),
+  },
+  {
+    id: "ilhabela",
+    cidade: "Ilhabela",
+    pais: "Brasil",
+    descricao: "Paraíso ecológico com cachoeiras, praias selvagens e ventos favoráveis.",
+    image: require("../assets/images/secret1.png"),
+  },
+];
+
 export const heroDestinos = [
   {
     id: "1",

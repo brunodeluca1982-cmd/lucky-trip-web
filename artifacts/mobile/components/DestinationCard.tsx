@@ -1,0 +1,124 @@
+import React from "react";
+import {
+  Dimensions,
+  Image,
+  ImageSourcePropType,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import Colors from "@/constants/colors";
+
+const C = Colors.light;
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const GAP = 8;
+const H_PAD = 24;
+const CARD_W = (SCREEN_WIDTH - H_PAD * 2 - GAP * 2) / 3;
+const CARD_H = CARD_W * 1.3;
+
+interface DestinationCardProps {
+  cidade: string;
+  pais: string;
+  image: ImageSourcePropType;
+  onPress: () => void;
+  featured?: boolean;
+}
+
+export function DestinationCard({ cidade, pais, image, onPress, featured }: DestinationCardProps) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.card,
+        featured && styles.cardFeatured,
+        pressed && { opacity: 0.88, transform: [{ scale: 0.96 }] },
+      ]}
+    >
+      <Image source={image} style={styles.image} />
+      <LinearGradient
+        colors={["transparent", "rgba(0,0,0,0.72)"]}
+        locations={[0.35, 1]}
+        style={styles.gradient}
+      />
+      {featured && (
+        <View style={styles.featuredBadge}>
+          <Text style={styles.featuredText}>✓</Text>
+        </View>
+      )}
+      <View style={styles.info}>
+        <Text style={styles.cidade} numberOfLines={1}>{cidade}</Text>
+        <Text style={styles.pais} numberOfLines={1}>{pais}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: {
+    width: CARD_W,
+    height: CARD_H,
+    borderRadius: 14,
+    overflow: "hidden",
+    backgroundColor: C.sand,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.14,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  cardFeatured: {
+    borderWidth: 2,
+    borderColor: C.white,
+  },
+  image: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+  },
+  gradient: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: "65%",
+  },
+  featuredBadge: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: C.white,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  featuredText: {
+    fontSize: 11,
+    color: C.darkBrown,
+    fontWeight: "700",
+  },
+  info: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 8,
+    paddingBottom: 10,
+    gap: 2,
+  },
+  cidade: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 12,
+    color: C.white,
+    lineHeight: 16,
+  },
+  pais: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: "rgba(255,255,255,0.72)",
+    lineHeight: 13,
+  },
+});
