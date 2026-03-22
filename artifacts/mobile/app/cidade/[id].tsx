@@ -185,7 +185,12 @@ export default function CidadeScreen() {
 
             {/* 3-5. Standard options */}
             <View style={styles.standardGroup}>
-              <GlassButton style={styles.btnStandard}>
+              <GlassButton
+                style={styles.btnStandard}
+                onPress={() =>
+                  router.push({ pathname: "/oQueFazer/[id]", params: { id: destino.id } })
+                }
+              >
                 <View style={styles.btnStandardInner}>
                   <Feather name="compass" size={16} color="rgba(255,255,255,0.70)" />
                   <Text style={styles.btnStandardLabel}>O que fazer</Text>
