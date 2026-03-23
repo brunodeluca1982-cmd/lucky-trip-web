@@ -328,3 +328,95 @@ export const segredos = [
     image: require("../assets/images/secret2.png"),
   },
 ];
+
+// ── Curados para você ──────────────────────────────────────────────────────────
+export const curadoPara = [
+  {
+    id: "cp1",
+    titulo: "Melhor tarde do Arpoador",
+    localizacao: "Arpoador",
+    image: require("../assets/images/ipanema.png"),
+  },
+  {
+    id: "cp2",
+    titulo: "COBRI · Bar do Mercado",
+    localizacao: "Centro",
+    image: require("../assets/images/restaurante1.png"),
+  },
+  {
+    id: "cp3",
+    titulo: "Banzeiro",
+    localizacao: "Botafogo",
+    image: require("../assets/images/restaurante2.png"),
+  },
+  {
+    id: "cp4",
+    titulo: "Parque Lage",
+    localizacao: "Jardim Botânico",
+    image: require("../assets/images/secret1.png"),
+  },
+];
+
+// ── Roteiros ──────────────────────────────────────────────────────────────────
+export interface Roteiro {
+  id: string;
+  titulo: string;
+  dias: string;
+  tags: string[];
+  numLugares: number;
+  image: any;
+}
+
+export const roteiros: Roteiro[] = [
+  {
+    id: "r1",
+    titulo: "Rio com classe",
+    dias: "3 dias",
+    tags: ["Arte", "Gastronomia"],
+    numLugares: 12,
+    image: require("../assets/images/hero-rio.png"),
+  },
+  {
+    id: "r2",
+    titulo: "Rio em família",
+    dias: "5 dias",
+    tags: ["Praia", "Natureza"],
+    numLugares: 18,
+    image: require("../assets/images/pao-acucar.png"),
+  },
+];
+
+// ── Influencers (Viaje como eles) ─────────────────────────────────────────────
+export interface Influencer {
+  id: string;
+  nome: string;
+  numRoteiros: number;
+  image: any;
+}
+
+export const influencers: Influencer[] = [
+  {
+    id: "if1",
+    nome: "Bruno De Luca",
+    numRoteiros: 8,
+    image: require("../assets/images/hotel2.png"),
+  },
+  {
+    id: "if2",
+    nome: "Claudia Cárdoz",
+    numRoteiros: 6,
+    image: require("../assets/images/secret1.png"),
+  },
+  {
+    id: "if3",
+    nome: "Di Ferrero",
+    numRoteiros: 4,
+    image: require("../assets/images/lapa.png"),
+  },
+  {
+    id: "if4",
+    nome: "Carolina Dieckmann",
+    numRoteiros: 5,
+    image: require("../assets/images/hotel1.png"),
+  },
+];
