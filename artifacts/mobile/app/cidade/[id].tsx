@@ -26,6 +26,7 @@ import {
   detectPeriodo,
   type Periodo,
 } from "@/data/mockData";
+import { AGORA_CONTENT, FALLBACK_CONTENT } from "@/data/agoraContent";
 import { DestaquesCard } from "@/components/DestaquesCard";
 import { RestauranteCard } from "@/components/RestauranteCard";
 import { HotelCard } from "@/components/HotelCard";
@@ -163,8 +164,10 @@ export default function CidadeScreen() {
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
   const periodo = detectPeriodo();
-  const agoraMap = AGORA[destino.id];
-  const experience = agoraMap ? agoraMap[periodo] : "Descoberta local";
+  // Derive "Agora" label + pinned item from the same source as the next page
+  const cityAgoraContent = AGORA_CONTENT[destino.id] ?? FALLBACK_CONTENT;
+  const firstAgoraItem = cityAgoraContent[periodo]?.[0];
+  const experience = firstAgoraItem?.titulo ?? "Descoberta local";
   const agoraLabel = AGORA_LABEL[destino.id] ?? `Agora em ${destino.cidade}`;
   const essentialRef = ESSENTIALS[destino.id] ?? `de ${destino.cidade}`;
 
@@ -248,7 +251,10 @@ export default function CidadeScreen() {
           <GlassButton
             style={s.btnExperience}
             onPress={() =>
-              router.push({ pathname: "/agoraNoRio/[id]", params: { id: destino.id } })
+              router.push({
+                pathname: "/agoraNoRio/[id]",
+                params: { id: destino.id, pinnedId: firstAgoraItem?.id },
+              })
             }
           >
             <View style={s.btnExperienceInner}>
