@@ -17,7 +17,6 @@
 
 import React, { useRef, useState } from "react";
 import {
-  Animated,
   Dimensions,
   Image,
   ImageSourcePropType,
@@ -37,6 +36,20 @@ import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { getLugar, LugarPlace } from "@/data/lugares";
 import { IllustratedMap, MapPlace } from "@/components/IllustratedMap";
+import { useGuia } from "@/context/GuiaContext";
+import type { SavedCategory } from "@/context/GuiaContext";
+
+// Derive the SavedCategory from the placeId prefix:
+//   "1"–"5"   → oQueFazer
+//   "c1"–"c5" → restaurante
+//   "h1"–"h5" → hotel
+//   "l1"–"l6" → lucky
+function resolveSaveCategory(placeId: string): SavedCategory {
+  if (placeId.startsWith("c")) return "restaurante";
+  if (placeId.startsWith("h")) return "hotel";
+  if (placeId.startsWith("l")) return "lucky";
+  return "oQueFazer";
+}
 
 const C = Colors.light;
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -84,7 +97,25 @@ export default function LugarDetailScreen() {
 
   // Map toggle — starts visible if navigated here via "Ver no mapa"
   const [showMap, setShowMap] = useState(showMapParam === "true");
-  const [saved, setSaved] = useState(false);
+
+  // Save to Trip — backed by GuiaContext (persists across navigation)
+  const { isSaved, save, unsave } = useGuia();
+  const saved = isSaved(place.id);
+  const saveCategory = resolveSaveCategory(placeId ?? "");
+
+  function toggleSave() {
+    if (saved) {
+      unsave(place.id);
+    } else {
+      save({
+        id: place.id,
+        categoria: saveCategory,
+        titulo: place.titulo,
+        localizacao: place.localizacao,
+        image: place.image,
+      });
+    }
+  }
 
   // Scroll sync for carousel
   function handleCarouselScroll(
@@ -242,7 +273,7 @@ export default function LugarDetailScreen() {
             {/* PRIMARY — Salvar */}
             <Pressable
               style={[s.btnPrimary, saved && s.btnPrimarySaved]}
-              onPress={() => setSaved((v) => !v)}
+              onPress={toggleSave}
             >
               <Feather
                 name={saved ? "check" : "bookmark"}
