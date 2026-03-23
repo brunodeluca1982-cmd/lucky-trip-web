@@ -17,7 +17,7 @@ import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { destinos } from "@/data/mockData";
 import { LUGARES_COMER } from "@/data/lugares";
-import { MapZoneOverlay, RIO_HOTSPOTS } from "@/components/MapZoneOverlay";
+import { MapZoneOverlay, NeighborhoodCard, RIO_HOTSPOTS, MAP_ZONE_H } from "@/components/MapZoneOverlay";
 
 const C = Colors.light;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -58,7 +58,8 @@ export default function ComerBemScreen() {
   const descricao = DESCRICOES[destino.id] ?? DEFAULT_DESCRICAO;
 
   const [selectedHotspot, setSelectedHotspot] = useState<string | null>(null);
-  const activeBairros = RIO_HOTSPOTS.find((h) => h.id === selectedHotspot)?.bairros ?? null;
+  const activeHotspot = RIO_HOTSPOTS.find((h) => h.id === selectedHotspot) ?? null;
+  const activeBairros = activeHotspot?.bairros ?? null;
   const lugares = activeBairros
     ? allLugares.filter((p) => activeBairros.includes(p.localizacao))
     : allLugares;
@@ -68,11 +69,14 @@ export default function ComerBemScreen() {
 
   function handleHotspotPress(id: string | null) {
     setSelectedHotspot(id);
-    if (id) {
-      setTimeout(() => {
-        scrollViewRef.current?.scrollTo({ y: cardsSectionY.current, animated: true });
-      }, 80);
-    }
+  }
+
+  function handleVerHoteis() {
+    setTimeout(() => scrollViewRef.current?.scrollTo({ y: cardsSectionY.current, animated: true }), 80);
+  }
+
+  function handlePorDentro() {
+    setTimeout(() => scrollViewRef.current?.scrollTo({ y: 0, animated: true }), 80);
   }
 
   return (
@@ -202,16 +206,40 @@ export default function ComerBemScreen() {
           </Text>
         </View>
       </ScrollView>
+
+      {/* ── Floating neighborhood card ── */}
+      {activeHotspot && (
+        <View style={s.cardOverlay}>
+          <NeighborhoodCard
+            hotspot={activeHotspot}
+            filteredCount={lugares.length}
+            onVerHoteis={handleVerHoteis}
+            onPorDentro={handlePorDentro}
+            onDismiss={() => setSelectedHotspot(null)}
+          />
+        </View>
+      )}
     </View>
   );
 }
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
+const CARD_OVERLAP = 48;
+
 const s = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: "#100A06",
+  },
+
+  cardOverlay: {
+    position: "absolute",
+    top: MAP_ZONE_H - CARD_OVERLAP,
+    left: 16,
+    right: 16,
+    zIndex: 100,
+    boxShadow: "0px 8px 32px rgba(0,0,0,0.28)",
   },
 
   descBlock: {
