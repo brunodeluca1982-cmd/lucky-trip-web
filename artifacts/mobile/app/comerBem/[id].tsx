@@ -2,7 +2,6 @@ import React, { useRef, useState } from "react";
 import {
   Dimensions,
   Image,
-  ImageSourcePropType,
   Platform,
   Pressable,
   ScrollView,
@@ -23,14 +22,6 @@ const C = Colors.light;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CARD_IMAGE_H = 210;
 
-const MAP_RIO = require("../../assets/images/map-rio.png");
-
-function getMapImage(cityId: string): ImageSourcePropType {
-  switch (cityId) {
-    case "rio": return MAP_RIO;
-    default:    return MAP_RIO;
-  }
-}
 
 const DESCRICOES: Record<string, string[]> = {
   rio: [
@@ -84,7 +75,6 @@ export default function ComerBemScreen() {
       <Stack.Screen options={{ headerShown: false }} />
 
       <MapZoneOverlay
-        mapImage={getMapImage(destino.id)}
         onBack={() => router.back()}
         topInset={topInset}
         locaisLabel={`${allLugares.length} locais`}
