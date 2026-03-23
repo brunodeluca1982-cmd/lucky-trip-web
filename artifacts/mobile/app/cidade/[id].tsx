@@ -226,7 +226,12 @@ export default function CidadeScreen() {
           </GlassButton>
 
           {/* 6. Sua Lucky List */}
-          <GlassButton style={[s.btnStandard, s.btnLucky]}>
+          <GlassButton
+            style={[s.btnStandard, s.btnLucky]}
+            onPress={() =>
+              router.push({ pathname: "/luckyList/[id]", params: { id: destino.id } })
+            }
+          >
             <View style={s.btnStandardInner}>
               <Text style={s.luckyIcon}>✦</Text>
               <Text style={s.btnLuckyLabel}>Sua Lucky List</Text>

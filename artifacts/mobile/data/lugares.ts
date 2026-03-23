@@ -273,6 +273,76 @@ export const LUGARES_FICAR: Record<string, LugarPlace[]> = {
   ],
 };
 
+// ── Lucky List — special curated picks ───────────────────────────────────────
+// These are the hidden gems, insider tips, and unmissable experiences that
+// make Lucky Trip feel like having a knowledgeable local friend.
+// Intentionally cross-category: a viewpoint, a bar, a café, a sunset ritual.
+
+export const LUGARES_LUCKY: Record<string, LugarPlace[]> = {
+  rio: [
+    {
+      id: "l1",
+      titulo: "Mirante do Leblon",
+      localizacao: "Leblon",
+      categoria: "SEGREDO LOCAL",
+      descricao:
+        "O pôr do sol mais silencioso do Rio. Enquanto todos vão ao Arpoador, os cariocas sobem até aqui — e ficam com a vista só para eles.",
+      image: require("../assets/images/secret1.png"),
+      ...resolvePin("rio", "Leblon", 0),
+    },
+    {
+      id: "l2",
+      titulo: "Parque Lage",
+      localizacao: "Jardim Botânico",
+      categoria: "DESCOBERTA",
+      descricao:
+        "Uma mansão neoclássica no meio da floresta com café dentro, trilha para o Cristo e patos no espelho d'água. Entrada gratuita, impacto infinito.",
+      image: require("../assets/images/secret2.png"),
+      ...resolvePin("rio", "Jardim Botânico", 0),
+    },
+    {
+      id: "l3",
+      titulo: "Pedra do Arpoador",
+      localizacao: "Arpoador",
+      categoria: "RITUAL CARIOCA",
+      descricao:
+        "Todo dia, ao pôr do sol, cariocas e viajantes sobem a pedra e aplaudem o sol desaparecendo no horizonte. Um dos rituais mais bonitos do mundo.",
+      image: require("../assets/images/ipanema.png"),
+      ...resolvePin("rio", "Arpoador", 0),
+    },
+    {
+      id: "l4",
+      titulo: "Vista Chinesa",
+      localizacao: "Floresta da Tijuca",
+      categoria: "MIRANTE",
+      descricao:
+        "Um pagode de ferro no meio da mata atlântica, com vista para a Lagoa Rodrigo de Freitas e os dois irmãos. Quase ninguém sabe que existe.",
+      image: require("../assets/images/secret1.png"),
+      ...resolvePin("rio", "Floresta da Tijuca", 0),
+    },
+    {
+      id: "l5",
+      titulo: "Escadaria Selarón",
+      localizacao: "Lapa",
+      categoria: "ARTE VIVA",
+      descricao:
+        "Jorge Selarón passou décadas revestindo cada degrau com azulejos de mais de 60 países. Uma obra que cresceu com o artista até o último dia de sua vida.",
+      image: require("../assets/images/secret2.png"),
+      ...resolvePin("rio", "Lapa", 0),
+    },
+    {
+      id: "l6",
+      titulo: "Biblioteca do MNBA",
+      localizacao: "Centro",
+      categoria: "ACHADO RARO",
+      descricao:
+        "O Museu Nacional de Belas Artes tem uma das coleções mais ricas do Brasil — e uma biblioteca quase desconhecida onde o tempo para. Grátis às quintas.",
+      image: require("../assets/images/secret1.png"),
+      ...resolvePin("rio", "Centro", 0),
+    },
+  ],
+};
+
 export function getLugar(
   cityId: string,
   placeId: string,
@@ -281,6 +351,7 @@ export function getLugar(
     ...(LUGARES_O_QUE_FAZER[cityId] ?? []),
     ...(LUGARES_COMER[cityId] ?? []),
     ...(LUGARES_FICAR[cityId] ?? []),
+    ...(LUGARES_LUCKY[cityId] ?? []),
   ];
   return all.find((p) => p.id === placeId);
 }
