@@ -216,6 +216,63 @@ export const LUGARES_COMER: Record<string, LugarPlace[]> = {
   ],
 };
 
+// ── Ficar bem — hotels & stays ───────────────────────────────────────────────
+
+export const LUGARES_FICAR: Record<string, LugarPlace[]> = {
+  rio: [
+    {
+      id: "h1",
+      titulo: "Copacabana Palace",
+      localizacao: "Copacabana",
+      categoria: "ÍCONE",
+      descricao:
+        "Um século de elegância à beira-mar. O hotel mais celebrado do Rio recebe o mundo com serviço impecável e vista para o Atlântico.",
+      image: require("../assets/images/hotel1.png"),
+      ...resolvePin("rio", "Copacabana", 0),
+    },
+    {
+      id: "h2",
+      titulo: "Santa Teresa Hotel MGallery",
+      localizacao: "Santa Teresa",
+      categoria: "BOUTIQUE",
+      descricao:
+        "Antiga mansão colonial transformada em refúgio de design. Piscina com vista para a Baía de Guanabara e atmosfera de artista.",
+      image: require("../assets/images/hotel2.png"),
+      ...resolvePin("rio", "Santa Teresa", 0),
+    },
+    {
+      id: "h3",
+      titulo: "Fasano Rio de Janeiro",
+      localizacao: "Ipanema",
+      categoria: "LUXO",
+      descricao:
+        "Rooftop com piscina suspensa sobre Ipanema, design Philippe Starck e o melhor endereço da Zona Sul para quem não abre mão do requinte.",
+      image: require("../assets/images/hotel1.png"),
+      ...resolvePin("rio", "Ipanema", 0),
+    },
+    {
+      id: "h4",
+      titulo: "Mama Ruisa",
+      localizacao: "Santa Teresa",
+      categoria: "CHARME",
+      descricao:
+        "Apenas sete quartos numa villa francesa de 1920. Café da manhã em varanda, arte por toda a parte e a sensação de ser hóspede especial.",
+      image: require("../assets/images/hotel2.png"),
+      ...resolvePin("rio", "Santa Teresa", 1),
+    },
+    {
+      id: "h5",
+      titulo: "Yoo2 Rio de Janeiro",
+      localizacao: "Botafogo",
+      categoria: "DESIGN",
+      descricao:
+        "Conceito lifestyle no coração de Botafogo, com rooftop aberto à cidade, piscina e uma vizinhança que pulsa gastronomia e cultura.",
+      image: require("../assets/images/hotel1.png"),
+      ...resolvePin("rio", "Botafogo", 0),
+    },
+  ],
+};
+
 export function getLugar(
   cityId: string,
   placeId: string,
@@ -223,6 +280,7 @@ export function getLugar(
   const all = [
     ...(LUGARES_O_QUE_FAZER[cityId] ?? []),
     ...(LUGARES_COMER[cityId] ?? []),
+    ...(LUGARES_FICAR[cityId] ?? []),
   ];
   return all.find((p) => p.id === placeId);
 }

@@ -1,0 +1,383 @@
+import React from "react";
+import {
+  Dimensions,
+  Image,
+  ImageSourcePropType,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { router, Stack, useLocalSearchParams } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Feather } from "@expo/vector-icons";
+import Colors from "@/constants/colors";
+import { destinos } from "@/data/mockData";
+import { LUGARES_FICAR } from "@/data/lugares";
+import { IllustratedMap } from "@/components/IllustratedMap";
+
+const C = Colors.light;
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const CARD_IMAGE_H = 210;
+
+const MAP_RIO = require("../../assets/images/map-rio.png");
+
+function getMapImage(cityId: string): ImageSourcePropType {
+  switch (cityId) {
+    case "rio": return MAP_RIO;
+    default:    return MAP_RIO;
+  }
+}
+
+const DESCRICOES: Record<string, string[]> = {
+  rio: [
+    "Onde você dorme define como você acorda. No Rio, cada bairro tem um ritmo próprio — e a escolha do hotel muda completamente a experiência da cidade.",
+    "De mansões coloniais no morro de Santa Teresa a palacetes centenários em Copacabana, esta seleção reúne endereços com alma, não apenas quartos.",
+    "Aqui, a hospedagem é parte da memória da viagem.",
+  ],
+};
+
+const DEFAULT_DESCRICAO = [
+  "Cada hospedagem desta seleção foi escolhida pelo que oferece além do quarto — a vista, o bairro, a atmosfera que só aquele endereço tem.",
+  "Ficar bem é também uma forma de viver o destino com mais profundidade.",
+];
+
+// ── Screen ────────────────────────────────────────────────────────────────────
+
+export default function FicarBemScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const insets = useSafeAreaInsets();
+  const topInset = Platform.OS === "web" ? 67 : insets.top;
+  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+
+  const destino = destinos.find((d) => d.id === id) ?? destinos[0];
+  const lugares = LUGARES_FICAR[destino.id] ?? [];
+  const descricao = DESCRICOES[destino.id] ?? DEFAULT_DESCRICAO;
+
+  return (
+    <View style={s.root}>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      {/* ════════════════════════════════════════════════════
+          ILLUSTRATED MAP — clean by default, no pins.
+          Pins only appear when the user views a specific place.
+      ════════════════════════════════════════════════════ */}
+      <IllustratedMap
+        mapImage={getMapImage(destino.id)}
+        places={[]}
+        onBack={() => router.back()}
+        topInset={topInset}
+        locaisLabel={`${lugares.length} locais`}
+      />
+
+      {/* ════════════════════════════════════════════════════
+          SCROLLABLE CONTENT — editorial text + place cards
+      ════════════════════════════════════════════════════ */}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: bottomPad + 40 }}
+      >
+        {/* ── Description block ── */}
+        <View style={s.descBlock}>
+          <Text style={s.descTitle}>Ficar bem em {destino.cidade}</Text>
+          {descricao.map((para, i) => (
+            <Text key={i} style={s.descPara}>{para}</Text>
+          ))}
+          <View style={s.descNoteWrap}>
+            <View style={s.descNoteDot} />
+            <Text style={s.descNoteText}>Seleção curada · {lugares.length} hospedagens</Text>
+          </View>
+        </View>
+
+        {/* ── Place cards ── */}
+        <View style={s.cardsSection}>
+          <Text style={s.cardsSectionLabel}>Hospedagens selecionadas</Text>
+
+          {lugares.map((place, index) => (
+            <Pressable
+              key={place.id}
+              style={s.card}
+              onPress={() =>
+                router.push(`/lugar/${destino.id}/${place.id}`)
+              }
+            >
+              {/* Image area */}
+              <View style={s.cardImageWrap}>
+                <Image source={place.image} style={s.cardImage} />
+                <LinearGradient
+                  colors={["rgba(0,0,0,0.12)", "transparent"]}
+                  locations={[0, 0.4]}
+                  style={StyleSheet.absoluteFill}
+                />
+
+                <View style={s.bookmarkBtn}>
+                  <Feather name="bookmark" size={15} color={C.white} />
+                </View>
+
+                {place.preco && (
+                  <View style={s.priceBadge}>
+                    <Text style={s.priceText}>{place.preco}</Text>
+                  </View>
+                )}
+
+                <View style={s.orderBadge}>
+                  <Text style={s.orderText}>{String(index + 1).padStart(2, "0")}</Text>
+                </View>
+              </View>
+
+              {/* Text area */}
+              <View style={s.cardBody}>
+                <View style={s.cardMeta}>
+                  <Text style={s.cardCategoria}>{place.categoria}</Text>
+                  <View style={s.cardLocWrap}>
+                    <Feather name="map-pin" size={10} color={C.warmGray} />
+                    <Text style={s.cardLocText}>{place.localizacao}</Text>
+                  </View>
+                </View>
+
+                <Text style={s.cardTitulo}>{place.titulo}</Text>
+                <Text style={s.cardDesc}>{place.descricao}</Text>
+
+                <Pressable
+                  style={s.verNoMapaBtn}
+                  onPress={(e) => {
+                    e.stopPropagation?.();
+                    router.push({
+                      pathname: "/lugar/[cityId]/[placeId]",
+                      params: {
+                        cityId: destino.id,
+                        placeId: place.id,
+                        showMap: "true",
+                      },
+                    });
+                  }}
+                >
+                  <Feather name="map-pin" size={13} color={C.terracotta} />
+                  <Text style={s.verNoMapaText}>Ver no mapa</Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          ))}
+        </View>
+
+        {/* ── Editorial footer ── */}
+        <View style={s.footer}>
+          <Text style={s.footerL}>L.</Text>
+          <Text style={s.footerText}>
+            Curadoria para quem quer descansar em {destino.cidade} com estilo.
+          </Text>
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+// ── Styles ─────────────────────────────────────────────────────────────────────
+
+const s = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: "#100A06",
+  },
+
+  descBlock: {
+    backgroundColor: "#100A06",
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    paddingBottom: 30,
+  },
+  descTitle: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 22,
+    color: C.white,
+    lineHeight: 30,
+    letterSpacing: -0.2,
+    marginBottom: 16,
+  },
+  descPara: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 15,
+    color: "rgba(255,255,255,0.72)",
+    lineHeight: 26,
+    letterSpacing: 0.1,
+    marginBottom: 14,
+  },
+  descNoteWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 6,
+  },
+  descNoteDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: C.terracotta,
+  },
+  descNoteText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: "rgba(255,255,255,0.40)",
+    letterSpacing: 0.5,
+  },
+
+  cardsSection: {
+    backgroundColor: C.cream,
+    paddingTop: 28,
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+  },
+  cardsSectionLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    color: C.warmGray,
+    letterSpacing: 1.8,
+    textTransform: "uppercase",
+    marginBottom: 20,
+  },
+
+  card: {
+    backgroundColor: "#1C1410",
+    borderRadius: 18,
+    overflow: "hidden",
+    marginBottom: 24,
+  },
+
+  cardImageWrap: {
+    height: CARD_IMAGE_H,
+    position: "relative",
+  },
+  cardImage: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+  },
+  bookmarkBtn: {
+    position: "absolute",
+    top: 14,
+    right: 14,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(0,0,0,0.38)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.20)",
+  },
+  priceBadge: {
+    position: "absolute",
+    top: 14,
+    right: 58,
+    backgroundColor: "rgba(0,0,0,0.52)",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+  },
+  priceText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: "rgba(255,255,255,0.80)",
+    letterSpacing: 0.5,
+  },
+  orderBadge: {
+    position: "absolute",
+    bottom: 14,
+    left: 14,
+  },
+  orderText: {
+    fontFamily: "PlayfairDisplay_400Regular",
+    fontSize: 12,
+    color: "rgba(255,255,255,0.45)",
+    letterSpacing: 1,
+  },
+
+  cardBody: {
+    padding: 18,
+    paddingTop: 16,
+  },
+  cardMeta: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  cardCategoria: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 10,
+    color: C.terracotta,
+    letterSpacing: 1.4,
+  },
+  cardLocWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  cardLocText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: C.warmGray,
+  },
+  cardTitulo: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 19,
+    color: C.white,
+    lineHeight: 26,
+    letterSpacing: -0.2,
+    marginBottom: 8,
+  },
+  cardDesc: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.62)",
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+
+  verNoMapaBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    borderWidth: 1,
+    borderColor: "rgba(196,112,74,0.30)",
+    borderRadius: 10,
+    paddingVertical: 11,
+    backgroundColor: "rgba(196,112,74,0.06)",
+  },
+  verNoMapaText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: C.terracotta,
+    letterSpacing: 0.2,
+  },
+
+  footer: {
+    backgroundColor: C.cream,
+    marginTop: 4,
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+    borderTopWidth: 1,
+    borderTopColor: C.border,
+    alignItems: "center",
+    gap: 8,
+  },
+  footerL: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 32,
+    color: C.terracotta,
+  },
+  footerText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: C.warmGray,
+    textAlign: "center",
+    lineHeight: 20,
+    maxWidth: 240,
+  },
+});
