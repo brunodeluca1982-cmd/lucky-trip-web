@@ -8,13 +8,31 @@ interface SectionHeaderProps {
   title: string;
   subtitle?: string;
   uppercase?: boolean;
+  dark?: boolean;
 }
 
-export function SectionHeader({ title, subtitle, uppercase = false }: SectionHeaderProps) {
+export function SectionHeader({
+  title,
+  subtitle,
+  uppercase = false,
+  dark = false,
+}: SectionHeaderProps) {
   return (
     <View style={styles.container}>
-      <Text style={[styles.title, uppercase && styles.titleUppercase]}>{title}</Text>
-      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+      <Text
+        style={[
+          styles.title,
+          uppercase && styles.titleUppercase,
+          dark && (uppercase ? styles.titleUppercaseDark : styles.titleDark),
+        ]}
+      >
+        {title}
+      </Text>
+      {subtitle ? (
+        <Text style={[styles.subtitle, dark && styles.subtitleDark]}>
+          {subtitle}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -25,6 +43,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     gap: 4,
   },
+
+  // Light mode (default)
   title: {
     fontFamily: "PlayfairDisplay_700Bold",
     fontSize: 24,
@@ -34,15 +54,27 @@ const styles = StyleSheet.create({
   },
   titleUppercase: {
     fontFamily: "Inter_700Bold",
-    fontSize: 13,
-    letterSpacing: 1.8,
+    fontSize: 12,
+    letterSpacing: 2.0,
     textTransform: "uppercase",
     color: C.terracotta,
+    lineHeight: undefined,
   },
   subtitle: {
     fontFamily: "Inter_400Regular",
     fontSize: 14,
     color: C.warmGray,
     lineHeight: 20,
+  },
+
+  // Dark mode overrides
+  titleDark: {
+    color: C.white,
+  },
+  titleUppercaseDark: {
+    color: C.terracotta,
+  },
+  subtitleDark: {
+    color: "rgba(255,255,255,0.52)",
   },
 });

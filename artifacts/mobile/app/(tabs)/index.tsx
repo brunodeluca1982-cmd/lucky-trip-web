@@ -42,76 +42,67 @@ import { useTimeOfDay } from "@/hooks/useTimeOfDay";
 
 const C = Colors.light;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const CARD_W = (SCREEN_WIDTH - 48 - 12) / 2; // 2-col grid card width
+const CARD_W = (SCREEN_WIDTH - 48 - 12) / 2;
 
-// ── Inline sub-components ─────────────────────────────────────────────────────
+const BG_IMAGE = require("../../assets/images/hero-rio.png");
 
+// ── Thin hairline between sections ───────────────────────────────────────────
 function Divider() {
   return <View style={s.divider} />;
 }
 
-// Lucky List dark highlight block
+// ── Lucky List dark editorial block ──────────────────────────────────────────
 function LuckyHighlight() {
   const picks = (LUGARES_LUCKY["rio"] ?? []).slice(0, 3);
   return (
     <View style={s.luckyBlock}>
-      <View style={s.luckyBlockInner}>
-        {/* header */}
-        <View style={s.luckyHeader}>
-          <Text style={s.luckyAccentText}>✦ LUCKY LIST</Text>
-          <View style={s.luckyAccentLine} />
-        </View>
-
-        <Text style={s.luckyHeadline}>Seu Rio mais Lucky</Text>
-        <Text style={s.luckySubtitle}>
-          Os segredos que poucos conhecem. Curadoria feita à mão, atualizada quando vale a pena.
-        </Text>
-
-        {/* picks preview */}
-        <View style={s.luckyPicks}>
-          {picks.map((place, i) => (
-            <Pressable
-              key={place.id}
-              style={s.luckyPickRow}
-              onPress={() => router.push(`/lugar/rio/${place.id}`)}
-            >
-              <View style={s.luckyPickNum}>
-                <Text style={s.luckyPickNumText}>✦</Text>
-              </View>
-              <View style={s.luckyPickText}>
-                <Text style={s.luckyPickTitle}>{place.titulo}</Text>
-                <Text style={s.luckyPickLoc}>{place.localizacao}</Text>
-              </View>
-              <Feather name="arrow-right" size={13} color="rgba(201,168,76,0.55)" />
-            </Pressable>
-          ))}
-        </View>
-
-        {/* CTA */}
-        <Pressable
-          style={s.luckyBtn}
-          onPress={() => router.push({ pathname: "/luckyList/[id]", params: { id: "rio" } })}
-        >
-          <Text style={s.luckyBtnText}>✦  Ver Lucky List completa</Text>
-        </Pressable>
+      <View style={s.luckyHeader}>
+        <Text style={s.luckyAccentText}>✦ LUCKY LIST</Text>
+        <View style={s.luckyAccentLine} />
       </View>
+      <Text style={s.luckyHeadline}>Seu Rio mais Lucky</Text>
+      <Text style={s.luckySubtitle}>
+        Os segredos que poucos conhecem. Curadoria feita à mão, atualizada quando vale a pena.
+      </Text>
+      <View style={s.luckyPicks}>
+        {picks.map((place) => (
+          <Pressable
+            key={place.id}
+            style={s.luckyPickRow}
+            onPress={() => router.push(`/lugar/rio/${place.id}`)}
+          >
+            <Text style={s.luckyPickStar}>✦</Text>
+            <View style={s.luckyPickText}>
+              <Text style={s.luckyPickTitle}>{place.titulo}</Text>
+              <Text style={s.luckyPickLoc}>{place.localizacao}</Text>
+            </View>
+            <Feather name="arrow-right" size={13} color="rgba(201,168,76,0.50)" />
+          </Pressable>
+        ))}
+      </View>
+      <Pressable
+        style={s.luckyBtn}
+        onPress={() => router.push({ pathname: "/luckyList/[id]", params: { id: "rio" } })}
+      >
+        <Text style={s.luckyBtnText}>✦  Ver Lucky List completa</Text>
+      </Pressable>
     </View>
   );
 }
 
-// Roteiro card — 2-col grid
+// ── Roteiro card (2-col grid) ─────────────────────────────────────────────────
 function RoteiroCard({ roteiro }: { roteiro: Roteiro }) {
   return (
     <View style={s.roteiroCard}>
       <Image source={roteiro.image} style={s.roteiroImage} />
       <LinearGradient
-        colors={["transparent", "rgba(10,5,2,0.80)"]}
-        locations={[0.3, 1]}
+        colors={["rgba(0,0,0,0.02)", "rgba(10,5,2,0.84)"]}
+        locations={[0.2, 1]}
         style={StyleSheet.absoluteFill}
       />
       <View style={s.roteiroContent}>
         <View style={s.roteiroDias}>
-          <Feather name="clock" size={10} color="rgba(255,255,255,0.72)" />
+          <Feather name="clock" size={10} color="rgba(255,255,255,0.65)" />
           <Text style={s.roteiroDiasText}>{roteiro.dias}</Text>
         </View>
         <Text style={s.roteiroTitle}>{roteiro.titulo}</Text>
@@ -127,45 +118,49 @@ function RoteiroCard({ roteiro }: { roteiro: Roteiro }) {
   );
 }
 
-// Influencer card — 2-col grid
+// ── Influencer card (2-col grid) ──────────────────────────────────────────────
 function InfluencerCard({ influencer }: { influencer: Influencer }) {
   return (
     <Pressable style={s.influencerCard}>
       <Image source={influencer.image} style={s.influencerImage} />
       <LinearGradient
-        colors={["transparent", "rgba(10,5,2,0.72)"]}
-        locations={[0.4, 1]}
+        colors={["rgba(0,0,0,0.04)", "rgba(10,5,2,0.78)"]}
+        locations={[0.35, 1]}
         style={StyleSheet.absoluteFill}
       />
       <View style={s.influencerBadge}>
         <Feather name="map" size={10} color={C.white} />
-        <Text style={s.influencerBadgeText}>Roteiros: {String(influencer.numRoteiros).padStart(2, "0")}</Text>
+        <Text style={s.influencerBadgeText}>
+          Roteiros: {String(influencer.numRoteiros).padStart(2, "0")}
+        </Text>
       </View>
       <Text style={s.influencerName}>{influencer.nome}</Text>
     </Pressable>
   );
 }
 
-// Roteiro CTA block
+// ── Criar roteiro CTA ─────────────────────────────────────────────────────────
 function RoteiroCTA() {
   return (
     <View style={s.ctaBlock}>
-      <View style={s.ctaInner}>
-        <Text style={s.ctaEyebrow}>ORGANIZE SUA PRÓXIMA VIAGEM</Text>
-        <Text style={s.ctaHeadline}>Monte seu roteiro personalizado</Text>
-        <Text style={s.ctaSub}>
-          Use nosso planejador intuitivo para criar experiências únicas no seu destino.
-        </Text>
-        <Pressable style={s.ctaBtn}>
-          <Feather name="plus" size={15} color={C.white} />
-          <Text style={s.ctaBtnText}>Criar roteiro</Text>
-        </Pressable>
-      </View>
+      <LinearGradient
+        colors={["rgba(255,255,255,0.06)", "rgba(255,255,255,0.02)"]}
+        style={StyleSheet.absoluteFill}
+      />
+      <Text style={s.ctaEyebrow}>ORGANIZE SUA PRÓXIMA VIAGEM</Text>
+      <Text style={s.ctaHeadline}>Monte seu roteiro personalizado</Text>
+      <Text style={s.ctaSub}>
+        Use nosso planejador intuitivo para criar experiências únicas no seu destino.
+      </Text>
+      <Pressable style={s.ctaBtn}>
+        <Feather name="plus" size={15} color={C.white} />
+        <Text style={s.ctaBtnText}>Criar roteiro</Text>
+      </Pressable>
     </View>
   );
 }
 
-// ── Main Screen ───────────────────────────────────────────────────────────────
+// ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -176,7 +171,18 @@ export default function HomeScreen() {
 
   return (
     <View style={s.root}>
+      {/* Fullscreen background image — persists behind all content */}
+      <Image source={BG_IMAGE} style={s.bgImage} />
+      {/* Dark overlay to ensure legibility everywhere */}
+      <LinearGradient
+        colors={["rgba(10,5,2,0.72)", "rgba(10,5,2,0.88)", "#0A0502"]}
+        locations={[0, 0.35, 0.65]}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
+
       <AppHeader transparent />
+
       <ScrollView
         style={s.scroll}
         showsVerticalScrollIndicator={false}
@@ -192,6 +198,7 @@ export default function HomeScreen() {
             title="Destaques"
             uppercase
             subtitle="Uma seleção editorial dos melhores do Rio."
+            dark
           />
           <HorizontalScroll>
             {destaques.map((d) => (
@@ -216,8 +223,9 @@ export default function HomeScreen() {
             title="O que fazer agora"
             uppercase
             subtitle={currentMeta.subtitle}
+            dark
           />
-          <PeriodoSwitcher active={periodo} onChange={setPeriodo} />
+          <PeriodoSwitcher active={periodo} onChange={setPeriodo} dark />
           <Animated.View style={{ opacity: fadeAnim }}>
             <HorizontalScroll>
               {currentItems.map((item) => (
@@ -243,6 +251,7 @@ export default function HomeScreen() {
             title="Curados para você"
             uppercase
             subtitle="Hotéis, restaurantes e experiências no Rio."
+            dark
           />
           <HorizontalScroll>
             {curadoPara.map((item) => (
@@ -267,6 +276,7 @@ export default function HomeScreen() {
             title="Onde comer"
             uppercase
             subtitle="Os melhores restaurantes do Rio."
+            dark
           />
           <HorizontalScroll>
             {restaurantes.map((r) => (
@@ -290,6 +300,7 @@ export default function HomeScreen() {
             title="Onde ficar"
             uppercase
             subtitle="Hotéis com personalidade carioca."
+            dark
           />
           <HorizontalScroll>
             {hoteis.map((h) => (
@@ -316,6 +327,7 @@ export default function HomeScreen() {
             title="Roteiros"
             uppercase
             subtitle="Crie o seu ou use os nossos."
+            dark
           />
           <View style={s.grid2}>
             {roteiros.map((r) => (
@@ -332,6 +344,7 @@ export default function HomeScreen() {
             title="Viaje como eles"
             uppercase
             subtitle="Siga os passos de quem você admira. Acesse roteiros detalhados, segredos e dicas pessoais das nossas estrelas convidadas."
+            dark
           />
           <View style={s.grid2}>
             {influencers.map((inf) => (
@@ -363,11 +376,22 @@ export default function HomeScreen() {
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: C.cream,
+    backgroundColor: "#0A0502",
   },
+
+  // ── Background ──
+  bgImage: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+    opacity: 0.18,
+  },
+
   scroll: {
     flex: 1,
-    backgroundColor: C.cream,
   },
 
   section: {
@@ -375,9 +399,10 @@ const s = StyleSheet.create({
     paddingBottom: 8,
   },
 
+  // Subtle hairline — barely visible on dark bg
   divider: {
     height: 1,
-    backgroundColor: C.border,
+    backgroundColor: "rgba(255,255,255,0.06)",
     marginHorizontal: 24,
     marginTop: 20,
   },
@@ -390,20 +415,22 @@ const s = StyleSheet.create({
     gap: 12,
   },
 
-  // ── Lucky List highlight block ──
+  // ── Lucky List highlight ──
   luckyBlock: {
     marginTop: 28,
-    backgroundColor: "#0A0502",
-  },
-  luckyBlockInner: {
-    paddingHorizontal: 24,
-    paddingVertical: 32,
+    marginHorizontal: 24,
+    borderRadius: 20,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(201,168,76,0.18)",
+    backgroundColor: "rgba(10,5,2,0.60)",
+    padding: 24,
   },
   luckyHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    marginBottom: 18,
+    marginBottom: 16,
   },
   luckyAccentText: {
     fontFamily: "Inter_500Medium",
@@ -414,42 +441,39 @@ const s = StyleSheet.create({
   luckyAccentLine: {
     flex: 1,
     height: 1,
-    backgroundColor: "rgba(201,168,76,0.22)",
+    backgroundColor: "rgba(201,168,76,0.20)",
   },
   luckyHeadline: {
     fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 26,
+    fontSize: 22,
     color: C.white,
-    lineHeight: 34,
-    letterSpacing: -0.3,
-    marginBottom: 10,
+    lineHeight: 30,
+    letterSpacing: -0.2,
+    marginBottom: 8,
   },
   luckySubtitle: {
     fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    color: "rgba(255,255,255,0.58)",
-    lineHeight: 22,
-    marginBottom: 24,
+    fontSize: 13,
+    color: "rgba(255,255,255,0.55)",
+    lineHeight: 20,
+    marginBottom: 20,
   },
   luckyPicks: {
-    gap: 0,
-    marginBottom: 24,
+    marginBottom: 20,
   },
   luckyPickRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    paddingVertical: 14,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(201,168,76,0.10)",
+    borderBottomColor: "rgba(201,168,76,0.08)",
   },
-  luckyPickNum: {
-    width: 24,
-    alignItems: "center",
-  },
-  luckyPickNumText: {
-    fontSize: 11,
+  luckyPickStar: {
+    fontSize: 10,
     color: C.gold,
+    width: 18,
+    textAlign: "center",
   },
   luckyPickText: {
     flex: 1,
@@ -462,21 +486,21 @@ const s = StyleSheet.create({
   },
   luckyPickLoc: {
     fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: "rgba(201,168,76,0.60)",
-    marginTop: 2,
+    fontSize: 11,
+    color: "rgba(201,168,76,0.55)",
+    marginTop: 1,
   },
   luckyBtn: {
     borderWidth: 1,
-    borderColor: "rgba(201,168,76,0.35)",
+    borderColor: "rgba(201,168,76,0.30)",
     borderRadius: 12,
-    paddingVertical: 15,
+    paddingVertical: 14,
     alignItems: "center",
-    backgroundColor: "rgba(201,168,76,0.08)",
+    backgroundColor: "rgba(201,168,76,0.07)",
   },
   luckyBtnText: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
+    fontSize: 13,
     color: C.gold,
     letterSpacing: 0.3,
   },
@@ -485,9 +509,11 @@ const s = StyleSheet.create({
   roteiroCard: {
     width: CARD_W,
     height: CARD_W * 1.3,
-    borderRadius: 14,
+    borderRadius: 16,
     overflow: "hidden",
-    backgroundColor: "#1C1410",
+    backgroundColor: "#1A1208",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
   },
   roteiroImage: {
     width: "100%",
@@ -499,7 +525,7 @@ const s = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    padding: 12,
+    padding: 14,
   },
   roteiroDias: {
     flexDirection: "row",
@@ -510,7 +536,7 @@ const s = StyleSheet.create({
   roteiroDiasText: {
     fontFamily: "Inter_400Regular",
     fontSize: 10,
-    color: "rgba(255,255,255,0.68)",
+    color: "rgba(255,255,255,0.60)",
     letterSpacing: 0.3,
   },
   roteiroTitle: {
@@ -526,15 +552,17 @@ const s = StyleSheet.create({
     gap: 4,
   },
   roteiroTag: {
-    backgroundColor: "rgba(255,255,255,0.14)",
+    backgroundColor: "rgba(255,255,255,0.12)",
     borderRadius: 6,
     paddingHorizontal: 7,
     paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
   },
   roteiroTagText: {
     fontFamily: "Inter_500Medium",
     fontSize: 9,
-    color: "rgba(255,255,255,0.78)",
+    color: "rgba(255,255,255,0.72)",
     letterSpacing: 0.5,
   },
 
@@ -542,11 +570,13 @@ const s = StyleSheet.create({
   influencerCard: {
     width: CARD_W,
     height: CARD_W * 1.2,
-    borderRadius: 14,
+    borderRadius: 16,
     overflow: "hidden",
-    backgroundColor: "#1C1410",
+    backgroundColor: "#1A1208",
     position: "relative",
     justifyContent: "flex-end",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
   },
   influencerImage: {
     ...StyleSheet.absoluteFillObject,
@@ -559,16 +589,18 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "rgba(0,0,0,0.48)",
+    backgroundColor: "rgba(0,0,0,0.50)",
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
   },
   influencerBadgeText: {
     fontFamily: "Inter_500Medium",
     fontSize: 10,
     color: C.white,
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
   },
   influencerName: {
     fontFamily: "Inter_600SemiBold",
@@ -579,15 +611,15 @@ const s = StyleSheet.create({
     paddingTop: 6,
   },
 
-  // ── CTA block ──
+  // ── CTA block — glass card ──
   ctaBlock: {
     marginTop: 28,
     marginHorizontal: 24,
     borderRadius: 20,
     overflow: "hidden",
-    backgroundColor: C.darkBrown,
-  },
-  ctaInner: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.04)",
     padding: 28,
   },
   ctaEyebrow: {
@@ -608,7 +640,7 @@ const s = StyleSheet.create({
   ctaSub: {
     fontFamily: "Inter_400Regular",
     fontSize: 14,
-    color: "rgba(255,255,255,0.60)",
+    color: "rgba(255,255,255,0.52)",
     lineHeight: 22,
     marginBottom: 22,
   },
@@ -634,7 +666,7 @@ const s = StyleSheet.create({
     marginHorizontal: 24,
     paddingTop: 24,
     borderTopWidth: 1,
-    borderTopColor: C.border,
+    borderTopColor: "rgba(255,255,255,0.06)",
     alignItems: "center",
     gap: 8,
     paddingBottom: 8,
@@ -647,7 +679,7 @@ const s = StyleSheet.create({
   footerText: {
     fontFamily: "Inter_400Regular",
     fontSize: 13,
-    color: C.warmGray,
+    color: "rgba(255,255,255,0.38)",
     textAlign: "center",
     lineHeight: 20,
     maxWidth: 240,
