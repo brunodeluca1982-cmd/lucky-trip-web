@@ -157,6 +157,36 @@ export const LUGARES_O_QUE_FAZER: Record<string, LugarPlace[]> = {
       image: require("../assets/images/secret2.png"),
       ...resolvePin("rio", "Lapa", 0),
     },
+    {
+      id: "6",
+      titulo: "Arpoador",
+      localizacao: "Arpoador",
+      categoria: "RITUAL CARIOCA",
+      descricao:
+        "Ao pôr do sol, cariocas e viajantes sobem a pedra e aplaudem o sol desaparecer no horizonte. Um dos rituais mais bonitos do mundo.",
+      image: require("../assets/images/ipanema.png"),
+      ...resolvePin("rio", "Arpoador", 0),
+    },
+    {
+      id: "7",
+      titulo: "Santa Teresa",
+      localizacao: "Santa Teresa",
+      categoria: "BAIRRO",
+      descricao:
+        "O bairro mais bohémio do Rio, com ruas de pedra, galerias de arte, bistrôs escondidos e vistas que cortam o fôlego.",
+      image: require("../assets/images/lapa.png"),
+      ...resolvePin("rio", "Santa Teresa", 0),
+    },
+    {
+      id: "8",
+      titulo: "Jardim Botânico",
+      localizacao: "Jardim Botânico",
+      categoria: "NATUREZA",
+      descricao:
+        "Mais de 8.000 espécies de plantas, uma alameda imperial de palmeiras e o silêncio da mata atlântica dentro da cidade.",
+      image: require("../assets/images/secret2.png"),
+      ...resolvePin("rio", "Jardim Botânico", 0),
+    },
   ],
 };
 

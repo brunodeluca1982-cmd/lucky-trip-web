@@ -42,44 +42,45 @@ interface ClassicoItem {
   image: ImageSourcePropType;
 }
 
+// IDs map directly to LUGARES_O_QUE_FAZER["rio"] entries — resolved by getLugar()
 const CLASSICOS_RIO: ClassicoItem[] = [
   {
-    id: "rio-classico-1",
+    id: "2",
     titulo: "Cristo Redentor",
     localizacao: "Corcovado",
     categoria: "ÍCONE",
     image: require("../../assets/images/cristo.png"),
   },
   {
-    id: "rio-classico-2",
+    id: "3",
     titulo: "Pão de Açúcar",
     localizacao: "Urca",
     categoria: "MIRANTE",
     image: require("../../assets/images/pao-acucar.png"),
   },
   {
-    id: "rio-classico-3",
+    id: "1",
     titulo: "Praia de Ipanema",
     localizacao: "Ipanema",
     categoria: "PRAIA",
     image: require("../../assets/images/ipanema.png"),
   },
   {
-    id: "rio-classico-4",
+    id: "6",
     titulo: "Arpoador",
     localizacao: "Arpoador",
     categoria: "RITUAL",
     image: require("../../assets/images/ipanema.png"),
   },
   {
-    id: "rio-classico-5",
+    id: "7",
     titulo: "Santa Teresa",
     localizacao: "Santa Teresa",
     categoria: "BAIRRO",
     image: require("../../assets/images/lapa.png"),
   },
   {
-    id: "rio-classico-6",
+    id: "8",
     titulo: "Jardim Botânico",
     localizacao: "Jardim Botânico",
     categoria: "NATUREZA",
