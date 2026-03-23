@@ -91,6 +91,47 @@ Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used b
 
 Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
 
+### `lib/supabase` (`@workspace/supabase`)
+
+Shared Supabase client package. Exports `supabase` (a `SupabaseClient`) and TypeScript types (`Hotel`, `Neighborhood`) for use in server-side scripts.
+
+- `src/index.ts` — creates client from `SUPABASE_URL` + `SUPABASE_ANON_KEY` env vars
+- Used by `@workspace/scripts` for data queries/tests
+- **Mobile app** uses its own client at `artifacts/mobile/lib/supabase.ts` (reads `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` inlined by Metro bundler)
+
 ### `scripts` (`@workspace/scripts`)
 
 Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
+
+- `test-supabase.ts` — live connection test against `stay_neighborhoods` and `v_stay_neighborhoods_with_hotels`
+
+## The Lucky Trip — Mobile App (`artifacts/mobile`)
+
+Expo React Native app (SDK 54) with dark glassmorphism aesthetic for Rio de Janeiro travel content.
+
+### Design System
+- Colors: Cream `#F5F0E8`, Terracotta `#C4704A`, Gold `#C9A84C`, Dark Brown `#2C1810`
+- Typography: Playfair Display (400/600/700) + Inter (400/500/600/700)
+- Background: always `#0A0502` / `#100A06` fullscreen
+- `boxShadow` everywhere (not `shadow*`); `pointerEvents` in style not as prop
+- Web insets: 67px top, 34px bottom; native uses `useSafeAreaInsets()`
+
+### Key Files
+- `components/MapZoneOverlay.tsx` — aerial map (58% screen height), zoom spring, 7 hotspots, dim overlay, 3-layer editorial labels
+- `lib/supabase.ts` — mobile Supabase client (`EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY`)
+- `hooks/useNeighborhoods.ts` — fetches `v_stay_neighborhoods_with_hotels` (active, ordered)
+- `hooks/useHotel.ts` — fetches a single hotel by UUID from the view
+
+### Supabase Tables Used
+- `stay_neighborhoods` — neighborhood details (name, slug, identity_phrase, my_view, etc.)
+- `v_stay_neighborhoods_with_hotels` — view joining neighborhoods + their hotels array; 26 hotels across 11 neighborhoods for Rio de Janeiro
+
+### Route Structure
+- `(tabs)/` — 5-tab navigator
+- `ficarBem/[id].tsx` — hotel list screen with live Supabase data + map filtering
+- `ficarBem/hotel/[hotelId].tsx` — hotel detail screen (full my_view, how_to_enjoy, reserve_url, etc.)
+- `oQueFazer/[id].tsx`, `comerBem/[id].tsx` — activities + dining screens (mock data)
+
+### Environment Variables (Mobile)
+- `EXPO_PUBLIC_SUPABASE_URL` — passed via dev script from `$SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY` — passed via dev script from `$SUPABASE_ANON_KEY`
