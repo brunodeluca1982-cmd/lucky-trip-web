@@ -576,6 +576,7 @@ const s = StyleSheet.create({
   btnExperienceInner: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 20,
     paddingVertical: 14,
     gap: 14,
@@ -593,7 +594,6 @@ const s = StyleSheet.create({
     color: "#C9A84C",
   },
   expTexts: {
-    flex: 1,
     gap: 2,
   },
   eyebrowGold: {
@@ -619,6 +619,7 @@ const s = StyleSheet.create({
   btnStandardInner: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 20,
     paddingVertical: 13,
     gap: 12,
@@ -627,7 +628,6 @@ const s = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 15,
     color: "rgba(255,255,255,0.88)",
-    flex: 1,
   },
 
   // LUCKY accent — same metrics as standard, gold border only
@@ -642,7 +642,6 @@ const s = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 15,
     color: "rgba(255,255,255,0.88)",
-    flex: 1,
   },
 
   // Editorial content — cream block, scrolls in naturally
