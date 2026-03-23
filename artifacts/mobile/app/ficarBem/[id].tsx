@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Dimensions,
   Image,
@@ -17,7 +17,7 @@ import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { destinos } from "@/data/mockData";
 import { LUGARES_FICAR } from "@/data/lugares";
-import { IllustratedMap } from "@/components/IllustratedMap";
+import { MapZoneOverlay, RIO_ZONES } from "@/components/MapZoneOverlay";
 
 const C = Colors.light;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -54,23 +54,27 @@ export default function FicarBemScreen() {
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
   const destino = destinos.find((d) => d.id === id) ?? destinos[0];
-  const lugares = LUGARES_FICAR[destino.id] ?? [];
+  const allLugares = LUGARES_FICAR[destino.id] ?? [];
   const descricao = DESCRICOES[destino.id] ?? DEFAULT_DESCRICAO;
+
+  const [selectedZone, setSelectedZone] = useState<string | null>(null);
+  const activeZoneBairros = RIO_ZONES.find((z) => z.id === selectedZone)?.bairros ?? null;
+  const lugares = activeZoneBairros
+    ? allLugares.filter((p) => activeZoneBairros.includes(p.localizacao))
+    : allLugares;
 
   return (
     <View style={s.root}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* ════════════════════════════════════════════════════
-          ILLUSTRATED MAP — clean by default, no pins.
-          Pins only appear when the user views a specific place.
-      ════════════════════════════════════════════════════ */}
-      <IllustratedMap
+      <MapZoneOverlay
         mapImage={getMapImage(destino.id)}
-        places={[]}
         onBack={() => router.back()}
         topInset={topInset}
-        locaisLabel={`${lugares.length} locais`}
+        locaisLabel={`${allLugares.length} locais`}
+        selectedZone={selectedZone}
+        onZonePress={setSelectedZone}
+        filteredCount={selectedZone ? lugares.length : undefined}
       />
 
       {/* ════════════════════════════════════════════════════
@@ -94,7 +98,21 @@ export default function FicarBemScreen() {
 
         {/* ── Place cards ── */}
         <View style={s.cardsSection}>
-          <Text style={s.cardsSectionLabel}>Hospedagens selecionadas</Text>
+          <Text style={s.cardsSectionLabel}>
+            {selectedZone
+              ? `${lugares.length} hospedagem${lugares.length !== 1 ? "s" : ""} nesta zona`
+              : "Hospedagens selecionadas"}
+          </Text>
+
+          {lugares.length === 0 && selectedZone && (
+            <View style={s.emptyState}>
+              <Feather name="map-pin" size={22} color="rgba(255,255,255,0.15)" />
+              <Text style={s.emptyTitle}>Nenhum local aqui</Text>
+              <Text style={s.emptyText}>
+                Esta zona não tem hospedagens selecionadas. Toque no mapa para explorar outra área.
+              </Text>
+            </View>
+          )}
 
           {lugares.map((place, index) => (
             <Pressable
@@ -355,6 +373,27 @@ const s = StyleSheet.create({
     fontSize: 13,
     color: C.terracotta,
     letterSpacing: 0.2,
+  },
+
+  emptyState: {
+    alignItems: "center",
+    paddingVertical: 40,
+    paddingHorizontal: 24,
+    gap: 10,
+  },
+  emptyTitle: {
+    fontFamily: "PlayfairDisplay_600SemiBold",
+    fontSize: 17,
+    color: "rgba(255,255,255,0.35)",
+    textAlign: "center",
+  },
+  emptyText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.22)",
+    textAlign: "center",
+    lineHeight: 20,
+    maxWidth: 260,
   },
 
   footer: {
