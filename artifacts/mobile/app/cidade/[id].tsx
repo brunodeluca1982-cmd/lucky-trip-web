@@ -23,6 +23,8 @@ import {
   restaurantes,
   hoteis,
   segredos,
+  detectPeriodo,
+  type Periodo,
 } from "@/data/mockData";
 import { DestaquesCard } from "@/components/DestaquesCard";
 import { RestauranteCard } from "@/components/RestauranteCard";
@@ -30,6 +32,22 @@ import { HotelCard } from "@/components/HotelCard";
 
 const C = Colors.light;
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+
+// "Agora no/em/na" — preposition + city label for the real-time card eyebrow
+const AGORA_LABEL: Record<string, string> = {
+  rio: "Agora no Rio",
+  santorini: "Agora em Santorini",
+  kyoto: "Agora em Kyoto",
+  paris: "Agora em Paris",
+  "nova-york": "Agora em Nova York",
+  toquio: "Agora em Tóquio",
+  lisboa: "Agora em Lisboa",
+  miami: "Agora em Miami",
+  bali: "Agora em Bali",
+  amsterdam: "Agora em Amsterdam",
+  marrakech: "Agora em Marrakech",
+  ilhabela: "Agora em Ilhabela",
+};
 
 const ESSENTIALS: Record<string, string> = {
   rio: "do Rio",
@@ -46,19 +64,67 @@ const ESSENTIALS: Record<string, string> = {
   ilhabela: "de Ilhabela",
 };
 
-const EXPERIENCES: Record<string, string> = {
-  rio: "Pôr do sol em Ipanema",
-  santorini: "Nascer do sol no Aegeu",
-  kyoto: "Cerimônia do chá em Gion",
-  paris: "Café da manhã em Montmartre",
-  "nova-york": "Golden hour no High Line",
-  toquio: "Sakura no Shinjuku Gyoen",
-  lisboa: "Fado ao cair da noite",
-  miami: "Passeio pela Art Deco District",
-  bali: "Ritual ao pôr do sol em Uluwatu",
-  amsterdam: "Canal ao entardecer",
-  marrakech: "Pôr do sol no deserto de Agafay",
-  ilhabela: "Trilha para a cachoeira do Gato",
+const AGORA: Record<string, Record<Periodo, string>> = {
+  rio: {
+    manha: "Café da manhã em Ipanema",
+    tarde: "Praia no Leblon",
+    noite: "Drinks em Botafogo",
+  },
+  santorini: {
+    manha: "Nascer do sol no Aegeu",
+    tarde: "Vinho na caldera ao entardecer",
+    noite: "Jantar com vista para o vulcão",
+  },
+  kyoto: {
+    manha: "Cerimônia do chá em Gion",
+    tarde: "Passeio pelos templos dourados",
+    noite: "Izakaya no Pontocho",
+  },
+  paris: {
+    manha: "Café da manhã em Montmartre",
+    tarde: "Musée d'Orsay sem fila",
+    noite: "Jantar perto do Sena",
+  },
+  "nova-york": {
+    manha: "Café no West Village",
+    tarde: "Golden hour no High Line",
+    noite: "Rooftop bar em Manhattan",
+  },
+  toquio: {
+    manha: "Sakura no Shinjuku Gyoen",
+    tarde: "Tsukiji e sushi fresco",
+    noite: "Izakaya no Shinjuku",
+  },
+  lisboa: {
+    manha: "Pastel de nata em Belém",
+    tarde: "Elétrico 28 pelo Alfama",
+    noite: "Fado ao cair da noite",
+  },
+  miami: {
+    manha: "Corrida na praia de South Beach",
+    tarde: "Passeio pela Art Deco District",
+    noite: "Wynwood Walls à noite",
+  },
+  bali: {
+    manha: "Yoga ao amanhecer em Ubud",
+    tarde: "Arrozais de Tegallalang",
+    noite: "Ritual ao pôr do sol em Uluwatu",
+  },
+  amsterdam: {
+    manha: "Mercado de flores Bloemenmarkt",
+    tarde: "Canal ao entardecer de bicicleta",
+    noite: "Jenever nos bares do Jordaan",
+  },
+  marrakech: {
+    manha: "Mercado de especiarias na medina",
+    tarde: "Riads escondidos no souk",
+    noite: "Pôr do sol no deserto de Agafay",
+  },
+  ilhabela: {
+    manha: "Trilha para a cachoeira do Gato",
+    tarde: "Snorkel nas praias do sul",
+    noite: "Frutos do mar na Vila",
+  },
 };
 
 function GlassButton({
@@ -96,7 +162,10 @@ export default function CidadeScreen() {
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
-  const experience = EXPERIENCES[destino.id] ?? "Descoberta local";
+  const periodo = detectPeriodo();
+  const agoraMap = AGORA[destino.id];
+  const experience = agoraMap ? agoraMap[periodo] : "Descoberta local";
+  const agoraLabel = AGORA_LABEL[destino.id] ?? `Agora em ${destino.cidade}`;
   const essentialRef = ESSENTIALS[destino.id] ?? `de ${destino.cidade}`;
 
   return (
@@ -182,7 +251,7 @@ export default function CidadeScreen() {
                 <Text style={s.expIcon}>✦</Text>
               </View>
               <View style={s.expTexts}>
-                <Text style={s.eyebrowGold}>Experiência do momento</Text>
+                <Text style={s.eyebrowGold}>{agoraLabel}</Text>
                 <Text style={s.btnExperienceLabel}>{experience}</Text>
               </View>
             </View>
