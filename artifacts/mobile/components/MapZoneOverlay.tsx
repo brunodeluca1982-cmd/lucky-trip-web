@@ -1,15 +1,19 @@
 /**
  * MapZoneOverlay
  *
- * Editorial aerial-photo map with invisible hotspot touch areas.
+ * Editorial aerial-photo map with editorial labels and invisible hotspot touch areas.
  *
  * Interaction model:
  *   • Tap a hotspot → fake-zoom (scale + translate + dim) + parent receives onHotspotPress
  *   • Tap another  → update zoom to new hotspot + update card
  *   • Tap outside  → reset zoom + onHotspotPress(null)
  *
- * No visible markers, dots, or labels on the map at any time.
- * Zoom is simulated (CSS transform) — no real tile zoom occurs.
+ * Labels:
+ *   • Neighborhood + landmark labels visible in overview state
+ *   • All labels live inside the zoomable Animated.View so they zoom with the map
+ *   • Non-active labels render BEFORE the dim overlay → get dimmed
+ *   • Active neighborhood label renders AFTER the dim overlay → stays bright
+ *   • Touch events are blocked on labels (pointerEvents: none)
  *
  * The floating NeighborhoodCard is rendered at SCREEN level (also exported here)
  * so it can overlap between the map and the scrollable content below.
@@ -34,34 +38,25 @@ const C = Colors.light;
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export const MAP_ZONE_W = SCREEN_WIDTH;
-// Portrait image fills ~58% of screen height — generous space for card below
 export const MAP_ZONE_H = Math.round(SCREEN_HEIGHT * 0.58);
 
-// Touch target size — meets mobile accessibility minimum
-const HIT_SIZE = 52;
+const HIT_SIZE     = 52;
+const ZOOM_SCALE   = 1.38;
+const NATIVE_DRIVER = Platform.OS !== "web";
+const SPRING_CFG   = { tension: 45, friction: 9, useNativeDriver: NATIVE_DRIVER } as const;
+const TIMING_CFG   = { duration: 280, easing: Easing.out(Easing.ease), useNativeDriver: NATIVE_DRIVER } as const;
 
-// Zoom parameters
-const ZOOM_SCALE      = 1.38;
-const NATIVE_DRIVER   = Platform.OS !== "web";
-const SPRING_CFG      = { tension: 45, friction: 9, useNativeDriver: NATIVE_DRIVER } as const;
-const TIMING_CFG      = { duration: 280, easing: Easing.out(Easing.ease), useNativeDriver: NATIVE_DRIVER } as const;
-
-// ── Data types ──────────────────────────────────────────────────────────────────
+// ── Hotspot data ────────────────────────────────────────────────────────────────
 
 export interface Hotspot {
   id: string;
   name: string;
   description: string;
   tagline: string;
-  xPct: number;   // % from left
-  yPct: number;   // % from top
+  xPct: number;
+  yPct: number;
   bairros: string[];
 }
-
-// ── Rio de Janeiro — hotspot data (portrait image positions) ────────────────────
-//
-// Positions estimated visually from the portrait aerial photo.
-// Upper-left = open ocean. The image shows Rio from SW looking NE.
 
 export const RIO_HOTSPOTS: Hotspot[] = [
   {
@@ -122,11 +117,41 @@ export const RIO_HOTSPOTS: Hotspot[] = [
   },
 ];
 
-// ── Zoom helper ────────────────────────────────────────────────────────────────
+// ── Editorial label data ────────────────────────────────────────────────────────
+//
+// Positions are % of the map container (portrait aerial photo, SW→NE orientation).
+// Manually placed to align with the image geography.
+
+interface MapLabel {
+  id: string;
+  name: string;
+  type: "neighborhood" | "landmark";
+  xPct: number;
+  yPct: number;
+  hotspotId: string | null;   // null → no associated hotspot (landmark without its own card)
+  labelW?: number;             // override container width if needed
+  align?: "left" | "center" | "right";
+}
+
+const RIO_LABELS: MapLabel[] = [
+  // ── Neighborhood labels ──
+  // Barra: the long beach upper-left; nudged right/down to clear the Voltar pill
+  { id: "l-barra",      name: "Barra da Tijuca",          type: "neighborhood", xPct: 20,  yPct: 23,  hotspotId: "barra"                    },
+  { id: "l-saoconrado", name: "São Conrado",               type: "neighborhood", xPct: 30,  yPct: 36,  hotspotId: "barra"                    },
+  { id: "l-leblon",     name: "Leblon",                    type: "neighborhood", xPct: 25,  yPct: 68,  hotspotId: "leblon"                   },
+  { id: "l-ipanema",    name: "Ipanema",                   type: "neighborhood", xPct: 41,  yPct: 71,  hotspotId: "ipanema"                  },
+  { id: "l-copa",       name: "Copacabana",                type: "neighborhood", xPct: 57,  yPct: 73,  hotspotId: "copacabana"               },
+  { id: "l-botafogo",   name: "Botafogo",                  type: "neighborhood", xPct: 67,  yPct: 76,  hotspotId: "centro"                   },
+  { id: "l-centro",     name: "Centro",                    type: "neighborhood", xPct: 80,  yPct: 80,  hotspotId: "centro"                   },
+  // ── Landmark labels ──
+  { id: "l-cristo",     name: "Cristo Redentor",           type: "landmark",     xPct: 37,  yPct: 38,  hotspotId: "cristoredentor", labelW: 88 },
+  { id: "l-lagoa",      name: "Lagoa Rodrigo\nde Freitas", type: "landmark",     xPct: 50,  yPct: 55,  hotspotId: "lagoa",          labelW: 102 },
+  { id: "l-maracana",   name: "Maracanã",                  type: "landmark",     xPct: 79,  yPct: 26,  hotspotId: null                       },
+];
+
+// ── Zoom helper ─────────────────────────────────────────────────────────────────
 
 function calcTranslate(hotspot: Hotspot) {
-  // Move the map so the hotspot is near the center of the visible frame.
-  // Formula: shift by (center - hotspot_pos) * (1 - 1/scale) 
   const cx = MAP_ZONE_W / 2;
   const cy = MAP_ZONE_H / 2;
   const hx = (hotspot.xPct / 100) * MAP_ZONE_W;
@@ -138,7 +163,49 @@ function calcTranslate(hotspot: Hotspot) {
   };
 }
 
-// ── MapZoneOverlay (main export) ────────────────────────────────────────────────
+// ── Label item (renders inside the zoomable Animated.View) ────────────────────
+
+function MapLabelItem({ label, isActive }: { label: MapLabel; isActive: boolean }) {
+  const isNeighborhood = label.type === "neighborhood";
+  const containerW     = label.labelW ?? (isNeighborhood ? 88 : 100);
+  const leftPx         = (label.xPct / 100) * MAP_ZONE_W;
+  const topPx          = (label.yPct / 100) * MAP_ZONE_H;
+
+  return (
+    <View
+      style={[
+        lbl.container,
+        {
+          left: leftPx - containerW / 2,
+          top:  topPx,
+          width: containerW,
+          pointerEvents: "none",
+        },
+      ]}
+    >
+      {/* Tiny dot for neighborhoods */}
+      {isNeighborhood && (
+        <View
+          style={[
+            lbl.dot,
+            isActive && lbl.dotActive,
+          ]}
+        />
+      )}
+      {/* Label text */}
+      <Text
+        style={[
+          isNeighborhood ? lbl.neighborhood : lbl.landmark,
+          isActive && lbl.textActive,
+        ]}
+      >
+        {label.name}
+      </Text>
+    </View>
+  );
+}
+
+// ── MapZoneOverlay (main component) ────────────────────────────────────────────
 
 interface MapZoneOverlayProps {
   onBack?: () => void;
@@ -159,13 +226,11 @@ export function MapZoneOverlay({
 }: MapZoneOverlayProps) {
   const controlTop = topInset + 10;
 
-  // ── Animation values ──────────────────────────────────────────────────────
   const mapScale      = useRef(new Animated.Value(1)).current;
   const mapTranslateX = useRef(new Animated.Value(0)).current;
   const mapTranslateY = useRef(new Animated.Value(0)).current;
   const dimOpacity    = useRef(new Animated.Value(0)).current;
 
-  // ── React to selectedHotspot changes ─────────────────────────────────────
   useEffect(() => {
     if (selectedHotspot) {
       const hs = RIO_HOTSPOTS.find((h) => h.id === selectedHotspot);
@@ -175,7 +240,7 @@ export function MapZoneOverlay({
         Animated.spring(mapScale,      { toValue: ZOOM_SCALE, ...SPRING_CFG }),
         Animated.spring(mapTranslateX, { toValue: tx,         ...SPRING_CFG }),
         Animated.spring(mapTranslateY, { toValue: ty,         ...SPRING_CFG }),
-        Animated.timing(dimOpacity,    { toValue: 0.30,       ...TIMING_CFG }),
+        Animated.timing(dimOpacity,    { toValue: 0.32,       ...TIMING_CFG }),
       ]).start();
     } else {
       Animated.parallel([
@@ -188,6 +253,12 @@ export function MapZoneOverlay({
   }, [selectedHotspot]);
 
   const activeHotspot = RIO_HOTSPOTS.find((h) => h.id === selectedHotspot) ?? null;
+
+  // Which labels are associated with the active hotspot
+  const activeHotspotId = activeHotspot?.id ?? null;
+  const activeLabels    = RIO_LABELS.filter((l) => l.hotspotId === activeHotspotId);
+  const nonActiveLabels = RIO_LABELS.filter((l) => l.hotspotId !== activeHotspotId);
+
   const badgeLabel =
     activeHotspot && filteredCount !== undefined
       ? `${filteredCount} local${filteredCount !== 1 ? "is" : ""}`
@@ -196,7 +267,7 @@ export function MapZoneOverlay({
   return (
     <View style={s.root}>
 
-      {/* ── Zoomable map layer ── */}
+      {/* ── Zoomable layer ── */}
       <Animated.View
         style={[
           s.mapInner,
@@ -209,26 +280,45 @@ export function MapZoneOverlay({
           },
         ]}
       >
-        {/* The editorial aerial photo */}
+        {/* Editorial aerial photo */}
         <Animated.Image
           source={require("../assets/images/map-rio-portrait.png")}
-          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-          // @ts-ignore — resizeMode prop vs style differs per RN version
+          // @ts-ignore
           resizeMode="cover"
           style={s.mapImage}
         />
 
-        {/* Dim overlay — deepens when any hotspot is active */}
-        <Animated.View style={[s.dimOverlay, { opacity: dimOpacity }]} />
+        {/* ── Layer 1: Non-active labels (sit below dim → get softened) ── */}
+        {nonActiveLabels.map((label) => (
+          <MapLabelItem
+            key={label.id}
+            label={label}
+            isActive={false}
+          />
+        ))}
 
-        {/* Full-map background Pressable — tap anywhere to dismiss */}
+        {/* ── Layer 2: Dim overlay ── */}
+        <Animated.View
+          style={[s.dimOverlay, { opacity: dimOpacity, pointerEvents: "none" }]}
+        />
+
+        {/* ── Layer 3: Active labels (above dim → always legible) ── */}
+        {activeHotspotId !== null && activeLabels.map((label) => (
+          <MapLabelItem
+            key={label.id}
+            label={label}
+            isActive={true}
+          />
+        ))}
+
+        {/* Background Pressable — tap outside hotspot to dismiss */}
         <Pressable
           style={StyleSheet.absoluteFillObject}
           onPress={() => onHotspotPress?.(null)}
           accessibilityLabel="Fechar bairro"
         />
 
-        {/* Invisible hotspot touch areas (rendered on top of background Pressable) */}
+        {/* Invisible hotspot touch areas */}
         {RIO_HOTSPOTS.map((hotspot) => {
           const left = (hotspot.xPct / 100) * MAP_ZONE_W - HIT_SIZE / 2;
           const top  = (hotspot.yPct / 100) * MAP_ZONE_H - HIT_SIZE / 2;
@@ -248,9 +338,8 @@ export function MapZoneOverlay({
         })}
       </Animated.View>
 
-      {/* ── Controls (above zoom layer, unaffected by transform) ── */}
+      {/* ── Fixed controls (outside zoomable layer) ── */}
 
-      {/* Voltar */}
       {onBack && (
         <Pressable
           onPress={onBack}
@@ -262,16 +351,14 @@ export function MapZoneOverlay({
         </Pressable>
       )}
 
-      {/* Count badge */}
       <View style={[s.controlPill, { top: controlTop, right: 16 }]}>
         <View style={[s.badgeDot, activeHotspot && s.badgeDotActive]} />
         <Text style={s.controlPillText}>{badgeLabel}</Text>
       </View>
 
-      {/* Hint strip (inside map, bottom) — only when idle */}
       {!activeHotspot && (
         <View style={s.hintStrip}>
-          <Feather name="map-pin" size={10} color="rgba(255,255,255,0.32)" />
+          <Feather name="map-pin" size={10} color="rgba(255,255,255,0.28)" />
           <Text style={s.hintText}>Toque num bairro para explorar</Text>
         </View>
       )}
@@ -279,7 +366,7 @@ export function MapZoneOverlay({
   );
 }
 
-// ── NeighborhoodCard (exported — rendered at screen level) ────────────────────
+// ── NeighborhoodCard ────────────────────────────────────────────────────────────
 
 export interface NeighborhoodCardProps {
   hotspot: Hotspot;
@@ -302,7 +389,6 @@ export function NeighborhoodCard({
       tint="light"
       style={nc.card}
     >
-      {/* Header: name + X */}
       <View style={nc.header}>
         <Text style={nc.name}>{hotspot.name}</Text>
         <Pressable
@@ -349,6 +435,16 @@ export function NeighborhoodCard({
 
 // ── Styles ──────────────────────────────────────────────────────────────────────
 
+// textShadow shorthand (RN web) — fallback to long-form on native
+const TEXT_SHADOW: Record<string, unknown> =
+  Platform.OS === "web"
+    ? { textShadow: "0px 1px 7px rgba(0,0,0,0.82), 0px 0px 3px rgba(0,0,0,0.60)" }
+    : {
+        textShadowColor: "rgba(0,0,0,0.72)",
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 6,
+      };
+
 const s = StyleSheet.create({
   root: {
     width: MAP_ZONE_W,
@@ -356,24 +452,18 @@ const s = StyleSheet.create({
     backgroundColor: "#060810",
     overflow: "hidden",
   },
-
-  // The zoomable layer — transform is applied to this
   mapInner: {
     ...StyleSheet.absoluteFillObject,
   },
-
   mapImage: {
     ...StyleSheet.absoluteFillObject,
     width: "100%",
     height: "100%",
   },
-
   dimOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "#000",
   },
-
-  // Invisible hotspot — just a touch area
   hotspotHit: {
     position: "absolute",
     width: HIT_SIZE,
@@ -381,8 +471,6 @@ const s = StyleSheet.create({
     borderRadius: HIT_SIZE / 2,
     backgroundColor: "transparent",
   },
-
-  // Hint strip
   hintStrip: {
     position: "absolute",
     bottom: 12,
@@ -397,11 +485,9 @@ const s = StyleSheet.create({
   hintText: {
     fontFamily: "Inter_400Regular",
     fontSize: 10,
-    color: "rgba(255,255,255,0.30)",
+    color: "rgba(255,255,255,0.28)",
     letterSpacing: 0.3,
   },
-
-  // Control pills (above zoom, fixed position)
   controlPill: {
     position: "absolute",
     flexDirection: "row",
@@ -429,6 +515,49 @@ const s = StyleSheet.create({
     backgroundColor: "#C9A84C",
   },
 });
+
+// ── Label styles ────────────────────────────────────────────────────────────────
+
+const lbl = StyleSheet.create({
+  container: {
+    position: "absolute",
+    alignItems: "center",
+  },
+  dot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: "rgba(255,255,255,0.55)",
+    marginBottom: 2,
+  },
+  dotActive: {
+    backgroundColor: "rgba(255,255,255,0.95)",
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+  },
+  neighborhood: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 9.5,
+    color: "rgba(255,255,255,0.80)",
+    letterSpacing: 0.55,
+    textAlign: "center",
+    ...TEXT_SHADOW,
+  },
+  landmark: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 8,
+    color: "rgba(255,255,255,0.58)",
+    letterSpacing: 0.3,
+    textAlign: "center",
+    ...TEXT_SHADOW,
+  },
+  textActive: {
+    color: "rgba(255,255,255,0.96)",
+  },
+});
+
+// ── NeighborhoodCard styles ─────────────────────────────────────────────────────
 
 const nc = StyleSheet.create({
   card: {
