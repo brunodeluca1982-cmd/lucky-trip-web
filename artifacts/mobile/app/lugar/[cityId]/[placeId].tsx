@@ -1,21 +1,28 @@
 /**
- * Place Detail Screen
+ * Place Detail Screen — single reusable component for the entire app.
  *
- * Route: /lugar/[cityId]/[placeId]
- * Reached from: O que fazer card tap, or "Ver no mapa" button.
+ * Route:  /lugar/[cityId]/[placeId]
+ * Source: any card tap from O que fazer / Comer bem / Ficar bem / Lucky List
  *
- * Layout:
- * - Cinematic hero image (fullscreen, gradient overlay)
- * - Scrollable content floats over: tags → title → description → actions
- * - "Ver no mapa" toggles the illustrated map with a single pin for this place
- * - Map is hidden by default; appears only when the user explicitly requests it
+ * Layout (top → bottom, all absolute/scroll layers on one root View):
+ *   1. Fullscreen hero image (absoluteFillObject — NEVER split into sections)
+ *   2. Gradient overlay
+ *   3. Fixed back button (top-left)
+ *   4. Carousel dots indicator (bottom of hero zone)
+ *   5. Vertical ScrollView: spacer → content card (tags / title / desc / map / actions)
+ *
+ * Content is fully dynamic — layout is identical for all categories.
+ * "Ver no mapa" toggles the illustrated map with a single pin for this place.
  */
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
+  Animated,
   Dimensions,
   Image,
   ImageSourcePropType,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   Pressable,
   ScrollView,
@@ -34,8 +41,12 @@ import { IllustratedMap, MapPlace } from "@/components/IllustratedMap";
 const C = Colors.light;
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
-const MAP_RIO = require("../../../assets/images/map-rio.png");
+// Hero occupies ~50% of screen height; content scrolls up from below
+const HERO_HEIGHT = SCREEN_HEIGHT * 0.50;
+// How far the content spacer pushes down before the card starts
+const SPACER_H = HERO_HEIGHT - 72;
 
+const MAP_RIO = require("../../../assets/images/map-rio.png");
 function getMapImage(cityId: string): ImageSourcePropType {
   switch (cityId) {
     case "rio": return MAP_RIO;
@@ -43,7 +54,6 @@ function getMapImage(cityId: string): ImageSourcePropType {
   }
 }
 
-// ── Fallback place for unknown ids ────────────────────────────────────────────
 const FALLBACK: LugarPlace = {
   id: "0",
   titulo: "Local",
@@ -55,22 +65,36 @@ const FALLBACK: LugarPlace = {
   yPct: 50,
 };
 
-// ── Screen ────────────────────────────────────────────────────────────────────
+// ── Screen ─────────────────────────────────────────────────────────────────────
 
 export default function LugarDetailScreen() {
   const { cityId, placeId, showMap: showMapParam } =
     useLocalSearchParams<{ cityId: string; placeId: string; showMap?: string }>();
 
   const insets = useSafeAreaInsets();
-  const topInset = Platform.OS === "web" ? 67 : insets.top;
+  const topInset  = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
-  const place = getLugar(cityId, placeId) ?? FALLBACK;
+  const place  = getLugar(cityId, placeId) ?? FALLBACK;
+  const images: ImageSourcePropType[] = place.images ?? [place.image];
 
-  // Map starts visible if navigated here via "Ver no mapa"
+  // Carousel state
+  const [imgIndex, setImgIndex] = useState(0);
+  const carouselRef = useRef<ScrollView>(null);
+
+  // Map toggle — starts visible if navigated here via "Ver no mapa"
   const [showMap, setShowMap] = useState(showMapParam === "true");
+  const [saved, setSaved] = useState(false);
 
-  // Single-pin data for the illustrated map
+  // Scroll sync for carousel
+  function handleCarouselScroll(
+    e: NativeSyntheticEvent<NativeScrollEvent>,
+  ) {
+    const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+    setImgIndex(idx);
+  }
+
+  // Single-pin for the map
   const mapPin: MapPlace = {
     id: place.id,
     titulo: place.titulo,
@@ -80,102 +104,179 @@ export default function LugarDetailScreen() {
     yPct: place.yPct,
   };
 
-  const HERO_HEIGHT = SCREEN_HEIGHT * 0.44;
-  const SPACER_H = HERO_HEIGHT - 60; // scroll content starts 60px before hero ends
-
   return (
     <View style={s.root}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* ── Hero image — fullscreen background ── */}
-      <Image
-        source={place.image}
-        style={StyleSheet.absoluteFill}
-        resizeMode="cover"
-      />
+      {/* ══════════════════════════════════════════════════════
+          1. HERO CAROUSEL — horizontal paging ScrollView.
+             Each image is SCREEN_WIDTH wide; shows fullscreen.
+             Falls back to single image when place.images is absent.
+      ══════════════════════════════════════════════════════ */}
+      <ScrollView
+        ref={carouselRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={handleCarouselScroll}
+        style={s.carousel}
+        scrollEnabled={images.length > 1}
+      >
+        {images.map((src, i) => (
+          <Image
+            key={i}
+            source={src}
+            style={s.carouselImage}
+            resizeMode="cover"
+          />
+        ))}
+      </ScrollView>
 
-      {/* ── Gradient overlay — transparent at top, solid dark at ~45% ── */}
+      {/* ══════════════════════════════════════════════════════
+          2. GRADIENT — transparent at top, solid dark at ~52%
+      ══════════════════════════════════════════════════════ */}
       <LinearGradient
-        colors={["transparent", "rgba(10,5,2,0.72)", "#0A0502"]}
-        locations={[0.18, 0.46, 0.68]}
-        style={StyleSheet.absoluteFill}
+        colors={[
+          "rgba(0,0,0,0.06)",
+          "rgba(10,5,2,0.55)",
+          "#0A0502",
+          "#0A0502",
+        ]}
+        locations={[0.12, 0.44, 0.64, 1]}
+        style={s.gradient}
       />
 
-      {/* ── Fixed back button ── */}
+      {/* ══════════════════════════════════════════════════════
+          3. BACK BUTTON — fixed top-left
+      ══════════════════════════════════════════════════════ */}
       <Pressable
-        style={[s.backBtn, { top: topInset + 10 }]}
+        style={[s.backBtn, { top: topInset + 12 }]}
         onPress={() => router.back()}
         hitSlop={10}
       >
-        <Feather name="arrow-left" size={15} color={C.white} />
+        <Feather name="arrow-left" size={14} color={C.white} />
         <Text style={s.backBtnText}>Voltar</Text>
       </Pressable>
 
-      {/* ── Scrollable content ── */}
+      {/* Photo counter — top-right */}
+      {images.length > 1 && (
+        <View style={[s.photoCounter, { top: topInset + 18 }]}>
+          <Text style={s.photoCounterText}>
+            {imgIndex + 1} / {images.length}
+          </Text>
+        </View>
+      )}
+
+      {/* ══════════════════════════════════════════════════════
+          4. CAROUSEL DOTS — sits at the bottom of the hero zone,
+             above the gradient fade, centered horizontally.
+      ══════════════════════════════════════════════════════ */}
+      <View style={[s.dotsRow, { top: HERO_HEIGHT - 48 }]}>
+        {images.map((_, i) => (
+          <Pressable
+            key={i}
+            hitSlop={8}
+            onPress={() => {
+              setImgIndex(i);
+              carouselRef.current?.scrollTo({ x: i * SCREEN_WIDTH, animated: true });
+            }}
+          >
+            <View style={[s.dot, i === imgIndex ? s.dotActive : s.dotInactive]} />
+          </Pressable>
+        ))}
+      </View>
+
+      {/* ══════════════════════════════════════════════════════
+          5. VERTICAL SCROLL — content card lifts from below hero
+      ══════════════════════════════════════════════════════ */}
       <ScrollView
-        style={StyleSheet.absoluteFill}
+        style={s.contentScroll}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: bottomPad + 40 }}
+        contentContainerStyle={{ paddingBottom: bottomPad + 48 }}
       >
-        {/* Spacer: lets the hero show behind the content */}
+        {/* Spacer: preserves hero visibility */}
         <View style={{ height: SPACER_H }} />
 
-        {/* Tags row */}
-        <View style={s.tags}>
-          <View style={s.tag}>
-            <Text style={s.tagText}>{place.categoria}</Text>
+        {/* ── Content card ── */}
+        <View style={s.contentCard}>
+
+          {/* Tags row: CATEGORIA + BAIRRO */}
+          <View style={s.tagsRow}>
+            <View style={s.tag}>
+              <Text style={s.tagText}>{place.categoria}</Text>
+            </View>
+            <View style={s.tagSep} />
+            <View style={s.tag}>
+              <Feather name="map-pin" size={9} color="rgba(255,255,255,0.55)" style={{ marginRight: 4 }} />
+              <Text style={s.tagText}>{place.localizacao}</Text>
+            </View>
           </View>
-          <View style={s.tag}>
-            <Text style={s.tagText}>{place.localizacao}</Text>
+
+          {/* Title */}
+          <Text style={s.titulo}>{place.titulo}</Text>
+
+          {/* Divider */}
+          <View style={s.titleDivider} />
+
+          {/* Description */}
+          <Text style={s.descricao}>{place.descricao}</Text>
+
+          {/* ── Illustrated map — toggled by "Ver no mapa" ── */}
+          {showMap && (
+            <View style={s.mapSection}>
+              <View style={s.mapHeader}>
+                <Feather name="map" size={13} color="rgba(255,255,255,0.50)" />
+                <Text style={s.mapHeaderText}>Localização</Text>
+              </View>
+              <IllustratedMap
+                mapImage={getMapImage(cityId)}
+                places={[mapPin]}
+                selectedId={place.id}
+              />
+            </View>
+          )}
+
+          {/* ── Action buttons ── */}
+          <View style={s.actions}>
+            {/* PRIMARY — Salvar */}
+            <Pressable
+              style={[s.btnPrimary, saved && s.btnPrimarySaved]}
+              onPress={() => setSaved((v) => !v)}
+            >
+              <Feather
+                name={saved ? "check" : "bookmark"}
+                size={16}
+                color={saved ? C.terracotta : C.darkBrown}
+              />
+              <Text style={[s.btnPrimaryText, saved && s.btnPrimaryTextSaved]}>
+                {saved ? "Salvo" : "Salvar"}
+              </Text>
+            </Pressable>
+
+            {/* SECONDARY — Ver no mapa / Ocultar mapa */}
+            <Pressable
+              style={[s.btnSecondary, showMap && s.btnSecondaryActive]}
+              onPress={() => setShowMap((v) => !v)}
+            >
+              <Feather
+                name="map-pin"
+                size={16}
+                color={showMap ? C.terracotta : "rgba(255,255,255,0.65)"}
+              />
+              <Text style={[s.btnSecondaryText, showMap && s.btnSecondaryTextActive]}>
+                {showMap ? "Ocultar mapa" : "Ver no mapa"}
+              </Text>
+            </Pressable>
           </View>
-        </View>
 
-        {/* Title */}
-        <Text style={s.titulo}>{place.titulo}</Text>
-
-        {/* Description */}
-        <Text style={s.descricao}>{place.descricao}</Text>
-
-        {/* ── Illustrated map — revealed when user taps "Ver no mapa" ── */}
-        {showMap && (
-          <View style={s.mapSection}>
-            <IllustratedMap
-              mapImage={getMapImage(cityId)}
-              places={[mapPin]}
-              selectedId={place.id}
-            />
-          </View>
-        )}
-
-        {/* ── Action buttons ── */}
-        <View style={s.actions}>
-          {/* Salvar */}
-          <Pressable style={s.btnSalvar}>
-            <Feather name="bookmark" size={16} color={C.darkBrown} />
-            <Text style={s.btnSalvarText}>Salvar</Text>
-          </Pressable>
-
-          {/* Ver no mapa / Ocultar mapa */}
-          <Pressable
-            style={s.btnMapa}
-            onPress={() => setShowMap((v) => !v)}
-          >
-            <Feather
-              name="map-pin"
-              size={16}
-              color={showMap ? C.terracotta : "rgba(255,255,255,0.70)"}
-            />
-            <Text style={[s.btnMapaText, showMap && s.btnMapaTextActive]}>
-              {showMap ? "Ocultar mapa" : "Ver no mapa"}
-            </Text>
-          </Pressable>
         </View>
       </ScrollView>
     </View>
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
+// ── Styles ──────────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
   root: {
@@ -183,17 +284,42 @@ const s = StyleSheet.create({
     backgroundColor: "#0A0502",
   },
 
+  // ── Hero carousel ──
+  carousel: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: HERO_HEIGHT,
+    zIndex: 0,
+  },
+  carouselImage: {
+    width: SCREEN_WIDTH,
+    height: HERO_HEIGHT,
+  },
+
+  // ── Gradient ──
+  gradient: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: SCREEN_HEIGHT,
+    zIndex: 1,
+  },
+
+  // ── Back button ──
   backBtn: {
     position: "absolute",
     left: 18,
+    zIndex: 20,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    zIndex: 20,
-    backgroundColor: "rgba(0,0,0,0.36)",
-    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.38)",
+    borderRadius: 22,
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 9,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.14)",
   },
@@ -201,97 +327,211 @@ const s = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 13,
     color: C.white,
-    letterSpacing: 0.2,
+    letterSpacing: 0.1,
   },
 
-  tags: {
+  // ── Photo counter ──
+  photoCounter: {
+    position: "absolute",
+    right: 18,
+    zIndex: 20,
+    backgroundColor: "rgba(0,0,0,0.42)",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+  },
+  photoCounterText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    color: "rgba(255,255,255,0.80)",
+    letterSpacing: 0.5,
+  },
+
+  // ── Carousel dots ──
+  dotsRow: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    zIndex: 10,
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+  },
+  dot: {
+    borderRadius: 4,
+    height: 4,
+  },
+  dotActive: {
+    width: 20,
+    backgroundColor: C.white,
+  },
+  dotInactive: {
+    width: 6,
+    backgroundColor: "rgba(255,255,255,0.38)",
+  },
+
+  // ── Content scroll ──
+  contentScroll: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 5,
+  },
+
+  // ── Content card ──
+  contentCard: {
+    backgroundColor: "#0A0502",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 28,
     paddingHorizontal: 22,
-    marginBottom: 14,
+    paddingBottom: 12,
+    // Subtle top border to give the card a "lifted" edge
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.06)",
+  },
+
+  // ── Tags ──
+  tagsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 0,
+    marginBottom: 16,
   },
   tag: {
-    backgroundColor: "rgba(255,255,255,0.10)",
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
     borderRadius: 20,
-    paddingHorizontal: 14,
+    paddingHorizontal: 13,
     paddingVertical: 6,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.16)",
+    borderColor: "rgba(255,255,255,0.13)",
+  },
+  tagSep: {
+    width: 8,
   },
   tagText: {
     fontFamily: "Inter_500Medium",
-    fontSize: 11,
-    color: "rgba(255,255,255,0.78)",
-    letterSpacing: 1.1,
+    fontSize: 10,
+    color: "rgba(255,255,255,0.72)",
+    letterSpacing: 1.2,
     textTransform: "uppercase",
   },
 
+  // ── Title ──
   titulo: {
     fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 36,
+    fontSize: 34,
     color: C.white,
-    lineHeight: 46,
-    letterSpacing: -0.5,
-    paddingHorizontal: 22,
-    marginBottom: 18,
+    lineHeight: 44,
+    letterSpacing: -0.4,
+    marginBottom: 16,
   },
 
+  // ── Divider ──
+  titleDivider: {
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    marginBottom: 18,
+    marginHorizontal: 0,
+  },
+
+  // ── Description ──
   descricao: {
     fontFamily: "Inter_400Regular",
     fontSize: 15,
     color: "rgba(255,255,255,0.68)",
     lineHeight: 26,
     letterSpacing: 0.1,
-    paddingHorizontal: 22,
     marginBottom: 28,
   },
 
+  // ── Map section ──
   mapSection: {
     marginBottom: 24,
-    borderRadius: 0,
+    borderRadius: 16,
     overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  mapHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.06)",
+  },
+  mapHeaderText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    color: "rgba(255,255,255,0.48)",
+    letterSpacing: 1.0,
+    textTransform: "uppercase",
   },
 
+  // ── Actions ──
   actions: {
-    paddingHorizontal: 22,
     gap: 12,
   },
 
-  btnSalvar: {
+  // Primary — Salvar
+  btnPrimary: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
     backgroundColor: C.cream,
     borderRadius: 14,
-    paddingVertical: 16,
+    paddingVertical: 17,
   },
-  btnSalvarText: {
+  btnPrimarySaved: {
+    backgroundColor: "rgba(196,112,74,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(196,112,74,0.30)",
+  },
+  btnPrimaryText: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 14,
     color: C.darkBrown,
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
+  },
+  btnPrimaryTextSaved: {
+    color: C.terracotta,
   },
 
-  btnMapa: {
+  // Secondary — Ver no mapa
+  btnSecondary: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
-    backgroundColor: "rgba(255,255,255,0.07)",
+    backgroundColor: "rgba(255,255,255,0.06)",
     borderRadius: 14,
-    paddingVertical: 16,
+    paddingVertical: 17,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(255,255,255,0.10)",
   },
-  btnMapaText: {
+  btnSecondaryActive: {
+    backgroundColor: "rgba(196,112,74,0.08)",
+    borderColor: "rgba(196,112,74,0.28)",
+  },
+  btnSecondaryText: {
     fontFamily: "Inter_500Medium",
     fontSize: 14,
-    color: "rgba(255,255,255,0.70)",
-    letterSpacing: 0.3,
+    color: "rgba(255,255,255,0.68)",
+    letterSpacing: 0.2,
   },
-  btnMapaTextActive: {
+  btnSecondaryTextActive: {
     color: C.terracotta,
   },
 });

@@ -17,6 +17,7 @@ export interface LugarPlace {
   categoria: string;
   descricao: string;
   image: ImageSourcePropType;
+  images?: ImageSourcePropType[]; // optional multi-image carousel; falls back to [image]
   preco?: string;
   xPct: number;
   yPct: number;
