@@ -186,7 +186,33 @@ export default function CidadeScreen() {
             </View>
           </GlassButton>
 
-          {/* 3. O que fazer */}
+          {/* 3. Onde ficar */}
+          <GlassButton
+            style={s.btnStandard}
+            onPress={() =>
+              router.push({ pathname: "/ficarBem/[id]", params: { id: destino.id } })
+            }
+          >
+            <View style={s.btnStandardInner}>
+              <Feather name="moon" size={16} color="rgba(255,255,255,0.70)" />
+              <Text style={s.btnStandardLabel}>Onde ficar</Text>
+            </View>
+          </GlassButton>
+
+          {/* 4. Onde comer */}
+          <GlassButton
+            style={s.btnStandard}
+            onPress={() =>
+              router.push({ pathname: "/comerBem/[id]", params: { id: destino.id } })
+            }
+          >
+            <View style={s.btnStandardInner}>
+              <Feather name="coffee" size={16} color="rgba(255,255,255,0.70)" />
+              <Text style={s.btnStandardLabel}>Onde comer</Text>
+            </View>
+          </GlassButton>
+
+          {/* 5. O que fazer */}
           <GlassButton
             style={s.btnStandard}
             onPress={() =>
@@ -199,33 +225,7 @@ export default function CidadeScreen() {
             </View>
           </GlassButton>
 
-          {/* 4. Comer bem */}
-          <GlassButton
-            style={s.btnStandard}
-            onPress={() =>
-              router.push({ pathname: "/comerBem/[id]", params: { id: destino.id } })
-            }
-          >
-            <View style={s.btnStandardInner}>
-              <Feather name="coffee" size={16} color="rgba(255,255,255,0.70)" />
-              <Text style={s.btnStandardLabel}>Comer bem</Text>
-            </View>
-          </GlassButton>
-
-          {/* 5. Ficar bem */}
-          <GlassButton
-            style={s.btnStandard}
-            onPress={() =>
-              router.push({ pathname: "/ficarBem/[id]", params: { id: destino.id } })
-            }
-          >
-            <View style={s.btnStandardInner}>
-              <Feather name="moon" size={16} color="rgba(255,255,255,0.70)" />
-              <Text style={s.btnStandardLabel}>Ficar bem</Text>
-            </View>
-          </GlassButton>
-
-          {/* 6. Sua Lucky List */}
+          {/* 6. Lucky List */}
           <GlassButton
             style={[s.btnStandard, s.btnLucky]}
             onPress={() =>
@@ -234,7 +234,7 @@ export default function CidadeScreen() {
           >
             <View style={s.btnStandardInner}>
               <Text style={s.luckyIcon}>✦</Text>
-              <Text style={s.btnLuckyLabel}>Sua Lucky List</Text>
+              <Text style={s.btnLuckyLabel}>Lucky List</Text>
             </View>
           </GlassButton>
 
@@ -297,7 +297,7 @@ export default function CidadeScreen() {
 
           <View style={s.section}>
             <SectionHeader
-              title="Comer bem"
+              title="Onde comer"
               subtitle={`Restaurantes com alma em ${destino.cidade}.`}
             />
             <HorizontalScroll>
@@ -318,7 +318,7 @@ export default function CidadeScreen() {
 
           <View style={s.section}>
             <SectionHeader
-              title="Ficar bem"
+              title="Onde ficar"
               subtitle={`Hospedagem com personalidade em ${destino.cidade}.`}
             />
             <HorizontalScroll>

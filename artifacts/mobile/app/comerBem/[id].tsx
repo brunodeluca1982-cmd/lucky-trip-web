@@ -82,7 +82,7 @@ export default function ComerBemScreen() {
       >
         {/* ── Description block ── */}
         <View style={s.descBlock}>
-          <Text style={s.descTitle}>Comer bem em {destino.cidade}</Text>
+          <Text style={s.descTitle}>Onde comer em {destino.cidade}</Text>
           {descricao.map((para, i) => (
             <Text key={i} style={s.descPara}>{para}</Text>
           ))}

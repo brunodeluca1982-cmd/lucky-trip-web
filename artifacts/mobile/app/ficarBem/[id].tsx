@@ -82,7 +82,7 @@ export default function FicarBemScreen() {
       >
         {/* ── Description block ── */}
         <View style={s.descBlock}>
-          <Text style={s.descTitle}>Ficar bem em {destino.cidade}</Text>
+          <Text style={s.descTitle}>Onde ficar em {destino.cidade}</Text>
           {descricao.map((para, i) => (
             <Text key={i} style={s.descPara}>{para}</Text>
           ))}
