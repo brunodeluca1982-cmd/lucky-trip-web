@@ -1,24 +1,22 @@
 /**
- * MapZoneOverlay — macro orientation layer for destination list screens.
+ * MapZoneOverlay — editorial map with neighborhood hotspots.
  *
- * Uses the illustrated map image as a base (unchanged).
- * Adds two interactive layers on top:
- *   1. Floating text labels for 8 neighborhoods (pointer-events: none)
- *   2. Invisible tappable rectangles for 5 macro zones
+ * Replaces large invisible zone rectangles with small, precise circular
+ * hotspot touch targets placed at the center of each neighborhood.
  *
- * Tapping a zone:
- *   → highlights it with a subtle terracotta wash
- *   → emits onZonePress(zoneId) so the parent can filter its place list
+ * Interaction model:
+ *   • Tap a hotspot → glow pulse animates, popup appears below map,
+ *     parent filters place list and scrolls to cards section.
+ *   • Tap X in popup (or same hotspot) → deselect.
  *
- * No pins. No Google Maps. No heavy controls.
- * This is an editorial orientation tool, not a navigation app.
- *
- * Used by: Onde ficar / Onde comer / O que fazer screens.
+ * No visible outlines or bounding boxes on the map.
  */
 
-import React from "react";
+import React, { useRef } from "react";
 import {
+  Animated,
   Dimensions,
+  Easing,
   Image,
   ImageSourcePropType,
   Pressable,
@@ -36,15 +34,23 @@ const MAP_ASPECT = 512 / 288;
 export const MAP_ZONE_W = SCREEN_WIDTH;
 export const MAP_ZONE_H = Math.round(MAP_ZONE_W / MAP_ASPECT);
 
+// Touch target diameter (px) — 44px meets mobile accessibility minimum
+const HIT_SIZE = 44;
+// Visible dot size when inactive
+const DOT_INACTIVE = 5;
+// Visible dot size when active
+const DOT_ACTIVE = 8;
+// Glow ring outer diameter when active
+const GLOW_SIZE = 28;
+
 // ── Data types ─────────────────────────────────────────────────────────────────
 
-export interface MacroZone {
+export interface Hotspot {
   id: string;
   name: string;
-  xMinPct: number;
-  xMaxPct: number;
-  yMinPct: number;
-  yMaxPct: number;
+  description: string;
+  xPct: number;
+  yPct: number;
   bairros: string[];
 }
 
@@ -55,89 +61,205 @@ interface FloatingLabel {
   width: number;
 }
 
-// ── Rio de Janeiro — zone definitions ──────────────────────────────────────────
-// Coordinates are % of the map image (512 × 288 px illustrated base).
-// xMin=0 is the left edge, yMin=0 is the top edge.
+// ── Rio de Janeiro hotspot config ──────────────────────────────────────────────
+// Positions are % of illustrated map image (512 × 288 px).
+// Each hotspot covers one or a small cluster of adjacent neighborhoods.
 
-export const RIO_ZONES: MacroZone[] = [
+export const RIO_HOTSPOTS: Hotspot[] = [
+  {
+    id: "leblon",
+    name: "Leblon",
+    description: "O bairro mais exclusivo do Rio — restaurantes premiados, livrarias e a melhor vista para o Dois Irmãos.",
+    xPct: 39,
+    yPct: 72,
+    bairros: ["Leblon"],
+  },
+  {
+    id: "ipanema",
+    name: "Ipanema",
+    description: "Boemia, moda e a praia que inspirou a bossa nova. Vibrante de manhã à noite.",
+    xPct: 48,
+    yPct: 72,
+    bairros: ["Ipanema", "Arpoador"],
+  },
+  {
+    id: "copacabana",
+    name: "Copacabana",
+    description: "Energia 24 horas, frente de mar icônica e uma mistura única de história e modernidade.",
+    xPct: 62,
+    yPct: 71,
+    bairros: ["Copacabana"],
+  },
+  {
+    id: "gavea",
+    name: "Gávea",
+    description: "Recanto intelectual do Rio — jardins, cachoeiras escondidas e gastronomia intimista.",
+    xPct: 45,
+    yPct: 50,
+    bairros: ["Gávea", "Jardim Botânico", "Lagoa"],
+  },
+  {
+    id: "botafogo",
+    name: "Botafogo",
+    description: "Jovem e criativo, com bares alternativos, cinemas e vista privilegiada para o Pão de Açúcar.",
+    xPct: 60,
+    yPct: 47,
+    bairros: ["Botafogo", "Urca", "Santa Teresa", "Lapa", "Flamengo", "Centro"],
+  },
   {
     id: "barra",
     name: "Barra da Tijuca",
-    xMinPct: 2,  xMaxPct: 30, yMinPct: 58, yMaxPct: 98,
+    description: "Praias extensas, natureza preservada e modernidade à beira-mar — o Rio além do cartão postal.",
+    xPct: 13,
+    yPct: 73,
     bairros: ["Barra da Tijuca", "São Conrado"],
-  },
-  {
-    id: "zona-sul",
-    name: "Zona Sul",
-    xMinPct: 30, xMaxPct: 96, yMinPct: 58, yMaxPct: 98,
-    bairros: ["Leblon", "Ipanema", "Arpoador", "Copacabana", "Leme", "Urca"],
-  },
-  {
-    id: "lagoa",
-    name: "Lagoa & Jardim Botânico",
-    xMinPct: 38, xMaxPct: 58, yMinPct: 40, yMaxPct: 67,
-    bairros: ["Lagoa", "Jardim Botânico", "Gávea", "Laranjeiras"],
-  },
-  {
-    id: "centro",
-    name: "Centro & Lapa",
-    xMinPct: 56, xMaxPct: 98, yMinPct: 14, yMaxPct: 60,
-    bairros: [
-      "Centro", "Lapa", "Santa Teresa",
-      "Botafogo", "Flamengo", "Catete", "Glória",
-    ],
-  },
-  {
-    id: "interior",
-    name: "Corcovado & Floresta",
-    xMinPct: 8,  xMaxPct: 54, yMinPct: 8,  yMaxPct: 58,
-    bairros: [
-      "Corcovado", "Floresta da Tijuca",
-      "Pedra da Gávea", "Morro Dois Irmãos",
-    ],
   },
 ];
 
-// Floating labels — centered at (xPct, yPct), rendered above zone rects
+// Floating text labels — orientation only, no interaction
 const RIO_LABELS: FloatingLabel[] = [
   { text: "BARRA DA TIJUCA",  xPct: 11, yPct: 67, width: 110 },
-  { text: "SÃO CONRADO",      xPct: 27, yPct: 73, width: 90  },
-  { text: "LEBLON",           xPct: 38, yPct: 61, width: 70  },
-  { text: "IPANEMA",          xPct: 48, yPct: 61, width: 70  },
+  { text: "SÃO CONRADO",      xPct: 27, yPct: 74, width: 90  },
+  { text: "LEBLON",           xPct: 38, yPct: 61, width: 68  },
+  { text: "IPANEMA",          xPct: 48, yPct: 61, width: 68  },
   { text: "COPACABANA",       xPct: 62, yPct: 60, width: 90  },
-  { text: "LAGOA",            xPct: 51, yPct: 52, width: 60  },
+  { text: "LAGOA",            xPct: 51, yPct: 52, width: 58  },
   { text: "CRISTO REDENTOR",  xPct: 34, yPct: 20, width: 110 },
   { text: "CENTRO",           xPct: 76, yPct: 25, width: 70  },
 ];
 
-// ── Props ──────────────────────────────────────────────────────────────────────
+// ── Sub-component: single animated hotspot ─────────────────────────────────────
+
+function HotspotPin({
+  hotspot,
+  isActive,
+  onPress,
+}: {
+  hotspot: Hotspot;
+  isActive: boolean;
+  onPress: () => void;
+}) {
+  const glowAnim = useRef(new Animated.Value(0)).current;
+
+  function triggerPulse() {
+    glowAnim.setValue(0);
+    Animated.sequence([
+      Animated.timing(glowAnim, {
+        toValue: 1,
+        duration: 280,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.timing(glowAnim, {
+        toValue: 0.4,
+        duration: 400,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }
+
+  function handlePress() {
+    if (!isActive) triggerPulse();
+    onPress();
+  }
+
+  const glowOpacity = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 0.55],
+  });
+  const glowScale = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.4, 1],
+  });
+
+  // Position: center the HIT_SIZE touch area at the hotspot coordinates
+  const cx = (hotspot.xPct / 100) * MAP_ZONE_W;
+  const cy = (hotspot.yPct / 100) * MAP_ZONE_H;
+  const left = cx - HIT_SIZE / 2;
+  const top  = cy - HIT_SIZE / 2;
+
+  return (
+    <Pressable
+      onPress={handlePress}
+      style={[hs.wrap, { left, top }]}
+      hitSlop={0}
+      accessibilityLabel={hotspot.name}
+      accessibilityRole="button"
+    >
+      {/* Glow ring — animates on press */}
+      <Animated.View
+        style={[
+          hs.glow,
+          {
+            opacity: isActive ? 0.35 : glowOpacity,
+            transform: [{ scale: isActive ? 1 : glowScale }],
+          },
+        ]}
+      />
+
+      {/* Visible dot */}
+      <View style={[hs.dot, isActive && hs.dotActive]} />
+    </Pressable>
+  );
+}
+
+const hs = StyleSheet.create({
+  wrap: {
+    position: "absolute",
+    width: HIT_SIZE,
+    height: HIT_SIZE,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  glow: {
+    position: "absolute",
+    width: GLOW_SIZE,
+    height: GLOW_SIZE,
+    borderRadius: GLOW_SIZE / 2,
+    backgroundColor: C.terracotta,
+  },
+  dot: {
+    width: DOT_INACTIVE,
+    height: DOT_INACTIVE,
+    borderRadius: DOT_INACTIVE / 2,
+    backgroundColor: "rgba(255,255,255,0.55)",
+  },
+  dotActive: {
+    width: DOT_ACTIVE,
+    height: DOT_ACTIVE,
+    borderRadius: DOT_ACTIVE / 2,
+    backgroundColor: C.terracotta,
+    boxShadow: `0px 0px 6px ${C.terracotta}`,
+  },
+});
+
+// ── Main component ─────────────────────────────────────────────────────────────
 
 interface MapZoneOverlayProps {
   mapImage: ImageSourcePropType;
   onBack?: () => void;
   topInset?: number;
   locaisLabel?: string;
-  selectedZone?: string | null;
-  onZonePress?: (zoneId: string | null) => void;
+  selectedHotspot?: string | null;
+  onHotspotPress?: (id: string | null) => void;
   filteredCount?: number;
 }
-
-// ── Component ──────────────────────────────────────────────────────────────────
 
 export function MapZoneOverlay({
   mapImage,
   onBack,
   topInset = 14,
   locaisLabel,
-  selectedZone,
-  onZonePress,
+  selectedHotspot,
+  onHotspotPress,
   filteredCount,
 }: MapZoneOverlayProps) {
   const controlTop = topInset + 10;
-  const activeZone = RIO_ZONES.find((z) => z.id === selectedZone) ?? null;
+  const activeHotspot = RIO_HOTSPOTS.find((h) => h.id === selectedHotspot) ?? null;
 
   const badgeLabel =
-    activeZone && filteredCount !== undefined
+    activeHotspot && filteredCount !== undefined
       ? `${filteredCount} local${filteredCount !== 1 ? "is" : ""}`
       : locaisLabel;
 
@@ -147,39 +269,13 @@ export function MapZoneOverlay({
       <View style={s.mapFrame}>
         <Image source={mapImage} style={s.mapImage} />
 
-        {/* Uniform dark wash — lifts label contrast without obscuring illustration */}
+        {/* Uniform dark wash — lifts label/dot contrast */}
         <View style={s.baseOverlay} />
 
-        {/* ── Zone 1: render larger/background zones first (lower z) ── */}
-        {RIO_ZONES.map((zone) => {
-          const isActive = zone.id === selectedZone;
-          const left  = (zone.xMinPct / 100) * MAP_ZONE_W;
-          const top   = (zone.yMinPct / 100) * MAP_ZONE_H;
-          const width = ((zone.xMaxPct - zone.xMinPct) / 100) * MAP_ZONE_W;
-          const height = ((zone.yMaxPct - zone.yMinPct) / 100) * MAP_ZONE_H;
-
-          return (
-            <Pressable
-              key={zone.id}
-              style={({ pressed }) => [
-                s.zoneRect,
-                { left, top, width, height },
-                isActive && s.zoneRectActive,
-                pressed && !isActive && s.zoneRectPressed,
-              ]}
-              onPress={() => onZonePress?.(isActive ? null : zone.id)}
-              accessibilityLabel={zone.name}
-              accessibilityRole="button"
-            />
-          );
-        })}
-
-        {/* ── Neighborhood labels — pointerEvents none so zones stay tappable ── */}
+        {/* ── Neighborhood text labels (orientation only, no touch) ── */}
         {RIO_LABELS.map((lbl) => {
-          // Center the label container at (xPct, yPct)
           const left = (lbl.xPct / 100) * MAP_ZONE_W - lbl.width / 2;
           const top  = (lbl.yPct / 100) * MAP_ZONE_H - 8;
-
           return (
             <View
               key={lbl.text}
@@ -190,7 +286,21 @@ export function MapZoneOverlay({
           );
         })}
 
-        {/* ── Voltar pill — top left ── */}
+        {/* ── Hotspot pins ── */}
+        {RIO_HOTSPOTS.map((hotspot) => (
+          <HotspotPin
+            key={hotspot.id}
+            hotspot={hotspot}
+            isActive={hotspot.id === selectedHotspot}
+            onPress={() =>
+              onHotspotPress?.(
+                hotspot.id === selectedHotspot ? null : hotspot.id
+              )
+            }
+          />
+        ))}
+
+        {/* ── Voltar pill ── */}
         {onBack && (
           <Pressable
             onPress={onBack}
@@ -202,40 +312,43 @@ export function MapZoneOverlay({
           </Pressable>
         )}
 
-        {/* ── Count badge — top right ── */}
+        {/* ── Count badge ── */}
         <View style={[s.controlPill, { top: controlTop, right: 16 }]}>
-          <View style={[s.badgeDot, activeZone && s.badgeDotActive]} />
+          <View style={[s.badgeDot, activeHotspot && s.badgeDotActive]} />
           <Text style={s.controlPillText}>{badgeLabel}</Text>
         </View>
       </View>
 
-      {/* ── Zone popup — slides in below map when a zone is active ── */}
-      {activeZone ? (
+      {/* ── Neighborhood popup — appears when a hotspot is active ── */}
+      {activeHotspot ? (
         <View style={s.popup}>
           <View style={s.popupLeft}>
-            <Text style={s.popupEyebrow}>ZONA SELECIONADA</Text>
+            <Text style={s.popupEyebrow}>BAIRRO SELECIONADO</Text>
             <Text style={s.popupTitle} numberOfLines={1}>
-              {activeZone.name}
+              {activeHotspot.name}
+            </Text>
+            <Text style={s.popupDesc} numberOfLines={2}>
+              {activeHotspot.description}
             </Text>
             {filteredCount === 0 && (
-              <Text style={s.popupHint}>Sem locais nesta categoria</Text>
+              <Text style={s.popupEmpty}>Sem locais nesta categoria</Text>
             )}
           </View>
 
           <Pressable
-            onPress={() => onZonePress?.(null)}
+            onPress={() => onHotspotPress?.(null)}
             style={s.popupDismiss}
             hitSlop={10}
-            accessibilityLabel="Remover filtro de zona"
+            accessibilityLabel="Fechar bairro"
           >
-            <Feather name="x" size={13} color="rgba(255,255,255,0.45)" />
+            <Feather name="x" size={13} color="rgba(255,255,255,0.50)" />
           </Pressable>
         </View>
       ) : (
-        /* Hint strip — only visible when no zone selected */
+        /* Hint strip */
         <View style={s.hintStrip}>
-          <Feather name="map" size={11} color="rgba(255,255,255,0.28)" />
-          <Text style={s.hintText}>Toque numa zona para filtrar</Text>
+          <Feather name="map-pin" size={11} color="rgba(255,255,255,0.25)" />
+          <Text style={s.hintText}>Toque num bairro para filtrar</Text>
         </View>
       )}
     </View>
@@ -265,22 +378,7 @@ const s = StyleSheet.create({
     backgroundColor: "rgba(6,3,1,0.20)",
   },
 
-  // ── Zone rectangles ──
-  zoneRect: {
-    position: "absolute",
-    backgroundColor: "transparent",
-  },
-  zoneRectActive: {
-    backgroundColor: "rgba(196,112,74,0.16)",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(196,112,74,0.45)",
-    borderRadius: 4,
-  },
-  zoneRectPressed: {
-    backgroundColor: "rgba(255,255,255,0.06)",
-  },
-
-  // ── Labels — editorial floating text ──
+  // ── Labels ──
   labelWrap: {
     position: "absolute",
     alignItems: "center",
@@ -288,13 +386,13 @@ const s = StyleSheet.create({
   labelText: {
     fontFamily: "Inter_500Medium",
     fontSize: 8,
-    color: "rgba(255,255,255,0.55)",
-    letterSpacing: 1.1,
+    color: "rgba(255,255,255,0.48)",
+    letterSpacing: 1.0,
     textAlign: "center",
     textShadow: "0px 1px 4px rgba(0,0,0,0.90)",
   },
 
-  // ── Control pills (Voltar / count badge) ──
+  // ── Control pills ──
   controlPill: {
     position: "absolute",
     flexDirection: "row",
@@ -322,7 +420,7 @@ const s = StyleSheet.create({
     backgroundColor: "#C9A84C",
   },
 
-  // ── Zone popup ──
+  // ── Popup ──
   popup: {
     marginHorizontal: 16,
     marginTop: 8,
@@ -331,14 +429,14 @@ const s = StyleSheet.create({
     backgroundColor: "rgba(20,12,6,0.97)",
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "rgba(196,112,74,0.30)",
+    borderColor: "rgba(196,112,74,0.28)",
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 10,
   },
   popupLeft: {
     flex: 1,
-    gap: 2,
+    gap: 3,
   },
   popupEyebrow: {
     fontFamily: "Inter_500Medium",
@@ -349,26 +447,35 @@ const s = StyleSheet.create({
   },
   popupTitle: {
     fontFamily: "PlayfairDisplay_600SemiBold",
-    fontSize: 16,
+    fontSize: 17,
     color: "#FFFFFF",
-    lineHeight: 22,
+    lineHeight: 23,
   },
-  popupHint: {
+  popupDesc: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: "rgba(255,255,255,0.55)",
+    lineHeight: 18,
+    marginTop: 1,
+  },
+  popupEmpty: {
     fontFamily: "Inter_400Regular",
     fontSize: 11,
-    color: "rgba(255,255,255,0.38)",
-    marginTop: 2,
+    color: "rgba(255,255,255,0.30)",
+    marginTop: 4,
+    fontStyle: "italic",
   },
   popupDismiss: {
-    width: 30,
-    height: 30,
+    width: 28,
+    height: 28,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(255,255,255,0.07)",
-    borderRadius: 15,
+    borderRadius: 14,
+    marginTop: 2,
   },
 
-  // ── Hint strip — shown when no zone is selected ──
+  // ── Hint strip ──
   hintStrip: {
     flexDirection: "row",
     alignItems: "center",
@@ -379,7 +486,7 @@ const s = StyleSheet.create({
   hintText: {
     fontFamily: "Inter_400Regular",
     fontSize: 11,
-    color: "rgba(255,255,255,0.28)",
+    color: "rgba(255,255,255,0.25)",
     letterSpacing: 0.2,
   },
 });

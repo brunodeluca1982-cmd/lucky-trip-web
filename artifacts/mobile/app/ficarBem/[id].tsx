@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   Dimensions,
   Image,
@@ -17,7 +17,7 @@ import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { destinos } from "@/data/mockData";
 import { LUGARES_FICAR } from "@/data/lugares";
-import { MapZoneOverlay, RIO_ZONES } from "@/components/MapZoneOverlay";
+import { MapZoneOverlay, RIO_HOTSPOTS } from "@/components/MapZoneOverlay";
 
 const C = Colors.light;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -57,11 +57,23 @@ export default function FicarBemScreen() {
   const allLugares = LUGARES_FICAR[destino.id] ?? [];
   const descricao = DESCRICOES[destino.id] ?? DEFAULT_DESCRICAO;
 
-  const [selectedZone, setSelectedZone] = useState<string | null>(null);
-  const activeZoneBairros = RIO_ZONES.find((z) => z.id === selectedZone)?.bairros ?? null;
-  const lugares = activeZoneBairros
-    ? allLugares.filter((p) => activeZoneBairros.includes(p.localizacao))
+  const [selectedHotspot, setSelectedHotspot] = useState<string | null>(null);
+  const activeBairros = RIO_HOTSPOTS.find((h) => h.id === selectedHotspot)?.bairros ?? null;
+  const lugares = activeBairros
+    ? allLugares.filter((p) => activeBairros.includes(p.localizacao))
     : allLugares;
+
+  const scrollViewRef = useRef<ScrollView>(null);
+  const cardsSectionY = useRef<number>(0);
+
+  function handleHotspotPress(id: string | null) {
+    setSelectedHotspot(id);
+    if (id) {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollTo({ y: cardsSectionY.current, animated: true });
+      }, 80);
+    }
+  }
 
   return (
     <View style={s.root}>
@@ -72,15 +84,13 @@ export default function FicarBemScreen() {
         onBack={() => router.back()}
         topInset={topInset}
         locaisLabel={`${allLugares.length} locais`}
-        selectedZone={selectedZone}
-        onZonePress={setSelectedZone}
-        filteredCount={selectedZone ? lugares.length : undefined}
+        selectedHotspot={selectedHotspot}
+        onHotspotPress={handleHotspotPress}
+        filteredCount={selectedHotspot ? lugares.length : undefined}
       />
 
-      {/* ════════════════════════════════════════════════════
-          SCROLLABLE CONTENT — editorial text + place cards
-      ════════════════════════════════════════════════════ */}
       <ScrollView
+        ref={scrollViewRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: bottomPad + 40 }}
       >
@@ -97,14 +107,17 @@ export default function FicarBemScreen() {
         </View>
 
         {/* ── Place cards ── */}
-        <View style={s.cardsSection}>
+        <View
+          style={s.cardsSection}
+          onLayout={(e) => { cardsSectionY.current = e.nativeEvent.layout.y; }}
+        >
           <Text style={s.cardsSectionLabel}>
-            {selectedZone
-              ? `${lugares.length} hospedagem${lugares.length !== 1 ? "s" : ""} nesta zona`
+            {selectedHotspot
+              ? `${lugares.length} hospedagem${lugares.length !== 1 ? "s" : ""} em ${RIO_HOTSPOTS.find(h => h.id === selectedHotspot)?.name ?? ""}`
               : "Hospedagens selecionadas"}
           </Text>
 
-          {lugares.length === 0 && selectedZone && (
+          {lugares.length === 0 && selectedHotspot && (
             <View style={s.emptyState}>
               <Feather name="map-pin" size={22} color="rgba(255,255,255,0.15)" />
               <Text style={s.emptyTitle}>Nenhum local aqui</Text>
