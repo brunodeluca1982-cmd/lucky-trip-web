@@ -19,10 +19,9 @@ import {
   View,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import type { TipoItem } from "@/data/normalizePlace";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-
-export type TipoItem = "hotel" | "restaurante" | "experiencia";
 
 export interface ActionBlockProps {
   google_maps_url?: string | null;

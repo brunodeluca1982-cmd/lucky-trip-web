@@ -39,7 +39,8 @@ import { getLugar, LugarPlace } from "@/data/lugares";
 import { useGuia } from "@/context/GuiaContext";
 import type { SavedCategory } from "@/context/GuiaContext";
 import { AppTabBar, TAB_BAR_HEIGHT } from "@/components/AppTabBar";
-import { ActionBlock, TipoItem } from "@/components/ActionBlock";
+import { ActionBlock } from "@/components/ActionBlock";
+import { normalizeLugarPlace, tipoFromPlaceId } from "@/data/normalizePlace";
 
 // Derive the SavedCategory from the placeId prefix:
 //   "1"–"8"   → oQueFazer
@@ -53,12 +54,6 @@ function resolveSaveCategory(placeId: string): SavedCategory {
   return "oQueFazer";
 }
 
-// Derive TipoItem from placeId prefix — fallback when place.tipo_item is absent
-function resolveTipoItem(placeId: string): TipoItem {
-  if (placeId.startsWith("h")) return "hotel";
-  if (placeId.startsWith("c")) return "restaurante";
-  return "experiencia";
-}
 
 const C = Colors.light;
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -94,6 +89,10 @@ export default function LugarDetailScreen() {
   // Carousel state
   const [imgIndex, setImgIndex] = useState(0);
   const carouselRef = useRef<ScrollView>(null);
+
+  // Normalized place object — single source of truth for all UI actions.
+  // When Supabase is connected, replace this with normalizeHotel / normalizeRestaurante / etc.
+  const normalized = normalizeLugarPlace(place, tipoFromPlaceId(placeId ?? ""));
 
   // Save to Trip — backed by GuiaContext (persists across navigation)
   const { isSaved, save, unsave } = useGuia();
@@ -244,13 +243,13 @@ export default function LugarDetailScreen() {
           {/* Description */}
           <Text style={s.descricao}>{place.descricao}</Text>
 
-          {/* ── ActionBlock — Maps / Instagram / Booking ── */}
+          {/* ── ActionBlock — receives only the normalized object, never raw fields ── */}
           <ActionBlock
-            google_maps_url={place.google_maps_url}
-            instagram_handle={place.instagram_handle}
-            instagram_url={place.instagram_url}
-            booking_url={place.booking_url}
-            tipo_item={place.tipo_item ?? resolveTipoItem(placeId ?? "")}
+            google_maps_url={normalized.google_maps_url}
+            instagram_handle={normalized.instagram_handle}
+            instagram_url={normalized.instagram_url}
+            booking_url={normalized.booking_url}
+            tipo_item={normalized.tipo_item}
           />
 
           {/* ── Action buttons ── */}
