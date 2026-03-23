@@ -19,16 +19,12 @@ import {
   View,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import type { TipoItem } from "@/data/normalizePlace";
+import type { NormalizedPlace } from "@/data/normalizePlace";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface ActionBlockProps {
-  google_maps_url?: string | null;
-  instagram_handle?: string | null;
-  instagram_url?: string | null;
-  booking_url?: string | null;
-  tipo_item?: TipoItem;
+  place: NormalizedPlace;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -47,13 +43,15 @@ function stripAt(handle: string) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function ActionBlock({
-  google_maps_url,
-  instagram_handle,
-  instagram_url,
-  booking_url,
-  tipo_item = "experiencia",
-}: ActionBlockProps) {
+export function ActionBlock({ place }: ActionBlockProps) {
+  const {
+    google_maps_url,
+    instagram_handle,
+    instagram_url,
+    booking_url,
+    tipo_item,
+  } = place;
+
   const resolvedInstagramUrl =
     instagram_url ??
     (instagram_handle

@@ -243,14 +243,8 @@ export default function LugarDetailScreen() {
           {/* Description */}
           <Text style={s.descricao}>{place.descricao}</Text>
 
-          {/* ── ActionBlock — receives only the normalized object, never raw fields ── */}
-          <ActionBlock
-            google_maps_url={normalized.google_maps_url}
-            instagram_handle={normalized.instagram_handle}
-            instagram_url={normalized.instagram_url}
-            booking_url={normalized.booking_url}
-            tipo_item={normalized.tipo_item}
-          />
+          {/* ── ActionBlock — single normalized object, never raw fields ── */}
+          <ActionBlock place={normalized} />
 
           {/* ── Action buttons ── */}
           <View style={s.actions}>
