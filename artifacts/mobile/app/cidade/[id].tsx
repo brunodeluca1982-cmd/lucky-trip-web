@@ -200,7 +200,12 @@ export default function CidadeScreen() {
           </GlassButton>
 
           {/* 4. Comer bem */}
-          <GlassButton style={s.btnStandard}>
+          <GlassButton
+            style={s.btnStandard}
+            onPress={() =>
+              router.push({ pathname: "/comerBem/[id]", params: { id: destino.id } })
+            }
+          >
             <View style={s.btnStandardInner}>
               <Feather name="coffee" size={16} color="rgba(255,255,255,0.70)" />
               <Text style={s.btnStandardLabel}>Comer bem</Text>

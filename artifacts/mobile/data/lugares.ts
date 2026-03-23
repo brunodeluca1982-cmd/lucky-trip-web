@@ -159,9 +159,70 @@ export const LUGARES_O_QUE_FAZER: Record<string, LugarPlace[]> = {
   ],
 };
 
+// ── Comer bem — food places ───────────────────────────────────────────────────
+
+export const LUGARES_COMER: Record<string, LugarPlace[]> = {
+  rio: [
+    {
+      id: "c1",
+      titulo: "Zuka",
+      localizacao: "Leblon",
+      categoria: "CONTEMPORÂNEO",
+      descricao:
+        "Fogão a lenha, ingredientes frescos e uma das adegas mais respeitadas do Rio. Mesa imperdível para quem leva a gastronomia a sério.",
+      image: require("../assets/images/restaurante1.png"),
+      ...resolvePin("rio", "Leblon", 0),
+    },
+    {
+      id: "c2",
+      titulo: "Aprazível",
+      localizacao: "Santa Teresa",
+      categoria: "EXPERIÊNCIA",
+      descricao:
+        "Jardim suspenso no morro de Santa Teresa, com vista para a Baía de Guanabara e culinária mineira revisitada entre flores e árvores frondosas.",
+      image: require("../assets/images/restaurante2.png"),
+      ...resolvePin("rio", "Santa Teresa", 0),
+    },
+    {
+      id: "c3",
+      titulo: "Oro",
+      localizacao: "Jardim Botânico",
+      categoria: "ALTA GASTRONOMIA",
+      descricao:
+        "Felipe Bronze e sua equipe traduzem o Brasil em pratos de precisão técnica e alma local. Estrelado e autoral.",
+      image: require("../assets/images/restaurante1.png"),
+      ...resolvePin("rio", "Jardim Botânico", 0),
+    },
+    {
+      id: "c4",
+      titulo: "Bar do Mineiro",
+      localizacao: "Santa Teresa",
+      categoria: "TRADICIONAL",
+      descricao:
+        "Feijoada às quartas e sábados, bolinho de bacalhau de rua e boteco com alma. O autêntico Rio de perto.",
+      image: require("../assets/images/restaurante2.png"),
+      ...resolvePin("rio", "Santa Teresa", 1),
+    },
+    {
+      id: "c5",
+      titulo: "Lasai",
+      localizacao: "Botafogo",
+      categoria: "BISTRÔ",
+      descricao:
+        "Horta própria, menu-degustação com raízes brasileiras e uma das experiências mais honestas da cidade.",
+      image: require("../assets/images/restaurante1.png"),
+      ...resolvePin("rio", "Botafogo", 0),
+    },
+  ],
+};
+
 export function getLugar(
   cityId: string,
   placeId: string,
 ): LugarPlace | undefined {
-  return LUGARES_O_QUE_FAZER[cityId]?.find((p) => p.id === placeId);
+  const all = [
+    ...(LUGARES_O_QUE_FAZER[cityId] ?? []),
+    ...(LUGARES_COMER[cityId] ?? []),
+  ];
+  return all.find((p) => p.id === placeId);
 }
