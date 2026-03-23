@@ -212,7 +212,7 @@ export default function CidadeScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           s.scrollContent,
-          { paddingTop: topInset + 56, paddingBottom: bottomPad + 40 },
+          { paddingTop: topInset + 44, paddingBottom: bottomPad + 40 },
         ]}
       >
         {/* City identity — in flow, sits in the clear zone of the gradient */}
@@ -222,7 +222,7 @@ export default function CidadeScreen() {
         </View>
 
         {/* Spacer — pushes buttons into the dark lower zone, prevents collision */}
-        <View style={{ height: SCREEN_HEIGHT * 0.14 }} />
+        <View style={{ height: SCREEN_HEIGHT * 0.10 }} />
 
         {/* ── Action buttons — normal flow inside scroll ── */}
         <View style={s.menu}>
@@ -512,29 +512,32 @@ const s = StyleSheet.create({
   // Buttons — in normal flow, below the spacer
   menu: {
     paddingHorizontal: 20,
-    gap: 10,
+    gap: 8,
   },
 
-  // Glass button base
+  // ── Glass button base — ALL buttons share these metrics ──
+  // borderRadius: 16  •  same for every tier
   glassBtn: {
     backgroundColor: "rgba(255,255,255,0.13)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.22)",
-    borderRadius: 18,
+    borderRadius: 16,
   },
   glassBtnBright: {
     backgroundColor: "rgba(255,255,255,0.20)",
     borderColor: "rgba(255,255,255,0.38)",
   },
 
+  // PRIMARY — "O essencial": tallest, brightest, arrow CTA
+  // paddingVertical 16 keeps it visually heavier than tier-2/3
   btnPrimary: {
-    borderRadius: 20,
+    borderRadius: 16,
   },
   btnPrimaryInner: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 22,
-    paddingVertical: 18,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     gap: 12,
   },
   btnPrimaryLeft: {
@@ -556,21 +559,24 @@ const s = StyleSheet.create({
     letterSpacing: -0.2,
   },
   btnPrimaryArrow: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: "rgba(255,255,255,0.18)",
     alignItems: "center",
     justifyContent: "center",
   },
 
+  // EXPERIENCE — "Agora no Rio": gold accent, two-line label
+  // Same borderRadius + paddingHorizontal as all others
   btnExperience: {
+    borderRadius: 16,
     borderColor: "rgba(201,168,76,0.38)",
   },
   btnExperienceInner: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
     paddingVertical: 14,
     gap: 14,
   },
@@ -588,7 +594,7 @@ const s = StyleSheet.create({
   },
   expTexts: {
     flex: 1,
-    gap: 3,
+    gap: 2,
   },
   eyebrowGold: {
     fontFamily: "Inter_500Medium",
@@ -605,6 +611,8 @@ const s = StyleSheet.create({
     letterSpacing: -0.1,
   },
 
+  // STANDARD — category buttons: icon + label, single row
+  // Same borderRadius + paddingHorizontal; paddingVertical 13 (compact but breathable)
   btnStandard: {
     borderRadius: 16,
   },
@@ -612,7 +620,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingVertical: 13,
     gap: 12,
   },
   btnStandardLabel: {
@@ -621,6 +629,8 @@ const s = StyleSheet.create({
     color: "rgba(255,255,255,0.88)",
     flex: 1,
   },
+
+  // LUCKY accent — same metrics as standard, gold border only
   btnLucky: {
     borderColor: "rgba(196,112,74,0.40)",
   },
