@@ -1,18 +1,19 @@
 /**
- * Place Detail Screen — single reusable component for the entire app.
+ * Place Detail Screen — unified reusable template for the entire app.
  *
  * Route:  /lugar/[cityId]/[placeId]
- * Source: any card tap from O que fazer / Comer bem / Ficar bem / Lucky List
+ * Used by: O que fazer / Comer bem / Ficar bem / Lucky List / Agora no Rio / O essencial
  *
- * Layout (top → bottom, all absolute/scroll layers on one root View):
- *   1. Fullscreen hero image (absoluteFillObject — NEVER split into sections)
- *   2. Gradient overlay
- *   3. Fixed back button (top-left)
- *   4. Carousel dots indicator (bottom of hero zone)
- *   5. Vertical ScrollView: spacer → content card (tags / title / desc / map / actions)
+ * Layout (all layers stacked on one root View):
+ *   1. Horizontal paging carousel — full-width images/videos
+ *   2. Gradient overlay — transparent at top, solid dark at ~50%
+ *   3. Fixed "< Voltar" back button — top-left
+ *   4. Photo counter — top-right (only when multiple images)
+ *   5. Carousel dots — centered at bottom of hero zone
+ *   6. Vertical ScrollView — spacer → content card (tags / title / desc / actions)
+ *   7. AppTabBar — fixed bottom navigation (same as main tabs)
  *
- * Content is fully dynamic — layout is identical for all categories.
- * "Ver no mapa" toggles the illustrated map with a single pin for this place.
+ * Content is fully dynamic — identical layout for all categories.
  */
 
 import React, { useRef, useState } from "react";
@@ -35,15 +36,15 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { getLugar, LugarPlace } from "@/data/lugares";
-import { IllustratedMap, MapPlace } from "@/components/IllustratedMap";
 import { useGuia } from "@/context/GuiaContext";
 import type { SavedCategory } from "@/context/GuiaContext";
+import { AppTabBar, TAB_BAR_HEIGHT } from "@/components/AppTabBar";
 
 // Derive the SavedCategory from the placeId prefix:
-//   "1"–"5"   → oQueFazer
+//   "1"–"8"   → oQueFazer
 //   "c1"–"c5" → restaurante
 //   "h1"–"h5" → hotel
-//   "l1"–"l6" → lucky
+//   "l1"–"l9" → lucky
 function resolveSaveCategory(placeId: string): SavedCategory {
   if (placeId.startsWith("c")) return "restaurante";
   if (placeId.startsWith("h")) return "hotel";
@@ -59,14 +60,6 @@ const HERO_HEIGHT = SCREEN_HEIGHT * 0.50;
 // How far the content spacer pushes down before the card starts
 const SPACER_H = HERO_HEIGHT - 72;
 
-const MAP_RIO = require("../../../assets/images/map-rio.png");
-function getMapImage(cityId: string): ImageSourcePropType {
-  switch (cityId) {
-    case "rio": return MAP_RIO;
-    default:    return MAP_RIO;
-  }
-}
-
 const FALLBACK: LugarPlace = {
   id: "0",
   titulo: "Local",
@@ -81,22 +74,18 @@ const FALLBACK: LugarPlace = {
 // ── Screen ─────────────────────────────────────────────────────────────────────
 
 export default function LugarDetailScreen() {
-  const { cityId, placeId, showMap: showMapParam } =
-    useLocalSearchParams<{ cityId: string; placeId: string; showMap?: string }>();
+  const { cityId, placeId } =
+    useLocalSearchParams<{ cityId: string; placeId: string }>();
 
   const insets = useSafeAreaInsets();
-  const topInset  = Platform.OS === "web" ? 67 : insets.top;
-  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const topInset = Platform.OS === "web" ? 67 : insets.top;
 
-  const place  = getLugar(cityId, placeId) ?? FALLBACK;
+  const place = getLugar(cityId, placeId) ?? FALLBACK;
   const images: ImageSourcePropType[] = place.images ?? [place.image];
 
   // Carousel state
   const [imgIndex, setImgIndex] = useState(0);
   const carouselRef = useRef<ScrollView>(null);
-
-  // Map toggle — starts visible if navigated here via "Ver no mapa"
-  const [showMap, setShowMap] = useState(showMapParam === "true");
 
   // Save to Trip — backed by GuiaContext (persists across navigation)
   const { isSaved, save, unsave } = useGuia();
@@ -118,22 +107,10 @@ export default function LugarDetailScreen() {
   }
 
   // Scroll sync for carousel
-  function handleCarouselScroll(
-    e: NativeSyntheticEvent<NativeScrollEvent>,
-  ) {
+  function handleCarouselScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
     const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
     setImgIndex(idx);
   }
-
-  // Single-pin for the map
-  const mapPin: MapPlace = {
-    id: place.id,
-    titulo: place.titulo,
-    localizacao: place.localizacao,
-    categoria: place.categoria,
-    xPct: place.xPct,
-    yPct: place.yPct,
-  };
 
   return (
     <View style={s.root}>
@@ -190,7 +167,7 @@ export default function LugarDetailScreen() {
         <Text style={s.backBtnText}>Voltar</Text>
       </Pressable>
 
-      {/* Photo counter — top-right */}
+      {/* Photo counter — top-right (only when multiple images) */}
       {images.length > 1 && (
         <View style={[s.photoCounter, { top: topInset + 18 }]}>
           <Text style={s.photoCounterText}>
@@ -219,12 +196,13 @@ export default function LugarDetailScreen() {
       </View>
 
       {/* ══════════════════════════════════════════════════════
-          5. VERTICAL SCROLL — content card lifts from below hero
+          5. VERTICAL SCROLL — content card lifts from below hero.
+             paddingBottom accounts for the fixed tab bar.
       ══════════════════════════════════════════════════════ */}
       <ScrollView
         style={s.contentScroll}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: bottomPad + 48 }}
+        contentContainerStyle={{ paddingBottom: TAB_BAR_HEIGHT + 12 }}
       >
         {/* Spacer: preserves hero visibility */}
         <View style={{ height: SPACER_H }} />
@@ -232,14 +210,19 @@ export default function LugarDetailScreen() {
         {/* ── Content card ── */}
         <View style={s.contentCard}>
 
-          {/* Tags row: CATEGORIA + BAIRRO */}
+          {/* Tags row: CATEGORIA + LOCALIZACAO */}
           <View style={s.tagsRow}>
             <View style={s.tag}>
               <Text style={s.tagText}>{place.categoria}</Text>
             </View>
             <View style={s.tagSep} />
             <View style={s.tag}>
-              <Feather name="map-pin" size={9} color="rgba(255,255,255,0.55)" style={{ marginRight: 4 }} />
+              <Feather
+                name="map-pin"
+                size={9}
+                color="rgba(255,255,255,0.55)"
+                style={{ marginRight: 4 }}
+              />
               <Text style={s.tagText}>{place.localizacao}</Text>
             </View>
           </View>
@@ -253,23 +236,9 @@ export default function LugarDetailScreen() {
           {/* Description */}
           <Text style={s.descricao}>{place.descricao}</Text>
 
-          {/* ── Illustrated map — toggled by "Ver no mapa" ── */}
-          {showMap && (
-            <View style={s.mapSection}>
-              <View style={s.mapHeader}>
-                <Feather name="map" size={13} color="rgba(255,255,255,0.50)" />
-                <Text style={s.mapHeaderText}>Localização</Text>
-              </View>
-              <IllustratedMap
-                mapImage={getMapImage(cityId)}
-                places={[mapPin]}
-                selectedId={place.id}
-              />
-            </View>
-          )}
-
           {/* ── Action buttons ── */}
           <View style={s.actions}>
+
             {/* PRIMARY — Salvar */}
             <Pressable
               style={[s.btnPrimary, saved && s.btnPrimarySaved]}
@@ -285,24 +254,20 @@ export default function LugarDetailScreen() {
               </Text>
             </Pressable>
 
-            {/* SECONDARY — Ver no mapa / Ocultar mapa */}
-            <Pressable
-              style={[s.btnSecondary, showMap && s.btnSecondaryActive]}
-              onPress={() => setShowMap((v) => !v)}
-            >
-              <Feather
-                name="map-pin"
-                size={16}
-                color={showMap ? C.terracotta : "rgba(255,255,255,0.65)"}
-              />
-              <Text style={[s.btnSecondaryText, showMap && s.btnSecondaryTextActive]}>
-                {showMap ? "Ocultar mapa" : "Ver no mapa"}
-              </Text>
+            {/* SECONDARY — Voltar */}
+            <Pressable style={s.btnSecondary} onPress={() => router.back()}>
+              <Text style={s.btnSecondaryText}>Voltar</Text>
+              <Feather name="corner-down-left" size={15} color="rgba(255,255,255,0.55)" />
             </Pressable>
-          </View>
 
+          </View>
         </View>
       </ScrollView>
+
+      {/* ══════════════════════════════════════════════════════
+          6. BOTTOM TAB BAR — persistent navigation
+      ══════════════════════════════════════════════════════ */}
+      <AppTabBar />
     </View>
   );
 }
@@ -422,7 +387,6 @@ const s = StyleSheet.create({
     paddingTop: 28,
     paddingHorizontal: 22,
     paddingBottom: 12,
-    // Subtle top border to give the card a "lifted" edge
     borderTopWidth: 1,
     borderTopColor: "rgba(255,255,255,0.06)",
   },
@@ -471,7 +435,6 @@ const s = StyleSheet.create({
     height: 1,
     backgroundColor: "rgba(255,255,255,0.07)",
     marginBottom: 18,
-    marginHorizontal: 0,
   },
 
   // ── Description ──
@@ -482,32 +445,6 @@ const s = StyleSheet.create({
     lineHeight: 26,
     letterSpacing: 0.1,
     marginBottom: 28,
-  },
-
-  // ── Map section ──
-  mapSection: {
-    marginBottom: 24,
-    borderRadius: 16,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-  mapHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.06)",
-  },
-  mapHeaderText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 11,
-    color: "rgba(255,255,255,0.48)",
-    letterSpacing: 1.0,
-    textTransform: "uppercase",
   },
 
   // ── Actions ──
@@ -540,7 +477,7 @@ const s = StyleSheet.create({
     color: C.terracotta,
   },
 
-  // Secondary — Ver no mapa
+  // Secondary — Voltar
   btnSecondary: {
     flexDirection: "row",
     alignItems: "center",
@@ -552,17 +489,10 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.10)",
   },
-  btnSecondaryActive: {
-    backgroundColor: "rgba(196,112,74,0.08)",
-    borderColor: "rgba(196,112,74,0.28)",
-  },
   btnSecondaryText: {
     fontFamily: "Inter_500Medium",
     fontSize: 14,
     color: "rgba(255,255,255,0.68)",
     letterSpacing: 0.2,
-  },
-  btnSecondaryTextActive: {
-    color: C.terracotta,
   },
 });
