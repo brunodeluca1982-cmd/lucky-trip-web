@@ -39,6 +39,7 @@ import { getLugar, LugarPlace } from "@/data/lugares";
 import { useGuia } from "@/context/GuiaContext";
 import type { SavedCategory } from "@/context/GuiaContext";
 import { AppTabBar, TAB_BAR_HEIGHT } from "@/components/AppTabBar";
+import { ActionBlock, TipoItem } from "@/components/ActionBlock";
 
 // Derive the SavedCategory from the placeId prefix:
 //   "1"–"8"   → oQueFazer
@@ -50,6 +51,13 @@ function resolveSaveCategory(placeId: string): SavedCategory {
   if (placeId.startsWith("h")) return "hotel";
   if (placeId.startsWith("l")) return "lucky";
   return "oQueFazer";
+}
+
+// Derive TipoItem from placeId prefix — fallback when place.tipo_item is absent
+function resolveTipoItem(placeId: string): TipoItem {
+  if (placeId.startsWith("h")) return "hotel";
+  if (placeId.startsWith("c")) return "restaurante";
+  return "experiencia";
 }
 
 const C = Colors.light;
@@ -235,6 +243,15 @@ export default function LugarDetailScreen() {
 
           {/* Description */}
           <Text style={s.descricao}>{place.descricao}</Text>
+
+          {/* ── ActionBlock — Maps / Instagram / Booking ── */}
+          <ActionBlock
+            google_maps_url={place.google_maps_url}
+            instagram_handle={place.instagram_handle}
+            instagram_url={place.instagram_url}
+            booking_url={place.booking_url}
+            tipo_item={place.tipo_item ?? resolveTipoItem(placeId ?? "")}
+          />
 
           {/* ── Action buttons ── */}
           <View style={s.actions}>

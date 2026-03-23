@@ -21,6 +21,12 @@ export interface LugarPlace {
   preco?: string;
   xPct: number;
   yPct: number;
+  // ── Action data — future Supabase fields ──
+  google_maps_url?: string | null;
+  instagram_handle?: string | null;
+  instagram_url?: string | null;
+  booking_url?: string | null;
+  tipo_item?: "hotel" | "restaurante" | "experiencia";
 }
 
 // ── Neighborhood zone table ───────────────────────────────────────────────────
@@ -116,6 +122,8 @@ export const LUGARES_O_QUE_FAZER: Record<string, LugarPlace[]> = {
         "O encontro perfeito entre o mar e a alma carioca. Cheia de vida do nascer ao pôr do sol.",
       image: require("../assets/images/ipanema.png"),
       ...resolvePin("rio", "Ipanema", 0),
+      tipo_item: "experiencia",
+      google_maps_url: "https://maps.app.goo.gl/Praia-Ipanema",
     },
     {
       id: "2",
@@ -203,6 +211,9 @@ export const LUGARES_COMER: Record<string, LugarPlace[]> = {
         "Fogão a lenha, ingredientes frescos e uma das adegas mais respeitadas do Rio. Mesa imperdível para quem leva a gastronomia a sério.",
       image: require("../assets/images/restaurante1.png"),
       ...resolvePin("rio", "Leblon", 0),
+      tipo_item: "restaurante",
+      google_maps_url: "https://maps.app.goo.gl/Zuka-Leblon",
+      instagram_handle: "zukarestaurante",
     },
     {
       id: "c2",
@@ -260,6 +271,10 @@ export const LUGARES_FICAR: Record<string, LugarPlace[]> = {
         "Um século de elegância à beira-mar. O hotel mais celebrado do Rio recebe o mundo com serviço impecável e vista para o Atlântico.",
       image: require("../assets/images/hotel1.png"),
       ...resolvePin("rio", "Copacabana", 0),
+      tipo_item: "hotel",
+      google_maps_url: "https://maps.app.goo.gl/Copacabana-Palace",
+      instagram_handle: "copacabanapalace",
+      booking_url: "https://www.belmond.com/hotels/south-america/brazil/rio-de-janeiro/belmond-copacabana-palace/",
     },
     {
       id: "h2",
