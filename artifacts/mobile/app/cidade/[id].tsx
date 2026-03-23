@@ -245,7 +245,12 @@ export default function CidadeScreen() {
           </GlassButton>
 
           {/* 2. EXPERIENCE */}
-          <GlassButton style={s.btnExperience}>
+          <GlassButton
+            style={s.btnExperience}
+            onPress={() =>
+              router.push({ pathname: "/agoraNoRio/[id]", params: { id: destino.id } })
+            }
+          >
             <View style={s.btnExperienceInner}>
               <View style={s.expIconWrap}>
                 <Text style={s.expIcon}>✦</Text>
