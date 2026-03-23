@@ -158,7 +158,9 @@ export default function CidadeScreen() {
           <GlassButton
             bright
             style={s.btnPrimary}
-            onPress={() => {}}
+            onPress={() =>
+              router.push({ pathname: "/essencial/[id]", params: { id: destino.id } })
+            }
           >
             <View style={s.btnPrimaryInner}>
               <View style={s.btnPrimaryLeft}>

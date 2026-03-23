@@ -341,6 +341,37 @@ export const LUGARES_LUCKY: Record<string, LugarPlace[]> = {
       image: require("../assets/images/secret1.png"),
       ...resolvePin("rio", "Centro", 0),
     },
+    // ── Supabase-ready items: loaded from mock until DB is connected ──────────
+    {
+      id: "l7",
+      titulo: "Aula de futevôlei na Barra",
+      localizacao: "Barra da Tijuca",
+      categoria: "EXPERIÊNCIA LOCAL",
+      descricao:
+        "A praia da Barra é o templo do futevôlei carioca. Aulas com jogadores da comunidade local — esporte, sol e a energia que só o Rio tem.",
+      image: require("../assets/images/ipanema.png"),
+      ...resolvePin("rio", "Barra da Tijuca", 0),
+    },
+    {
+      id: "l8",
+      titulo: "Salgado do cabeleireiro do Fashion Mall",
+      localizacao: "São Conrado",
+      categoria: "SEGREDO GASTRONÔMICO",
+      descricao:
+        "Dentro do Fashion Mall existe um cabeleireiro discreto com salgados que são, literalmente, segredo de salão. Um dos endereços preferidos de Carolina Dieckmann.",
+      image: require("../assets/images/restaurante1.png"),
+      ...resolvePin("rio", "São Conrado", 0),
+    },
+    {
+      id: "l9",
+      titulo: "Melhor açaí do Rio — ASA",
+      localizacao: "Leblon",
+      categoria: "RITUAL CARIOCA",
+      descricao:
+        "O ASA não é uma sorveteria comum. É o ponto de referência do açaí autoral no Rio — cremoso, sem adição de xarope, servido da forma que deveria ser.",
+      image: require("../assets/images/restaurante2.png"),
+      ...resolvePin("rio", "Leblon", 1),
+    },
   ],
 };
 
