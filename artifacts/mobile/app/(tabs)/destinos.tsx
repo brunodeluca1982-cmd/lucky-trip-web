@@ -1,4 +1,4 @@
-import React, { memo } from "react";
+import React, { memo, useCallback } from "react";
 import {
   Dimensions,
   Image,
@@ -34,7 +34,6 @@ interface DestCardProps {
   pais: string;
   image: ImageSourcePropType;
   selected: boolean;
-  onPress: () => void;
 }
 
 const DestCard = memo(function DestCard({
@@ -43,12 +42,16 @@ const DestCard = memo(function DestCard({
   pais,
   image,
   selected,
-  onPress,
 }: DestCardProps) {
+  // Stable handler — created once per card id, never recreated on parent re-render
+  const handlePress = useCallback(() => {
+    router.push({ pathname: "/cidade/[id]", params: { id } });
+  }, [id]);
+
   return (
     <Pressable
       key={id}
-      onPress={onPress}
+      onPress={handlePress}
       style={({ pressed }) => [
         s.card,
         selected && s.cardSelected,
@@ -174,12 +177,6 @@ export default function DestinosScreen() {
                     pais={d.pais}
                     image={d.image}
                     selected={d.id === SELECTED_ID}
-                    onPress={() =>
-                      router.push({
-                        pathname: "/cidade/[id]",
-                        params: { id: d.id },
-                      })
-                    }
                   />
                 ))}
                 {/* Fill trailing empty slots */}
@@ -297,7 +294,6 @@ const s = StyleSheet.create({
   cardImage: {
     width: "100%",
     height: "100%",
-    resizeMode: "cover",
   },
   // Bottom-anchored: image top half is never covered
   cardGradient: {
