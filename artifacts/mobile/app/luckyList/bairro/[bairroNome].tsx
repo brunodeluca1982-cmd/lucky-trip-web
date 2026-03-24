@@ -65,6 +65,12 @@ export default function LuckyListBairroScreen() {
     (n) => n.neighborhood_name === bairroNome,
   ) ?? null;
 
+  const heroImage = getNeighborhoodHero(
+    supabaseNeighborhood?.image_url,
+    bairroNome,
+    destino.image,
+  );
+
   const [editorialOpen, setEditorialOpen] = useState(false);
 
   const scrollRef    = useRef<ScrollView>(null);
@@ -76,6 +82,19 @@ export default function LuckyListBairroScreen() {
     <View style={s.root}>
       <Stack.Screen options={{ headerShown: false }} />
 
+      {/* ── Full-screen background (persists while scrolling) ── */}
+      <Image
+        source={heroImage}
+        style={StyleSheet.absoluteFillObject}
+        resizeMode="cover"
+      />
+      <LinearGradient
+        colors={["rgba(10,5,2,0.05)", "rgba(10,5,2,0.38)", "rgba(10,5,2,0.82)", "rgba(10,5,2,0.95)"]}
+        locations={[0, 0.30, 0.54, 1.0]}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
+
       <ScrollView
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
@@ -83,21 +102,6 @@ export default function LuckyListBairroScreen() {
       >
         {/* ── Hero ── */}
         <View style={[s.hero, { height: HERO_H }]}>
-          <Image
-            source={getNeighborhoodHero(
-              supabaseNeighborhood?.image_url,
-              bairroNome,
-              destino.image,
-            )}
-            style={StyleSheet.absoluteFillObject}
-            resizeMode="cover"
-          />
-          <LinearGradient
-            colors={["rgba(10,5,2,0.18)", "rgba(10,5,2,0.40)", "rgba(10,5,2,0.95)"]}
-            locations={[0, 0.5, 1]}
-            style={StyleSheet.absoluteFill}
-          />
-
           {/* Gold top accent line */}
           <View style={s.goldLine} />
 
