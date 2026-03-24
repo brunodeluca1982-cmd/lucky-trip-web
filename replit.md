@@ -130,10 +130,23 @@ Expo React Native app (SDK 54) with dark glassmorphism aesthetic for Rio de Jane
 
 ### Route Structure
 - `(tabs)/` — 5-tab navigator
-- `ondeFicar/[id].tsx` — hotel list screen with live Supabase data; fixed OndeFicarMap at top (aerial photo + 11 hotspots + spring zoom/dim animation); animated floating NeighborhoodCard on tap; filtered hotel list by neighborhood below
+- `ondeFicar/[id].tsx` — hotels map screen (RioMapView); tap neighborhood → navigates directly to bairro page; all hotels always visible in scrollable list below; no floating card
 - `ondeFicar/hotel/[hotelId].tsx` — hotel detail screen (full my_view, how_to_enjoy, reserve_url, Google Maps link)
-- `ondeFicar/bairro/[slug].tsx` — neighborhood editorial detail (my_view, how_to_live, stat pills, Ver hospedagens CTA)
-- `oQueFazer/[id].tsx`, `comerBem/[id].tsx` — activities + dining screens (mock data)
+- `ondeFicar/bairro/[slug].tsx` — neighborhood detail: hero + "Ver X hotéis" + "Por dentro do bairro" toggle; collapsible editorial; hotel list
+- `comerBem/[id].tsx` — restaurants map screen (RioMapView); tap neighborhood → navigates to comerBem/bairro/; all restaurants always shown below
+- `comerBem/bairro/[bairroNome].tsx` — neighborhood restaurants: hero + action buttons + collapsible editorial + filtered Supabase restaurants
+- `oQueFazer/[id].tsx` — activities map screen (RioMapView); tap neighborhood → navigates to oQueFazer/bairro/; all activities shown below
+- `oQueFazer/bairro/[bairroNome].tsx` — neighborhood activities: hero + action buttons + collapsible editorial + filtered mock data
+- `luckyList/[id].tsx` — Lucky List map screen; tap neighborhood → navigates to luckyList/bairro/; gold branding preserved
+- `luckyList/bairro/[bairroNome].tsx` — neighborhood Lucky picks: hero + gold action buttons + collapsible editorial + filtered picks
+
+### Neighborhood Flow (all 4 sections)
+Map tap → navigate directly to bairro page (no floating card). Bairro pages have:
+1. Hero image (destino.image, 46% screen height)
+2. Neighborhood name + identity_phrase (if Supabase neighborhood found)
+3. Two CTA buttons: primary "Ver X [items]" (scroll to list) + ghost "Por dentro do bairro" (toggle editorial)
+4. Collapsible editorial: my_view + how_to_live tips + stat pills (only shown when button pressed)
+5. Filtered items list for that neighborhood
 
 ### Environment Variables (Mobile)
 - `EXPO_PUBLIC_SUPABASE_URL` — passed via dev script from `$SUPABASE_URL`

@@ -1,16 +1,14 @@
 /**
- * oQueFazer/[id].tsx — O que fazer category screen
+ * oQueFazer/[id].tsx — O que fazer map + activities list screen
  *
- * Map: RioMapView (Leaflet satellite) — same component as ondeFicar.
- * Layout: fixed map section (50% screen) + scrollable place list below.
- * Filtering: by neighborhood name selected on the map.
+ * Map: RioMapView (Leaflet satellite).
+ * Tap a neighborhood → navigate directly to oQueFazer/bairro/[bairroNome] (no floating card).
+ * Scrollable list always shows ALL activities.
  */
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef } from "react";
 import {
-  Animated,
   Dimensions,
-  Easing,
   Image,
   Platform,
   Pressable,
@@ -37,170 +35,60 @@ const DESCRICOES: Record<string, string[]> = {
   rio: [
     "O Rio de Janeiro é muito mais que praias paradisíacas e o Cristo Redentor. É uma cidade que respira música, dança e uma energia contagiante que mistura modernidade com tradição.",
     "Cada bairro carrega uma identidade própria — de Santa Teresa com seus artistas e ladeiras de pedra, ao Leblon com seu charme discretamente exclusivo.",
-    "Aqui, natureza e vida urbana coexistem com uma harmonia rara no mundo. Uma caminhada pelo Parque Lage revela uma cachoeira no coração da Floresta da Tijuca.",
+    "Aqui, natureza e vida urbana coexistem com uma harmonia rara no mundo.",
   ],
 };
 
 const DEFAULT_DESCRICAO = [
-  "Uma cidade que convida à exploração lenta e curiosa. Cada esquina revela algo inesperado — um café escondido, uma vista que rouba o fôlego.",
-  "A verdadeira experiência começa quando você abandona o roteiro previsível e segue o instinto. Esta seleção foi pensada para guiar sem restringir.",
+  "Uma cidade que convida à exploração lenta e curiosa. Cada esquina revela algo inesperado.",
+  "A verdadeira experiência começa quando você abandona o roteiro previsível e segue o instinto.",
 ];
-
-// ── Floating neighborhood card (section-specific, no Supabase dependency) ─────
-
-function SectionNeighborhoodCard({
-  name,
-  count,
-  onVerLocais,
-  onDismiss,
-}: {
-  name: string;
-  count: number;
-  onVerLocais: () => void;
-  onDismiss: () => void;
-}) {
-  return (
-    <LinearGradient
-      colors={["rgba(28,16,8,0.97)", "rgba(10,5,2,0.98)"]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 0.6, y: 1 }}
-      style={nc.card}
-    >
-      <View style={nc.header}>
-        <View style={nc.headerLeft}>
-          <Text style={nc.name}>{name}</Text>
-          <Text style={nc.sub}>
-            {count === 0
-              ? "Sem locais nesta área"
-              : `${count} local${count !== 1 ? "is" : ""} selecionado${count !== 1 ? "s" : ""}`}
-          </Text>
-        </View>
-        <Pressable style={nc.closeBtn} onPress={onDismiss} hitSlop={12}>
-          <Feather name="x" size={13} color="rgba(255,255,255,0.35)" />
-        </Pressable>
-      </View>
-      <View style={nc.actions}>
-        <Pressable style={nc.hotBtn} onPress={onVerLocais}>
-          <Text style={nc.hotBtnText}>
-            {count > 0 ? `Ver ${count} local${count !== 1 ? "is" : ""}` : "Ver todos"}
-          </Text>
-        </Pressable>
-        <Pressable style={nc.ghostBtn} onPress={onDismiss}>
-          <Text style={nc.ghostBtnText}>Explorar mapa</Text>
-          <Feather name="map" size={12} color="rgba(255,255,255,0.55)" />
-        </Pressable>
-      </View>
-    </LinearGradient>
-  );
-}
-
-// ── Screen ────────────────────────────────────────────────────────────────────
 
 export default function OQueFazerScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const insets = useSafeAreaInsets();
-  const topInset = Platform.OS === "web" ? 67 : insets.top;
+  const insets    = useSafeAreaInsets();
+  const topInset  = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
-  const destino = destinos.find((d) => d.id === id) ?? destinos[0];
+  const destino    = destinos.find((d) => d.id === id) ?? destinos[0];
   const allLugares = LUGARES_O_QUE_FAZER[destino.id] ?? [];
-  const descricao = DESCRICOES[destino.id] ?? DEFAULT_DESCRICAO;
-
-  // Selected neighborhood name (matches RioMapView marker names)
-  const [selected, setSelected] = useState<string | null>(null);
-
-  // Filter places by exact neighborhood match
-  const lugares = selected
-    ? allLugares.filter((p) => p.localizacao === selected)
-    : allLugares;
-
-  // Animated card entry
-  const cardAnim = useRef(new Animated.Value(0)).current;
-  const prevSelected = useRef<string | null>(null);
-  useEffect(() => {
-    if (selected && selected !== prevSelected.current) {
-      cardAnim.setValue(0);
-      Animated.timing(cardAnim, {
-        toValue: 1,
-        duration: 280,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }).start();
-    }
-    prevSelected.current = selected;
-  }, [selected]);
+  const descricao  = DESCRICOES[destino.id] ?? DEFAULT_DESCRICAO;
 
   const listRef = useRef<ScrollView>(null);
-  const listY = useRef(0);
 
   function handleNeighborhoodPress(name: string | null) {
-    setSelected((prev) => (prev === name ? null : name));
+    if (!name) return;
+    router.push({
+      pathname: "/oQueFazer/bairro/[bairroNome]",
+      params: { bairroNome: name, cityId: destino.id },
+    });
   }
-
-  function handleVerLocais() {
-    setTimeout(
-      () => listRef.current?.scrollTo({ y: listY.current + MAP_H, animated: true }),
-      80,
-    );
-  }
-
-  const cardStyle = {
-    opacity: cardAnim,
-    transform: [
-      {
-        translateY: cardAnim.interpolate({
-          inputRange: [0, 1],
-          outputRange: [18, 0],
-        }),
-      },
-    ],
-  };
 
   return (
     <View style={s.root}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* ── Fixed map section (matches ondeFicar layout) ── */}
+      {/* ── Fixed map section ── */}
       <View style={s.mapSection}>
         <RioMapView
-          selectedNeighborhood={selected}
+          selectedNeighborhood={null}
           onNeighborhoodPress={handleNeighborhoodPress}
           style={StyleSheet.absoluteFillObject}
         />
 
-        {/* Fixed overlay controls */}
         <View style={[s.mapControls, { top: topInset + 10 }]} pointerEvents="box-none">
           <Pressable style={s.pill} onPress={() => router.back()} hitSlop={8}>
             <Text style={s.pillText}>← Voltar</Text>
           </Pressable>
           <View style={s.pill}>
-            <View style={[s.badgeDot, selected ? s.badgeDotActive : null]} />
-            <Text style={s.pillText}>
-              {selected
-                ? `${lugares.length} local${lugares.length !== 1 ? "is" : ""}`
-                : `${allLugares.length} locais`}
-            </Text>
+            <View style={s.badgeDot} />
+            <Text style={s.pillText}>{allLugares.length} locais</Text>
           </View>
         </View>
 
-        {/* Hint when nothing selected */}
-        {!selected && (
-          <View style={[s.mapHint, { pointerEvents: "none" }]}>
-            <Text style={s.mapHintText}>Toque num bairro para explorar</Text>
-          </View>
-        )}
-
-        {/* Floating neighborhood card */}
-        {selected && (
-          <Animated.View style={[s.cardWrap, cardStyle]} pointerEvents="box-none">
-            <SectionNeighborhoodCard
-              name={selected}
-              count={lugares.length}
-              onVerLocais={handleVerLocais}
-              onDismiss={() => setSelected(null)}
-            />
-          </Animated.View>
-        )}
+        <View style={[s.mapHint, { pointerEvents: "none" }]}>
+          <Text style={s.mapHintText}>Toque num bairro para explorar</Text>
+        </View>
       </View>
 
       {/* ── Scrollable list ── */}
@@ -210,7 +98,6 @@ export default function OQueFazerScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: bottomPad + 40 }}
       >
-        {/* Editorial intro with destination photo */}
         <View style={s.introHeroWrap}>
           <Image
             source={destino.image}
@@ -224,54 +111,25 @@ export default function OQueFazerScreen() {
             pointerEvents="none"
           />
           <View style={[s.intro, s.introAbsolute]}>
-            {selected ? (
-              <>
-                <Text style={s.introTitle}>{selected}</Text>
-                <Text style={s.introPara}>
-                  {lugares.length === 0
-                    ? "Nenhuma experiência mapeada neste bairro por enquanto."
-                    : `${lugares.length} experiência${lugares.length !== 1 ? "s" : ""} para explorar.`}
-                </Text>
-              </>
-            ) : (
-              <>
-                <Text style={s.introTitle}>O que fazer em {destino.cidade}</Text>
-                <Text style={s.introPara}>{descricao[0]}</Text>
-              </>
-            )}
+            <Text style={s.introTitle}>O que fazer em {destino.cidade}</Text>
+            <Text style={s.introPara}>{descricao[0]}</Text>
             <View style={s.introMeta}>
               <View style={s.introDot} />
               <Text style={s.introMetaText}>
-                Seleção curada · {lugares.length} lugar{lugares.length !== 1 ? "es" : ""}
+                Seleção curada · {allLugares.length} lugar{allLugares.length !== 1 ? "es" : ""}
               </Text>
             </View>
           </View>
         </View>
 
-        {/* Cards section */}
-        <View
-          style={s.listSection}
-          onLayout={(e) => { listY.current = e.nativeEvent.layout.y; }}
-        >
-          <Text style={s.listLabel}>
-            {selected
-              ? `${lugares.length} local${lugares.length !== 1 ? "is" : ""} em ${selected}`
-              : "Experiências selecionadas"}
-          </Text>
+        <View style={s.listSection}>
+          <Text style={s.listLabel}>Experiências selecionadas</Text>
 
-          {!selected && descricao.slice(1).map((para, i) => (
+          {descricao.slice(1).map((para, i) => (
             <Text key={i} style={s.descPara}>{para}</Text>
           ))}
 
-          {lugares.length === 0 && selected && (
-            <View style={s.centerWrap}>
-              <Feather name="map-pin" size={18} color="rgba(255,255,255,0.10)" />
-              <Text style={s.emptyTitle}>Nenhum local em {selected}</Text>
-              <Text style={s.emptyText}>Toque em outro bairro no mapa.</Text>
-            </View>
-          )}
-
-          {lugares.map((place, index) => (
+          {allLugares.map((place, index) => (
             <Pressable
               key={place.id}
               style={s.card}
@@ -336,23 +194,13 @@ export default function OQueFazerScreen() {
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
-
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#0A0502" },
 
-  // ── Map section (identical to ondeFicar) ──
   mapSection: {
     width: "100%",
     height: MAP_H,
     position: "relative",
-  },
-  cardWrap: {
-    position: "absolute",
-    bottom: 14,
-    left: 14,
-    right: 14,
-    zIndex: 20,
   },
   mapControls: {
     position: "absolute",
@@ -389,9 +237,6 @@ const s = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: C.terracotta,
   },
-  badgeDotActive: {
-    backgroundColor: C.gold,
-  },
   mapHint: {
     position: "absolute",
     bottom: 14,
@@ -407,13 +252,8 @@ const s = StyleSheet.create({
     letterSpacing: 0.4,
   },
 
-  // ── Scrollable list ──
-  listScroll: {
-    flex: 1,
-    backgroundColor: "#0A0502",
-  },
+  listScroll: { flex: 1, backgroundColor: "#0A0502" },
 
-  // ── Intro hero ──
   introHeroWrap: {
     width: "100%",
     height: 260,
@@ -460,7 +300,6 @@ const s = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // ── List section ──
   listSection: {
     backgroundColor: "#0A0502",
     paddingTop: 20,
@@ -485,25 +324,7 @@ const s = StyleSheet.create({
     letterSpacing: 0.1,
     marginBottom: 14,
   },
-  centerWrap: {
-    alignItems: "center",
-    paddingVertical: 40,
-    gap: 10,
-  },
-  emptyTitle: {
-    fontFamily: "PlayfairDisplay_600SemiBold",
-    fontSize: 16,
-    color: "rgba(255,255,255,0.25)",
-    textAlign: "center",
-  },
-  emptyText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: "rgba(255,255,255,0.20)",
-    textAlign: "center",
-  },
 
-  // ── Place card ──
   card: {
     backgroundColor: "rgba(255,255,255,0.04)",
     borderRadius: 18,
@@ -614,7 +435,6 @@ const s = StyleSheet.create({
     letterSpacing: 0.2,
   },
 
-  // ── Footer ──
   footer: {
     backgroundColor: "#0A0502",
     marginTop: 4,
@@ -637,84 +457,5 @@ const s = StyleSheet.create({
     textAlign: "center",
     lineHeight: 20,
     maxWidth: 240,
-  },
-});
-
-// ── Neighborhood card styles ───────────────────────────────────────────────────
-
-const nc = StyleSheet.create({
-  card: {
-    borderRadius: 18,
-    overflow: "hidden",
-    paddingHorizontal: 18,
-    paddingTop: 16,
-    paddingBottom: 14,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  headerLeft: { flex: 1, marginRight: 8 },
-  name: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 20,
-    color: C.white,
-    lineHeight: 26,
-    letterSpacing: -0.2,
-    marginBottom: 2,
-  },
-  sub: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: "rgba(255,255,255,0.45)",
-  },
-  closeBtn: {
-    width: 26,
-    height: 26,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderRadius: 13,
-    marginTop: 2,
-  },
-  actions: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  hotBtn: {
-    flex: 1,
-    backgroundColor: "rgba(255,255,255,0.94)",
-    borderRadius: 50,
-    paddingVertical: 11,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  hotBtnText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13.5,
-    color: "#18120C",
-    letterSpacing: 0.1,
-  },
-  ghostBtn: {
-    flex: 1,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderRadius: 50,
-    paddingVertical: 11,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-    flexDirection: "row",
-    gap: 6,
-  },
-  ghostBtnText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 13.5,
-    color: "rgba(255,255,255,0.65)",
-    letterSpacing: 0.1,
   },
 });

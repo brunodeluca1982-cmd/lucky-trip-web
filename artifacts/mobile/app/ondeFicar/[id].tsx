@@ -1,9 +1,15 @@
-import React, { useEffect, useRef, useState } from "react";
+/**
+ * ondeFicar/[id].tsx — "Onde ficar" map + hotel list screen
+ *
+ * Map: RioMapView (Leaflet satellite).
+ * Tap a neighborhood → navigate directly to ondeFicar/bairro/[slug] (no floating card).
+ * The scrollable section below the map always shows ALL hotels.
+ */
+
+import React, { useRef } from "react";
 import {
   ActivityIndicator,
-  Animated,
   Dimensions,
-  Easing,
   Image,
   Linking,
   Platform,
@@ -72,88 +78,18 @@ export default function OndeFicarScreen() {
   const { neighborhoods, loading, error } = useNeighborhoods();
   const allHotels = flattenHotels(neighborhoods);
 
-  const [selected, setSelected] = useState<string | null>(null);
-  // cardVisible separates the card display from the filter selection:
-  // tapping "Ver hotéis" or "Por dentro" dismisses the card but may keep the filter
-  const [cardVisible, setCardVisible] = useState(false);
+  const listRef = useRef<ScrollView>(null);
 
-  const activeNeighborhood = neighborhoods.find(
-    (n) => n.neighborhood_name === selected,
-  ) ?? null;
-
-  const hotels = selected
-    ? allHotels.filter((h) => h.localizacao === selected)
-    : allHotels;
-
-  // Card animation
-  const cardAnim = useRef(new Animated.Value(0)).current;
-  const prevSelected = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (selected && selected !== prevSelected.current) {
-      // New selection: animate card in
-      cardAnim.setValue(0);
-      Animated.timing(cardAnim, {
-        toValue: 1,
-        duration: 280,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }).start();
-    }
-    prevSelected.current = selected;
-  }, [selected]);
-
-  const listRef   = useRef<ScrollView>(null);
-  const listY     = useRef(0);
-
+  // Tap a neighborhood → navigate directly to its detail page
   function handleNeighborhoodPress(name: string | null) {
-    if (!name || name === selected) {
-      setSelected(null);
-      setCardVisible(false);
-    } else {
-      setSelected(name);
-      setCardVisible(true);
-    }
-  }
-
-  function handleVerHoteis() {
-    if (!activeNeighborhood) return;
-    // Dismiss card first — then navigate to bairro detail focused on hotels
-    setCardVisible(false);
+    if (!name) return;
+    const neighborhood = neighborhoods.find((n) => n.neighborhood_name === name);
+    if (!neighborhood) return;
     router.push({
       pathname: "/ondeFicar/bairro/[slug]",
-      params: {
-        slug: activeNeighborhood.neighborhood_slug,
-        cityId: destino.id,
-        focusHotels: "true",
-      },
+      params: { slug: neighborhood.neighborhood_slug, cityId: destino.id },
     });
   }
-
-  function handlePorDentro() {
-    if (!activeNeighborhood) return;
-    // Fully dismiss the card, then navigate cleanly
-    setCardVisible(false);
-    router.push({
-      pathname: "/ondeFicar/bairro/[slug]",
-      params: {
-        slug: activeNeighborhood.neighborhood_slug,
-        cityId: destino.id,
-      },
-    });
-  }
-
-  const cardStyle = {
-    opacity: cardAnim,
-    transform: [
-      {
-        translateY: cardAnim.interpolate({
-          inputRange: [0, 1],
-          outputRange: [18, 0],
-        }),
-      },
-    ],
-  };
 
   return (
     <View style={s.root}>
@@ -161,49 +97,27 @@ export default function OndeFicarScreen() {
 
       {/* ── Fixed map section ── */}
       <View style={s.mapSection}>
-        {/* Leaflet interactive map fills the section */}
         <RioMapView
-          selectedNeighborhood={selected}
+          selectedNeighborhood={null}
           onNeighborhoodPress={handleNeighborhoodPress}
           style={StyleSheet.absoluteFillObject}
         />
 
-        {/* ── Fixed overlay controls (outside the iframe, always on top) ── */}
         <View style={[s.mapControls, { top: topInset + 10 }]} pointerEvents="box-none">
           <Pressable style={s.pill} onPress={() => router.back()} hitSlop={8}>
             <Text style={s.pillText}>← Voltar</Text>
           </Pressable>
           <View style={s.pill}>
-            <View style={[s.badgeDot, selected ? s.badgeDotActive : null]} />
+            <View style={s.badgeDot} />
             <Text style={s.pillText}>
-              {loading
-                ? "carregando…"
-                : selected
-                ? `${hotels.length} hotel${hotels.length !== 1 ? "s" : ""}`
-                : `${allHotels.length} hospedagens`}
+              {loading ? "carregando…" : `${allHotels.length} hospedagens`}
             </Text>
           </View>
         </View>
 
-        {/* Hint — only when nothing is selected */}
-        {!selected && (
-          <View style={[s.mapHint, { pointerEvents: "none" }]}>
-            <Text style={s.mapHintText}>Toque num bairro para explorar</Text>
-          </View>
-        )}
-
-        {/* Floating neighborhood card — only shown when cardVisible */}
-        {activeNeighborhood && cardVisible && (
-          <Animated.View style={[s.cardWrap, cardStyle]} pointerEvents="box-none">
-            <NeighborhoodCard
-              neighborhood={activeNeighborhood}
-              hotelCount={hotels.length}
-              onVerHoteis={handleVerHoteis}
-              onPorDentro={handlePorDentro}
-              onDismiss={() => { setSelected(null); setCardVisible(false); }}
-            />
-          </Animated.View>
-        )}
+        <View style={[s.mapHint, { pointerEvents: "none" }]}>
+          <Text style={s.mapHintText}>Toque num bairro para explorar</Text>
+        </View>
       </View>
 
       {/* ── Scrollable hotel list ── */}
@@ -213,7 +127,7 @@ export default function OndeFicarScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: bottomPad + 40 }}
       >
-        {/* ── Photo hero intro — editorial bridge from map to hotel list ── */}
+        {/* Photo hero intro */}
         <View style={s.introHeroWrap}>
           <Image
             source={destino.image}
@@ -227,42 +141,24 @@ export default function OndeFicarScreen() {
             pointerEvents="none"
           />
           <View style={[s.intro, s.introAbsolute]}>
-            {activeNeighborhood ? (
-              <>
-                <Text style={s.introTitle}>{activeNeighborhood.title}</Text>
-                <Text style={s.introPhrase}>{activeNeighborhood.identity_phrase}</Text>
-              </>
-            ) : (
-              <>
-                <Text style={s.introTitle}>Onde ficar em {destino.cidade}</Text>
-                <Text style={s.introPara}>
-                  Onde você dorme define como você acorda. No Rio, cada bairro tem
-                  um ritmo próprio — escolher bem o hotel muda toda a experiência.
-                </Text>
-              </>
-            )}
+            <Text style={s.introTitle}>Onde ficar em {destino.cidade}</Text>
+            <Text style={s.introPara}>
+              Onde você dorme define como você acorda. No Rio, cada bairro tem
+              um ritmo próprio — escolher bem o hotel muda toda a experiência.
+            </Text>
             <View style={s.introMeta}>
               <View style={s.introDot} />
               <Text style={s.introMetaText}>
                 Seleção curada ·{" "}
-                {loading ? "…" : `${hotels.length} hospedagem${hotels.length !== 1 ? "s" : ""}`}
+                {loading ? "…" : `${allHotels.length} hospedagem${allHotels.length !== 1 ? "s" : ""}`}
               </Text>
             </View>
           </View>
         </View>
 
         {/* List section */}
-        <View
-          style={s.listSection}
-          onLayout={(e) => {
-            listY.current = e.nativeEvent.layout.y;
-          }}
-        >
-          <Text style={s.listLabel}>
-            {selected
-              ? `${hotels.length} hospedagem${hotels.length !== 1 ? "s" : ""} em ${selected}`
-              : "Hospedagens selecionadas"}
-          </Text>
+        <View style={s.listSection}>
+          <Text style={s.listLabel}>Hospedagens selecionadas</Text>
 
           {loading && (
             <View style={s.centerWrap}>
@@ -278,29 +174,19 @@ export default function OndeFicarScreen() {
             </View>
           )}
 
-          {!loading && !error && hotels.length === 0 && selected && (
-            <View style={s.centerWrap}>
-              <Feather name="map-pin" size={18} color="rgba(255,255,255,0.10)" />
-              <Text style={s.emptyTitle}>Nenhum local em {selected}</Text>
-              <Text style={s.emptyText}>Toque em outro bairro no mapa.</Text>
-            </View>
-          )}
-
-          {!loading &&
-            !error &&
-            hotels.map((hotel, idx) => (
-              <HotelCard
-                key={hotel.id}
-                hotel={hotel}
-                index={idx}
-                onPress={() =>
-                  router.push({
-                    pathname: "/ondeFicar/hotel/[hotelId]",
-                    params: { hotelId: hotel.id },
-                  })
-                }
-              />
-            ))}
+          {!loading && !error && allHotels.map((hotel, idx) => (
+            <HotelCard
+              key={hotel.id}
+              hotel={hotel}
+              index={idx}
+              onPress={() =>
+                router.push({
+                  pathname: "/ondeFicar/hotel/[hotelId]",
+                  params: { hotelId: hotel.id },
+                })
+              }
+            />
+          ))}
         </View>
 
         {/* Footer */}
@@ -312,67 +198,6 @@ export default function OndeFicarScreen() {
         </View>
       </ScrollView>
     </View>
-  );
-}
-
-// ── Neighborhood card ─────────────────────────────────────────────────────────
-
-function NeighborhoodCard({
-  neighborhood,
-  hotelCount,
-  onVerHoteis,
-  onPorDentro,
-  onDismiss,
-}: {
-  neighborhood: Neighborhood;
-  hotelCount: number;
-  onVerHoteis: () => void;
-  onPorDentro: () => void;
-  onDismiss: () => void;
-}) {
-  return (
-    <LinearGradient
-      colors={["rgba(22,18,16,0.97)", "rgba(10,9,8,0.98)"]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 0.6, y: 1 }}
-      style={nc.card}
-    >
-      {/* Header */}
-      <View style={nc.header}>
-        <View style={nc.headerLeft}>
-          {/* Best-for tags */}
-          <View style={nc.tags}>
-            {[neighborhood.best_for_1, neighborhood.best_for_2, neighborhood.best_for_3]
-              .filter(Boolean)
-              .map((tag, i) => (
-                <View key={i} style={nc.tag}>
-                  <Text style={nc.tagText}>{(tag as string).toUpperCase()}</Text>
-                </View>
-              ))}
-          </View>
-          <Text style={nc.name}>{neighborhood.neighborhood_name}</Text>
-          <Text style={nc.phrase} numberOfLines={2}>
-            {neighborhood.identity_phrase}
-          </Text>
-        </View>
-        <Pressable style={nc.closeBtn} onPress={onDismiss} hitSlop={12}>
-          <Feather name="x" size={13} color="rgba(255,255,255,0.35)" />
-        </Pressable>
-      </View>
-
-      {/* Action buttons */}
-      <View style={nc.actions}>
-        <Pressable style={nc.hotBtn} onPress={onVerHoteis}>
-          <Text style={nc.hotBtnText}>
-            Ver hotéis
-          </Text>
-        </Pressable>
-        <Pressable style={nc.ghostBtn} onPress={onPorDentro}>
-          <Text style={nc.ghostBtnText}>Por dentro do bairro</Text>
-          <Feather name="arrow-right" size={12} color="rgba(255,255,255,0.50)" />
-        </Pressable>
-      </View>
-    </LinearGradient>
   );
 }
 
@@ -469,21 +294,11 @@ function HotelCard({
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#0A0502" },
 
-  // ── Map section ──
   mapSection: {
     width: "100%",
     height: MAP_H,
     position: "relative",
   },
-  cardWrap: {
-    position: "absolute",
-    bottom: 14,
-    left: 14,
-    right: 14,
-    zIndex: 20,
-  },
-
-  // ── Map overlay controls ──
   mapControls: {
     position: "absolute",
     left: 0,
@@ -519,9 +334,6 @@ const s = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: C.terracotta,
   },
-  badgeDotActive: {
-    backgroundColor: C.gold,
-  },
   mapHint: {
     position: "absolute",
     bottom: 14,
@@ -535,33 +347,22 @@ const s = StyleSheet.create({
     fontSize: 11,
     color: "rgba(255,255,255,0.52)",
     letterSpacing: 0.4,
-    paddingHorizontal: 0,
-    paddingVertical: 0,
   },
 
-  // ── Scrollable list ──
-  listScroll: {
-    flex: 1,
-    backgroundColor: "#0A0502",
-  },
+  listScroll: { flex: 1, backgroundColor: "#0A0502" },
 
-  // ── Intro hero wrapper — destination photo behind the editorial intro text ──
   introHeroWrap: {
     width: "100%",
     height: 260,
     position: "relative",
     overflow: "hidden",
   },
-
-  // ── Intro text block — pinned to the bottom of the hero image ──
   introAbsolute: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
   },
-
-  // ── Intro ──
   intro: {
     paddingHorizontal: 24,
     paddingTop: 24,
@@ -574,15 +375,6 @@ const s = StyleSheet.create({
     lineHeight: 36,
     letterSpacing: -0.4,
     marginBottom: 8,
-  },
-  introPhrase: {
-    fontFamily: "PlayfairDisplay_400Regular",
-    fontSize: 15,
-    color: C.gold,
-    letterSpacing: 0.1,
-    marginBottom: 16,
-    fontStyle: "italic",
-    opacity: 0.82,
   },
   introPara: {
     fontFamily: "Inter_400Regular",
@@ -605,7 +397,6 @@ const s = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // ── List section ──
   listSection: {
     backgroundColor: "#0A0502",
     paddingTop: 20,
@@ -627,12 +418,6 @@ const s = StyleSheet.create({
     paddingVertical: 40,
     gap: 10,
   },
-  emptyTitle: {
-    fontFamily: "PlayfairDisplay_600SemiBold",
-    fontSize: 16,
-    color: "rgba(255,255,255,0.25)",
-    textAlign: "center",
-  },
   emptyText: {
     fontFamily: "Inter_400Regular",
     fontSize: 13,
@@ -640,7 +425,6 @@ const s = StyleSheet.create({
     textAlign: "center",
   },
 
-  // ── Hotel card ──
   card: {
     backgroundColor: "#1C1410",
     borderRadius: 18,
@@ -734,14 +518,14 @@ const s = StyleSheet.create({
     color: C.white,
     lineHeight: 26,
     letterSpacing: -0.2,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   cardDesc: {
     fontFamily: "Inter_400Regular",
     fontSize: 13,
-    color: "rgba(255,255,255,0.58)",
+    color: "rgba(255,255,255,0.55)",
     lineHeight: 20,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   reserveBtn: {
     flexDirection: "row",
@@ -749,137 +533,39 @@ const s = StyleSheet.create({
     justifyContent: "center",
     gap: 7,
     borderWidth: 1,
-    borderColor: "rgba(201,168,76,0.25)",
+    borderColor: "rgba(201,168,76,0.22)",
     borderRadius: 10,
     paddingVertical: 11,
-    backgroundColor: "rgba(201,168,76,0.06)",
+    backgroundColor: "rgba(201,168,76,0.04)",
   },
   reserveTxt: {
     fontFamily: "Inter_500Medium",
     fontSize: 13,
     color: C.gold,
-    letterSpacing: 0.2,
+    letterSpacing: 0.1,
   },
 
-  // ── Footer ──
   footer: {
+    backgroundColor: "#0A0502",
     marginTop: 4,
     paddingVertical: 32,
     paddingHorizontal: 24,
     borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.05)",
+    borderTopColor: "rgba(255,255,255,0.06)",
     alignItems: "center",
     gap: 8,
   },
   footerL: {
     fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 30,
-    color: C.terracotta,
+    fontSize: 32,
+    color: "rgba(255,255,255,0.25)",
   },
   footerText: {
     fontFamily: "Inter_400Regular",
     fontSize: 13,
-    color: C.warmGray,
+    color: "rgba(255,255,255,0.35)",
     textAlign: "center",
     lineHeight: 20,
     maxWidth: 240,
-  },
-});
-
-// ── Neighborhood card styles ──────────────────────────────────────────────────
-
-const nc = StyleSheet.create({
-  card: {
-    borderRadius: 22,
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.09)",
-    overflow: "hidden",
-    boxShadow: "0px 8px 32px rgba(0,0,0,0.65), 0px 0px 0px 1px rgba(255,255,255,0.05)",
-  } as any,
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 14,
-  },
-  headerLeft: { flex: 1, paddingRight: 12 },
-  name: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 24,
-    color: C.white,
-    letterSpacing: -0.3,
-    lineHeight: 30,
-    marginBottom: 5,
-  },
-  phrase: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: "rgba(255,255,255,0.46)",
-    lineHeight: 19,
-    fontStyle: "italic",
-  },
-  closeBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 2,
-  },
-  tags: { flexDirection: "row", flexWrap: "wrap", gap: 5, marginBottom: 10 },
-  tag: {
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderRadius: 20,
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-  },
-  tagText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 9,
-    color: "rgba(255,255,255,0.45)",
-    letterSpacing: 0.8,
-  },
-  actions: { flexDirection: "row", gap: 10 },
-  hotBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    backgroundColor: "rgba(255,255,255,0.92)",
-    borderRadius: 13,
-    paddingVertical: 12,
-  },
-  hotBtnText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-    color: "#0A0502",
-    letterSpacing: 0.1,
-  },
-  ghostBtn: {
-    flex: 1.3,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-    borderRadius: 13,
-    paddingVertical: 12,
-    backgroundColor: "rgba(255,255,255,0.06)",
-  },
-  ghostBtnText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 13,
-    color: "rgba(255,255,255,0.72)",
-    letterSpacing: 0.1,
   },
 });

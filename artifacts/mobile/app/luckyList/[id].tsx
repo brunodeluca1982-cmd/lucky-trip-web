@@ -1,16 +1,14 @@
 /**
- * luckyList/[id].tsx — Lucky List curated picks screen
+ * luckyList/[id].tsx — Lucky List map + curated picks screen
  *
- * Map: RioMapView (Leaflet satellite) — same component as ondeFicar.
- * Layout: fixed map section (50% screen) + scrollable list below.
- * Visual: gold Lucky List branding with ✦ marks preserved.
+ * Map: RioMapView (Leaflet satellite).
+ * Tap a neighborhood → navigate directly to luckyList/bairro/[bairroNome] (no floating card).
+ * Scrollable list always shows ALL lucky picks. Gold branding preserved.
  */
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef } from "react";
 import {
-  Animated,
   Dimensions,
-  Easing,
   Image,
   Platform,
   Pressable,
@@ -28,13 +26,13 @@ import { destinos } from "@/data/mockData";
 import { LUGARES_LUCKY } from "@/data/lugares";
 import RioMapView from "@/components/RioMapView";
 
-const C = Colors.light;
+const C    = Colors.light;
 const GOLD = "#C9A84C";
-const GOLD_DIM = "rgba(201,168,76,0.18)";
+const GOLD_DIM    = "rgba(201,168,76,0.18)";
 const GOLD_BORDER = "rgba(201,168,76,0.28)";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
-const MAP_H = Math.round(SCREEN_HEIGHT * 0.50);
+const MAP_H       = Math.round(SCREEN_HEIGHT * 0.50);
 const CARD_IMAGE_H = 218;
 
 const EDITORIAIS: Record<string, { headline: string; paras: string[] }> = {
@@ -56,116 +54,25 @@ const DEFAULT_EDITORIAL = {
   ],
 };
 
-// ── Floating neighborhood card (Lucky styling) ────────────────────────────────
-
-function LuckyNeighborhoodCard({
-  name,
-  count,
-  onVerLocais,
-  onDismiss,
-}: {
-  name: string;
-  count: number;
-  onVerLocais: () => void;
-  onDismiss: () => void;
-}) {
-  return (
-    <LinearGradient
-      colors={["rgba(26,18,8,0.97)", "rgba(10,5,2,0.98)"]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 0.6, y: 1 }}
-      style={nc.card}
-    >
-      {/* Gold top accent line */}
-      <View style={nc.goldLine} />
-
-      <View style={nc.header}>
-        <View style={nc.headerLeft}>
-          <Text style={nc.accentLabel}>✦ LUCKY LIST</Text>
-          <Text style={nc.name}>{name}</Text>
-          <Text style={nc.sub}>
-            {count === 0
-              ? "Sem picks nesta área"
-              : `${count} pick${count !== 1 ? "s" : ""} selecionado${count !== 1 ? "s" : ""}`}
-          </Text>
-        </View>
-        <Pressable style={nc.closeBtn} onPress={onDismiss} hitSlop={12}>
-          <Feather name="x" size={13} color="rgba(255,255,255,0.35)" />
-        </Pressable>
-      </View>
-      <View style={nc.actions}>
-        <Pressable style={nc.goldBtn} onPress={onVerLocais}>
-          <Text style={nc.goldBtnText}>
-            {count > 0 ? `Ver ${count} pick${count !== 1 ? "s" : ""}` : "Ver todos"}
-          </Text>
-        </Pressable>
-        <Pressable style={nc.ghostBtn} onPress={onDismiss}>
-          <Text style={nc.ghostBtnText}>Explorar mapa</Text>
-          <Feather name="map" size={12} color={GOLD} style={{ opacity: 0.7 }} />
-        </Pressable>
-      </View>
-    </LinearGradient>
-  );
-}
-
-// ── Screen ────────────────────────────────────────────────────────────────────
-
 export default function LuckyListScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const insets = useSafeAreaInsets();
-  const topInset = Platform.OS === "web" ? 67 : insets.top;
+  const insets    = useSafeAreaInsets();
+  const topInset  = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
-  const destino = destinos.find((d) => d.id === id) ?? destinos[0];
+  const destino    = destinos.find((d) => d.id === id) ?? destinos[0];
   const allLugares = LUGARES_LUCKY[destino.id] ?? [];
-  const editorial = EDITORIAIS[destino.id] ?? DEFAULT_EDITORIAL;
-
-  const [selected, setSelected] = useState<string | null>(null);
-
-  const lugares = selected
-    ? allLugares.filter((p) => p.localizacao === selected)
-    : allLugares;
-
-  const cardAnim = useRef(new Animated.Value(0)).current;
-  const prevSelected = useRef<string | null>(null);
-  useEffect(() => {
-    if (selected && selected !== prevSelected.current) {
-      cardAnim.setValue(0);
-      Animated.timing(cardAnim, {
-        toValue: 1,
-        duration: 280,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }).start();
-    }
-    prevSelected.current = selected;
-  }, [selected]);
+  const editorial  = EDITORIAIS[destino.id] ?? DEFAULT_EDITORIAL;
 
   const listRef = useRef<ScrollView>(null);
-  const listY = useRef(0);
 
   function handleNeighborhoodPress(name: string | null) {
-    setSelected((prev) => (prev === name ? null : name));
+    if (!name) return;
+    router.push({
+      pathname: "/luckyList/bairro/[bairroNome]",
+      params: { bairroNome: name, cityId: destino.id },
+    });
   }
-
-  function handleVerLocais() {
-    setTimeout(
-      () => listRef.current?.scrollTo({ y: listY.current + MAP_H, animated: true }),
-      80,
-    );
-  }
-
-  const cardStyle = {
-    opacity: cardAnim,
-    transform: [
-      {
-        translateY: cardAnim.interpolate({
-          inputRange: [0, 1],
-          outputRange: [18, 0],
-        }),
-      },
-    ],
-  };
 
   return (
     <View style={s.root}>
@@ -174,7 +81,7 @@ export default function LuckyListScreen() {
       {/* ── Fixed map section ── */}
       <View style={s.mapSection}>
         <RioMapView
-          selectedNeighborhood={selected}
+          selectedNeighborhood={null}
           onNeighborhoodPress={handleNeighborhoodPress}
           style={StyleSheet.absoluteFillObject}
         />
@@ -184,31 +91,13 @@ export default function LuckyListScreen() {
             <Text style={s.pillText}>← Voltar</Text>
           </Pressable>
           <View style={[s.pill, s.pillGold]}>
-            <Text style={s.pillGoldText}>
-              ✦{" "}
-              {selected
-                ? `${lugares.length} pick${lugares.length !== 1 ? "s" : ""}`
-                : `${allLugares.length} picks`}
-            </Text>
+            <Text style={s.pillGoldText}>✦ {allLugares.length} picks</Text>
           </View>
         </View>
 
-        {!selected && (
-          <View style={[s.mapHint, { pointerEvents: "none" }]}>
-            <Text style={s.mapHintText}>✦ Toque num bairro para filtrar picks</Text>
-          </View>
-        )}
-
-        {selected && (
-          <Animated.View style={[s.cardWrap, cardStyle]} pointerEvents="box-none">
-            <LuckyNeighborhoodCard
-              name={selected}
-              count={lugares.length}
-              onVerLocais={handleVerLocais}
-              onDismiss={() => setSelected(null)}
-            />
-          </Animated.View>
-        )}
+        <View style={[s.mapHint, { pointerEvents: "none" }]}>
+          <Text style={s.mapHintText}>✦ Toque num bairro para filtrar picks</Text>
+        </View>
       </View>
 
       {/* ── Scrollable list ── */}
@@ -224,54 +113,26 @@ export default function LuckyListScreen() {
             <Text style={s.heroAccentText}>✦ LUCKY LIST</Text>
             <View style={s.heroAccentLine} />
           </View>
-
-          {selected ? (
-            <>
-              <Text style={s.heroHeadline}>{selected}</Text>
-              <Text style={s.heroPara}>
-                {lugares.length === 0
-                  ? "Nenhum pick Lucky neste bairro. Explore o mapa para descobrir outros."
-                  : `${lugares.length} pick${lugares.length !== 1 ? "s" : ""} Lucky neste bairro — selecionados para quem sabe escolher.`}
-              </Text>
-            </>
-          ) : (
-            <>
-              <Text style={s.heroHeadline}>{editorial.headline}</Text>
-              {editorial.paras.map((para, i) => (
-                <Text key={i} style={s.heroPara}>{para}</Text>
-              ))}
-            </>
-          )}
-
+          <Text style={s.heroHeadline}>{editorial.headline}</Text>
+          {editorial.paras.map((para, i) => (
+            <Text key={i} style={s.heroPara}>{para}</Text>
+          ))}
           <View style={s.curatorBadge}>
             <View style={s.curatorDot} />
             <Text style={s.curatorText}>
-              Curadoria Lucky Trip · {destino.cidade} · {lugares.length} picks selecionados
+              Curadoria Lucky Trip · {destino.cidade} · {allLugares.length} picks selecionados
             </Text>
           </View>
         </View>
 
         {/* Lucky picks cards */}
-        <View
-          style={s.cardsSection}
-          onLayout={(e) => { listY.current = e.nativeEvent.layout.y; }}
-        >
+        <View style={s.cardsSection}>
           <View style={s.sectionHeader}>
-            <Text style={s.sectionLabel}>
-              {selected ? `${lugares.length} Picks em ${selected}` : "Lucky Picks"}
-            </Text>
+            <Text style={s.sectionLabel}>Lucky Picks</Text>
             <View style={s.sectionLabelLine} />
           </View>
 
-          {lugares.length === 0 && selected && (
-            <View style={s.centerWrap}>
-              <Text style={s.emptyGold}>✦</Text>
-              <Text style={s.emptyTitle}>Nenhum pick em {selected}</Text>
-              <Text style={s.emptyText}>Toque em outro bairro no mapa.</Text>
-            </View>
-          )}
-
-          {lugares.map((place, index) => (
+          {allLugares.map((place, index) => (
             <Pressable
               key={place.id}
               style={s.card}
@@ -310,11 +171,7 @@ export default function LuckyListScreen() {
                       e.stopPropagation?.();
                       router.push({
                         pathname: "/lugar/[cityId]/[placeId]",
-                        params: {
-                          cityId: destino.id,
-                          placeId: place.id,
-                          showMap: "true",
-                        },
+                        params: { cityId: destino.id, placeId: place.id, showMap: "true" },
                       });
                     }}
                   >
@@ -331,7 +188,6 @@ export default function LuckyListScreen() {
           ))}
         </View>
 
-        {/* Editorial footer */}
         <View style={s.footer}>
           <Text style={s.footerGold}>✦</Text>
           <Text style={s.footerTitle}>Lucky Trip</Text>
@@ -344,23 +200,13 @@ export default function LuckyListScreen() {
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
-
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#0A0502" },
 
-  // ── Map section ──
   mapSection: {
     width: "100%",
     height: MAP_H,
     position: "relative",
-  },
-  cardWrap: {
-    position: "absolute",
-    bottom: 14,
-    left: 14,
-    right: 14,
-    zIndex: 20,
   },
   mapControls: {
     position: "absolute",
@@ -416,13 +262,8 @@ const s = StyleSheet.create({
     letterSpacing: 0.4,
   },
 
-  // ── Scrollable list ──
-  listScroll: {
-    flex: 1,
-    backgroundColor: "#0A0502",
-  },
+  listScroll: { flex: 1, backgroundColor: "#0A0502" },
 
-  // ── Hero editorial ──
   heroBlock: {
     backgroundColor: "#0A0502",
     paddingHorizontal: 24,
@@ -484,7 +325,6 @@ const s = StyleSheet.create({
     flexShrink: 1,
   },
 
-  // ── Cards section ──
   cardsSection: {
     backgroundColor: "#0F0A06",
     paddingTop: 28,
@@ -508,31 +348,7 @@ const s = StyleSheet.create({
     height: 1,
     backgroundColor: GOLD_BORDER,
   },
-  centerWrap: {
-    alignItems: "center",
-    paddingVertical: 40,
-    gap: 8,
-  },
-  emptyGold: {
-    fontSize: 22,
-    color: GOLD,
-    opacity: 0.35,
-    marginBottom: 4,
-  },
-  emptyTitle: {
-    fontFamily: "PlayfairDisplay_600SemiBold",
-    fontSize: 16,
-    color: "rgba(255,255,255,0.25)",
-    textAlign: "center",
-  },
-  emptyText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: "rgba(255,255,255,0.18)",
-    textAlign: "center",
-  },
 
-  // ── Lucky pick card ──
   card: {
     backgroundColor: "#1A1208",
     borderRadius: 18,
@@ -664,7 +480,6 @@ const s = StyleSheet.create({
     color: GOLD,
   },
 
-  // ── Footer ──
   footer: {
     backgroundColor: "#0A0502",
     paddingVertical: 36,
@@ -693,97 +508,5 @@ const s = StyleSheet.create({
     lineHeight: 20,
     maxWidth: 250,
     marginTop: 4,
-  },
-});
-
-// ── Lucky neighborhood card styles ────────────────────────────────────────────
-
-const nc = StyleSheet.create({
-  card: {
-    borderRadius: 18,
-    overflow: "hidden",
-    paddingHorizontal: 18,
-    paddingTop: 14,
-    paddingBottom: 14,
-    borderWidth: 1,
-    borderColor: GOLD_BORDER,
-  },
-  goldLine: {
-    height: 1,
-    backgroundColor: GOLD_BORDER,
-    marginBottom: 14,
-    marginHorizontal: -18,
-    marginTop: -14,
-    // positioned above the card content as a decorative top accent
-    display: "none", // kept for future use; gold border on card handles it
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  headerLeft: { flex: 1, marginRight: 8 },
-  accentLabel: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 9,
-    color: GOLD,
-    letterSpacing: 2.2,
-    marginBottom: 4,
-  },
-  name: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 20,
-    color: C.white,
-    lineHeight: 26,
-    letterSpacing: -0.2,
-    marginBottom: 2,
-  },
-  sub: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: "rgba(201,168,76,0.55)",
-  },
-  closeBtn: {
-    width: 26,
-    height: 26,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderRadius: 13,
-    marginTop: 2,
-  },
-  actions: { flexDirection: "row", gap: 10 },
-  goldBtn: {
-    flex: 1,
-    backgroundColor: GOLD,
-    borderRadius: 50,
-    paddingVertical: 11,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  goldBtnText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13.5,
-    color: "#18120C",
-    letterSpacing: 0.1,
-  },
-  ghostBtn: {
-    flex: 1,
-    backgroundColor: "rgba(201,168,76,0.06)",
-    borderRadius: 50,
-    paddingVertical: 11,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: GOLD_BORDER,
-    flexDirection: "row",
-    gap: 6,
-  },
-  ghostBtnText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 13.5,
-    color: "rgba(201,168,76,0.75)",
-    letterSpacing: 0.1,
   },
 });

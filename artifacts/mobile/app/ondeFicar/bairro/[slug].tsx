@@ -1,15 +1,19 @@
 /**
- * ondeFicar/bairro/[slug].tsx — Neighborhood editorial detail page
+ * ondeFicar/bairro/[slug].tsx — Neighborhood detail for "Onde ficar"
  *
- * Params:
- *  - slug: neighborhood_slug (required)
- *  - cityId: destination id for hero image (optional, defaults to "rio")
- *  - focusHotels: "true" → auto-scroll to hotels section on mount
+ * Layout:
+ *   Hero image → neighborhood name + phrase
+ *   ACTION BUTTONS: "Ver X hotéis" (scroll) | "Por dentro do bairro" (toggle editorial)
+ *   [Collapsible editorial: my_view + how_to_live + stats]
+ *   Hotels list
  *
- * Content: cinematic hero image → editorial → stats → hotels list
+ * URL params:
+ *   slug     — neighborhood_slug
+ *   cityId   — destination id for hero image
+ *   focusHotels — "true" to auto-scroll to hotels on mount
  */
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -32,7 +36,7 @@ import { useNeighborhoods } from "@/hooks/useNeighborhoods";
 import type { Hotel } from "@/lib/supabase";
 
 const C = Colors.light;
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const HERO_H = Math.round(SCREEN_HEIGHT * 0.46);
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -50,11 +54,7 @@ function categoryLabel(raw: string): string {
 
 function formatLevel(val: string): string {
   const m: Record<string, string> = {
-    alto:       "Alta",
-    media:      "Média",
-    baixa:      "Baixa",
-    alta:       "Alta",
-    muito_alta: "Muito alta",
+    alto: "Alta", alta: "Alta", media: "Média", baixa: "Baixa", muito_alta: "Muito alta",
   };
   return m[val?.toLowerCase()] ?? val ?? "—";
 }
@@ -74,14 +74,14 @@ export default function BairroDetailScreen() {
   const { neighborhoods, loading, error } = useNeighborhoods();
   const neighborhood = neighborhoods.find((n) => n.neighborhood_slug === slug) ?? null;
 
-  // Resolve hero image from cityId or fallback to Rio
   const destino = destinos.find((d) => d.id === (cityId ?? "rio")) ?? destinos[0];
+
+  const [editorialOpen, setEditorialOpen] = useState(false);
 
   const scrollRef    = useRef<ScrollView>(null);
   const hotelsSectionY = useRef(0);
   const hasScrolled  = useRef(false);
 
-  // Auto-scroll to hotels when focusHotels=true and the page content is ready
   useEffect(() => {
     if (focusHotels === "true" && neighborhood && !hasScrolled.current) {
       hasScrolled.current = true;
@@ -91,20 +91,20 @@ export default function BairroDetailScreen() {
     }
   }, [neighborhood, focusHotels]);
 
+  const hotelCount = neighborhood?.hotels?.length ?? 0;
+
   return (
     <View style={s.root}>
       <Stack.Screen options={{ headerShown: false }} />
 
       {loading && (
         <View style={s.loadingWrap}>
-          <ActivityIndicator size="large" color="rgba(255,255,255,0.40)" />
-          <Text style={s.loadingText}>Carregando…</Text>
+          <ActivityIndicator size="large" color="rgba(255,255,255,0.30)" />
         </View>
       )}
 
       {error && !loading && (
         <View style={s.loadingWrap}>
-          <Feather name="alert-circle" size={24} color="rgba(255,255,255,0.25)" />
           <Text style={s.loadingText}>{error}</Text>
         </View>
       )}
@@ -121,26 +121,19 @@ export default function BairroDetailScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: bottomPad + 56 }}
         >
-          {/* ── Cinematic hero ── */}
-          <View style={s.hero}>
+          {/* ── Hero ── */}
+          <View style={[s.hero, { height: HERO_H }]}>
             <Image
               source={destino.image}
               style={StyleSheet.absoluteFillObject}
               resizeMode="cover"
             />
-
-            {/* Deep gradient: shows through image at top, fully opaque at bottom */}
             <LinearGradient
-              colors={[
-                "rgba(10,5,2,0.18)",
-                "rgba(10,5,2,0.38)",
-                "rgba(10,5,2,0.92)",
-              ]}
+              colors={["rgba(10,5,2,0.18)", "rgba(10,5,2,0.40)", "rgba(10,5,2,0.94)"]}
               locations={[0, 0.5, 1]}
               style={StyleSheet.absoluteFill}
             />
 
-            {/* Back button */}
             <Pressable
               style={[s.backBtn, { top: topInset + 12 }]}
               onPress={() => router.back()}
@@ -150,22 +143,14 @@ export default function BairroDetailScreen() {
               <Text style={s.backText}>Voltar</Text>
             </Pressable>
 
-            {/* Hero content — pinned to bottom */}
             <View style={s.heroContent}>
-              {/* Category badge */}
               <View style={s.categoryBadge}>
                 <Text style={s.categoryText}>
                   {neighborhood.category_neighborhood?.toUpperCase() ?? "BAIRRO"}
                 </Text>
               </View>
-
-              {/* Neighborhood name */}
               <Text style={s.heroName}>{neighborhood.neighborhood_name}</Text>
-
-              {/* Identity phrase */}
               <Text style={s.heroPhrase}>{neighborhood.identity_phrase}</Text>
-
-              {/* Best-for tags */}
               <View style={s.tagsRow}>
                 {[neighborhood.best_for_1, neighborhood.best_for_2, neighborhood.best_for_3]
                   .filter(Boolean)
@@ -178,46 +163,70 @@ export default function BairroDetailScreen() {
             </View>
           </View>
 
-          {/* ── Editorial — Por dentro ── */}
-          <View style={s.section}>
-            <Text style={s.sectionLabel}>Por dentro do bairro</Text>
-            {neighborhood.my_view
-              .replace(/\r\n/g, "\n")
-              .split("\n")
-              .map((p, i) =>
-                p.trim() ? (
-                  <Text key={i} style={s.bodyText}>{p.trim()}</Text>
-                ) : null,
-              )}
+          {/* ── Action buttons ── */}
+          <View style={s.actionRow}>
+            <Pressable
+              style={s.actionPrimary}
+              onPress={() =>
+                setTimeout(
+                  () => scrollRef.current?.scrollTo({ y: hotelsSectionY.current, animated: true }),
+                  60,
+                )
+              }
+            >
+              <Feather name="home" size={14} color="#18120C" />
+              <Text style={s.actionPrimaryText}>
+                Ver {hotelCount > 0 ? `${hotelCount} ` : ""}hotel{hotelCount !== 1 ? "s" : ""}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[s.actionGhost, editorialOpen && s.actionGhostActive]}
+              onPress={() => setEditorialOpen((v) => !v)}
+            >
+              <Text style={s.actionGhostText}>Por dentro do bairro</Text>
+              <Feather
+                name={editorialOpen ? "chevron-up" : "chevron-down"}
+                size={13}
+                color="rgba(255,255,255,0.55)"
+              />
+            </Pressable>
           </View>
 
-          {/* ── Como viver ── */}
-          {neighborhood.how_to_live && neighborhood.how_to_live.length > 0 && (
-            <View style={s.section}>
-              <Text style={s.sectionLabel}>Como viver o bairro</Text>
-              {neighborhood.how_to_live.map((tip, i) => (
-                <View key={i} style={s.tipRow}>
-                  <View style={s.tipDot} />
-                  <Text style={s.tipText}>{tip}</Text>
-                </View>
-              ))}
+          {/* ── Collapsible editorial ── */}
+          {editorialOpen && (
+            <View style={s.editorial}>
+              <Text style={s.sectionLabel}>Por dentro do bairro</Text>
+              {neighborhood.my_view
+                .replace(/\r\n/g, "\n")
+                .split("\n")
+                .map((p, i) =>
+                  p.trim() ? (
+                    <Text key={i} style={s.bodyText}>{p.trim()}</Text>
+                  ) : null,
+                )}
+
+              {neighborhood.how_to_live && neighborhood.how_to_live.length > 0 && (
+                <>
+                  <Text style={[s.sectionLabel, { marginTop: 24 }]}>Como viver o bairro</Text>
+                  {neighborhood.how_to_live.map((tip, i) => (
+                    <View key={i} style={s.tipRow}>
+                      <View style={s.tipDot} />
+                      <Text style={s.tipText}>{tip}</Text>
+                    </View>
+                  ))}
+                </>
+              )}
+
+              <Text style={[s.sectionLabel, { marginTop: 24 }]}>Perfil do bairro</Text>
+              <View style={s.statsGrid}>
+                <StatPill label="Vida noturna"  value={formatLevel(neighborhood.nightlife)} />
+                <StatPill label="Gastronomia"   value={formatLevel(neighborhood.gastronomy)} />
+                <StatPill label="Paisagem"      value={formatLevel(neighborhood.scenery)} />
+                <StatPill label="A pé"          value={formatLevel(neighborhood.walkable)} />
+                <StatPill label="Solo feminino" value={formatLevel(neighborhood.safety_solo_woman)} />
+              </View>
             </View>
           )}
-
-          {/* ── Perfil ── */}
-          <View style={s.section}>
-            <Text style={s.sectionLabel}>Perfil do bairro</Text>
-            <View style={s.statsGrid}>
-              <StatPill label="Vida noturna"  value={formatLevel(neighborhood.nightlife)} />
-              <StatPill label="Gastronomia"   value={formatLevel(neighborhood.gastronomy)} />
-              <StatPill label="Paisagem"      value={formatLevel(neighborhood.scenery)} />
-              <StatPill label="A pé"          value={formatLevel(neighborhood.walkable)} />
-              <StatPill label="Solo feminino" value={formatLevel(neighborhood.safety_solo_woman)} />
-            </View>
-          </View>
-
-          {/* ── Divider before hotels ── */}
-          <View style={s.divider} />
 
           {/* ── Hotels section ── */}
           <View
@@ -228,14 +237,14 @@ export default function BairroDetailScreen() {
               <Text style={s.sectionLabel}>
                 Hospedagens em {neighborhood.neighborhood_name}
               </Text>
-              {neighborhood.hotels && neighborhood.hotels.length > 0 && (
+              {hotelCount > 0 && (
                 <Text style={s.hotelCount}>
-                  {neighborhood.hotels.length} opção{neighborhood.hotels.length !== 1 ? "ões" : ""}
+                  {hotelCount} opção{hotelCount !== 1 ? "ões" : ""}
                 </Text>
               )}
             </View>
 
-            {(!neighborhood.hotels || neighborhood.hotels.length === 0) && (
+            {hotelCount === 0 && (
               <View style={s.emptyHotels}>
                 <Text style={s.emptyHotelsText}>
                   Nenhuma hospedagem cadastrada neste bairro por enquanto.
@@ -259,9 +268,9 @@ export default function BairroDetailScreen() {
             ))}
           </View>
 
-          {/* ── CTA row ── */}
-          <View style={s.ctaSection}>
-            {neighborhood.google_maps && (
+          {/* ── Google Maps CTA ── */}
+          {neighborhood.google_maps && (
+            <View style={s.ctaSection}>
               <Pressable
                 style={s.mapsBtn}
                 onPress={() => Linking.openURL(neighborhood.google_maps!)}
@@ -269,8 +278,8 @@ export default function BairroDetailScreen() {
                 <Feather name="map-pin" size={14} color="rgba(255,255,255,0.55)" />
                 <Text style={s.mapsBtnText}>Ver no Google Maps</Text>
               </Pressable>
-            )}
-          </View>
+            </View>
+          )}
 
           {/* ── Footer ── */}
           <View style={s.footer}>
@@ -325,20 +334,14 @@ function HotelCard({
         <Text style={hc.index}>{String(index + 1).padStart(2, "0")}</Text>
       </View>
 
-      {preview ? (
-        <Text style={hc.preview}>{preview}</Text>
-      ) : null}
+      {preview ? <Text style={hc.preview}>{preview}</Text> : null}
 
       <View style={hc.badgeRow}>
         {hotel.front_beach && (
-          <View style={hc.badge}>
-            <Text style={hc.badgeTxt}>Frente ao mar</Text>
-          </View>
+          <View style={hc.badge}><Text style={hc.badgeTxt}>Frente ao mar</Text></View>
         )}
         {hotel.rooftop && (
-          <View style={hc.badge}>
-            <Text style={hc.badgeTxt}>Rooftop</Text>
-          </View>
+          <View style={hc.badge}><Text style={hc.badgeTxt}>Rooftop</Text></View>
         )}
       </View>
 
@@ -369,13 +372,7 @@ function HotelCard({
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#0A0502" },
 
-  loadingWrap: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 14,
-    paddingHorizontal: 32,
-  },
+  loadingWrap: { flex: 1, alignItems: "center", justifyContent: "center", gap: 14 },
   loadingText: {
     fontFamily: "Inter_400Regular",
     fontSize: 14,
@@ -383,10 +380,8 @@ const s = StyleSheet.create({
     textAlign: "center",
   },
 
-  // ── Hero ──
   hero: {
     width: "100%",
-    height: HERO_H,
     position: "relative",
     overflow: "hidden",
     justifyContent: "flex-end",
@@ -410,10 +405,7 @@ const s = StyleSheet.create({
     fontSize: 13,
     color: "rgba(255,255,255,0.88)",
   },
-  heroContent: {
-    paddingHorizontal: 24,
-    paddingBottom: 28,
-  },
+  heroContent: { paddingHorizontal: 24, paddingBottom: 28 },
   categoryBadge: {
     alignSelf: "flex-start",
     backgroundColor: "rgba(255,255,255,0.10)",
@@ -463,11 +455,61 @@ const s = StyleSheet.create({
     color: "rgba(255,255,255,0.72)",
   },
 
-  // ── Editorial sections ──
-  section: {
-    paddingHorizontal: 24,
-    paddingTop: 28,
+  // ── Action buttons ──
+  actionRow: {
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingTop: 20,
     paddingBottom: 4,
+  },
+  actionPrimary: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    backgroundColor: "rgba(255,255,255,0.94)",
+    borderRadius: 50,
+    paddingVertical: 13,
+  },
+  actionPrimaryText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13.5,
+    color: "#18120C",
+    letterSpacing: 0.1,
+  },
+  actionGhost: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 50,
+    paddingVertical: 13,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+  },
+  actionGhostActive: {
+    backgroundColor: "rgba(255,255,255,0.09)",
+    borderColor: "rgba(255,255,255,0.20)",
+  },
+  actionGhostText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.70)",
+    letterSpacing: 0.1,
+  },
+
+  // ── Editorial ──
+  editorial: {
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 16,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.06)",
+    marginTop: 16,
   },
   sectionLabel: {
     fontFamily: "Inter_500Medium",
@@ -475,7 +517,7 @@ const s = StyleSheet.create({
     color: C.warmGray,
     letterSpacing: 2,
     textTransform: "uppercase",
-    marginBottom: 18,
+    marginBottom: 16,
   },
   bodyText: {
     fontFamily: "Inter_400Regular",
@@ -528,19 +570,14 @@ const s = StyleSheet.create({
     color: "rgba(255,255,255,0.75)",
   },
 
-  // ── Divider ──
-  divider: {
-    marginTop: 24,
-    height: 1,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    marginHorizontal: 24,
-  },
-
-  // ── Hotels section ──
+  // ── Hotels ──
   hotelsSection: {
     paddingTop: 28,
     paddingHorizontal: 20,
     paddingBottom: 8,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.05)",
+    marginTop: 16,
   },
   hotelsSectionHeader: {
     flexDirection: "row",
@@ -553,10 +590,7 @@ const s = StyleSheet.create({
     fontSize: 11,
     color: "rgba(255,255,255,0.25)",
   },
-  emptyHotels: {
-    paddingVertical: 24,
-    alignItems: "center",
-  },
+  emptyHotels: { paddingVertical: 24, alignItems: "center" },
   emptyHotelsText: {
     fontFamily: "Inter_400Regular",
     fontSize: 13,
@@ -565,8 +599,7 @@ const s = StyleSheet.create({
     lineHeight: 20,
   },
 
-  // ── CTA ──
-  ctaSection: { paddingHorizontal: 24, paddingTop: 20, gap: 12 },
+  ctaSection: { paddingHorizontal: 24, paddingTop: 12 },
   mapsBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -585,9 +618,8 @@ const s = StyleSheet.create({
     letterSpacing: 0.1,
   },
 
-  // ── Footer ──
   footer: {
-    marginTop: 36,
+    marginTop: 32,
     paddingVertical: 32,
     paddingHorizontal: 24,
     borderTopWidth: 1,
@@ -610,8 +642,6 @@ const s = StyleSheet.create({
     fontStyle: "italic",
   },
 });
-
-// ── Hotel card styles ─────────────────────────────────────────────────────────
 
 const hc = StyleSheet.create({
   card: {
@@ -657,12 +687,7 @@ const hc = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 12,
   },
-  badgeRow: {
-    flexDirection: "row",
-    gap: 7,
-    marginBottom: 14,
-    flexWrap: "wrap",
-  },
+  badgeRow: { flexDirection: "row", gap: 7, marginBottom: 14, flexWrap: "wrap" },
   badge: {
     backgroundColor: "rgba(255,255,255,0.05)",
     borderRadius: 20,
@@ -682,11 +707,7 @@ const hc = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  locRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
+  locRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   locText: {
     fontFamily: "Inter_400Regular",
     fontSize: 11,
