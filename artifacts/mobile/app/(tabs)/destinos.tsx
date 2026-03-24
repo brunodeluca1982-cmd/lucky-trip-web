@@ -20,12 +20,12 @@ import { destinos } from "@/data/mockData";
 const C = Colors.light;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
-const H_PAD = 16;
-const GAP = 10;
-const CARD_W = (SCREEN_WIDTH - H_PAD * 2 - GAP) / 2;
-const CARD_H = CARD_W * 1.28;
+const H_PAD = 14;
+const GAP = 8;
+const COLS = 3;
+const CARD_W = (SCREEN_WIDTH - H_PAD * 2 - GAP * (COLS - 1)) / COLS;
+const CARD_H = Math.round(CARD_W * 1.18);
 
-// The "selected" destination (Rio is the active curated pick)
 const SELECTED_ID = "rio";
 
 export default function DestinosScreen() {
@@ -43,10 +43,9 @@ export default function DestinosScreen() {
       )
     : destinos;
 
-  // Build rows of 2
   const rows: (typeof destinos)[] = [];
-  for (let i = 0; i < filtered.length; i += 2) {
-    rows.push(filtered.slice(i, i + 2));
+  for (let i = 0; i < filtered.length; i += COLS) {
+    rows.push(filtered.slice(i, i + COLS));
   }
 
   function navigate(id: string) {
@@ -55,7 +54,7 @@ export default function DestinosScreen() {
 
   return (
     <View style={s.root}>
-      {/* ── Full-screen atmospheric background — declared first so it sits behind ── */}
+      {/* Full-screen atmospheric background */}
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
         <Image
           source={destinos[0].image}
@@ -77,7 +76,7 @@ export default function DestinosScreen() {
           { paddingTop: topPad + 8, paddingBottom: bottomPad + 96 },
         ]}
       >
-        {/* ── Header ── */}
+        {/* Header */}
         <View style={s.header}>
           <View style={s.headerLeft}>
             <Text style={s.title}>Vai pra onde?</Text>
@@ -90,7 +89,7 @@ export default function DestinosScreen() {
           </Pressable>
         </View>
 
-        {/* ── Search bar — glassmorphism ── */}
+        {/* Search bar */}
         <View style={s.searchWrap}>
           <Feather name="search" size={16} color="rgba(255,255,255,0.50)" />
           <TextInput
@@ -108,7 +107,7 @@ export default function DestinosScreen() {
           )}
         </View>
 
-        {/* ── Grid ── */}
+        {/* 3-column grid */}
         {rows.length > 0 ? (
           <View style={s.grid}>
             {rows.map((row, ri) => (
@@ -125,21 +124,25 @@ export default function DestinosScreen() {
                         pressed && { opacity: 0.88, transform: [{ scale: 0.97 }] },
                       ]}
                     >
-                      <Image source={d.image} style={s.cardImage} resizeMode="cover" />
+                      <Image
+                        source={d.image}
+                        style={s.cardImage}
+                        resizeMode="cover"
+                      />
                       <LinearGradient
-                        colors={["transparent", "rgba(0,0,0,0.20)", "rgba(0,0,0,0.82)"]}
-                        locations={[0.3, 0.6, 1]}
+                        colors={["transparent", "rgba(0,0,0,0.18)", "rgba(0,0,0,0.82)"]}
+                        locations={[0.25, 0.55, 1]}
                         style={StyleSheet.absoluteFill}
                       />
 
-                      {/* Selected badge */}
+                      {/* Selected checkmark */}
                       {selected && (
                         <View style={s.checkBadge}>
-                          <Feather name="check" size={12} color="#2C1810" />
+                          <Feather name="check" size={10} color="#1C0E08" />
                         </View>
                       )}
 
-                      {/* Card info */}
+                      {/* Card labels */}
                       <View style={s.cardInfo}>
                         <Text style={s.cardCidade} numberOfLines={1}>
                           {d.cidade}
@@ -151,8 +154,11 @@ export default function DestinosScreen() {
                     </Pressable>
                   );
                 })}
-                {/* Spacer if odd row */}
-                {row.length === 1 && <View style={{ width: CARD_W }} />}
+                {/* Fill trailing empty slots */}
+                {row.length < COLS &&
+                  Array.from({ length: COLS - row.length }).map((_, i) => (
+                    <View key={`fill-${i}`} style={{ width: CARD_W }} />
+                  ))}
               </View>
             ))}
           </View>
@@ -175,7 +181,6 @@ const s = StyleSheet.create({
   bgImage: {
     width: "100%",
     height: "100%",
-    resizeMode: "cover",
     opacity: 0.55,
   },
 
@@ -183,7 +188,7 @@ const s = StyleSheet.create({
     paddingHorizontal: H_PAD,
   },
 
-  // ── Header ──
+  // Header
   header: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -220,7 +225,7 @@ const s = StyleSheet.create({
     marginTop: 2,
   },
 
-  // ── Search ──
+  // Search
   searchWrap: {
     flexDirection: "row",
     alignItems: "center",
@@ -231,7 +236,7 @@ const s = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.20)",
     paddingHorizontal: 18,
     paddingVertical: 13,
-    marginBottom: 24,
+    marginBottom: 20,
   },
   searchInput: {
     flex: 1,
@@ -241,7 +246,7 @@ const s = StyleSheet.create({
     padding: 0,
   },
 
-  // ── Grid ──
+  // 3-column grid
   grid: {
     gap: GAP,
   },
@@ -252,26 +257,25 @@ const s = StyleSheet.create({
   card: {
     width: CARD_W,
     height: CARD_H,
-    borderRadius: 18,
+    borderRadius: 16,
     overflow: "hidden",
     backgroundColor: "#1A120A",
   },
   cardSelected: {
-    borderWidth: 2.5,
+    borderWidth: 2,
     borderColor: "#FFFFFF",
   },
   cardImage: {
     width: "100%",
     height: "100%",
-    resizeMode: "cover",
   },
   checkBadge: {
     position: "absolute",
-    top: 10,
-    right: 10,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    top: 8,
+    right: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
@@ -281,25 +285,25 @@ const s = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: 12,
-    paddingBottom: 13,
-    gap: 3,
+    paddingHorizontal: 9,
+    paddingBottom: 10,
+    gap: 2,
   },
   cardCidade: {
     fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 14,
+    fontSize: 12,
     color: "#FFFFFF",
-    lineHeight: 19,
+    lineHeight: 16,
     letterSpacing: -0.1,
   },
   cardPais: {
     fontFamily: "Inter_400Regular",
-    fontSize: 11,
+    fontSize: 10,
     color: "rgba(255,255,255,0.68)",
-    lineHeight: 15,
+    lineHeight: 14,
   },
 
-  // ── Empty state ──
+  // Empty state
   empty: {
     alignItems: "center",
     paddingTop: 60,
