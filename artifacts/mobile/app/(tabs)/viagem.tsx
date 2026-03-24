@@ -150,7 +150,7 @@ function ActionArea() {
           act.aiBtn,
           pressed && { opacity: 0.82, transform: [{ scale: 0.985 }] },
         ]}
-        onPress={() => {}}
+        onPress={() => router.push("/roteiro")}
       >
         <View style={act.aiLeft}>
           <View style={act.aiIconWrap}>
