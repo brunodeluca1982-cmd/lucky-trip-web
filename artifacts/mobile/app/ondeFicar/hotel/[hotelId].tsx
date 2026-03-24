@@ -17,8 +17,10 @@ import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useHotel } from "@/hooks/useHotel";
 import { getImageForEntity } from "@/utils/getImageForEntity";
+import { useGuia } from "@/context/GuiaContext";
 
 const C = Colors.light;
+const GOLD = "#C9A84C";
 
 const CATEGORY_LABEL: Record<string, string> = {
   luxo:     "LUXO",
@@ -41,6 +43,7 @@ export default function HotelDetailScreen() {
   const bottomPad   = Platform.OS === "web" ? 34 : insets.bottom;
 
   const { hotel, loading, error } = useHotel(hotelId ?? "");
+  const { save, unsave, isSaved } = useGuia();
 
   // Hero image — hotel-specific via resolver (curated → neighborhood context → local asset)
   const heroImage = hotel
@@ -198,6 +201,32 @@ export default function HotelDetailScreen() {
                 <Text style={s.reservarText}>Reservar agora</Text>
               </Pressable>
             ) : null}
+
+            <Pressable
+              style={[s.salvarBtn, isSaved(hotel.id) && s.salvarBtnSaved]}
+              onPress={() => {
+                if (isSaved(hotel.id)) {
+                  unsave(hotel.id);
+                } else {
+                  save({
+                    id: hotel.id,
+                    categoria: "hotel",
+                    titulo: hotel.hotel_name,
+                    localizacao: hotel.neighborhood.neighborhood_name,
+                    image: heroImage,
+                  });
+                }
+              }}
+            >
+              <Feather
+                name="bookmark"
+                size={14}
+                color={isSaved(hotel.id) ? GOLD : "rgba(255,255,255,0.68)"}
+              />
+              <Text style={[s.salvarText, isSaved(hotel.id) && s.salvarTextSaved]}>
+                {isSaved(hotel.id) ? "Salvo na viagem" : "Salvar na viagem"}
+              </Text>
+            </Pressable>
 
             {hotel.google_maps && (
               <Pressable
@@ -483,6 +512,30 @@ const s = StyleSheet.create({
     fontSize: 14,
     color: "rgba(255,255,255,0.68)",
     letterSpacing: 0.1,
+  },
+  salvarBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    borderRadius: 14,
+    paddingVertical: 14,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  salvarBtnSaved: {
+    backgroundColor: "rgba(201,168,76,0.12)",
+    borderColor: "rgba(201,168,76,0.30)",
+  },
+  salvarText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    color: "rgba(255,255,255,0.68)",
+    letterSpacing: 0.1,
+  },
+  salvarTextSaved: {
+    color: GOLD,
   },
 
   // Footer

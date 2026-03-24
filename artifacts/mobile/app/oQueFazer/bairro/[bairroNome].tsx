@@ -31,8 +31,10 @@ import { destinos } from "@/data/mockData";
 import { LUGARES_O_QUE_FAZER } from "@/data/lugares";
 import { useNeighborhoods } from "@/hooks/useNeighborhoods";
 import { getNeighborhoodHero } from "@/utils/neighborhoodHero";
+import { useGuia } from "@/context/GuiaContext";
 
 const C = Colors.light;
+const GOLD = "#C9A84C";
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const HERO_H = Math.round(SCREEN_HEIGHT * 0.46);
 const CARD_IMAGE_H = 200;
@@ -55,6 +57,7 @@ export default function OQueFazerBairroScreen() {
   const filtered   = allLugares.filter((p) => p.localizacao === bairroNome);
 
   const { neighborhoods } = useNeighborhoods();
+  const { save, unsave, isSaved } = useGuia();
   const supabaseNeighborhood = neighborhoods.find(
     (n) => n.neighborhood_name === bairroNome,
   ) ?? null;
@@ -227,9 +230,30 @@ export default function OQueFazerBairroScreen() {
                   locations={[0, 0.4]}
                   style={StyleSheet.absoluteFill}
                 />
-                <View style={s.bookmarkBtn}>
-                  <Feather name="bookmark" size={15} color={C.white} />
-                </View>
+                <Pressable
+                  style={[s.bookmarkBtn, isSaved(place.id) && s.bookmarkBtnSaved]}
+                  hitSlop={6}
+                  onPress={(e) => {
+                    e.stopPropagation?.();
+                    if (isSaved(place.id)) {
+                      unsave(place.id);
+                    } else {
+                      save({
+                        id: place.id,
+                        categoria: "oQueFazer",
+                        titulo: place.titulo,
+                        localizacao: place.localizacao,
+                        image: place.image,
+                      });
+                    }
+                  }}
+                >
+                  <Feather
+                    name="bookmark"
+                    size={15}
+                    color={isSaved(place.id) ? GOLD : C.white}
+                  />
+                </Pressable>
                 {place.preco && (
                   <View style={s.priceBadge}>
                     <Text style={s.priceText}>{place.preco}</Text>
@@ -536,6 +560,10 @@ const s = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.20)",
+  },
+  bookmarkBtnSaved: {
+    backgroundColor: "rgba(201,168,76,0.22)",
+    borderColor: "rgba(201,168,76,0.40)",
   },
   priceBadge: {
     position: "absolute",

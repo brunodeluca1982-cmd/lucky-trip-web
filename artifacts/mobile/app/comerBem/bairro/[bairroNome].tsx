@@ -33,8 +33,10 @@ import { useRestaurants } from "@/hooks/useRestaurants";
 import { useNeighborhoods } from "@/hooks/useNeighborhoods";
 import { getNeighborhoodHero } from "@/utils/neighborhoodHero";
 import { getImageForEntity } from "@/utils/getImageForEntity";
+import { useGuia } from "@/context/GuiaContext";
 
 const C = Colors.light;
+const GOLD = "#C9A84C";
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const HERO_H = Math.round(SCREEN_HEIGHT * 0.46);
 const CARD_IMAGE_H = 200;
@@ -56,6 +58,7 @@ export default function ComerBemBairroScreen() {
 
   const { restaurantes, loading, error } = useRestaurants(destino.id);
   const { neighborhoods }               = useNeighborhoods();
+  const { save, unsave, isSaved }       = useGuia();
 
   const filtered = restaurantes.filter((r) => r.bairro === bairroNome);
 
@@ -257,6 +260,30 @@ export default function ComerBemBairroScreen() {
                     locations={[0, 0.4]}
                     style={StyleSheet.absoluteFill}
                   />
+                  <Pressable
+                    style={[s.bookmarkBtn, isSaved(String(r.id)) && s.bookmarkBtnSaved]}
+                    hitSlop={6}
+                    onPress={(e) => {
+                      e.stopPropagation?.();
+                      if (isSaved(String(r.id))) {
+                        unsave(String(r.id));
+                      } else {
+                        save({
+                          id: String(r.id),
+                          categoria: "restaurante",
+                          titulo: r.nome,
+                          localizacao: r.bairro,
+                          image: imageSource,
+                        });
+                      }
+                    }}
+                  >
+                    <Feather
+                      name="bookmark"
+                      size={15}
+                      color={isSaved(String(r.id)) ? GOLD : C.white}
+                    />
+                  </Pressable>
                   {r.perfil_publico ? (
                     <View style={s.priceBadge}>
                       <Text style={s.priceText}>{r.perfil_publico}</Text>
@@ -554,10 +581,27 @@ const s = StyleSheet.create({
     height: "100%",
     resizeMode: "cover",
   },
-  priceBadge: {
+  bookmarkBtn: {
     position: "absolute",
     top: 14,
     right: 14,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(0,0,0,0.38)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.20)",
+  },
+  bookmarkBtnSaved: {
+    backgroundColor: "rgba(201,168,76,0.22)",
+    borderColor: "rgba(201,168,76,0.40)",
+  },
+  priceBadge: {
+    position: "absolute",
+    top: 14,
+    right: 58,
     backgroundColor: "rgba(0,0,0,0.52)",
     borderRadius: 8,
     paddingHorizontal: 8,

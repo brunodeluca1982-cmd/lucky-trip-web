@@ -26,8 +26,10 @@ import { destinos } from "@/data/mockData";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import RioMapView from "@/components/RioMapView";
 import { getImageForEntity } from "@/utils/getImageForEntity";
+import { useGuia } from "@/context/GuiaContext";
 
 const C = Colors.light;
+const GOLD = "#C9A84C";
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const MAP_H = Math.round(SCREEN_HEIGHT * 0.50);
 const CARD_IMAGE_H = 210;
@@ -55,6 +57,7 @@ export default function ComerBemScreen() {
   const descricao = DESCRICOES[destino.id] ?? DEFAULT_DESCRICAO;
 
   const { restaurantes: allRestaurantes, loading, error } = useRestaurants(destino.id);
+  const { save, unsave, isSaved } = useGuia();
 
   const listRef = useRef<ScrollView>(null);
 
@@ -172,9 +175,30 @@ export default function ComerBemScreen() {
                     locations={[0, 0.4]}
                     style={StyleSheet.absoluteFill}
                   />
-                  <View style={s.bookmarkBtn}>
-                    <Feather name="bookmark" size={15} color={C.white} />
-                  </View>
+                  <Pressable
+                    style={[s.bookmarkBtn, isSaved(String(r.id)) && s.bookmarkBtnSaved]}
+                    hitSlop={6}
+                    onPress={(e) => {
+                      e.stopPropagation?.();
+                      if (isSaved(String(r.id))) {
+                        unsave(String(r.id));
+                      } else {
+                        save({
+                          id: String(r.id),
+                          categoria: "restaurante",
+                          titulo: r.nome,
+                          localizacao: r.bairro,
+                          image: imageSource,
+                        });
+                      }
+                    }}
+                  >
+                    <Feather
+                      name="bookmark"
+                      size={15}
+                      color={isSaved(String(r.id)) ? GOLD : C.white}
+                    />
+                  </Pressable>
                   {r.perfil_publico ? (
                     <View style={s.priceBadge}>
                       <Text style={s.priceText}>{r.perfil_publico}</Text>
@@ -396,6 +420,10 @@ const s = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.20)",
+  },
+  bookmarkBtnSaved: {
+    backgroundColor: "rgba(201,168,76,0.22)",
+    borderColor: "rgba(201,168,76,0.40)",
   },
   priceBadge: {
     position: "absolute",
