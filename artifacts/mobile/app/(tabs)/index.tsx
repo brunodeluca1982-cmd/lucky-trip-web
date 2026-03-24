@@ -237,13 +237,6 @@ export default function HomeScreen() {
         {/* ── 1. HERO CAROUSEL ── */}
         <HeroCarousel items={heroDestinos} />
 
-        {/* ── Bleed: softens the hard dark bottom of the hero into the content below ── */}
-        <LinearGradient
-          colors={["rgba(0,0,0,0.58)", "rgba(10,5,2,0.18)", "transparent"]}
-          locations={[0, 0.55, 1]}
-          style={{ height: 80, marginTop: -80, pointerEvents: "none" }}
-        />
-
         {/* ── 2. DESTAQUES ── */}
         <View style={s.section}>
           <SectionHeader
