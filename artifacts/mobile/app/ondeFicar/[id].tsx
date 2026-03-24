@@ -73,6 +73,9 @@ export default function OndeFicarScreen() {
   const allHotels = flattenHotels(neighborhoods);
 
   const [selected, setSelected] = useState<string | null>(null);
+  // cardVisible separates the card display from the filter selection:
+  // tapping "Ver hotéis" or "Por dentro" dismisses the card but may keep the filter
+  const [cardVisible, setCardVisible] = useState(false);
 
   const activeNeighborhood = neighborhoods.find(
     (n) => n.neighborhood_name === selected,
@@ -104,21 +107,39 @@ export default function OndeFicarScreen() {
   const listY     = useRef(0);
 
   function handleNeighborhoodPress(name: string | null) {
-    setSelected((prev) => (prev === name ? null : name));
+    if (!name || name === selected) {
+      setSelected(null);
+      setCardVisible(false);
+    } else {
+      setSelected(name);
+      setCardVisible(true);
+    }
   }
 
   function handleVerHoteis() {
-    setTimeout(
-      () => listRef.current?.scrollTo({ y: listY.current + MAP_H, animated: true }),
-      80,
-    );
+    if (!activeNeighborhood) return;
+    // Dismiss card first — then navigate to bairro detail focused on hotels
+    setCardVisible(false);
+    router.push({
+      pathname: "/ondeFicar/bairro/[slug]",
+      params: {
+        slug: activeNeighborhood.neighborhood_slug,
+        cityId: destino.id,
+        focusHotels: "true",
+      },
+    });
   }
 
   function handlePorDentro() {
     if (!activeNeighborhood) return;
+    // Fully dismiss the card, then navigate cleanly
+    setCardVisible(false);
     router.push({
       pathname: "/ondeFicar/bairro/[slug]",
-      params: { slug: activeNeighborhood.neighborhood_slug },
+      params: {
+        slug: activeNeighborhood.neighborhood_slug,
+        cityId: destino.id,
+      },
     });
   }
 
@@ -171,15 +192,15 @@ export default function OndeFicarScreen() {
           </View>
         )}
 
-        {/* Floating neighborhood card */}
-        {activeNeighborhood && (
+        {/* Floating neighborhood card — only shown when cardVisible */}
+        {activeNeighborhood && cardVisible && (
           <Animated.View style={[s.cardWrap, cardStyle]} pointerEvents="box-none">
             <NeighborhoodCard
               neighborhood={activeNeighborhood}
               hotelCount={hotels.length}
               onVerHoteis={handleVerHoteis}
               onPorDentro={handlePorDentro}
-              onDismiss={() => setSelected(null)}
+              onDismiss={() => { setSelected(null); setCardVisible(false); }}
             />
           </Animated.View>
         )}
@@ -311,7 +332,7 @@ function NeighborhoodCard({
 }) {
   return (
     <LinearGradient
-      colors={["rgba(28,16,8,0.97)", "rgba(10,5,2,0.98)"]}
+      colors={["rgba(22,18,16,0.97)", "rgba(10,9,8,0.98)"]}
       start={{ x: 0, y: 0 }}
       end={{ x: 0.6, y: 1 }}
       style={nc.card}
@@ -319,7 +340,7 @@ function NeighborhoodCard({
       {/* Header */}
       <View style={nc.header}>
         <View style={nc.headerLeft}>
-          {/* Best-for tags — above the title like the detail screen category tags */}
+          {/* Best-for tags */}
           <View style={nc.tags}>
             {[neighborhood.best_for_1, neighborhood.best_for_2, neighborhood.best_for_3]
               .filter(Boolean)
@@ -343,12 +364,12 @@ function NeighborhoodCard({
       <View style={nc.actions}>
         <Pressable style={nc.hotBtn} onPress={onVerHoteis}>
           <Text style={nc.hotBtnText}>
-            {hotelCount} hotel{hotelCount !== 1 ? "s" : ""}
+            Ver hotéis
           </Text>
         </Pressable>
         <Pressable style={nc.ghostBtn} onPress={onPorDentro}>
-          <Text style={nc.ghostBtnText}>Por dentro</Text>
-          <Feather name="arrow-right" size={12} color="rgba(255,255,255,0.55)" />
+          <Text style={nc.ghostBtnText}>Por dentro do bairro</Text>
+          <Feather name="arrow-right" size={12} color="rgba(255,255,255,0.50)" />
         </Pressable>
       </View>
     </LinearGradient>
