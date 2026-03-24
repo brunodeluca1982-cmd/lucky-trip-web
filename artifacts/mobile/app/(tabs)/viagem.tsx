@@ -28,6 +28,8 @@ import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useGuia } from "@/context/GuiaContext";
 import type { SavedCategory, SavedItem } from "@/context/GuiaContext";
+import { buildRoteiro, PERIODO_LABEL, PERIODO_ICON } from "@/utils/buildRoteiro";
+import type { DiaRoteiro, DiaPeriodo } from "@/utils/buildRoteiro";
 
 const C = Colors.light;
 
@@ -392,6 +394,143 @@ const hint = StyleSheet.create({
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Roteiro section — DIA 1 – Bairro structure, shown below saved chips
+// ─────────────────────────────────────────────────────────────────────────────
+
+function PeriodoBlock({ periodo, items }: DiaPeriodo) {
+  const label = PERIODO_LABEL[periodo];
+  const icon  = PERIODO_ICON[periodo] as keyof typeof Feather.glyphMap;
+  return (
+    <View style={rot.periodoWrap}>
+      <View style={rot.periodoHeader}>
+        <Feather name={icon} size={11} color={C.terracotta} />
+        <Text style={rot.periodoLabel}>{label}</Text>
+      </View>
+      {items.map((item) => (
+        <View key={item.id} style={rot.itemRow}>
+          <View style={rot.itemDot} />
+          <Text style={rot.itemNome} numberOfLines={1}>{item.titulo}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function DiaCard({ dia }: { dia: DiaRoteiro }) {
+  return (
+    <View style={rot.diaCard}>
+      {/* Day header */}
+      <View style={rot.diaHeader}>
+        <Text style={rot.diaNome}>
+          <Text style={rot.diaNum}>DIA {dia.numero}</Text>
+          {"  "}
+          <Text style={rot.diaBairro}>{dia.bairro}</Text>
+        </Text>
+      </View>
+      <View style={rot.diaLine} />
+      {/* Periodos */}
+      {dia.periodos.map((p) => (
+        <PeriodoBlock key={p.periodo} {...p} />
+      ))}
+    </View>
+  );
+}
+
+function RoteiroSection({ dias }: { dias: DiaRoteiro[] }) {
+  if (dias.length === 0) return null;
+  return (
+    <View style={rot.wrap}>
+      <Text style={rot.sectionLabel}>Roteiro Base</Text>
+      {dias.map((dia) => (
+        <DiaCard key={dia.bairro} dia={dia} />
+      ))}
+    </View>
+  );
+}
+
+const rot = StyleSheet.create({
+  wrap: {
+    marginTop: 28,
+    gap: 12,
+  },
+  sectionLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    color: C.warmGray,
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
+  },
+  diaCard: {
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.60)",
+    borderWidth: 1,
+    borderColor: "rgba(196,112,74,0.14)",
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    gap: 0,
+  },
+  diaHeader: {
+    marginBottom: 10,
+  },
+  diaNome: {
+    fontSize: 15,
+  },
+  diaNum: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+    color: C.terracotta,
+    letterSpacing: 1.4,
+    textTransform: "uppercase",
+  },
+  diaBairro: {
+    fontFamily: "PlayfairDisplay_600SemiBold",
+    fontSize: 18,
+    color: C.darkBrown,
+  },
+  diaLine: {
+    height: 1,
+    backgroundColor: "rgba(196,112,74,0.12)",
+    marginBottom: 12,
+  },
+  periodoWrap: {
+    marginBottom: 12,
+  },
+  periodoHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginBottom: 6,
+  },
+  periodoLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+    color: C.terracotta,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+  },
+  itemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 3,
+  },
+  itemDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: C.warmGray,
+    opacity: 0.5,
+    flexShrink: 0,
+  },
+  itemNome: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: C.darkBrown,
+    flex: 1,
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Main screen
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -403,6 +542,7 @@ export default function MinhaViagemScreen() {
   const { saved, unsave } = useGuia();
   const totalSaved        = saved.length;
   const bgImages          = saved.map((s) => s.image);
+  const dias              = buildRoteiro(saved);
 
   return (
     <View style={s.root}>
@@ -450,6 +590,9 @@ export default function MinhaViagemScreen() {
         ) : (
           <EmptyHint />
         )}
+
+        {/* ── Base itinerary (roteiro) — only when groupable items exist ── */}
+        <RoteiroSection dias={dias} />
 
       </ScrollView>
     </View>

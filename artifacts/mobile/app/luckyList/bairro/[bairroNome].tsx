@@ -33,6 +33,7 @@ import { destinos } from "@/data/mockData";
 import { LUGARES_LUCKY } from "@/data/lugares";
 import { useNeighborhoods } from "@/hooks/useNeighborhoods";
 import { getNeighborhoodHero } from "@/utils/neighborhoodHero";
+import { useGuia } from "@/context/GuiaContext";
 
 const C    = Colors.light;
 const GOLD = "#C9A84C";
@@ -59,6 +60,8 @@ export default function LuckyListBairroScreen() {
   const destino    = destinos.find((d) => d.id === (cityId ?? "rio")) ?? destinos[0];
   const allLugares = LUGARES_LUCKY[destino.id] ?? [];
   const filtered   = allLugares.filter((p) => p.localizacao === bairroNome);
+
+  const { save, unsave, isSaved } = useGuia();
 
   const { neighborhoods } = useNeighborhoods();
   const supabaseNeighborhood = neighborhoods.find(
@@ -275,9 +278,31 @@ export default function LuckyListBairroScreen() {
                     <Feather name="map-pin" size={13} color={C.terracotta} />
                     <Text style={s.verNoMapaText}>Ver no mapa</Text>
                   </Pressable>
-                  <Pressable style={s.saveBtn}>
-                    <Feather name="bookmark" size={13} color={GOLD} />
-                    <Text style={s.saveBtnText}>Salvar</Text>
+                  <Pressable
+                    style={[s.saveBtn, isSaved(place.id) && s.saveBtnSaved]}
+                    onPress={(e) => {
+                      e.stopPropagation?.();
+                      if (isSaved(place.id)) {
+                        unsave(place.id);
+                      } else {
+                        save({
+                          id: place.id,
+                          categoria: "lucky",
+                          titulo: place.titulo,
+                          localizacao: place.localizacao,
+                          image: place.image,
+                        });
+                      }
+                    }}
+                  >
+                    <Feather
+                      name="bookmark"
+                      size={13}
+                      color={isSaved(place.id) ? C.white : GOLD}
+                    />
+                    <Text style={[s.saveBtnText, isSaved(place.id) && s.saveBtnTextSaved]}>
+                      {isSaved(place.id) ? "Salvo" : "Salvar"}
+                    </Text>
                   </Pressable>
                 </View>
               </View>
@@ -679,6 +704,13 @@ const s = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 13,
     color: GOLD,
+  },
+  saveBtnSaved: {
+    backgroundColor: GOLD,
+    borderColor: GOLD,
+  },
+  saveBtnTextSaved: {
+    color: "#0A0502",
   },
 
   footer: {

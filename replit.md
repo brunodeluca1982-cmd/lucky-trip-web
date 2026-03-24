@@ -192,3 +192,25 @@ Map tap → navigate directly to bairro page (no floating card). Bairro pages ha
 ### Environment Variables (Mobile)
 - `EXPO_PUBLIC_SUPABASE_URL` — passed via dev script from `$SUPABASE_URL`
 - `EXPO_PUBLIC_SUPABASE_ANON_KEY` — passed via dev script from `$SUPABASE_ANON_KEY`
+
+### Save + Trip System (Roteiro Base)
+
+**Data model** (local, AsyncStorage-backed):
+- `SavedItem` — `{ id, categoria, titulo, localizacao (=bairro), image }` — stored at `@luckytrip/saved_v1`
+- `Viagem` — `{ id, nome, destino, created_at }` — one auto-created default viagem per device
+- `ViagemItem` — `{ viagem_id, item_id, tipo, bairro }` — derived in-memory from saved list
+
+**Context**: `context/GuiaContext.tsx` — exposes `{ saved, save, unsave, isSaved, viagem, viagemItens }`. Persists `saved` to AsyncStorage on every change. Loads on mount.
+
+**Grouping logic**: `utils/buildRoteiro.ts` — pure `buildRoteiro(items: SavedItem[]): DiaRoteiro[]`
+- Groups by `localizacao` (bairro) → each bairro = one day
+- Within each bairro: atividades (oQueFazer + lucky) → 1st half→Manhã / 2nd half→Tarde; restaurantes → 1st→Almoço / rest→Noite; hotels excluded from timetable
+- Hotel-only bairros are skipped entirely
+- Day numbers are sequential in bairro insertion order
+
+**Display**: `viagem.tsx` — `RoteiroSection` renders below the saved chips; shows `DIA N — Bairro` cards with Manhã/Almoço/Tarde/Noite periodo blocks. Only appears when at least one atividade or restaurante is saved.
+
+**Save entry points**:
+- `lugar/[cityId]/[placeId].tsx` — bookmark button on detail screen (all categories)
+- `luckyList/[id].tsx` — "Salvar" button on each lucky pick card (toggles Salvar↔Salvo with gold fill)
+- `luckyList/bairro/[bairroNome].tsx` — same "Salvar" button in neighborhood lucky picks view
