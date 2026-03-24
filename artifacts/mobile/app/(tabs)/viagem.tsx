@@ -1,20 +1,17 @@
 /**
- * viagem.tsx — "Meu Guia" travel planning hub.
+ * viagem.tsx — "Minha Viagem" planning hub.
  *
- * Layout:
- *   Header (kept) → Divider → [SavedPlacesGrid | EmptyState] → ActionButtons
- *
- * States:
- *   Empty  → compact icon + message + all action buttons clearly visible
- *   Filled → saved places horizontal grid + action buttons below
+ * Order (both states):
+ *   Header → Divider → Actions (AI primary + 3 chips) → Saved chips | Empty hint
  *
  * Background:
- *   When saved items exist → first saved item's image (blurred) + cream overlay.
+ *   When saved items exist → rotating blurred destination images (fade crossfade).
  *   When empty → plain cream.
  */
 
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  Animated,
   Image,
   ImageSourcePropType,
   Platform,
@@ -49,182 +46,214 @@ const CATEGORY_LABEL: Record<SavedCategory, string> = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Action Buttons — glassmorphism secondary + filled primary
+// Rotating blurred background
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface ActionBtnProps {
-  icon: keyof typeof Feather.glyphMap;
-  label: string;
-  primary?: boolean;
-  onPress: () => void;
-}
+function RotatingBackground({ images }: { images: ImageSourcePropType[] }) {
+  const [idx, setIdx]   = useState(0);
+  const fadeAnim        = useRef(new Animated.Value(1)).current;
 
-function ActionBtn({ icon, label, primary, onPress }: ActionBtnProps) {
+  useEffect(() => {
+    if (images.length <= 1) return;
+    const timer = setInterval(() => {
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 700,
+        useNativeDriver: false,
+      }).start(() => {
+        setIdx((prev) => (prev + 1) % images.length);
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 700,
+          useNativeDriver: false,
+        }).start();
+      });
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [images.length]);
+
+  const current = images[idx] ?? images[0];
+
   return (
-    <Pressable
-      style={({ pressed }) => [
-        act.btn,
-        primary ? act.btnPrimary : act.btnGlass,
-        pressed && { opacity: 0.80, transform: [{ scale: 0.96 }] },
-      ]}
-      onPress={onPress}
-    >
-      <Feather name={icon} size={16} color={primary ? C.white : C.terracotta} />
-      <Text style={[act.label, primary && act.labelPrimary]} numberOfLines={1}>
-        {label}
-      </Text>
-    </Pressable>
+    <>
+      <Animated.Image
+        source={current}
+        style={[StyleSheet.absoluteFillObject, { opacity: fadeAnim }]}
+        resizeMode="cover"
+        blurRadius={Platform.OS === "ios" ? 28 : 16}
+      />
+      <LinearGradient
+        colors={["rgba(245,240,232,0.58)", "rgba(245,240,232,0.97)"]}
+        locations={[0, 0.50]}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
+    </>
   );
 }
 
-function ActionButtons() {
+// ─────────────────────────────────────────────────────────────────────────────
+// Actions — AI primary CTA + 3 secondary chips
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ActionArea() {
   return (
     <View style={act.wrap}>
-      <Text style={act.sectionLabel}>FERRAMENTAS</Text>
-      <View style={act.grid}>
-        <View style={act.row}>
-          <ActionBtn
-            icon="instagram"
-            label="Colar Instagram"
-            onPress={() => {}}
-          />
-          <ActionBtn
-            icon="video"
-            label="Colar TikTok"
-            onPress={() => {}}
-          />
-        </View>
-        <View style={act.row}>
-          <ActionBtn
-            icon="link"
-            label="Colar link"
-            onPress={() => {}}
-          />
-          <ActionBtn
-            icon="zap"
-            label="✦  Criar com IA"
-            primary
-            onPress={() => {}}
-          />
-        </View>
+      {/* PRIMARY — AI itinerary CTA */}
+      <Pressable
+        style={({ pressed }) => [
+          act.primaryBtn,
+          pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+        ]}
+        onPress={() => {}}
+      >
+        <LinearGradient
+          colors={[C.terracotta, "#B5613E"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={act.primaryGradient}
+        >
+          <Feather name="zap" size={17} color={C.white} />
+          <Text style={act.primaryLabel}>Criar roteiro com IA</Text>
+          <Feather name="arrow-right" size={15} color="rgba(255,255,255,0.7)" />
+        </LinearGradient>
+      </Pressable>
+
+      {/* SECONDARY ROW — 3 glass chips */}
+      <View style={act.chipRow}>
+        <GlassChip icon="instagram" label="Instagram" onPress={() => {}} />
+        <GlassChip icon="video"     label="TikTok"    onPress={() => {}} />
+        <GlassChip icon="link"      label="Link"       onPress={() => {}} />
       </View>
     </View>
   );
 }
 
+function GlassChip({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      style={({ pressed }) => [
+        act.chip,
+        pressed && { opacity: 0.75, transform: [{ scale: 0.95 }] },
+      ]}
+      onPress={onPress}
+    >
+      <Feather name={icon} size={14} color={C.terracotta} />
+      <Text style={act.chipLabel} numberOfLines={1}>{label}</Text>
+    </Pressable>
+  );
+}
+
 const act = StyleSheet.create({
   wrap: {
-    marginTop: 28,
-    gap: 12,
-  },
-  sectionLabel: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 11,
-    color: C.warmGray,
-    letterSpacing: 1.5,
-    marginBottom: 2,
-  },
-  grid: {
     gap: 10,
+    marginBottom: 28,
   },
-  row: {
+  primaryBtn: {
+    borderRadius: 16,
+    overflow: "hidden",
+    boxShadow: `0px 6px 18px rgba(196,112,74,0.32)`,
+  },
+  primaryGradient: {
     flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 10,
+    paddingVertical: 17,
+    paddingHorizontal: 20,
   },
-  btn: {
+  primaryLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: C.white,
+    flex: 1,
+  },
+  chipRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  chip: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-  },
-  btnGlass: {
+    gap: 6,
+    borderRadius: 12,
+    paddingVertical: 12,
     backgroundColor: "rgba(196,112,74,0.07)",
     borderWidth: 1,
-    borderColor: "rgba(196,112,74,0.15)",
+    borderColor: "rgba(196,112,74,0.16)",
   },
-  btnPrimary: {
-    backgroundColor: C.terracotta,
-    shadowColor: C.terracotta,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.30,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  label: {
+  chipLabel: {
     fontFamily: "Inter_500Medium",
-    fontSize: 13,
+    fontSize: 12,
     color: C.terracotta,
-  },
-  labelPrimary: {
-    color: C.white,
-    fontFamily: "Inter_600SemiBold",
   },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Saved Places — horizontal thumbnail cards
+// Saved chip card — compact, multiple visible at once
 // ─────────────────────────────────────────────────────────────────────────────
 
-function SavedThumbCard({
+function SavedChip({
   item,
   onRemove,
 }: {
   item: SavedItem;
   onRemove: (id: string) => void;
 }) {
-  const accent = CATEGORY_ACCENT[item.categoria];
+  const accent   = CATEGORY_ACCENT[item.categoria];
   const catLabel = CATEGORY_LABEL[item.categoria];
 
   return (
     <Pressable
       style={({ pressed }) => [
-        thumb.card,
-        pressed && { opacity: 0.88, transform: [{ scale: 0.97 }] },
+        chip.card,
+        pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] },
       ]}
       onPress={() => router.push(`/lugar/rio/${item.id}`)}
     >
-      <Image source={item.image} style={thumb.image} resizeMode="cover" />
+      <Image source={item.image} style={chip.image} resizeMode="cover" />
       <LinearGradient
-        colors={["transparent", "rgba(10,5,2,0.80)"]}
-        locations={[0.28, 1]}
+        colors={["transparent", "rgba(10,5,2,0.78)"]}
+        locations={[0.25, 1]}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
-
-      {/* Remove button */}
       <Pressable
-        style={thumb.removeBtn}
+        style={chip.removeBtn}
         onPress={(e) => { e.stopPropagation?.(); onRemove(item.id); }}
         hitSlop={8}
       >
-        <Feather name="x" size={10} color="rgba(255,255,255,0.9)" />
+        <Feather name="x" size={9} color="rgba(255,255,255,0.9)" />
       </Pressable>
-
-      {/* Category badge */}
-      <View style={[thumb.catBadge, { borderColor: `${accent}55` }]}>
-        <Text style={[thumb.catText, { color: accent }]}>{catLabel}</Text>
+      <View style={chip.footer}>
+        <View style={[chip.badge, { borderColor: `${accent}60` }]}>
+          <Text style={[chip.badgeText, { color: accent }]}>{catLabel}</Text>
+        </View>
+        <Text style={chip.name} numberOfLines={2}>{item.titulo}</Text>
       </View>
-
-      {/* Name */}
-      <Text style={thumb.name} numberOfLines={2}>{item.titulo}</Text>
     </Pressable>
   );
 }
 
-const thumb = StyleSheet.create({
+const chip = StyleSheet.create({
   card: {
-    width: 120,
-    height: 156,
+    width: 112,
+    height: 148,
     borderRadius: 14,
     overflow: "hidden",
     backgroundColor: C.sand,
     marginRight: 10,
     justifyContent: "flex-end",
-    padding: 10,
   },
   image: {
     ...StyleSheet.absoluteFillObject,
@@ -232,39 +261,42 @@ const thumb = StyleSheet.create({
   } as any,
   removeBtn: {
     position: "absolute",
-    top: 7,
-    right: 7,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: "rgba(10,5,2,0.45)",
+    top: 6,
+    right: 6,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "rgba(10,5,2,0.50)",
     alignItems: "center",
     justifyContent: "center",
   },
-  catBadge: {
+  footer: {
+    padding: 9,
+    gap: 4,
+  },
+  badge: {
     alignSelf: "flex-start",
     borderWidth: 1,
-    borderRadius: 5,
-    paddingHorizontal: 5,
+    borderRadius: 4,
+    paddingHorizontal: 4,
     paddingVertical: 2,
-    marginBottom: 5,
-    backgroundColor: "rgba(10,5,2,0.35)",
+    backgroundColor: "rgba(10,5,2,0.32)",
   },
-  catText: {
+  badgeText: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 9,
-    letterSpacing: 0.5,
+    fontSize: 8,
+    letterSpacing: 0.4,
     textTransform: "uppercase",
   },
   name: {
     fontFamily: "PlayfairDisplay_600SemiBold",
-    fontSize: 13,
+    fontSize: 12,
     color: C.white,
-    lineHeight: 17,
+    lineHeight: 16,
   },
 });
 
-function SavedPlacesGrid({
+function SavedSection({
   saved,
   onRemove,
 }: {
@@ -272,24 +304,24 @@ function SavedPlacesGrid({
   onRemove: (id: string) => void;
 }) {
   return (
-    <View style={grid.wrap}>
-      <Text style={grid.label}>
+    <View style={saved_s.wrap}>
+      <Text style={saved_s.label}>
         {saved.length === 1 ? "1 lugar salvo" : `${saved.length} lugares salvos`}
       </Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={grid.scroll}
+        contentContainerStyle={saved_s.scroll}
       >
         {saved.map((item) => (
-          <SavedThumbCard key={item.id} item={item} onRemove={onRemove} />
+          <SavedChip key={item.id} item={item} onRemove={onRemove} />
         ))}
       </ScrollView>
     </View>
   );
 }
 
-const grid = StyleSheet.create({
+const saved_s = StyleSheet.create({
   wrap: {
     gap: 12,
   },
@@ -306,57 +338,54 @@ const grid = StyleSheet.create({
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Empty state — compact, leaves room for action buttons below
+// Empty hint — minimal, actions are already prominent above
 // ─────────────────────────────────────────────────────────────────────────────
 
-function EmptyState() {
+function EmptyHint() {
   return (
-    <View style={emp.wrap}>
-      <View style={emp.iconWrap}>
-        <Feather name="bookmark" size={28} color={C.terracotta} />
+    <View style={hint.wrap}>
+      <View style={hint.iconWrap}>
+        <Feather name="bookmark" size={22} color={C.terracotta} />
       </View>
-      <Text style={emp.title}>Salve lugares para{"\n"}montar sua viagem</Text>
-      <Text style={emp.desc}>
+      <Text style={hint.text}>
         Toque no{" "}
-        <Text style={emp.descBold}>marcador</Text>
-        {" "}em qualquer cartão para guardar aqui.
+        <Text style={hint.bold}>marcador</Text>
+        {" "}em qualquer cartão para guardar lugares aqui.
       </Text>
     </View>
   );
 }
 
-const emp = StyleSheet.create({
+const hint = StyleSheet.create({
   wrap: {
-    alignItems: "center",
-    paddingTop: 32,
-    paddingBottom: 8,
+    flexDirection: "row",
+    alignItems: "flex-start",
     gap: 12,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: "rgba(196,112,74,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(196,112,74,0.12)",
   },
   iconWrap: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: "rgba(196,112,74,0.10)",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 4,
+    marginTop: 1,
+    flexShrink: 0,
   },
-  title: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 22,
-    color: C.darkBrown,
-    textAlign: "center",
-    lineHeight: 30,
-  },
-  desc: {
+  text: {
+    flex: 1,
     fontFamily: "Inter_400Regular",
     fontSize: 14,
     color: C.warmGray,
-    textAlign: "center",
     lineHeight: 22,
-    maxWidth: 260,
   },
-  descBold: {
+  bold: {
     fontFamily: "Inter_600SemiBold",
     color: C.terracotta,
   },
@@ -366,40 +395,20 @@ const emp = StyleSheet.create({
 // Main screen
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function MeuGuiaScreen() {
+export default function MinhaViagemScreen() {
   const insets    = useSafeAreaInsets();
   const topPad    = Platform.OS === "web" ? 67 : insets.top + 16;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
   const { saved, unsave } = useGuia();
-  const totalSaved = saved.length;
-
-  const bgSource: ImageSourcePropType | null =
-    totalSaved > 0 ? saved[0].image : null;
+  const totalSaved        = saved.length;
+  const bgImages          = saved.map((s) => s.image);
 
   return (
     <View style={s.root}>
 
-      {/* ── Blurred destination background ── */}
-      {bgSource && (
-        <>
-          <Image
-            source={bgSource}
-            style={StyleSheet.absoluteFillObject}
-            resizeMode="cover"
-            blurRadius={Platform.OS === "ios" ? 26 : 14}
-          />
-          <LinearGradient
-            colors={[
-              "rgba(245,240,232,0.62)",
-              "rgba(245,240,232,0.96)",
-            ]}
-            locations={[0, 0.48]}
-            style={StyleSheet.absoluteFill}
-            pointerEvents="none"
-          />
-        </>
-      )}
+      {/* ── Rotating blurred background (only when saved places exist) ── */}
+      {bgImages.length > 0 && <RotatingBackground images={bgImages} />}
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -413,34 +422,34 @@ export default function MeuGuiaScreen() {
         <View style={s.header}>
           <Text style={s.eyebrow}>Viagem</Text>
           <View style={s.titleRow}>
-            <Text style={s.title}>Meu Guia</Text>
+            <Text style={s.title}>Minha Viagem</Text>
             {totalSaved > 0 && (
-              <View style={s.totalBadge}>
-                <Text style={s.totalBadgeText}>{totalSaved}</Text>
+              <View style={s.badge}>
+                <Text style={s.badgeText}>{totalSaved}</Text>
               </View>
             )}
           </View>
-          {totalSaved > 0 && (
-            <Text style={s.subtitle}>
-              {totalSaved === 1
+          <Text style={s.subtitle}>
+            {totalSaved === 0
+              ? "Suas ideias salvas para a próxima viagem"
+              : totalSaved === 1
                 ? "1 lugar salvo"
                 : `${totalSaved} lugares salvos`}
-            </Text>
-          )}
+          </Text>
         </View>
 
         {/* ── Divider ── */}
         <View style={s.divider} />
 
-        {/* ── Saved places grid or compact empty state ── */}
-        {totalSaved > 0 ? (
-          <SavedPlacesGrid saved={saved} onRemove={unsave} />
-        ) : (
-          <EmptyState />
-        )}
+        {/* ── Actions — always at top, always visible ── */}
+        <ActionArea />
 
-        {/* ── Action buttons — always visible ── */}
-        <ActionButtons />
+        {/* ── Saved chips or empty hint ── */}
+        {totalSaved > 0 ? (
+          <SavedSection saved={saved} onRemove={unsave} />
+        ) : (
+          <EmptyHint />
+        )}
 
       </ScrollView>
     </View>
@@ -481,14 +490,14 @@ const s = StyleSheet.create({
     color: C.darkBrown,
     lineHeight: 40,
   },
-  totalBadge: {
+  badge: {
     backgroundColor: C.terracotta,
     borderRadius: 14,
     paddingHorizontal: 10,
     paddingVertical: 4,
     marginTop: 4,
   },
-  totalBadgeText: {
+  badgeText: {
     fontFamily: "Inter_700Bold",
     fontSize: 14,
     color: C.white,
@@ -497,10 +506,11 @@ const s = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 14,
     color: C.warmGray,
+    lineHeight: 20,
   },
   divider: {
     height: 1,
     backgroundColor: C.border,
-    marginBottom: 28,
+    marginBottom: 24,
   },
 });
