@@ -6,7 +6,9 @@ import Colors from "@/constants/colors";
 
 const C = Colors.light;
 
-// Cursive L. symbol only — transparent RGBA, cropped to top 62% (no tagline text)
+// Cursive L. brand mark — RGBA PNG with white strokes on transparent background.
+// Pixels are white (255,255,255) with alpha derived from original logo darkness.
+// No tintColor or CSS filter needed — the asset renders white natively everywhere.
 const LOGO_MARK = require("../assets/images/logo-symbol.png");
 
 interface AppHeaderProps {
@@ -16,16 +18,6 @@ interface AppHeaderProps {
 export function AppHeader({ transparent = false }: AppHeaderProps) {
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
-
-  // Web: CSS filter inverts the black logo to white (invert(1)) then reduces opacity
-  // Native (iOS/Android): tintColor paints the transparent RGBA logo white
-  const logoStyle =
-    Platform.OS === "web"
-      ? ([
-          styles.logoMark,
-          { filter: "invert(1)", opacity: 0.55 } as any,
-        ] as const)
-      : ([styles.logoMark, { opacity: 0.55 }] as const);
 
   return (
     <View
@@ -37,16 +29,14 @@ export function AppHeader({ transparent = false }: AppHeaderProps) {
     >
       <View style={styles.inner}>
         {/*
-          Cursive L. brand mark rendered as an editorial watermark / signature.
-          Web: CSS invert filter turns the black logo white; native: tintColor="white".
-          opacity 0.55 keeps it subtle, integrated, non-dominant — like a signature
-          on the photographic surface rather than a UI icon.
+          Cursive L. watermark — white brand mark at low opacity.
+          Feels like a signature on the photographic surface, not a UI icon.
+          No tintColor, no filter — asset is natively white, just reduced opacity.
         */}
         <Image
           source={LOGO_MARK}
-          style={logoStyle}
+          style={styles.logoMark}
           resizeMode="contain"
-          {...(Platform.OS !== "web" ? { tintColor: "#FFFFFF" } : {})}
         />
         <Pressable style={styles.avatarBtn}>
           <Feather name="user" size={18} color={C.white} />
@@ -75,11 +65,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   logoMark: {
-    // Cropped symbol PNG: 2622×748 (ratio ~3.5:1) — L. mark only, no tagline
-    // Transparent surrounding area means only the actual logo strokes show.
-    // height 28px × width 96px preserves exact aspect ratio without distortion.
+    // RGBA asset: 2622×748 (ratio ~3.5:1) — L. mark only, no tagline text.
+    // White strokes on transparent bg — renders correctly on any background.
+    // opacity: 0.50 → subtle watermark feel, premium and non-dominant.
     height: 28,
     width: 96,
+    opacity: 0.50,
   },
   avatarBtn: {
     width: 38,
