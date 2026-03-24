@@ -22,11 +22,13 @@ interface RestauranteCardProps {
   bairro: string;
   categoria: string;
   image: ImageSourcePropType;
+  onPress?: () => void;
 }
 
-export function RestauranteCard({ id, nome, bairro, categoria, image }: RestauranteCardProps) {
+export function RestauranteCard({ id, nome, bairro, categoria, image, onPress }: RestauranteCardProps) {
   return (
     <Pressable
+      onPress={onPress}
       style={({ pressed }) => [
         styles.card,
         pressed && { opacity: 0.92, transform: [{ scale: 0.97 }] },

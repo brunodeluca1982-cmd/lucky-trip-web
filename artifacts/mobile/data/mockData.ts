@@ -100,6 +100,7 @@ export const heroDestinos = [
     pais: "Brasil",
     badge: "Confira as novidades",
     image: require("../assets/images/hero-rio.png"),
+    cityId: "rio",
   },
   {
     id: "2",
@@ -107,6 +108,7 @@ export const heroDestinos = [
     pais: "Grécia",
     badge: "Destaque da semana",
     image: require("../assets/images/hero-santorini.png"),
+    cityId: "santorini",
   },
   {
     id: "3",
@@ -114,6 +116,7 @@ export const heroDestinos = [
     pais: "Japão",
     badge: "Experiência única",
     image: require("../assets/images/hero-kyoto.png"),
+    cityId: "kyoto",
   },
 ];
 

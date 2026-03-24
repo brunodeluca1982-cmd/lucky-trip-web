@@ -6,6 +6,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { HorizontalScroll } from "@/components/HorizontalScroll";
 import { PlaceCard } from "@/components/PlaceCard";
@@ -54,11 +55,14 @@ export default function LuckyScreen() {
         {segredos.map((s) => (
           <PlaceCard
             key={s.id}
+            id={s.id}
+            saveCategoria="oQueFazer"
             titulo={s.titulo}
             localizacao={s.localizacao}
             descricao={s.descricao}
             image={s.image}
             variant="secret"
+            onPress={() => router.push(`/lugar/rio/${s.id}`)}
           />
         ))}
 
@@ -72,10 +76,13 @@ export default function LuckyScreen() {
           {oQueFazer.map((item) => (
             <PlaceCard
               key={item.id}
+              id={item.id}
+              saveCategoria="oQueFazer"
               titulo={item.titulo}
               localizacao={item.localizacao}
               image={item.image}
               size="medium"
+              onPress={() => router.push(`/lugar/rio/${item.id}`)}
             />
           ))}
         </HorizontalScroll>

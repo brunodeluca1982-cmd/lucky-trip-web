@@ -11,6 +11,7 @@ import {
   ViewToken,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import Colors from "@/constants/colors";
 
 const C = Colors.light;
@@ -23,6 +24,7 @@ interface HeroItem {
   pais: string;
   badge: string;
   image: ImageSourcePropType;
+  cityId?: string;
 }
 
 interface HeroCarouselProps {
@@ -45,6 +47,7 @@ function HeroSlide({ item }: { item: HeroItem }) {
         <Text style={styles.cidade}>{item.cidade}</Text>
         <Text style={styles.pais}>{item.pais}</Text>
         <Pressable
+          onPress={() => item.cityId && router.push({ pathname: "/cidade/[id]", params: { id: item.cityId } })}
           style={({ pressed }) => [styles.cta, pressed && { opacity: 0.88, transform: [{ scale: 0.97 }] }]}
         >
           <Text style={styles.ctaText}>Conferir agora</Text>

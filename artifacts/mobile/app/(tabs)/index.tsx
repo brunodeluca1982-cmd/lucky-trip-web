@@ -93,7 +93,10 @@ function LuckyHighlight() {
 // ── Roteiro card (2-col grid) ─────────────────────────────────────────────────
 function RoteiroCard({ roteiro }: { roteiro: Roteiro }) {
   return (
-    <View style={s.roteiroCard}>
+    <Pressable
+      style={({ pressed }) => [s.roteiroCard, pressed && { opacity: 0.90, transform: [{ scale: 0.97 }] }]}
+      onPress={() => router.push("/(tabs)/viagem")}
+    >
       <Image source={roteiro.image} style={s.roteiroImage} resizeMode="cover" />
       <LinearGradient
         colors={["rgba(0,0,0,0.02)", "rgba(10,5,2,0.84)"]}
@@ -114,14 +117,17 @@ function RoteiroCard({ roteiro }: { roteiro: Roteiro }) {
           ))}
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
 // ── Influencer card (2-col grid) ──────────────────────────────────────────────
 function InfluencerCard({ influencer }: { influencer: Influencer }) {
   return (
-    <Pressable style={s.influencerCard}>
+    <Pressable
+      style={({ pressed }) => [s.influencerCard, pressed && { opacity: 0.90, transform: [{ scale: 0.97 }] }]}
+      onPress={() => router.push({ pathname: "/luckyList/[id]", params: { id: "rio" } })}
+    >
       <Image source={influencer.image} style={s.influencerImage} resizeMode="cover" />
       <LinearGradient
         colors={["rgba(0,0,0,0.04)", "rgba(10,5,2,0.78)"]}
@@ -152,7 +158,7 @@ function RoteiroCTA() {
       <Text style={s.ctaSub}>
         Use nosso planejador intuitivo para criar experiências únicas no seu destino.
       </Text>
-      <Pressable style={s.ctaBtn}>
+      <Pressable style={s.ctaBtn} onPress={() => router.push("/(tabs)/viagem")}>
         <Feather name="plus" size={15} color={C.white} />
         <Text style={s.ctaBtnText}>Criar roteiro</Text>
       </Pressable>
@@ -210,6 +216,7 @@ export default function HomeScreen() {
                 localizacao={d.localizacao}
                 image={d.image}
                 size="large"
+                onPress={() => router.push(`/lugar/rio/${d.id}`)}
               />
             ))}
           </HorizontalScroll>
@@ -237,6 +244,7 @@ export default function HomeScreen() {
                   localizacao={item.localizacao}
                   image={item.image}
                   size="medium"
+                  onPress={() => router.push({ pathname: "/cidade/[id]", params: { id: "rio" } })}
                 />
               ))}
             </HorizontalScroll>
@@ -263,6 +271,7 @@ export default function HomeScreen() {
                 localizacao={item.localizacao}
                 image={item.image}
                 size="medium"
+                onPress={() => router.push({ pathname: "/cidade/[id]", params: { id: "rio" } })}
               />
             ))}
           </HorizontalScroll>
@@ -287,6 +296,7 @@ export default function HomeScreen() {
                 bairro={r.bairro}
                 categoria={r.categoria}
                 image={r.image}
+                onPress={() => router.push({ pathname: "/cidade/[id]", params: { id: "rio" } })}
               />
             ))}
           </HorizontalScroll>
@@ -311,6 +321,7 @@ export default function HomeScreen() {
                 localizacao={h.localizacao}
                 tipo={h.tipo}
                 image={h.image}
+                onPress={() => router.push({ pathname: "/cidade/[id]", params: { id: "rio" } })}
               />
             ))}
           </HorizontalScroll>

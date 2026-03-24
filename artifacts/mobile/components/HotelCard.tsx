@@ -22,6 +22,7 @@ interface HotelCardProps {
   localizacao: string;
   tipo: string;
   image: ImageSourcePropType;
+  onPress?: () => void;
 }
 
 const TIPO_COLORS: Record<string, string> = {
@@ -30,11 +31,12 @@ const TIPO_COLORS: Record<string, string> = {
   Conforto: "#C4704A",
 };
 
-export function HotelCard({ id, nome, localizacao, tipo, image }: HotelCardProps) {
+export function HotelCard({ id, nome, localizacao, tipo, image, onPress }: HotelCardProps) {
   const tipoColor = TIPO_COLORS[tipo] ?? C.terracotta;
 
   return (
     <Pressable
+      onPress={onPress}
       style={({ pressed }) => [
         styles.card,
         pressed && { opacity: 0.92, transform: [{ scale: 0.97 }] },
