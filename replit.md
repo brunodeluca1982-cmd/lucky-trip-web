@@ -117,11 +117,12 @@ Expo React Native app (SDK 54) with dark glassmorphism aesthetic for Rio de Jane
 - Web insets: 67px top, 34px bottom; native uses `useSafeAreaInsets()`
 
 ### Key Files
-- `components/RioMapView.tsx` — platform-aware interactive map: web=Leaflet.js iframe (CartoDB dark tiles, no API key), native=react-native-maps; 11 clickable neighborhood markers + 3 visual-only; postMessage communication with parent
-- `components/RioMapViewNative.tsx` — native MapView implementation with Marker components (lazy-loaded by RioMapView)
+- `components/OndeFicarMap.tsx` — premium editorial aerial map for the Onde Ficar screen; uses `assets/images/rio-aerial-clean.png` (2340×1440 aerial photo, left-aligned); 11 invisible Pressable hotspots with editorial text labels; spring zoom/pan animation on neighborhood tap; dim overlay; floating "← Voltar" and badge pills
+- `components/MapZoneOverlay.tsx` — zone-based interactive map used by `oQueFazer` and `comerBem` screens (portrait satellite image + 7 zone hotspots); DO NOT modify
 - `lib/supabase.ts` — mobile Supabase client (`EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY`); exports `Hotel` and `Neighborhood` types
 - `hooks/useNeighborhoods.ts` — fetches `v_stay_neighborhoods_with_hotels` (active, ordered)
 - `hooks/useHotel.ts` — fetches a single hotel by UUID from the view
+- `assets/images/rio-aerial-clean.png` — clean Rio aerial photo (5.75MB, 2340×1440) used by OndeFicarMap
 
 ### Supabase Tables Used
 - `stay_neighborhoods` — neighborhood details (name, slug, identity_phrase, my_view, how_to_live, best_for_*, nightlife, gastronomy, scenery, walkable, safety_solo_woman, etc.)
@@ -129,7 +130,7 @@ Expo React Native app (SDK 54) with dark glassmorphism aesthetic for Rio de Jane
 
 ### Route Structure
 - `(tabs)/` — 5-tab navigator
-- `ondeFicar/[id].tsx` — hotel list screen with live Supabase data, interactive RioMapView, floating NeighborhoodCard on selection, filtered hotel list
+- `ondeFicar/[id].tsx` — hotel list screen with live Supabase data; fixed OndeFicarMap at top (aerial photo + 11 hotspots + spring zoom/dim animation); animated floating NeighborhoodCard on tap; filtered hotel list by neighborhood below
 - `ondeFicar/hotel/[hotelId].tsx` — hotel detail screen (full my_view, how_to_enjoy, reserve_url, Google Maps link)
 - `ondeFicar/bairro/[slug].tsx` — neighborhood editorial detail (my_view, how_to_live, stat pills, Ver hospedagens CTA)
 - `oQueFazer/[id].tsx`, `comerBem/[id].tsx` — activities + dining screens (mock data)
