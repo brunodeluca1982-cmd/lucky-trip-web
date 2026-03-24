@@ -1,4 +1,5 @@
 import { getNeighborhoodImage } from "./neighborhoodImages";
+import { getImageForEntity } from "../utils/getImageForEntity";
 
 export interface Destino {
   id: string;
@@ -35,63 +36,63 @@ export const destinos: Destino[] = [
     cidade: "Lisboa",
     pais: "Portugal",
     descricao: "Fado, pastéis de nata e becos iluminados à beira do Tejo.",
-    image: require("../assets/images/secret2.png"),
+    image: getImageForEntity("city", "Lisboa"),
   },
   {
     id: "buenosaires",
     cidade: "Buenos Aires",
     pais: "Argentina",
     descricao: "Tango, arquitetura europeia e os melhores cortes de carne do continente.",
-    image: require("../assets/images/hotel2.png"),
+    image: getImageForEntity("city", "Buenos Aires"),
   },
   {
     id: "floripa",
     cidade: "Florianópolis",
     pais: "Brasil",
     descricao: "A ilha da magia — 42 praias para todos os estilos e humores.",
-    image: require("../assets/images/ipanema.png"),
+    image: getImageForEntity("city", "Florianópolis"),
   },
   {
     id: "paraty",
     cidade: "Paraty",
     pais: "Brasil",
     descricao: "Centro histórico colonial à beira da Baía da Ilha Grande.",
-    image: require("../assets/images/lapa.png"),
+    image: getImageForEntity("city", "Paraty"),
   },
   {
     id: "gramado",
     cidade: "Gramado",
     pais: "Brasil",
     descricao: "Charme europeu encravado entre as montanhas gaúchas.",
-    image: require("../assets/images/hotel1.png"),
+    image: getImageForEntity("city", "Gramado"),
   },
   {
     id: "miami",
     cidade: "Miami",
     pais: "Estados Unidos",
     descricao: "Arte, design, sol e a energia única de South Beach.",
-    image: require("../assets/images/pao-acucar.png"),
+    image: getImageForEntity("city", "Miami"),
   },
   {
     id: "paris",
     cidade: "Paris",
     pais: "França",
     descricao: "A capital do romance, da moda e da gastronomia mais refinada do mundo.",
-    image: require("../assets/images/restaurante1.png"),
+    image: getImageForEntity("city", "Paris"),
   },
   {
     id: "bali",
     cidade: "Bali",
     pais: "Indonésia",
     descricao: "Templos entre arrozais, ondas perfeitas e a espiritualidade do povo balinês.",
-    image: require("../assets/images/restaurante2.png"),
+    image: getImageForEntity("city", "Bali"),
   },
   {
     id: "ilhabela",
     cidade: "Ilhabela",
     pais: "Brasil",
     descricao: "Paraíso ecológico com cachoeiras, praias selvagens e ventos favoráveis.",
-    image: require("../assets/images/secret1.png"),
+    image: getImageForEntity("city", "Ilhabela"),
   },
 ];
 
@@ -282,14 +283,14 @@ export const restaurantes = [
     nome: "Confeitaria Colombo",
     bairro: "Centro",
     categoria: "Café / Histórico",
-    image: require("../assets/images/restaurante1.png"),
+    image: getImageForEntity("restaurant", "Confeitaria Colombo", "Centro"),
   },
   {
     id: "2",
     nome: "Oro Restaurant",
     bairro: "Leblon",
     categoria: "Contemporâneo",
-    image: require("../assets/images/restaurante2.png"),
+    image: getImageForEntity("restaurant", "Oro Restaurant", "Leblon"),
   },
 ];
 
@@ -299,14 +300,14 @@ export const hoteis = [
     nome: "Copacabana Palace",
     localizacao: "Copacabana",
     tipo: "Luxo",
-    image: require("../assets/images/hotel1.png"),
+    image: getImageForEntity("hotel", "Copacabana Palace", "Copacabana"),
   },
   {
     id: "2",
     nome: "Santa Teresa Hotel",
     localizacao: "Santa Teresa",
     tipo: "Boutique",
-    image: require("../assets/images/hotel2.png"),
+    image: getImageForEntity("hotel", "Santa Teresa Hotel", "Santa Teresa"),
   },
 ];
 

@@ -116,17 +116,37 @@ Expo React Native app (SDK 54) with dark glassmorphism aesthetic for Rio de Jane
 - `boxShadow` everywhere (not `shadow*`); `pointerEvents` in style not as prop
 - Web insets: 67px top, 34px bottom; native uses `useSafeAreaInsets()`
 
-### IMAGE RULE — Neighborhood Image Consistency
-**`getNeighborhoodImage(neighborhoodName)`** in `data/neighborhoodImages.ts` is the single source of truth for all neighborhood → image mappings. Every data file and screen that renders a place by neighborhood MUST use this resolver.
+### IMAGE RULE — Unified Entity Image Resolution
+Two resolvers form the complete image system. Every entity MUST use one of them — no bare `require()` for entities.
 
-Files now using the resolver (all neighborhood-bearing images):
+#### 1. `getNeighborhoodImage(name)` — `data/neighborhoodImages.ts`
+Single source of truth for neighborhood → image. Returns Wikipedia Commons URI (Tier 2) or local asset (Tier 3).
+
+Files using this resolver:
 - `data/lugares.ts` — all 32+ LUGARES_LUCKY entries
 - `data/mockData.ts` — destaques, oQueFazer, oQueFazerPorMomento, segredos, curadoPara
 - `data/agoraContent.ts` — AGORA_CONTENT, FALLBACK_CONTENT, DESTAQUE_PRINCIPAL
 - `app/essencial/[id].tsx` — CLASSICOS_RIO cards
 - All 4 bairro detail pages (via `getNeighborhoodHero()` in `utils/neighborhoodHero.ts`)
 
-Exempt (entity-level images, not neighborhood images): `destinos` (city heroes), `restaurantes`, `hoteis`, `roteiros`, `influencers` in mockData.ts.
+#### 2. `getImageForEntity(type, name, localizacao?, supabaseUrl?)` — `utils/getImageForEntity.ts`
+4-tier resolver for restaurants, hotels, cities, activities, and any future entities.
+- **Tier 1**: Supabase `photo_url` / `image_url` (always wins when present)
+- **Tier 2**: Curated Wikipedia Commons permalink (entity-specific map in the resolver)
+- **Tier 3**: `getNeighborhoodImage(localizacao)` — contextually correct, never random
+- **Tier 4**: Local asset fallback bundled in the app
+
+Module-level cache (`Map`) ensures same entity → same image on every render.
+
+Files using this resolver:
+- `data/mockData.ts` — `restaurantes`, `hoteis`, all non-Rio `destinos` (Lisboa, Buenos Aires, Paris, etc.)
+- `app/comerBem/[id].tsx` — restaurant card image with full Supabase → entity → neighborhood → local chain
+- `app/comerBem/bairro/[bairroNome].tsx` — same
+
+Exempt (use bundled hero assets directly — permanent brand images):
+- `destinos` Rio, Santorini, Kyoto entries → `hero-rio.png`, `hero-santorini.png`, `hero-kyoto.png`
+- `influencers` avatars → placeholder until Supabase real photos available
+- `roteiros` covers → editorial-only, manually curated
 
 Neighborhood map (defined in `data/neighborhoodImages.ts`):
 - Ipanema / Leblon / Arpoador → `ipanema.png`

@@ -32,6 +32,7 @@ import { destinos } from "@/data/mockData";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import { useNeighborhoods } from "@/hooks/useNeighborhoods";
 import { getNeighborhoodHero } from "@/utils/neighborhoodHero";
+import { getImageForEntity } from "@/utils/getImageForEntity";
 
 const C = Colors.light;
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -233,9 +234,7 @@ export default function ComerBemBairroScreen() {
 
           {!loading && !error && filtered.map((r, index) => {
             const precoStr    = "€".repeat(Math.max(1, Math.min(4, r.preco_nivel)));
-            const imageSource = r.resolvedPhotoUri
-              ? { uri: r.resolvedPhotoUri }
-              : require("../../../assets/images/restaurante1.png");
+            const imageSource = getImageForEntity("restaurant", r.nome, r.bairro, r.resolvedPhotoUri);
 
             return (
               <Pressable
