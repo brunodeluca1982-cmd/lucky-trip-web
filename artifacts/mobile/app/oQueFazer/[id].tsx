@@ -266,7 +266,7 @@ const s = StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: 2.5,
-    backgroundColor: C.terracotta,
+    backgroundColor: "rgba(201,168,76,0.55)",
   },
   descNoteText: {
     fontFamily: "Inter_500Medium",

@@ -4,6 +4,7 @@ import {
   Animated,
   Dimensions,
   Easing,
+  Image,
   Linking,
   Platform,
   Pressable,
@@ -191,28 +192,41 @@ export default function OndeFicarScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: bottomPad + 40 }}
       >
-        {/* Editorial intro */}
-        <View style={s.intro}>
-          {activeNeighborhood ? (
-            <>
-              <Text style={s.introTitle}>{activeNeighborhood.title}</Text>
-              <Text style={s.introPhrase}>{activeNeighborhood.identity_phrase}</Text>
-            </>
-          ) : (
-            <>
-              <Text style={s.introTitle}>Onde ficar em {destino.cidade}</Text>
-              <Text style={s.introPara}>
-                Onde você dorme define como você acorda. No Rio, cada bairro tem
-                um ritmo próprio — escolher bem o hotel muda toda a experiência.
+        {/* ── Photo hero intro — editorial bridge from map to hotel list ── */}
+        <View style={s.introHeroWrap}>
+          <Image
+            source={destino.image}
+            style={StyleSheet.absoluteFillObject}
+            resizeMode="cover"
+          />
+          <LinearGradient
+            colors={["rgba(10,5,2,0.28)", "rgba(10,5,2,0.92)"]}
+            locations={[0.05, 1]}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
+          <View style={[s.intro, s.introAbsolute]}>
+            {activeNeighborhood ? (
+              <>
+                <Text style={s.introTitle}>{activeNeighborhood.title}</Text>
+                <Text style={s.introPhrase}>{activeNeighborhood.identity_phrase}</Text>
+              </>
+            ) : (
+              <>
+                <Text style={s.introTitle}>Onde ficar em {destino.cidade}</Text>
+                <Text style={s.introPara}>
+                  Onde você dorme define como você acorda. No Rio, cada bairro tem
+                  um ritmo próprio — escolher bem o hotel muda toda a experiência.
+                </Text>
+              </>
+            )}
+            <View style={s.introMeta}>
+              <View style={s.introDot} />
+              <Text style={s.introMetaText}>
+                Seleção curada ·{" "}
+                {loading ? "…" : `${hotels.length} hospedagem${hotels.length !== 1 ? "s" : ""}`}
               </Text>
-            </>
-          )}
-          <View style={s.introMeta}>
-            <View style={s.introDot} />
-            <Text style={s.introMetaText}>
-              Seleção curada ·{" "}
-              {loading ? "…" : `${hotels.length} hospedagem${hotels.length !== 1 ? "s" : ""}`}
-            </Text>
+            </View>
           </View>
         </View>
 
@@ -510,6 +524,22 @@ const s = StyleSheet.create({
     backgroundColor: "#0A0502",
   },
 
+  // ── Intro hero wrapper — destination photo behind the editorial intro text ──
+  introHeroWrap: {
+    width: "100%",
+    height: 260,
+    position: "relative",
+    overflow: "hidden",
+  },
+
+  // ── Intro text block — pinned to the bottom of the hero image ──
+  introAbsolute: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
+
   // ── Intro ──
   intro: {
     paddingHorizontal: 24,
@@ -545,7 +575,7 @@ const s = StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: 2.5,
-    backgroundColor: C.terracotta,
+    backgroundColor: "rgba(201,168,76,0.55)",
   },
   introMetaText: {
     fontFamily: "Inter_500Medium",
