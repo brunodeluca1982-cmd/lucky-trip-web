@@ -198,6 +198,13 @@ export default function HomeScreen() {
         {/* ── 1. HERO CAROUSEL ── */}
         <HeroCarousel items={heroDestinos} />
 
+        {/* ── Hero → content gradient bridge — overlaps hero bottom, fades to bg ── */}
+        <LinearGradient
+          colors={["transparent", "rgba(10,5,2,0.78)", "#0A0502"]}
+          locations={[0, 0.62, 1]}
+          style={{ height: 96, marginTop: -96, pointerEvents: "none" }}
+        />
+
         {/* ── 2. DESTAQUES ── */}
         <View style={s.section}>
           <SectionHeader
