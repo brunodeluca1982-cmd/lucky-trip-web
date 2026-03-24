@@ -152,7 +152,6 @@ export default function ComerBemScreen() {
           )}
 
           {!loading && !error && allRestaurantes.map((r, index) => {
-            const precoStr    = "€".repeat(Math.max(1, Math.min(4, r.preco_nivel)));
             const imageSource = getImageForEntity("restaurant", r.nome, r.bairro, r.resolvedPhotoUri);
 
             return (
@@ -176,9 +175,11 @@ export default function ComerBemScreen() {
                   <View style={s.bookmarkBtn}>
                     <Feather name="bookmark" size={15} color={C.white} />
                   </View>
-                  <View style={s.priceBadge}>
-                    <Text style={s.priceText}>{precoStr}</Text>
-                  </View>
+                  {r.perfil_publico ? (
+                    <View style={s.priceBadge}>
+                      <Text style={s.priceText}>{r.perfil_publico}</Text>
+                    </View>
+                  ) : null}
                   <View style={s.orderBadge}>
                     <Text style={s.orderText}>{String(index + 1).padStart(2, "0")}</Text>
                   </View>
