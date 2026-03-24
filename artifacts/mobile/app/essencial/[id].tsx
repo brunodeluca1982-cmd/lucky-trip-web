@@ -126,7 +126,7 @@ function LuckyCard({
   index,
   cityId,
 }: {
-  item: ReturnType<typeof LUGARES_LUCKY["rio"]>[number];
+  item: (typeof LUGARES_LUCKY)["rio"][number];
   index: number;
   cityId: string;
 }) {
@@ -194,20 +194,13 @@ export default function EssencialScreen() {
     .map((lid) => allLucky.find((l) => l.id === lid))
     .filter((l): l is NonNullable<typeof l> => Boolean(l));
 
+  const HERO_HEIGHT = topInset + 300;
+
   return (
     <View style={s.root}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* ── Fullscreen background ── */}
-      <Image source={destino.image} style={s.bgImage} resizeMode="cover" />
-      <LinearGradient
-        colors={["rgba(10,5,2,0.78)", "rgba(10,5,2,0.60)", "#0A0502"]}
-        locations={[0, 0.30, 0.55]}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
-
-      {/* ── Back button — fixed ── */}
+      {/* ── Fixed back button — floats above scroll ── */}
       <Pressable
         onPress={() => router.back()}
         style={[s.backBtn, { top: topInset + 12 }]}
@@ -218,64 +211,84 @@ export default function EssencialScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          s.scrollContent,
-          { paddingTop: topInset + 64, paddingBottom: bottomPad + 60 },
-        ]}
+        contentContainerStyle={{ paddingBottom: bottomPad + 60 }}
       >
-        {/* ── Hero header ── */}
-        <View style={s.hero}>
-          <Text style={s.heroEyebrow}>COMECE POR AQUI</Text>
-          <Text style={s.heroTitle}>O essencial{"\n"}do Rio</Text>
-          <Text style={s.heroSub}>
-            Os clássicos que definem o Rio — com um toque Lucky para quem quer
-            começar pelo que realmente importa.
-          </Text>
-        </View>
-
-        {/* ── Section 1: Clássicos do Rio ── */}
-        <View style={s.sectionHeader}>
-          <Text style={s.sectionLabel}>CLÁSSICOS DO RIO</Text>
-          <Text style={s.sectionCount}>{classicos.length} lugares</Text>
-        </View>
-
-        <View style={s.grid2}>
-          {classicos.map((item) => (
-            <ClassicoCard key={item.id} item={item} />
-          ))}
-        </View>
-
-        {/* ── Divider ── */}
-        <View style={s.divider} />
-
-        {/* ── Section 2: 3 achados Lucky no Rio ── */}
-        <View style={s.sectionHeader}>
-          <View style={s.luckyHeaderRow}>
-            <Text style={s.luckyHeaderStar}>✦</Text>
-            <Text style={s.luckyHeaderLabel}>3 ACHADOS LUCKY NO RIO</Text>
+        {/* ── Hero image area — cinematic, full-opacity ── */}
+        <View style={[s.heroWrap, { height: HERO_HEIGHT }]}>
+          <Image source={destino.image} style={s.heroImage} resizeMode="cover" />
+          {/* Top dark band for back button legibility */}
+          <LinearGradient
+            colors={["rgba(10,5,2,0.52)", "transparent"]}
+            locations={[0, 0.38]}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
+          {/* Bottom dark band — blends into content section */}
+          <LinearGradient
+            colors={["transparent", "rgba(10,5,2,0.75)", "#0A0502"]}
+            locations={[0.45, 0.75, 1]}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
+          {/* Hero title text — sits at the bottom of the image */}
+          <View style={s.heroTextWrap}>
+            <Text style={s.heroEyebrow}>COMECE POR AQUI</Text>
+            <Text style={s.heroTitle}>O essencial{"\n"}do Rio</Text>
+            <Text style={s.heroSub}>
+              Os clássicos que definem o Rio — com um toque Lucky para quem quer
+              começar pelo que realmente importa.
+            </Text>
           </View>
-          <Text style={s.luckyHeaderSub}>
-            Segredos que poucos conhecem. Escolhidos com razão.
-          </Text>
         </View>
 
-        <View style={s.luckyList}>
-          {luckyPicks.map((item, i) => (
-            <LuckyCard
-              key={item.id}
-              item={item}
-              index={i}
-              cityId={destino.id}
-            />
-          ))}
-        </View>
+        {/* ── Dark content area ── */}
+        <View style={s.contentArea}>
 
-        {/* ── Editorial footer ── */}
-        <View style={s.footer}>
-          <Text style={s.footerL}>L.</Text>
-          <Text style={s.footerText}>
-            Curadoria para quem quer começar o Rio pelo que realmente importa.
-          </Text>
+          {/* ── Section 1: Clássicos do Rio ── */}
+          <View style={s.sectionHeader}>
+            <Text style={s.sectionLabel}>CLÁSSICOS DO RIO</Text>
+            <Text style={s.sectionCount}>{classicos.length} lugares</Text>
+          </View>
+
+          <View style={s.grid2}>
+            {classicos.map((item) => (
+              <ClassicoCard key={item.id} item={item} />
+            ))}
+          </View>
+
+          {/* ── Divider ── */}
+          <View style={s.divider} />
+
+          {/* ── Section 2: 3 achados Lucky no Rio ── */}
+          <View style={s.sectionHeader}>
+            <View style={s.luckyHeaderRow}>
+              <Text style={s.luckyHeaderStar}>✦</Text>
+              <Text style={s.luckyHeaderLabel}>3 ACHADOS LUCKY NO RIO</Text>
+            </View>
+            <Text style={s.luckyHeaderSub}>
+              Segredos que poucos conhecem. Escolhidos com razão.
+            </Text>
+          </View>
+
+          <View style={s.luckyList}>
+            {luckyPicks.map((item, i) => (
+              <LuckyCard
+                key={item.id}
+                item={item}
+                index={i}
+                cityId={destino.id}
+              />
+            ))}
+          </View>
+
+          {/* ── Editorial footer ── */}
+          <View style={s.footer}>
+            <Text style={s.footerL}>L.</Text>
+            <Text style={s.footerText}>
+              Curadoria para quem quer começar o Rio pelo que realmente importa.
+            </Text>
+          </View>
+
         </View>
       </ScrollView>
     </View>
@@ -290,16 +303,7 @@ const s = StyleSheet.create({
     backgroundColor: "#0A0502",
   },
 
-  bgImage: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    width: "100%",
-    height: "100%",
-    resizeMode: "cover",
-    opacity: 0.22,
-  },
-
+  // ── Fixed back button ──
   backBtn: {
     position: "absolute",
     left: 20,
@@ -314,18 +318,28 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
 
-  scrollContent: {},
-
-  // ── Hero ──
-  hero: {
+  // ── Hero image block ──
+  heroWrap: {
+    width: "100%",
+    position: "relative",
+  },
+  heroImage: {
+    width: "100%",
+    height: "100%",
+  },
+  heroTextWrap: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
     paddingHorizontal: 24,
-    paddingBottom: 32,
-    gap: 10,
+    paddingBottom: 30,
+    gap: 8,
   },
   heroEyebrow: {
     fontFamily: "Inter_500Medium",
     fontSize: 10,
-    color: C.terracotta,
+    color: "rgba(201,168,76,0.78)",
     letterSpacing: 2.5,
   },
   heroTitle: {
@@ -338,9 +352,14 @@ const s = StyleSheet.create({
   heroSub: {
     fontFamily: "Inter_400Regular",
     fontSize: 14,
-    color: "rgba(255,255,255,0.58)",
+    color: "rgba(255,255,255,0.60)",
     lineHeight: 22,
-    maxWidth: 300,
+  },
+
+  // ── Content area below hero ──
+  contentArea: {
+    backgroundColor: "#0A0502",
+    paddingTop: 28,
   },
 
   // ── Section header ──
@@ -352,7 +371,7 @@ const s = StyleSheet.create({
   sectionLabel: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 11,
-    color: C.terracotta,
+    color: "rgba(255,255,255,0.46)",
     letterSpacing: 2.2,
   },
   sectionCount: {
