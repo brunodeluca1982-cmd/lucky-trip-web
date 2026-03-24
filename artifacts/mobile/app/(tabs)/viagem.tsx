@@ -1,17 +1,21 @@
 /**
- * viagem.tsx — "Minha Viagem" planning hub.
+ * viagem.tsx — "Minha Viagem" — premium trip planning dashboard.
  *
- * Order (both states):
- *   Header → Divider → Actions (AI primary + 3 chips) → Saved chips | Empty hint
+ * Layout order:
+ *   Header → ActionArea (chips → AI CTA) → SavedGrid | EmptyHint → RoteiroSection
  *
  * Background:
- *   When saved items exist → rotating blurred destination images (fade crossfade).
- *   When empty → plain cream.
+ *   Empty  → static blurred Rio image + gradient overlay
+ *   Saved  → rotating fade through saved item images + gradient
+ *
+ * Style system:
+ *   Glassmorphism panels, transparent blocks, cream + terracotta + gold palette.
  */
 
 import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
+  Dimensions,
   Image,
   ImageSourcePropType,
   Platform,
@@ -31,14 +35,15 @@ import type { SavedCategory, SavedItem } from "@/context/GuiaContext";
 import { buildRoteiro, PERIODO_LABEL, PERIODO_ICON } from "@/utils/buildRoteiro";
 import type { DiaRoteiro, DiaPeriodo } from "@/utils/buildRoteiro";
 
-const C = Colors.light;
+const C    = Colors.light;
+const GOLD = "#C9A84C";
+const { width: SCREEN_W } = Dimensions.get("window");
 
-const CATEGORY_ACCENT: Record<SavedCategory, string> = {
-  oQueFazer:   C.terracotta,
-  restaurante: "#8B6914",
-  hotel:       "#2D5A3D",
-  lucky:       C.gold,
-};
+const FALLBACK_BG = require("@/assets/images/ipanema.png");
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Category label map
+// ─────────────────────────────────────────────────────────────────────────────
 
 const CATEGORY_LABEL: Record<SavedCategory, string> = {
   oQueFazer:   "Experiência",
@@ -48,25 +53,26 @@ const CATEGORY_LABEL: Record<SavedCategory, string> = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Rotating blurred background
+// Background — fades between saved images (or static fallback)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function RotatingBackground({ images }: { images: ImageSourcePropType[] }) {
-  const [idx, setIdx]   = useState(0);
-  const fadeAnim        = useRef(new Animated.Value(1)).current;
+function SceneBackground({ images }: { images: ImageSourcePropType[] }) {
+  const hasSaved   = images.length > 0;
+  const [idx, setIdx] = useState(0);
+  const fadeAnim   = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     if (images.length <= 1) return;
     const timer = setInterval(() => {
       Animated.timing(fadeAnim, {
         toValue: 0,
-        duration: 700,
+        duration: 800,
         useNativeDriver: false,
       }).start(() => {
         setIdx((prev) => (prev + 1) % images.length);
         Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 700,
+          duration: 800,
           useNativeDriver: false,
         }).start();
       });
@@ -74,19 +80,25 @@ function RotatingBackground({ images }: { images: ImageSourcePropType[] }) {
     return () => clearInterval(timer);
   }, [images.length]);
 
-  const current = images[idx] ?? images[0];
+  const src = hasSaved ? (images[idx] ?? images[0]) : FALLBACK_BG;
 
   return (
     <>
       <Animated.Image
-        source={current}
+        source={src}
         style={[StyleSheet.absoluteFillObject, { opacity: fadeAnim }]}
         resizeMode="cover"
-        blurRadius={Platform.OS === "ios" ? 28 : 16}
+        blurRadius={Platform.OS === "ios" ? 32 : 20}
       />
+      {/* 4-stop gradient: let image breathe at top, opaque cream at bottom */}
       <LinearGradient
-        colors={["rgba(245,240,232,0.58)", "rgba(245,240,232,0.97)"]}
-        locations={[0, 0.50]}
+        colors={[
+          "rgba(245,240,232,0.30)",
+          "rgba(245,240,232,0.62)",
+          "rgba(245,240,232,0.88)",
+          "rgba(245,240,232,0.97)",
+        ]}
+        locations={[0, 0.28, 0.55, 1]}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
@@ -95,43 +107,10 @@ function RotatingBackground({ images }: { images: ImageSourcePropType[] }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Actions — AI primary CTA + 3 secondary chips
+// Action area — Row 1: social chips · Row 2: AI primary CTA
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ActionArea() {
-  return (
-    <View style={act.wrap}>
-      {/* PRIMARY — AI itinerary CTA */}
-      <Pressable
-        style={({ pressed }) => [
-          act.primaryBtn,
-          pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
-        ]}
-        onPress={() => {}}
-      >
-        <LinearGradient
-          colors={[C.terracotta, "#B5613E"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={act.primaryGradient}
-        >
-          <Feather name="zap" size={17} color={C.white} />
-          <Text style={act.primaryLabel}>Criar roteiro com IA</Text>
-          <Feather name="arrow-right" size={15} color="rgba(255,255,255,0.7)" />
-        </LinearGradient>
-      </Pressable>
-
-      {/* SECONDARY ROW — 3 glass chips */}
-      <View style={act.chipRow}>
-        <GlassChip icon="instagram" label="Instagram" onPress={() => {}} />
-        <GlassChip icon="video"     label="TikTok"    onPress={() => {}} />
-        <GlassChip icon="link"      label="Link"       onPress={() => {}} />
-      </View>
-    </View>
-  );
-}
-
-function GlassChip({
+function SocialChip({
   icon,
   label,
   onPress,
@@ -143,14 +122,54 @@ function GlassChip({
   return (
     <Pressable
       style={({ pressed }) => [
-        act.chip,
-        pressed && { opacity: 0.75, transform: [{ scale: 0.95 }] },
+        act.socialChip,
+        pressed && { opacity: 0.72, transform: [{ scale: 0.95 }] },
       ]}
       onPress={onPress}
     >
-      <Feather name={icon} size={14} color={C.terracotta} />
-      <Text style={act.chipLabel} numberOfLines={1}>{label}</Text>
+      <Feather name={icon} size={13} color={C.terracotta} />
+      <Text style={act.socialLabel} numberOfLines={1}>{label}</Text>
     </Pressable>
+  );
+}
+
+function ActionArea() {
+  return (
+    <View style={act.wrap}>
+      {/* Row 1 — social import chips */}
+      <View style={act.socialRow}>
+        <SocialChip icon="instagram" label="Instagram" onPress={() => {}} />
+        <SocialChip icon="video"     label="TikTok"    onPress={() => {}} />
+        <SocialChip icon="link-2"    label="Link"      onPress={() => {}} />
+      </View>
+
+      {/* Row 2 — primary AI CTA */}
+      <Pressable
+        style={({ pressed }) => [
+          act.aiBtn,
+          pressed && { opacity: 0.88, transform: [{ scale: 0.985 }] },
+        ]}
+        onPress={() => {}}
+      >
+        <LinearGradient
+          colors={[C.terracotta, "#B85D3A"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0.8 }}
+          style={act.aiGradient}
+        >
+          <View style={act.aiLeft}>
+            <View style={act.aiIconWrap}>
+              <Feather name="zap" size={15} color={C.white} />
+            </View>
+            <View>
+              <Text style={act.aiLabel}>Criar roteiro com IA</Text>
+              <Text style={act.aiSub}>Baseado nos seus lugares salvos</Text>
+            </View>
+          </View>
+          <Feather name="arrow-right" size={16} color="rgba(255,255,255,0.65)" />
+        </LinearGradient>
+      </Pressable>
+    </View>
   );
 }
 
@@ -159,136 +178,155 @@ const act = StyleSheet.create({
     gap: 10,
     marginBottom: 28,
   },
-  primaryBtn: {
-    borderRadius: 16,
-    overflow: "hidden",
-    boxShadow: `0px 6px 18px rgba(196,112,74,0.32)`,
-  },
-  primaryGradient: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    paddingVertical: 17,
-    paddingHorizontal: 20,
-  },
-  primaryLabel: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
-    color: C.white,
-    flex: 1,
-  },
-  chipRow: {
+
+  // Social chips row
+  socialRow: {
     flexDirection: "row",
     gap: 8,
   },
-  chip: {
+  socialChip: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
+    paddingVertical: 11,
     borderRadius: 12,
-    paddingVertical: 12,
-    backgroundColor: "rgba(196,112,74,0.07)",
+    backgroundColor: "rgba(245,240,232,0.72)",
     borderWidth: 1,
-    borderColor: "rgba(196,112,74,0.16)",
+    borderColor: "rgba(196,112,74,0.18)",
   },
-  chipLabel: {
+  socialLabel: {
     fontFamily: "Inter_500Medium",
     fontSize: 12,
     color: C.terracotta,
   },
+
+  // AI CTA
+  aiBtn: {
+    borderRadius: 16,
+    overflow: "hidden",
+    boxShadow: `0px 8px 24px rgba(196,112,74,0.30)`,
+  },
+  aiGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+  },
+  aiLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    flex: 1,
+  },
+  aiIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  aiLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: C.white,
+    letterSpacing: 0.1,
+  },
+  aiSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: "rgba(255,255,255,0.68)",
+    marginTop: 1,
+  },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Saved chip card — compact, multiple visible at once
+// Saved places — compact horizontal scroll
 // ─────────────────────────────────────────────────────────────────────────────
 
-function SavedChip({
+const CARD_W = Math.round((SCREEN_W - 48 - 10) / 2.6); // ~2.6 cards visible
+const CARD_H = Math.round(CARD_W * 1.3);
+
+function SavedCard({
   item,
   onRemove,
 }: {
   item: SavedItem;
   onRemove: (id: string) => void;
 }) {
-  const accent   = CATEGORY_ACCENT[item.categoria];
-  const catLabel = CATEGORY_LABEL[item.categoria];
-
   return (
     <Pressable
       style={({ pressed }) => [
-        chip.card,
-        pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] },
+        sc.card,
+        { width: CARD_W, height: CARD_H },
+        pressed && { opacity: 0.88, transform: [{ scale: 0.97 }] },
       ]}
       onPress={() => router.push(`/lugar/rio/${item.id}`)}
     >
-      <Image source={item.image} style={chip.image} resizeMode="cover" />
+      {/* Image */}
+      <Image source={item.image} style={StyleSheet.absoluteFillObject as any} resizeMode="cover" />
+
+      {/* Bottom gradient */}
       <LinearGradient
-        colors={["transparent", "rgba(10,5,2,0.78)"]}
-        locations={[0.25, 1]}
+        colors={["transparent", "rgba(10,5,2,0.85)"]}
+        locations={[0.32, 1]}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
+
+      {/* Remove × */}
       <Pressable
-        style={chip.removeBtn}
+        style={sc.removeBtn}
         onPress={(e) => { e.stopPropagation?.(); onRemove(item.id); }}
         hitSlop={8}
       >
-        <Feather name="x" size={9} color="rgba(255,255,255,0.9)" />
+        <Feather name="x" size={9} color="rgba(255,255,255,0.88)" />
       </Pressable>
-      <View style={chip.footer}>
-        <View style={[chip.badge, { borderColor: `${accent}60` }]}>
-          <Text style={[chip.badgeText, { color: accent }]}>{catLabel}</Text>
-        </View>
-        <Text style={chip.name} numberOfLines={2}>{item.titulo}</Text>
+
+      {/* Footer */}
+      <View style={sc.footer}>
+        <Text style={sc.catLabel} numberOfLines={1}>
+          {CATEGORY_LABEL[item.categoria].toUpperCase()}
+        </Text>
+        <Text style={sc.name} numberOfLines={2}>{item.titulo}</Text>
       </View>
     </Pressable>
   );
 }
 
-const chip = StyleSheet.create({
+const sc = StyleSheet.create({
   card: {
-    width: 112,
-    height: 148,
-    borderRadius: 14,
+    borderRadius: 16,
     overflow: "hidden",
-    backgroundColor: C.sand,
+    backgroundColor: "#1C1410",
     marginRight: 10,
     justifyContent: "flex-end",
   },
-  image: {
-    ...StyleSheet.absoluteFillObject,
-    resizeMode: "cover",
-  } as any,
   removeBtn: {
     position: "absolute",
-    top: 6,
-    right: 6,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: "rgba(10,5,2,0.50)",
+    top: 8,
+    right: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "rgba(10,5,2,0.55)",
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
   },
   footer: {
-    padding: 9,
-    gap: 4,
+    padding: 10,
+    gap: 3,
   },
-  badge: {
-    alignSelf: "flex-start",
-    borderWidth: 1,
-    borderRadius: 4,
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    backgroundColor: "rgba(10,5,2,0.32)",
-  },
-  badgeText: {
+  catLabel: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 8,
-    letterSpacing: 0.4,
-    textTransform: "uppercase",
+    color: GOLD,
+    letterSpacing: 1.2,
   },
   name: {
     fontFamily: "PlayfairDisplay_600SemiBold",
@@ -306,33 +344,59 @@ function SavedSection({
   onRemove: (id: string) => void;
 }) {
   return (
-    <View style={saved_s.wrap}>
-      <Text style={saved_s.label}>
-        {saved.length === 1 ? "1 lugar salvo" : `${saved.length} lugares salvos`}
-      </Text>
+    <View style={ss.wrap}>
+      {/* Section label */}
+      <View style={ss.labelRow}>
+        <Text style={ss.label}>
+          {saved.length === 1 ? "1 lugar salvo" : `${saved.length} lugares salvos`}
+        </Text>
+        <View style={ss.dot} />
+        <Text style={ss.sublabel}>toque para ver</Text>
+      </View>
+
+      {/* Horizontal scroll */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={saved_s.scroll}
+        contentContainerStyle={ss.scroll}
+        decelerationRate="fast"
       >
         {saved.map((item) => (
-          <SavedChip key={item.id} item={item} onRemove={onRemove} />
+          <SavedCard key={item.id} item={item} onRemove={onRemove} />
         ))}
       </ScrollView>
     </View>
   );
 }
 
-const saved_s = StyleSheet.create({
+const ss = StyleSheet.create({
   wrap: {
     gap: 12,
+    marginBottom: 4,
+  },
+  labelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   label: {
-    fontFamily: "Inter_500Medium",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    color: C.darkBrown,
+    letterSpacing: 1.4,
+    textTransform: "uppercase",
+  },
+  dot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: C.warmGray,
+    opacity: 0.5,
+  },
+  sublabel: {
+    fontFamily: "Inter_400Regular",
     fontSize: 11,
     color: C.warmGray,
-    letterSpacing: 1.5,
-    textTransform: "uppercase",
   },
   scroll: {
     paddingRight: 8,
@@ -340,52 +404,65 @@ const saved_s = StyleSheet.create({
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Empty hint — minimal, actions are already prominent above
+// Empty hint — minimal, elegant, space-efficient
 // ─────────────────────────────────────────────────────────────────────────────
 
 function EmptyHint() {
   return (
-    <View style={hint.wrap}>
-      <View style={hint.iconWrap}>
-        <Feather name="bookmark" size={22} color={C.terracotta} />
+    <View style={eh.wrap}>
+      <View style={eh.iconRing}>
+        <Feather name="bookmark" size={20} color={C.terracotta} />
       </View>
-      <Text style={hint.text}>
-        Toque no{" "}
-        <Text style={hint.bold}>marcador</Text>
-        {" "}em qualquer cartão para guardar lugares aqui.
-      </Text>
+      <View style={eh.body}>
+        <Text style={eh.title}>Nenhum lugar salvo ainda</Text>
+        <Text style={eh.desc}>
+          Toque no{" "}
+          <Text style={eh.bold}>marcador</Text>
+          {" "}em qualquer cartão para guardar aqui.
+        </Text>
+      </View>
     </View>
   );
 }
 
-const hint = StyleSheet.create({
+const eh = StyleSheet.create({
   wrap: {
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 12,
+    gap: 14,
     paddingVertical: 20,
-    paddingHorizontal: 16,
-    borderRadius: 14,
-    backgroundColor: "rgba(196,112,74,0.06)",
+    paddingHorizontal: 18,
+    borderRadius: 16,
+    backgroundColor: "rgba(245,240,232,0.68)",
     borderWidth: 1,
-    borderColor: "rgba(196,112,74,0.12)",
+    borderColor: "rgba(196,112,74,0.14)",
   },
-  iconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  iconRing: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: "rgba(196,112,74,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(196,112,74,0.18)",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 1,
     flexShrink: 0,
+    marginTop: 2,
   },
-  text: {
+  body: {
     flex: 1,
-    fontFamily: "Inter_400Regular",
+    gap: 4,
+  },
+  title: {
+    fontFamily: "Inter_600SemiBold",
     fontSize: 14,
+    color: C.darkBrown,
+  },
+  desc: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
     color: C.warmGray,
-    lineHeight: 22,
+    lineHeight: 20,
   },
   bold: {
     fontFamily: "Inter_600SemiBold",
@@ -394,7 +471,7 @@ const hint = StyleSheet.create({
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Roteiro section — DIA 1 – Bairro structure, shown below saved chips
+// Roteiro Base — glass cards, day-by-day timetable
 // ─────────────────────────────────────────────────────────────────────────────
 
 function PeriodoBlock({ periodo, items }: DiaPeriodo) {
@@ -403,7 +480,7 @@ function PeriodoBlock({ periodo, items }: DiaPeriodo) {
   return (
     <View style={rot.periodoWrap}>
       <View style={rot.periodoHeader}>
-        <Feather name={icon} size={11} color={C.terracotta} />
+        <Feather name={icon} size={10} color={C.terracotta} />
         <Text style={rot.periodoLabel}>{label}</Text>
       </View>
       {items.map((item) => (
@@ -419,16 +496,11 @@ function PeriodoBlock({ periodo, items }: DiaPeriodo) {
 function DiaCard({ dia }: { dia: DiaRoteiro }) {
   return (
     <View style={rot.diaCard}>
-      {/* Day header */}
       <View style={rot.diaHeader}>
-        <Text style={rot.diaNome}>
-          <Text style={rot.diaNum}>DIA {dia.numero}</Text>
-          {"  "}
-          <Text style={rot.diaBairro}>{dia.bairro}</Text>
-        </Text>
+        <Text style={rot.diaNum}>DIA {dia.numero}</Text>
+        <Text style={rot.diaBairro}>{dia.bairro}</Text>
       </View>
-      <View style={rot.diaLine} />
-      {/* Periodos */}
+      <View style={rot.separator} />
       {dia.periodos.map((p) => (
         <PeriodoBlock key={p.periodo} {...p} />
       ))}
@@ -440,7 +512,12 @@ function RoteiroSection({ dias }: { dias: DiaRoteiro[] }) {
   if (dias.length === 0) return null;
   return (
     <View style={rot.wrap}>
-      <Text style={rot.sectionLabel}>Roteiro Base</Text>
+      <View style={rot.titleRow}>
+        <Text style={rot.sectionLabel}>Roteiro Base</Text>
+        <View style={rot.pill}>
+          <Text style={rot.pillText}>{dias.length} {dias.length === 1 ? "dia" : "dias"}</Text>
+        </View>
+      </View>
       {dias.map((dia) => (
         <DiaCard key={dia.bairro} dia={dia} />
       ))}
@@ -451,61 +528,78 @@ function RoteiroSection({ dias }: { dias: DiaRoteiro[] }) {
 const rot = StyleSheet.create({
   wrap: {
     marginTop: 28,
-    gap: 12,
+    gap: 10,
+  },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
   sectionLabel: {
-    fontFamily: "Inter_500Medium",
+    fontFamily: "Inter_600SemiBold",
     fontSize: 11,
-    color: C.warmGray,
-    letterSpacing: 1.5,
+    color: C.darkBrown,
+    letterSpacing: 1.4,
     textTransform: "uppercase",
+  },
+  pill: {
+    backgroundColor: "rgba(196,112,74,0.10)",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: "rgba(196,112,74,0.16)",
+  },
+  pillText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 10,
+    color: C.terracotta,
   },
   diaCard: {
     borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.60)",
+    backgroundColor: "rgba(245,240,232,0.78)",
     borderWidth: 1,
-    borderColor: "rgba(196,112,74,0.14)",
+    borderColor: "rgba(196,112,74,0.12)",
     paddingHorizontal: 18,
     paddingVertical: 16,
-    gap: 0,
+    boxShadow: `0px 2px 12px rgba(10,5,2,0.06)`,
   },
   diaHeader: {
     marginBottom: 10,
-  },
-  diaNome: {
-    fontSize: 15,
+    gap: 1,
   },
   diaNum: {
     fontFamily: "Inter_700Bold",
-    fontSize: 11,
+    fontSize: 10,
     color: C.terracotta,
-    letterSpacing: 1.4,
+    letterSpacing: 1.6,
     textTransform: "uppercase",
   },
   diaBairro: {
     fontFamily: "PlayfairDisplay_600SemiBold",
-    fontSize: 18,
+    fontSize: 20,
     color: C.darkBrown,
+    lineHeight: 26,
   },
-  diaLine: {
+  separator: {
     height: 1,
     backgroundColor: "rgba(196,112,74,0.12)",
     marginBottom: 12,
   },
   periodoWrap: {
-    marginBottom: 12,
+    marginBottom: 10,
   },
   periodoHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    marginBottom: 6,
+    marginBottom: 5,
   },
   periodoLabel: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 10,
+    fontSize: 9,
     color: C.terracotta,
-    letterSpacing: 1.2,
+    letterSpacing: 1.4,
     textTransform: "uppercase",
   },
   itemRow: {
@@ -519,7 +613,7 @@ const rot = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: C.warmGray,
-    opacity: 0.5,
+    opacity: 0.45,
     flexShrink: 0,
   },
   itemNome: {
@@ -536,7 +630,7 @@ const rot = StyleSheet.create({
 
 export default function MinhaViagemScreen() {
   const insets    = useSafeAreaInsets();
-  const topPad    = Platform.OS === "web" ? 67 : insets.top + 16;
+  const topPad    = Platform.OS === "web" ? 67 : insets.top + 12;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
   const { saved, unsave } = useGuia();
@@ -547,25 +641,25 @@ export default function MinhaViagemScreen() {
   return (
     <View style={s.root}>
 
-      {/* ── Rotating blurred background (only when saved places exist) ── */}
-      {bgImages.length > 0 && <RotatingBackground images={bgImages} />}
+      {/* ── Ambient background — always present ── */}
+      <SceneBackground images={bgImages} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           s.content,
-          { paddingTop: topPad + 8, paddingBottom: bottomPad + 80 },
+          { paddingTop: topPad + 8, paddingBottom: bottomPad + 90 },
         ]}
       >
 
         {/* ── Header ── */}
         <View style={s.header}>
-          <Text style={s.eyebrow}>Viagem</Text>
+          <Text style={s.eyebrow}>VIAGEM</Text>
           <View style={s.titleRow}>
             <Text style={s.title}>Minha Viagem</Text>
             {totalSaved > 0 && (
-              <View style={s.badge}>
-                <Text style={s.badgeText}>{totalSaved}</Text>
+              <View style={s.countBadge}>
+                <Text style={s.countText}>{totalSaved}</Text>
               </View>
             )}
           </View>
@@ -573,25 +667,25 @@ export default function MinhaViagemScreen() {
             {totalSaved === 0
               ? "Suas ideias salvas para a próxima viagem"
               : totalSaved === 1
-                ? "1 lugar salvo"
-                : `${totalSaved} lugares salvos`}
+                ? "1 lugar salvo · Rio de Janeiro"
+                : `${totalSaved} lugares salvos · Rio de Janeiro`}
           </Text>
         </View>
 
-        {/* ── Divider ── */}
-        <View style={s.divider} />
+        {/* ── Thin rule ── */}
+        <View style={s.rule} />
 
-        {/* ── Actions — always at top, always visible ── */}
+        {/* ── Actions (social chips → AI CTA) ── */}
         <ActionArea />
 
-        {/* ── Saved chips or empty hint ── */}
+        {/* ── Saved places or empty hint ── */}
         {totalSaved > 0 ? (
           <SavedSection saved={saved} onRemove={unsave} />
         ) : (
           <EmptyHint />
         )}
 
-        {/* ── Base itinerary (roteiro) — only when groupable items exist ── */}
+        {/* ── Roteiro Base ── */}
         <RoteiroSection dias={dias} />
 
       </ScrollView>
@@ -600,27 +694,28 @@ export default function MinhaViagemScreen() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Screen-level styles
+// Screen styles
 // ─────────────────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: C.cream,
+    backgroundColor: "#100A06",
   },
   content: {
     paddingHorizontal: 24,
   },
+
+  // Header
   header: {
-    gap: 6,
-    marginBottom: 24,
+    gap: 5,
+    marginBottom: 22,
   },
   eyebrow: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
     color: C.terracotta,
-    letterSpacing: 2,
-    textTransform: "uppercase",
+    letterSpacing: 2.5,
   },
   titleRow: {
     flexDirection: "row",
@@ -629,31 +724,36 @@ const s = StyleSheet.create({
   },
   title: {
     fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 34,
+    fontSize: 36,
     color: C.darkBrown,
-    lineHeight: 40,
+    lineHeight: 42,
   },
-  badge: {
+  countBadge: {
     backgroundColor: C.terracotta,
     borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    minWidth: 28,
+    height: 28,
+    paddingHorizontal: 9,
+    alignItems: "center",
+    justifyContent: "center",
     marginTop: 4,
   },
-  badgeText: {
+  countText: {
     fontFamily: "Inter_700Bold",
-    fontSize: 14,
+    fontSize: 13,
     color: C.white,
   },
   subtitle: {
     fontFamily: "Inter_400Regular",
-    fontSize: 14,
+    fontSize: 13.5,
     color: C.warmGray,
     lineHeight: 20,
   },
-  divider: {
+
+  // Divider
+  rule: {
     height: 1,
-    backgroundColor: C.border,
-    marginBottom: 24,
+    backgroundColor: "rgba(196,112,74,0.14)",
+    marginBottom: 22,
   },
 });
