@@ -15,6 +15,7 @@
 
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   Platform,
   Pressable,
@@ -30,6 +31,7 @@ import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useGuia } from "@/context/GuiaContext";
 import type { SavedCategory } from "@/context/GuiaContext";
+import { supabase } from "@/lib/supabase";
 import {
   buildItinerary,
   type Inspiration,
@@ -715,18 +717,21 @@ function ScreenHeader({
   phase,
   onBack,
 }: {
-  phase: "setup" | "result";
+  phase: "setup" | "result" | "loading";
   onBack: () => void;
 }) {
+  const title =
+    phase === "result"  ? "Seu Roteiro"   :
+    phase === "loading" ? "Criando…"      :
+    "Criar Roteiro";
+
   return (
     <View style={hdr.wrap}>
       <Pressable style={hdr.back} onPress={onBack} hitSlop={8}>
         <Feather name="arrow-left" size={20} color={C.darkBrown} />
       </Pressable>
       <View style={hdr.center}>
-        <Text style={hdr.title}>
-          {phase === "setup" ? "Criar Roteiro" : "Seu Roteiro"}
-        </Text>
+        <Text style={hdr.title}>{title}</Text>
         <Text style={hdr.sub}>Rio de Janeiro</Text>
       </View>
       <View style={hdr.spacer} />
@@ -788,7 +793,8 @@ export default function RoteiroScreen() {
   const [vibe, setVibe]                 = useState<Vibe | null>("moderado");
 
   // Result state — null = setup phase, defined = result phase
-  const [result, setResult] = useState<ItineraryResult | null>(null);
+  const [result, setResult]     = useState<ItineraryResult | null>(null);
+  const [generating, setGenerating] = useState(false);
 
   // Category counts for the summary card
   const categoryCounts = saved.reduce<Record<SavedCategory, number>>(
@@ -805,9 +811,56 @@ export default function RoteiroScreen() {
     );
   }
 
-  function handleGenerate() {
-    const prefs: ItineraryPreferences = { inspirations, vibe };
-    setResult(buildItinerary(saved, prefs));
+  async function handleGenerate() {
+    if (generating) return;
+    setGenerating(true);
+
+    try {
+      // Serialize saved items — image objects are not JSON-safe, so we
+      // send only the plain fields and re-hydrate the result on the way back.
+      const serializableItems = saved.map((s) => ({
+        id:          s.id,
+        titulo:      s.titulo,
+        categoria:   s.categoria,
+        localizacao: s.localizacao,
+      }));
+
+      const { data, error } = await supabase.functions.invoke("lucky-trip-ai", {
+        body: {
+          savedItems:  serializableItems,
+          destination: "Rio de Janeiro",
+          preferences: { inspirations, vibe },
+        },
+      });
+
+      if (error || !data?.days) throw new Error(error?.message ?? "empty response");
+
+      // Re-hydrate each returned item with the original SavedItem (incl. image)
+      const savedMap = new Map(saved.map((s) => [s.id, s]));
+      const hydratedDays: DiaRoteiro[] = (data.days as DiaRoteiro[]).map((day) => ({
+        ...day,
+        periodos: day.periodos.map((p) => ({
+          ...p,
+          items: p.items
+            .map((item) => savedMap.get(item.id) ?? item)
+            .filter(Boolean),
+        })),
+      }));
+
+      setResult({
+        destination: data.destination ?? "Rio de Janeiro",
+        source:      "trip_saved_places",
+        preferences: { inspirations, vibe },
+        summary:     data.summary,
+        days:        hydratedDays,
+      });
+    } catch (_) {
+      // Graceful fallback — run locally if the edge function is unavailable
+      const prefs: ItineraryPreferences = { inspirations, vibe };
+      setResult(buildItinerary(saved, prefs));
+    } finally {
+      setGenerating(false);
+    }
   }
 
   function handleBack() {
@@ -818,7 +871,8 @@ export default function RoteiroScreen() {
     }
   }
 
-  const phase: "setup" | "result" = result ? "result" : "setup";
+  const phase: "setup" | "result" | "loading" =
+    generating ? "loading" : result ? "result" : "setup";
 
   return (
     <View style={sc.root}>
@@ -829,27 +883,35 @@ export default function RoteiroScreen() {
         <ScreenHeader phase={phase} onBack={handleBack} />
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          sc.content,
-          { paddingBottom: bottomPad + 40 },
-        ]}
-      >
-        {phase === "setup" ? (
-          <SetupPhase
-            savedCount={saved.length}
-            categoryCounts={categoryCounts}
-            inspirations={inspirations}
-            vibe={vibe}
-            onToggleInspiration={handleToggleInspiration}
-            onSetVibe={setVibe}
-            onGenerate={handleGenerate}
-          />
-        ) : (
-          <ResultPhase result={result!} onReset={() => setResult(null)} />
-        )}
-      </ScrollView>
+      {phase === "loading" ? (
+        <View style={sc.loadingWrap}>
+          <ActivityIndicator size="large" color={GOLD} />
+          <Text style={sc.loadingText}>Gerando roteiro com IA…</Text>
+          <Text style={sc.loadingSubText}>Isso pode levar alguns segundos</Text>
+        </View>
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
+            sc.content,
+            { paddingBottom: bottomPad + 40 },
+          ]}
+        >
+          {phase === "setup" ? (
+            <SetupPhase
+              savedCount={saved.length}
+              categoryCounts={categoryCounts}
+              inspirations={inspirations}
+              vibe={vibe}
+              onToggleInspiration={handleToggleInspiration}
+              onSetVibe={setVibe}
+              onGenerate={handleGenerate}
+            />
+          ) : (
+            <ResultPhase result={result!} onReset={() => setResult(null)} />
+          )}
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -862,5 +924,24 @@ const sc = StyleSheet.create({
   content: {
     paddingHorizontal: 24,
     paddingTop: 24,
+  },
+  loadingWrap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 14,
+    paddingHorizontal: 40,
+  },
+  loadingText: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 18,
+    color: C.darkBrown,
+    textAlign: "center",
+  },
+  loadingSubText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: C.warmGray,
+    textAlign: "center",
   },
 });
