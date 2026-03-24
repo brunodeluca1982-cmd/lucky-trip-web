@@ -74,17 +74,19 @@ function buildLeafletHTML(
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body, #map { width: 100%; height: 100%; background: #12100E; }
+    html, body, #map { width: 100%; height: 100%; background: #E8E2D8; }
 
     /*
-     * VISUAL ADJUSTMENT — lighter, less-heavy dark map:
-     * brightness(1.62) lifts the almost-black tiles to a dark charcoal.
-     * contrast(0.74) softens harsh dark/light boundaries.
-     * saturate(0.82) keeps colour but removes oversaturation of water/green.
-     * No additional dark overlay is placed on top of the tiles.
+     * voyager_nolabels tiles: natural cartographic colors (blue water, green parks,
+     * warm beige roads) with zero built-in text labels — our custom markers are
+     * the only labels on the map.
+     *
+     * Subtle filter: slightly reduce saturation for a premium editorial tone,
+     * very gentle contrast reduction to soften the tile rendering.
+     * No heavy overlay; no dark wash.
      */
     .leaflet-layer {
-      filter: brightness(1.62) contrast(0.74) saturate(0.82);
+      filter: saturate(0.78) contrast(0.92) brightness(1.04);
     }
 
     .neigh-marker {
@@ -93,49 +95,69 @@ function buildLeafletHTML(
       align-items: center;
       cursor: pointer;
     }
+
+    /* Dots — terracotta with a white halo so they pop on the light map */
     .neigh-dot {
       width: 10px; height: 10px;
       border-radius: 50%;
       background: #C4704A;
-      border: 2px solid rgba(255,255,255,0.5);
+      border: 2px solid #fff;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.30);
       transition: transform 0.15s, box-shadow 0.15s;
     }
     .neigh-dot.selected {
-      background: #E88C5A;
-      box-shadow: 0 0 0 4px rgba(196,112,74,0.35);
-      transform: scale(1.4);
+      background: #C4704A;
+      border-color: #fff;
+      box-shadow: 0 0 0 4px rgba(196,112,74,0.30), 0 1px 6px rgba(0,0,0,0.35);
+      transform: scale(1.45);
     }
+    /* Visual-only landmarks: smaller, muted dot */
     .neigh-dot.visual {
-      background: rgba(255,255,255,0.2);
-      border-color: rgba(255,255,255,0.25);
+      width: 7px; height: 7px;
+      background: rgba(100,85,70,0.45);
+      border: 1.5px solid rgba(100,85,70,0.55);
+      box-shadow: none;
     }
+
+    /* Labels — dark text on light map, white halo for legibility */
     .neigh-label {
       margin-top: 4px;
       font-family: -apple-system, 'Inter', sans-serif;
       font-size: 10px;
       font-weight: 600;
-      color: rgba(255,255,255,0.85);
+      color: rgba(30,18,10,0.88);
       white-space: nowrap;
-      letter-spacing: 0.2px;
-      text-shadow: 0 1px 3px rgba(0,0,0,0.85), 0 0 6px rgba(0,0,0,0.55);
+      letter-spacing: 0.15px;
+      text-shadow:
+        0 0 4px rgba(255,255,255,0.95),
+        0 0 8px rgba(255,255,255,0.80),
+        1px 1px 0 rgba(255,255,255,0.70),
+        -1px -1px 0 rgba(255,255,255,0.70);
       pointer-events: none;
     }
     .neigh-label.selected {
-      color: #F0A070;
+      color: #9E3D1A;
+      font-weight: 700;
     }
+    /* Landmark labels — italic, smaller, muted brown */
     .neigh-label.visual {
-      color: rgba(255,255,255,0.38);
+      font-size: 9px;
       font-weight: 400;
+      font-style: italic;
+      color: rgba(60,45,30,0.60);
+      text-shadow:
+        0 0 4px rgba(255,255,255,0.90),
+        0 0 8px rgba(255,255,255,0.70);
     }
 
-    /* Leaflet chrome — lighter to match the brighter map */
-    .leaflet-control-attribution { font-size: 8px; opacity: 0.30; }
+    /* Leaflet chrome — clean white buttons to match the light map */
+    .leaflet-control-attribution { font-size: 8px; opacity: 0.28; }
     .leaflet-bar a {
-      background: rgba(22,15,10,0.80);
-      color: rgba(255,255,255,0.72);
-      border-color: rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.88);
+      color: rgba(40,28,18,0.80);
+      border-color: rgba(180,160,140,0.40);
     }
-    .leaflet-bar a:hover { background: rgba(44,28,18,0.88); }
+    .leaflet-bar a:hover { background: rgba(255,255,255,1); }
   </style>
 </head>
 <body>
@@ -151,8 +173,12 @@ function buildLeafletHTML(
       attributionControl: true,
     });
 
-    // CartoDB dark_all — full labels, dark base; CSS filter lightens globally
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    /*
+     * voyager_nolabels — CartoDB Voyager style with NO built-in text labels.
+     * All map text you see comes exclusively from our custom markers below.
+     * Natural colors: blue Atlantic, green Tijuca forest, warm beige city fabric.
+     */
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://openstreetmap.org/copyright">OSM</a>',
       subdomains: 'abcd',
       maxZoom: 19,
@@ -228,7 +254,7 @@ function RioMapViewWeb({ selectedNeighborhood, onNeighborhoodPress, style }: Map
         key={selectedNeighborhood}
         ref={iframeRef as any}
         srcDoc={html}
-        style={{ width: "100%", height: "100%", border: "none", background: "#12100E" } as any}
+        style={{ width: "100%", height: "100%", border: "none", background: "#E8E2D8" } as any}
         title="Mapa do Rio de Janeiro"
       />
     </View>
