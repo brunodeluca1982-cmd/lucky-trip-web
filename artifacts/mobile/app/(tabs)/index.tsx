@@ -179,10 +179,10 @@ export default function HomeScreen() {
     <View style={s.root}>
       {/* Fullscreen background image — persists behind all content */}
       <Image source={BG_IMAGE} style={s.bgImage} resizeMode="cover" />
-      {/* Dark overlay to ensure legibility everywhere */}
+      {/* Editorial overlay — permeable enough that the photo reads as a surface, not black */}
       <LinearGradient
-        colors={["rgba(10,5,2,0.72)", "rgba(10,5,2,0.88)", "#0A0502"]}
-        locations={[0, 0.35, 0.65]}
+        colors={["rgba(10,5,2,0.38)", "rgba(10,5,2,0.50)", "rgba(10,5,2,0.58)"]}
+        locations={[0, 0.40, 1]}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
@@ -198,11 +198,11 @@ export default function HomeScreen() {
         {/* ── 1. HERO CAROUSEL ── */}
         <HeroCarousel items={heroDestinos} />
 
-        {/* ── Hero → content gradient bridge — overlaps hero bottom, fades to bg ── */}
+        {/* ── Bleed: softens the hard dark bottom of the hero into the content below ── */}
         <LinearGradient
-          colors={["transparent", "rgba(10,5,2,0.78)", "#0A0502"]}
-          locations={[0, 0.62, 1]}
-          style={{ height: 96, marginTop: -96, pointerEvents: "none" }}
+          colors={["rgba(0,0,0,0.58)", "rgba(10,5,2,0.18)", "transparent"]}
+          locations={[0, 0.55, 1]}
+          style={{ height: 80, marginTop: -80, pointerEvents: "none" }}
         />
 
         {/* ── 2. DESTAQUES ── */}
@@ -405,7 +405,7 @@ const s = StyleSheet.create({
     width: "100%",
     height: "100%",
     resizeMode: "cover",
-    opacity: 0.18,
+    opacity: 0.58,
   },
 
   scroll: {
