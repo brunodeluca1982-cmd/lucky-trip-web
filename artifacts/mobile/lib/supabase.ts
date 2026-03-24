@@ -25,6 +25,24 @@ export type Hotel = {
   display_order: number;
 };
 
+export type Restaurante = {
+  id: number;
+  nome: string;
+  bairro: string;
+  categoria: string;
+  especialidade: string | null;
+  perfil_publico: string | null;
+  meu_olhar: string;
+  preco_nivel: number;
+  instagram: string | null;
+  google_maps_url: string | null;
+  photo_url: string | null;
+  ativo: boolean;
+  ordem_bairro: number;
+  /** Resolved image URI — photo_url → place_photos fallback → null */
+  resolvedPhotoUri: string | null;
+};
+
 export type Neighborhood = {
   id: string;
   neighborhood_name: string;

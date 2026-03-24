@@ -25,7 +25,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { destinos } from "@/data/mockData";
-import { LUGARES_COMER } from "@/data/lugares";
+import { useRestaurants } from "@/hooks/useRestaurants";
 import RioMapView from "@/components/RioMapView";
 
 const C = Colors.light;
@@ -105,14 +105,15 @@ export default function ComerBemScreen() {
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
   const destino = destinos.find((d) => d.id === id) ?? destinos[0];
-  const allLugares = LUGARES_COMER[destino.id] ?? [];
   const descricao = DESCRICOES[destino.id] ?? DEFAULT_DESCRICAO;
+
+  const { restaurantes: allRestaurantes, loading, error } = useRestaurants(destino.id);
 
   const [selected, setSelected] = useState<string | null>(null);
 
   const lugares = selected
-    ? allLugares.filter((p) => p.localizacao === selected)
-    : allLugares;
+    ? allRestaurantes.filter((r) => r.bairro === selected)
+    : allRestaurantes;
 
   const cardAnim = useRef(new Animated.Value(0)).current;
   const prevSelected = useRef<string | null>(null);
@@ -176,7 +177,9 @@ export default function ComerBemScreen() {
             <Text style={s.pillText}>
               {selected
                 ? `${lugares.length} restaurante${lugares.length !== 1 ? "s" : ""}`
-                : `${allLugares.length} locais`}
+                : loading
+                ? "carregando..."
+                : `${allRestaurantes.length} locais`}
             </Text>
           </View>
         </View>
@@ -238,7 +241,9 @@ export default function ComerBemScreen() {
             <View style={s.introMeta}>
               <View style={s.introDot} />
               <Text style={s.introMetaText}>
-                Seleção curada · {lugares.length} restaurante{lugares.length !== 1 ? "s" : ""}
+                {loading
+                  ? "Carregando seleção…"
+                  : `Seleção curada · ${lugares.length} restaurante${lugares.length !== 1 ? "s" : ""}`}
               </Text>
             </View>
           </View>
@@ -259,7 +264,25 @@ export default function ComerBemScreen() {
             <Text key={i} style={s.descPara}>{para}</Text>
           ))}
 
-          {lugares.length === 0 && selected && (
+          {/* Loading state */}
+          {loading && (
+            <View style={s.centerWrap}>
+              <Feather name="coffee" size={18} color="rgba(255,255,255,0.10)" />
+              <Text style={s.emptyText}>Carregando restaurantes…</Text>
+            </View>
+          )}
+
+          {/* Error state */}
+          {!loading && error && (
+            <View style={s.centerWrap}>
+              <Feather name="alert-circle" size={18} color="rgba(255,255,255,0.10)" />
+              <Text style={s.emptyTitle}>Erro ao carregar</Text>
+              <Text style={s.emptyText}>{error}</Text>
+            </View>
+          )}
+
+          {/* Empty neighborhood filter state */}
+          {!loading && !error && lugares.length === 0 && selected && (
             <View style={s.centerWrap}>
               <Feather name="map-pin" size={18} color="rgba(255,255,255,0.10)" />
               <Text style={s.emptyTitle}>Nenhum restaurante em {selected}</Text>
@@ -267,58 +290,69 @@ export default function ComerBemScreen() {
             </View>
           )}
 
-          {lugares.map((place, index) => (
-            <Pressable
-              key={place.id}
-              style={s.card}
-              onPress={() => router.push(`/lugar/${destino.id}/${place.id}`)}
-            >
-              <View style={s.cardImageWrap}>
-                <Image source={place.image} style={s.cardImage} resizeMode="cover" />
-                <LinearGradient
-                  colors={["rgba(0,0,0,0.12)", "transparent"]}
-                  locations={[0, 0.4]}
-                  style={StyleSheet.absoluteFill}
-                />
-                <View style={s.bookmarkBtn}>
-                  <Feather name="bookmark" size={15} color={C.white} />
-                </View>
-                {place.preco && (
-                  <View style={s.priceBadge}>
-                    <Text style={s.priceText}>{place.preco}</Text>
-                  </View>
-                )}
-                <View style={s.orderBadge}>
-                  <Text style={s.orderText}>{String(index + 1).padStart(2, "0")}</Text>
-                </View>
-              </View>
+          {/* Restaurant cards */}
+          {!loading && !error && lugares.map((r, index) => {
+            const precoStr = "€".repeat(Math.max(1, Math.min(4, r.preco_nivel)));
+            const imageSource = r.resolvedPhotoUri
+              ? { uri: r.resolvedPhotoUri }
+              : require("../../assets/images/restaurante1.png");
 
-              <View style={s.cardBody}>
-                <View style={s.cardMeta}>
-                  <Text style={s.cardCategoria}>{place.categoria}</Text>
-                  <View style={s.cardLocWrap}>
-                    <Feather name="map-pin" size={10} color={C.warmGray} />
-                    <Text style={s.cardLocText}>{place.localizacao}</Text>
+            return (
+              <Pressable
+                key={r.id}
+                style={s.card}
+                onPress={() =>
+                  router.push({
+                    pathname: "/lugar/[cityId]/[placeId]",
+                    params: { cityId: destino.id, placeId: String(r.id) },
+                  })
+                }
+              >
+                <View style={s.cardImageWrap}>
+                  <Image source={imageSource} style={s.cardImage} resizeMode="cover" />
+                  <LinearGradient
+                    colors={["rgba(0,0,0,0.12)", "transparent"]}
+                    locations={[0, 0.4]}
+                    style={StyleSheet.absoluteFill}
+                  />
+                  <View style={s.bookmarkBtn}>
+                    <Feather name="bookmark" size={15} color={C.white} />
+                  </View>
+                  <View style={s.priceBadge}>
+                    <Text style={s.priceText}>{precoStr}</Text>
+                  </View>
+                  <View style={s.orderBadge}>
+                    <Text style={s.orderText}>{String(index + 1).padStart(2, "0")}</Text>
                   </View>
                 </View>
-                <Text style={s.cardTitulo}>{place.titulo}</Text>
-                <Text style={s.cardDesc}>{place.descricao}</Text>
-                <Pressable
-                  style={s.verNoMapaBtn}
-                  onPress={(e) => {
-                    e.stopPropagation?.();
-                    router.push({
-                      pathname: "/lugar/[cityId]/[placeId]",
-                      params: { cityId: destino.id, placeId: place.id, showMap: "true" },
-                    });
-                  }}
-                >
-                  <Feather name="map-pin" size={13} color={C.terracotta} />
-                  <Text style={s.verNoMapaText}>Ver no mapa</Text>
-                </Pressable>
-              </View>
-            </Pressable>
-          ))}
+
+                <View style={s.cardBody}>
+                  <View style={s.cardMeta}>
+                    <Text style={s.cardCategoria}>{r.categoria.toUpperCase()}</Text>
+                    <View style={s.cardLocWrap}>
+                      <Feather name="map-pin" size={10} color={C.warmGray} />
+                      <Text style={s.cardLocText}>{r.bairro}</Text>
+                    </View>
+                  </View>
+                  <Text style={s.cardTitulo}>{r.nome}</Text>
+                  <Text style={s.cardDesc}>{r.meu_olhar}</Text>
+                  <Pressable
+                    style={s.verNoMapaBtn}
+                    onPress={(e) => {
+                      e.stopPropagation?.();
+                      router.push({
+                        pathname: "/lugar/[cityId]/[placeId]",
+                        params: { cityId: destino.id, placeId: String(r.id), showMap: "true" },
+                      });
+                    }}
+                  >
+                    <Feather name="map-pin" size={13} color={C.terracotta} />
+                    <Text style={s.verNoMapaText}>Ver no mapa</Text>
+                  </Pressable>
+                </View>
+              </Pressable>
+            );
+          })}
         </View>
 
         <View style={s.footer}>
