@@ -74,16 +74,18 @@ function buildLeafletHTML(
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; background: #0C0804; }
+    html, body { width: 100%; height: 100%; background: #0D1117; }
     #map { width: 100%; height: 100%; }
 
     /*
-     * Tile layer: voyager_nolabels — natural cartographic colors, zero built-in
-     * text labels. Subtle filter: desaturate slightly (premium tone) + very faint
-     * blur so tiles read as a background canvas, not a tool interface.
+     * Tile layer: Esri World Imagery — true satellite imagery.
+     * Real city texture: buildings, beaches, Tijuca forest, ocean depth.
+     * Very gentle filter: slight brightness pull-back + minimal softening blur
+     * so it reads as a cinematic backdrop, not a sharp Google Maps screenshot.
+     * No desaturation — all natural satellite colors are preserved.
      */
     .leaflet-tile-pane {
-      filter: saturate(0.72) brightness(0.98) blur(0.55px);
+      filter: brightness(0.96) contrast(0.94) blur(0.45px);
     }
 
     /*
@@ -194,13 +196,13 @@ function buildLeafletHTML(
     });
 
     /*
-     * voyager_nolabels — CartoDB Voyager with NO built-in text labels.
-     * Natural colors: blue Atlantic, green Tijuca, warm beige city fabric.
-     * All visible text comes only from our 14 custom markers below.
+     * Esri World Imagery — true satellite/aerial photography.
+     * Shows the real Rio: Tijuca rainforest (deep green), Atlantic (dark blue),
+     * beaches (sand strip), Lagoa Rodrigo de Freitas (lake), city fabric.
+     * No built-in text labels — all visible labels come only from our custom markers.
      */
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://openstreetmap.org/copyright">OSM</a>',
-      subdomains: 'abcd',
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles &copy; Esri &mdash; Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP',
       maxZoom: 19,
     }).addTo(map);
 
