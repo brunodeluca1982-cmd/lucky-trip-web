@@ -3,20 +3,26 @@
  *
  * Priority chain (strict, never skipped):
  *   1. Supabase image_url / photo_url  — if set and non-empty, always wins
- *   2. Curated entity-specific web URI — stable Wikipedia Commons permalink
- *   3. Neighborhood-based web URI      — via getNeighborhoodImage(localizacao)
+ *   2. Curated entity-specific web URI — Wikipedia Commons permalink (NATIVE ONLY)
+ *   3. Neighborhood-based image        — via getNeighborhoodImage(localizacao)
+ *      On native: Wikipedia Commons URI for the neighborhood zone.
+ *      On web:    Local bundled .png (CORS-safe, always visible).
  *   4. Local asset fallback            — bundled .png, always available offline
  *
- * Stability guarantee:
- *   - All resolutions are cached in a module-level Map keyed by (type:name:localizacao).
- *   - Same entity → same image on every screen, every render, every session.
- *   - No random images, no variation between renders.
+ * PLATFORM RULE (critical):
+ *   Expo web cannot reliably load external image URIs — Wikipedia Commons
+ *   Special:FilePath URLs involve redirect chains that trigger CORS failures,
+ *   causing the Image component to render nothing (shows card background color).
+ *   On web: all external URI tiers are skipped; local bundled assets are used.
+ *   On native: external URIs work fine — higher quality images are preferred.
  *
- * TEMPORARY: entity-specific images use Wikipedia Commons Special:FilePath links
- * (permanent redirect URLs, guaranteed by Wikipedia policy) until official photos
- * are uploaded to Supabase.
+ * Stability guarantee:
+ *   All resolutions are cached in a module-level Map keyed by
+ *   (type:name:localizacao:platform). Same entity → same image on every
+ *   screen, every render, every session.
  */
 
+import { Platform } from "react-native";
 import {
   getNeighborhoodImage,
   type NeighborhoodImageSource,
@@ -25,18 +31,19 @@ import {
 export type EntityType = "neighborhood" | "restaurant" | "hotel" | "activity" | "city";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Module-level result cache — keyed by "type:name:localizacao"
-// Populated once per entity; subsequent calls return the cached value instantly.
+// Module-level result cache — keyed by "type:name:localizacao:platform"
 // ─────────────────────────────────────────────────────────────────────────────
 const _cache = new Map<string, NeighborhoodImageSource>();
 
 function cacheKey(type: EntityType, name: string, localizacao = ""): string {
-  return `${type}:${name.toLowerCase().trim()}:${localizacao.toLowerCase().trim()}`;
+  return `${type}:${name.toLowerCase().trim()}:${localizacao.toLowerCase().trim()}:${Platform.OS}`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Curated entity images (tier 2)
+// Curated entity web images (NATIVE ONLY — tier 2)
 // Wikipedia Commons Special:FilePath links — deterministic, permanent URLs.
+// Skipped on Expo web (CORS failures make images blank, which is worse than
+// the local neighborhood image fallback).
 // ─────────────────────────────────────────────────────────────────────────────
 
 const RESTAURANT_WEB_IMAGES: Record<string, string> = {
@@ -74,6 +81,27 @@ const CITY_WEB_IMAGES: Record<string, string> = {
   "miami":           "https://commons.wikimedia.org/wiki/Special:FilePath/South_Beach_20080315.jpg",
   "paris":           "https://commons.wikimedia.org/wiki/Special:FilePath/Paris_-_Eiffelturm_und_Marsfeld2.jpg",
   "bali":            "https://commons.wikimedia.org/wiki/Special:FilePath/Tanah_Lot_Bali.jpg",
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Local asset fallbacks for non-Rio cities (WEB — CORS-safe, always visible).
+// Used on Expo web where external URIs fail. These are bundled at build time.
+// ─────────────────────────────────────────────────────────────────────────────
+const CITY_LOCAL_ASSETS: Record<string, NeighborhoodImageSource> = {
+  "rio de janeiro":  require("../assets/images/hero-rio.png"),
+  "santorini":       require("../assets/images/hero-santorini.png"),
+  "kyoto":           require("../assets/images/hero-kyoto.png"),
+  // Non-Rio cities: best available local asset — contextually adjacent in mood
+  "lisboa":          require("../assets/images/lapa.png"),
+  "buenos aires":    require("../assets/images/secret2.png"),
+  "florianopolis":   require("../assets/images/ipanema.png"),
+  "florianópolis":   require("../assets/images/ipanema.png"),
+  "paraty":          require("../assets/images/lapa.png"),
+  "gramado":         require("../assets/images/secret1.png"),
+  "miami":           require("../assets/images/hero-rio.png"),
+  "paris":           require("../assets/images/secret2.png"),
+  "bali":            require("../assets/images/secret1.png"),
+  "ilhabela":        require("../assets/images/ipanema.png"),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -117,28 +145,40 @@ function _resolve(
 ): NeighborhoodImageSource {
   const nameLower = name.toLowerCase().trim();
   const loc = localizacao ?? "";
+  const isNative = Platform.OS !== "web";
 
   switch (type) {
     case "neighborhood":
       return getNeighborhoodImage(name);
 
     case "restaurant": {
-      const uri = RESTAURANT_WEB_IMAGES[nameLower];
-      if (uri) return { uri };
+      // On native: try curated Wikipedia Commons URL first
+      if (isNative) {
+        const uri = RESTAURANT_WEB_IMAGES[nameLower];
+        if (uri) return { uri };
+      }
+      // Web + native fallback: neighborhood local/web image
       return getNeighborhoodImage(loc || name);
     }
 
     case "hotel": {
-      const uri = HOTEL_WEB_IMAGES[nameLower];
-      if (uri) return { uri };
+      if (isNative) {
+        const uri = HOTEL_WEB_IMAGES[nameLower];
+        if (uri) return { uri };
+      }
       return getNeighborhoodImage(loc || name);
     }
 
     case "city": {
-      const uri = CITY_WEB_IMAGES[nameLower];
-      if (uri) return { uri };
-      // Generic city: use the best-matching neighborhood image or hero-rio
-      return getNeighborhoodImage(name);
+      if (isNative) {
+        const uri = CITY_WEB_IMAGES[nameLower];
+        if (uri) return { uri };
+      }
+      // Web: use local bundled city asset (always visible)
+      return (
+        CITY_LOCAL_ASSETS[nameLower] ??
+        require("../assets/images/hero-rio.png")
+      );
     }
 
     case "activity":

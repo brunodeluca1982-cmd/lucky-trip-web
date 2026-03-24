@@ -3,7 +3,7 @@
  *
  * Priority chain for getNeighborhoodHero() (bairro pages):
  *   1. image_url from Supabase  (set by content team in stay_neighborhoods)
- *   2. getRioNeighborhoodImage(name)  ← web URI from this file
+ *   2. getRioNeighborhoodImage(name)  ← this file
  *   3. city destino.image fallback
  *
  * getNeighborhoodImage() is the only place where neighborhood ↔ image is mapped.
@@ -11,23 +11,57 @@
  *
  * Rule: same neighborhood name = same image, everywhere, always.
  *
- * TEMPORARY: until official photos are uploaded to Supabase, each neighborhood
- * maps to one stable Wikipedia Commons image (Special:FilePath permalink format —
- * guaranteed permanent by Wikipedia policy). Priority:
- *   1. Supabase image_url (when set)
- *   2. Web URI below (Google-indexed Wikipedia Commons photo)
- *   3. Local asset fallback (LOCAL_FALLBACK) — safety net if network fails
+ * PLATFORM RULE:
+ *   - Expo web:    always returns local bundled assets (zero CORS, zero network dep).
+ *   - Expo native: prefers Wikipedia Commons Special:FilePath URIs (higher quality).
+ *     Falls back to local bundled asset if no web URI is in the map.
  */
 
+import { Platform } from "react-native";
 import { ImageRequireSource } from "react-native";
 
 export type NeighborhoodImageSource = ImageRequireSource | { uri: string };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Tier 2 — Stable Google/Wikipedia image per neighborhood cluster.
-// One URI per zone; every neighborhood in a zone shares the same image so the
-// look is consistent across all screens.
-// URLs use Wikipedia Commons Special:FilePath (permanent redirect, no expiry).
+// Tier A — Local bundled assets (always work — no network, no CORS).
+// Used on web, and as fallback on native when no web URI is defined.
+// ─────────────────────────────────────────────────────────────────────────────
+const LOCAL_FALLBACK: Record<string, ImageRequireSource> = {
+  ipanema:              require("../assets/images/ipanema.png"),
+  leblon:               require("../assets/images/ipanema.png"),
+  arpoador:             require("../assets/images/ipanema.png"),
+  copacabana:           require("../assets/images/hero-rio.png"),
+  leme:                 require("../assets/images/hero-rio.png"),
+  "santa teresa":       require("../assets/images/cristo.png"),
+  corcovado:            require("../assets/images/cristo.png"),
+  "cosme velho":        require("../assets/images/cristo.png"),
+  "floresta da tijuca": require("../assets/images/secret1.png"),
+  "pedra da gavea":     require("../assets/images/secret1.png"),
+  botafogo:             require("../assets/images/pao-acucar.png"),
+  urca:                 require("../assets/images/pao-acucar.png"),
+  flamengo:             require("../assets/images/hotel1.png"),
+  catete:               require("../assets/images/hotel1.png"),
+  laranjeiras:          require("../assets/images/hotel1.png"),
+  "jardim botanico":    require("../assets/images/secret2.png"),
+  lagoa:                require("../assets/images/secret2.png"),
+  gavea:                require("../assets/images/secret2.png"),
+  lapa:                 require("../assets/images/lapa.png"),
+  centro:               require("../assets/images/lapa.png"),
+  saude:                require("../assets/images/lapa.png"),
+  gamboa:               require("../assets/images/lapa.png"),
+  gloria:               require("../assets/images/hotel2.png"),
+  "barra da tijuca":    require("../assets/images/secret1.png"),
+  "sao conrado":        require("../assets/images/secret1.png"),
+  recreio:              require("../assets/images/secret1.png"),
+  maracana:             require("../assets/images/hero-rio.png"),
+  tijuca:               require("../assets/images/hero-rio.png"),
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tier B — Wikipedia Commons Special:FilePath URIs (native only).
+// Permanent redirect URLs (guaranteed by Wikipedia policy). Higher quality.
+// One URI per zone; every neighborhood in a zone shares the same image.
+// NOTE: Skipped on Expo web due to CORS and redirect-chain failures.
 // ─────────────────────────────────────────────────────────────────────────────
 const RIO_WEB_IMAGES: Record<string, string> = {
   // ── Zona Sul — beach arc ──────────────────────────────────────────────────
@@ -105,40 +139,6 @@ const RIO_WEB_IMAGES: Record<string, string> = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Tier 3 — Local asset safety net (used only when no web URI is in the map).
-// ─────────────────────────────────────────────────────────────────────────────
-const LOCAL_FALLBACK: Record<string, ImageRequireSource> = {
-  ipanema:              require("../assets/images/ipanema.png"),
-  leblon:               require("../assets/images/ipanema.png"),
-  arpoador:             require("../assets/images/ipanema.png"),
-  copacabana:           require("../assets/images/hero-rio.png"),
-  leme:                 require("../assets/images/hero-rio.png"),
-  "santa teresa":       require("../assets/images/cristo.png"),
-  corcovado:            require("../assets/images/cristo.png"),
-  "cosme velho":        require("../assets/images/cristo.png"),
-  "floresta da tijuca": require("../assets/images/secret1.png"),
-  "pedra da gavea":     require("../assets/images/secret1.png"),
-  botafogo:             require("../assets/images/pao-acucar.png"),
-  urca:                 require("../assets/images/pao-acucar.png"),
-  flamengo:             require("../assets/images/hotel1.png"),
-  catete:               require("../assets/images/hotel1.png"),
-  laranjeiras:          require("../assets/images/hotel1.png"),
-  "jardim botanico":    require("../assets/images/secret2.png"),
-  lagoa:                require("../assets/images/secret2.png"),
-  gavea:                require("../assets/images/secret2.png"),
-  lapa:                 require("../assets/images/lapa.png"),
-  centro:               require("../assets/images/lapa.png"),
-  saude:                require("../assets/images/lapa.png"),
-  gamboa:               require("../assets/images/lapa.png"),
-  gloria:               require("../assets/images/hotel2.png"),
-  "barra da tijuca":    require("../assets/images/secret1.png"),
-  "sao conrado":        require("../assets/images/secret1.png"),
-  recreio:              require("../assets/images/secret1.png"),
-  maracana:             require("../assets/images/hero-rio.png"),
-  tijuca:               require("../assets/images/hero-rio.png"),
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 function normalize(name: string): string {
@@ -150,28 +150,32 @@ function normalize(name: string): string {
 
 /**
  * Returns the canonical neighborhood image for the given name, or null.
- * Prefers the stable web URI (tier 2). Falls back to local asset (tier 3).
- * Deterministic: same input → same output, every time, every screen.
+ * On web: always local bundled asset (CORS-safe).
+ * On native: Wikipedia Commons URI first, then local bundled asset.
  */
 export function getRioNeighborhoodImage(
   neighborhoodName: string | undefined | null,
 ): NeighborhoodImageSource | null {
   if (!neighborhoodName) return null;
   const key = normalize(neighborhoodName);
-  const webUri = RIO_WEB_IMAGES[key];
-  if (webUri) return { uri: webUri };
+  if (Platform.OS !== "web") {
+    const webUri = RIO_WEB_IMAGES[key];
+    if (webUri) return { uri: webUri };
+  }
   return LOCAL_FALLBACK[key] ?? null;
 }
 
 /**
- * Like getRioNeighborhoodImage but always returns something.
- * Use this for place card images in data files (lugares.ts, mockData.ts, etc.).
+ * Like getRioNeighborhoodImage but always returns something — never null.
+ * Use this everywhere place card images need a value (lugares.ts, mockData.ts, etc.).
  */
 export function getNeighborhoodImage(
   neighborhoodName: string,
 ): NeighborhoodImageSource {
   const key = normalize(neighborhoodName);
-  const webUri = RIO_WEB_IMAGES[key];
-  if (webUri) return { uri: webUri };
+  if (Platform.OS !== "web") {
+    const webUri = RIO_WEB_IMAGES[key];
+    if (webUri) return { uri: webUri };
+  }
   return LOCAL_FALLBACK[key] ?? require("../assets/images/hero-rio.png");
 }
