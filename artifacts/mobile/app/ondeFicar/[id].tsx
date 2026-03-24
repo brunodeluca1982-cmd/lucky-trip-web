@@ -20,7 +20,10 @@ import Colors from "@/constants/colors";
 import { destinos } from "@/data/mockData";
 import { useNeighborhoods } from "@/hooks/useNeighborhoods";
 import type { Hotel, Neighborhood } from "@/lib/supabase";
-import OndeFicarMap, { MAP_H } from "@/components/OndeFicarMap";
+import RioMapView from "@/components/RioMapView";
+
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+const MAP_H = Math.round(SCREEN_HEIGHT * 0.50);
 
 const C = Colors.light;
 
@@ -136,19 +139,36 @@ export default function OndeFicarScreen() {
 
       {/* ── Fixed map section ── */}
       <View style={s.mapSection}>
-        <OndeFicarMap
+        {/* Leaflet interactive map fills the section */}
+        <RioMapView
           selectedNeighborhood={selected}
           onNeighborhoodPress={handleNeighborhoodPress}
-          onBack={() => router.back()}
-          topInset={topInset}
-          badgeText={
-            loading
-              ? "carregando…"
-              : selected
-              ? `${hotels.length} hotel${hotels.length !== 1 ? "s" : ""}`
-              : `${allHotels.length} hospedagens`
-          }
+          style={StyleSheet.absoluteFillObject}
         />
+
+        {/* ── Fixed overlay controls (outside the iframe, always on top) ── */}
+        <View style={[s.mapControls, { top: topInset + 10 }]} pointerEvents="box-none">
+          <Pressable style={s.pill} onPress={() => router.back()} hitSlop={8}>
+            <Text style={s.pillText}>← Voltar</Text>
+          </Pressable>
+          <View style={s.pill}>
+            <View style={[s.badgeDot, selected ? s.badgeDotActive : null]} />
+            <Text style={s.pillText}>
+              {loading
+                ? "carregando…"
+                : selected
+                ? `${hotels.length} hotel${hotels.length !== 1 ? "s" : ""}`
+                : `${allHotels.length} hospedagens`}
+            </Text>
+          </View>
+        </View>
+
+        {/* Hint — only when nothing is selected */}
+        {!selected && (
+          <View style={[s.mapHint, { pointerEvents: "none" }]}>
+            <Text style={s.mapHintText}>Toque num bairro para explorar</Text>
+          </View>
+        )}
 
         {/* Floating neighborhood card */}
         {activeNeighborhood && (
@@ -423,6 +443,63 @@ const s = StyleSheet.create({
     left: 14,
     right: 14,
     zIndex: 20,
+  },
+
+  // ── Map overlay controls ──
+  mapControls: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    zIndex: 30,
+    pointerEvents: "box-none",
+  },
+  pill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(5,2,0,0.62)",
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+    boxShadow: "0px 2px 10px rgba(0,0,0,0.40)",
+  } as any,
+  pillText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.90)",
+  },
+  badgeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: C.terracotta,
+  },
+  badgeDotActive: {
+    backgroundColor: C.gold,
+  },
+  mapHint: {
+    position: "absolute",
+    bottom: 10,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    zIndex: 10,
+  },
+  mapHintText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: "rgba(255,255,255,0.45)",
+    letterSpacing: 0.3,
+    backgroundColor: "rgba(5,2,0,0.52)",
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
   },
 
   // ── Scrollable list ──
