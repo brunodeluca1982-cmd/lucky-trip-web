@@ -272,7 +272,7 @@ export default function CidadeScreen() {
           <GlassButton
             style={s.btnStandard}
             onPress={() =>
-              router.push({ pathname: "/ficarBem/[id]", params: { id: destino.id } })
+              router.push({ pathname: "/ondeFicar/[id]", params: { id: destino.id } })
             }
           >
             <View style={s.btnStandardInner}>

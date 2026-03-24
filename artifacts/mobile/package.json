@@ -57,6 +57,7 @@
   },
   "dependencies": {
     "@expo-google-fonts/playfair-display": "^0.4.2",
-    "@supabase/supabase-js": "^2.99.3"
+    "@supabase/supabase-js": "^2.99.3",
+    "react-native-maps": "^1.27.2"
   }
 }

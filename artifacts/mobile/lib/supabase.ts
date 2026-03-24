@@ -43,6 +43,7 @@ export type Neighborhood = {
   gastronomy: string;
   scenery: string;
   safety_solo_woman: string;
+  google_maps: string | null;
   active: boolean;
   display_order: number;
   hotels: Hotel[];

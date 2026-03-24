@@ -117,19 +117,21 @@ Expo React Native app (SDK 54) with dark glassmorphism aesthetic for Rio de Jane
 - Web insets: 67px top, 34px bottom; native uses `useSafeAreaInsets()`
 
 ### Key Files
-- `components/MapZoneOverlay.tsx` — aerial map (58% screen height), zoom spring, 7 hotspots, dim overlay, 3-layer editorial labels
-- `lib/supabase.ts` — mobile Supabase client (`EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY`)
+- `components/RioMapView.tsx` — platform-aware interactive map: web=Leaflet.js iframe (CartoDB dark tiles, no API key), native=react-native-maps; 11 clickable neighborhood markers + 3 visual-only; postMessage communication with parent
+- `components/RioMapViewNative.tsx` — native MapView implementation with Marker components (lazy-loaded by RioMapView)
+- `lib/supabase.ts` — mobile Supabase client (`EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY`); exports `Hotel` and `Neighborhood` types
 - `hooks/useNeighborhoods.ts` — fetches `v_stay_neighborhoods_with_hotels` (active, ordered)
 - `hooks/useHotel.ts` — fetches a single hotel by UUID from the view
 
 ### Supabase Tables Used
-- `stay_neighborhoods` — neighborhood details (name, slug, identity_phrase, my_view, etc.)
+- `stay_neighborhoods` — neighborhood details (name, slug, identity_phrase, my_view, how_to_live, best_for_*, nightlife, gastronomy, scenery, walkable, safety_solo_woman, etc.)
 - `v_stay_neighborhoods_with_hotels` — view joining neighborhoods + their hotels array; 26 hotels across 11 neighborhoods for Rio de Janeiro
 
 ### Route Structure
 - `(tabs)/` — 5-tab navigator
-- `ficarBem/[id].tsx` — hotel list screen with live Supabase data + map filtering
-- `ficarBem/hotel/[hotelId].tsx` — hotel detail screen (full my_view, how_to_enjoy, reserve_url, etc.)
+- `ondeFicar/[id].tsx` — hotel list screen with live Supabase data, interactive RioMapView, floating NeighborhoodCard on selection, filtered hotel list
+- `ondeFicar/hotel/[hotelId].tsx` — hotel detail screen (full my_view, how_to_enjoy, reserve_url, Google Maps link)
+- `ondeFicar/bairro/[slug].tsx` — neighborhood editorial detail (my_view, how_to_live, stat pills, Ver hospedagens CTA)
 - `oQueFazer/[id].tsx`, `comerBem/[id].tsx` — activities + dining screens (mock data)
 
 ### Environment Variables (Mobile)
