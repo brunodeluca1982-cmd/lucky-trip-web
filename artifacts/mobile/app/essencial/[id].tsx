@@ -29,6 +29,7 @@ import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { destinos } from "@/data/mockData";
 import { LUGARES_LUCKY } from "@/data/lugares";
+import { getNeighborhoodImage } from "@/data/neighborhoodImages";
 
 const C = Colors.light;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -43,48 +44,50 @@ interface ClassicoItem {
 }
 
 // IDs map directly to LUGARES_O_QUE_FAZER["rio"] entries — resolved by getLugar()
+// Images come from getNeighborhoodImage() so each entry is consistent with
+// every other screen that shows the same neighborhood.
 const CLASSICOS_RIO: ClassicoItem[] = [
   {
     id: "2",
     titulo: "Cristo Redentor",
     localizacao: "Corcovado",
     categoria: "ÍCONE",
-    image: require("../../assets/images/cristo.png"),
+    image: getNeighborhoodImage("Corcovado"),
   },
   {
     id: "3",
     titulo: "Pão de Açúcar",
     localizacao: "Urca",
     categoria: "MIRANTE",
-    image: require("../../assets/images/pao-acucar.png"),
+    image: getNeighborhoodImage("Urca"),
   },
   {
     id: "1",
     titulo: "Praia de Ipanema",
     localizacao: "Ipanema",
     categoria: "PRAIA",
-    image: require("../../assets/images/ipanema.png"),
+    image: getNeighborhoodImage("Ipanema"),
   },
   {
     id: "6",
     titulo: "Arpoador",
     localizacao: "Arpoador",
     categoria: "RITUAL",
-    image: require("../../assets/images/ipanema.png"),
+    image: getNeighborhoodImage("Arpoador"),
   },
   {
     id: "7",
     titulo: "Santa Teresa",
     localizacao: "Santa Teresa",
     categoria: "BAIRRO",
-    image: require("../../assets/images/lapa.png"),
+    image: getNeighborhoodImage("Santa Teresa"),
   },
   {
     id: "8",
     titulo: "Jardim Botânico",
     localizacao: "Jardim Botânico",
     categoria: "NATUREZA",
-    image: require("../../assets/images/secret2.png"),
+    image: getNeighborhoodImage("Jardim Botânico"),
   },
 ];
 

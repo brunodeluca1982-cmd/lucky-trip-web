@@ -1,3 +1,5 @@
+import { getNeighborhoodImage } from "./neighborhoodImages";
+
 export interface Destino {
   id: string;
   cidade: string;
@@ -129,7 +131,7 @@ export const destaques = [
     localizacao: "Ipanema",
     descricao: "O encontro perfeito entre o mar e a alma carioca.",
     tipo: "oQueFazer" as DestaqueType,
-    image: require("../assets/images/ipanema.png"),
+    image: getNeighborhoodImage("Ipanema"),
   },
   {
     id: "2",
@@ -137,7 +139,7 @@ export const destaques = [
     localizacao: "Centro Histórico",
     descricao: "Um século de elegância servido em cada xícara.",
     tipo: "restaurante" as DestaqueType,
-    image: require("../assets/images/restaurante1.png"),
+    image: getNeighborhoodImage("Centro"),
   },
   {
     id: "3",
@@ -145,7 +147,7 @@ export const destaques = [
     localizacao: "Copacabana",
     descricao: "O endereço mais icônico do Rio, com vista para o mar.",
     tipo: "hotel" as DestaqueType,
-    image: require("../assets/images/hotel1.png"),
+    image: getNeighborhoodImage("Copacabana"),
   },
   {
     id: "4",
@@ -153,7 +155,7 @@ export const destaques = [
     localizacao: "Lapa",
     descricao: "Arte viva em cada azulejo, curada por décadas de paixão.",
     tipo: "lucky" as DestaqueType,
-    image: require("../assets/images/secret2.png"),
+    image: getNeighborhoodImage("Lapa"),
   },
 ];
 
@@ -162,19 +164,19 @@ export const oQueFazer = [
     id: "1",
     titulo: "Praia de Ipanema",
     localizacao: "Ipanema",
-    image: require("../assets/images/ipanema.png"),
+    image: getNeighborhoodImage("Ipanema"),
   },
   {
     id: "2",
     titulo: "Escadaria Selarón",
     localizacao: "Lapa",
-    image: require("../assets/images/secret2.png"),
+    image: getNeighborhoodImage("Lapa"),
   },
   {
     id: "3",
     titulo: "Arcos da Lapa",
     localizacao: "Lapa",
-    image: require("../assets/images/lapa.png"),
+    image: getNeighborhoodImage("Lapa"),
   },
 ];
 
@@ -217,19 +219,19 @@ export const oQueFazerPorMomento: Record<
       id: "m1",
       titulo: "Praia de Ipanema",
       localizacao: "Ipanema",
-      image: require("../assets/images/ipanema.png"),
+      image: getNeighborhoodImage("Ipanema"),
     },
     {
       id: "m2",
       titulo: "Caminhada ao Cristo",
       localizacao: "Cosme Velho",
-      image: require("../assets/images/cristo.png"),
+      image: getNeighborhoodImage("Corcovado"),
     },
     {
       id: "m3",
       titulo: "Café na Colombo",
       localizacao: "Centro Histórico",
-      image: require("../assets/images/restaurante1.png"),
+      image: getNeighborhoodImage("Centro"),
     },
   ],
   tarde: [
@@ -237,19 +239,19 @@ export const oQueFazerPorMomento: Record<
       id: "t1",
       titulo: "Pão de Açúcar",
       localizacao: "Urca",
-      image: require("../assets/images/pao-acucar.png"),
+      image: getNeighborhoodImage("Urca"),
     },
     {
       id: "t2",
       titulo: "Escadaria Selarón",
       localizacao: "Lapa",
-      image: require("../assets/images/secret2.png"),
+      image: getNeighborhoodImage("Lapa"),
     },
     {
       id: "t3",
       titulo: "Santa Teresa",
       localizacao: "Santa Teresa",
-      image: require("../assets/images/hotel2.png"),
+      image: getNeighborhoodImage("Santa Teresa"),
     },
   ],
   noite: [
@@ -257,19 +259,19 @@ export const oQueFazerPorMomento: Record<
       id: "n1",
       titulo: "Beco das Sardinhas",
       localizacao: "Centro",
-      image: require("../assets/images/secret1.png"),
+      image: getNeighborhoodImage("Centro"),
     },
     {
       id: "n2",
       titulo: "Oro Restaurant",
       localizacao: "Leblon",
-      image: require("../assets/images/restaurante2.png"),
+      image: getNeighborhoodImage("Leblon"),
     },
     {
       id: "n3",
       titulo: "Arcos da Lapa",
       localizacao: "Lapa",
-      image: require("../assets/images/lapa.png"),
+      image: getNeighborhoodImage("Lapa"),
     },
   ],
 };
@@ -314,21 +316,21 @@ export const segredos = [
     titulo: "Beco das Sardinhas",
     localizacao: "Centro",
     descricao: "Ruelas históricas onde cariocas se reúnem ao pôr do sol para petiscos e cerveja.",
-    image: require("../assets/images/secret1.png"),
+    image: getNeighborhoodImage("Centro"),
   },
   {
     id: "2",
     titulo: "Mirante Dona Marta",
     localizacao: "Botafogo",
     descricao: "Vista panorâmica do Rio sem as multidões do Corcovado — o segredo dos cariocas.",
-    image: require("../assets/images/lapa.png"),
+    image: getNeighborhoodImage("Botafogo"),
   },
   {
     id: "3",
     titulo: "Escadaria Selarón",
     localizacao: "Lapa",
     descricao: "Mosaico de azulejos de mais de 60 países, criado por Jorge Selarón ao longo de décadas.",
-    image: require("../assets/images/secret2.png"),
+    image: getNeighborhoodImage("Lapa"),
   },
 ];
 
@@ -338,25 +340,25 @@ export const curadoPara = [
     id: "cp1",
     titulo: "Melhor tarde do Arpoador",
     localizacao: "Arpoador",
-    image: require("../assets/images/ipanema.png"),
+    image: getNeighborhoodImage("Arpoador"),
   },
   {
     id: "cp2",
     titulo: "COBRI · Bar do Mercado",
     localizacao: "Centro",
-    image: require("../assets/images/restaurante1.png"),
+    image: getNeighborhoodImage("Centro"),
   },
   {
     id: "cp3",
     titulo: "Banzeiro",
     localizacao: "Botafogo",
-    image: require("../assets/images/restaurante2.png"),
+    image: getNeighborhoodImage("Botafogo"),
   },
   {
     id: "cp4",
     titulo: "Parque Lage",
     localizacao: "Jardim Botânico",
-    image: require("../assets/images/secret1.png"),
+    image: getNeighborhoodImage("Jardim Botânico"),
   },
 ];
 

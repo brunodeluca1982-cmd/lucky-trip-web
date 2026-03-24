@@ -116,6 +116,27 @@ Expo React Native app (SDK 54) with dark glassmorphism aesthetic for Rio de Jane
 - `boxShadow` everywhere (not `shadow*`); `pointerEvents` in style not as prop
 - Web insets: 67px top, 34px bottom; native uses `useSafeAreaInsets()`
 
+### IMAGE RULE — Neighborhood Image Consistency
+**`getNeighborhoodImage(neighborhoodName)`** in `data/neighborhoodImages.ts` is the single source of truth for all neighborhood → image mappings. Every data file and screen that renders a place by neighborhood MUST use this resolver.
+
+Files now using the resolver (all neighborhood-bearing images):
+- `data/lugares.ts` — all 32+ LUGARES_LUCKY entries
+- `data/mockData.ts` — destaques, oQueFazer, oQueFazerPorMomento, segredos, curadoPara
+- `data/agoraContent.ts` — AGORA_CONTENT, FALLBACK_CONTENT, DESTAQUE_PRINCIPAL
+- `app/essencial/[id].tsx` — CLASSICOS_RIO cards
+- All 4 bairro detail pages (via `getNeighborhoodHero()` in `utils/neighborhoodHero.ts`)
+
+Exempt (entity-level images, not neighborhood images): `destinos` (city heroes), `restaurantes`, `hoteis`, `roteiros`, `influencers` in mockData.ts.
+
+Neighborhood map (defined in `data/neighborhoodImages.ts`):
+- Ipanema / Leblon / Arpoador → `ipanema.png`
+- Corcovado / Santa Teresa / Cosme Velho → `cristo.png`
+- Botafogo / Urca → `pao-acucar.png`
+- Lapa / Centro → `lapa.png`
+- Jardim Botânico / Lagoa → `secret2.png`
+- Floresta da Tijuca / Barra da Tijuca / São Conrado → `secret1.png`
+- Copacabana / Leme → `hero-rio.png`
+
 ### Key Files
 - `components/OndeFicarMap.tsx` — premium editorial aerial map for the Onde Ficar screen; uses `assets/images/rio-aerial-clean.png` (2340×1440 aerial photo, left-aligned); 11 invisible Pressable hotspots with editorial text labels; spring zoom/pan animation on neighborhood tap; dim overlay; floating "← Voltar" and badge pills
 - `components/MapZoneOverlay.tsx` — zone-based interactive map used by `oQueFazer` and `comerBem` screens (portrait satellite image + 7 zone hotspots); DO NOT modify

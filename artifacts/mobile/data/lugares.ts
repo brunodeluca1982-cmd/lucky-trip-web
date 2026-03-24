@@ -4,9 +4,14 @@
  * Imported by both the list screen (oQueFazer) and the place detail screen.
  * Zone coordinates are visual percentages over the illustrated map image —
  * not geographic. No lat/lng, no map provider.
+ *
+ * IMAGE RULE: every place.image is resolved via getNeighborhoodImage(localizacao).
+ * Do NOT assign images manually — use the resolver so the same neighborhood
+ * always shows the same image, across every card and screen.
  */
 
 import { ImageSourcePropType } from "react-native";
+import { getNeighborhoodImage } from "./neighborhoodImages";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -106,10 +111,13 @@ export function resolvePin(
   };
 }
 
+// ── Shorthand: resolve a neighborhood image by localizacao ───────────────────
+// All place images go through this — never hardcode images in place data.
+function ni(localizacao: string): ImageSourcePropType {
+  return getNeighborhoodImage(localizacao) as ImageSourcePropType;
+}
+
 // ── Place data by city and category ──────────────────────────────────────────
-// "o_que_fazer" → O que fazer screen
-// "comer"       → Comer bem screen (future)
-// "ficar"       → Ficar bem screen (future)
 
 export const LUGARES_O_QUE_FAZER: Record<string, LugarPlace[]> = {
   rio: [
@@ -120,7 +128,7 @@ export const LUGARES_O_QUE_FAZER: Record<string, LugarPlace[]> = {
       categoria: "EXPERIÊNCIA",
       descricao:
         "O encontro perfeito entre o mar e a alma carioca. Cheia de vida do nascer ao pôr do sol.",
-      image: require("../assets/images/ipanema.png"),
+      image: ni("Ipanema"),
       ...resolvePin("rio", "Ipanema", 0),
       tipo_item: "experiencia",
       google_maps_url: "https://maps.app.goo.gl/Praia-Ipanema",
@@ -132,7 +140,7 @@ export const LUGARES_O_QUE_FAZER: Record<string, LugarPlace[]> = {
       categoria: "MONUMENTO",
       descricao:
         "A sétima maravilha do mundo moderna abraça o Rio de braços abertos. A vista do topo para a Guanabara é inesquecível.",
-      image: require("../assets/images/cristo.png"),
+      image: ni("Corcovado"),
       ...resolvePin("rio", "Corcovado", 0),
     },
     {
@@ -142,7 +150,7 @@ export const LUGARES_O_QUE_FAZER: Record<string, LugarPlace[]> = {
       categoria: "EXPERIÊNCIA",
       descricao:
         "Dois picos, dois bondilhos e uma das vistas mais dramáticas do planeta. O Rio em panorama completo.",
-      image: require("../assets/images/pao-acucar.png"),
+      image: ni("Urca"),
       ...resolvePin("rio", "Urca", 0),
     },
     {
@@ -152,7 +160,7 @@ export const LUGARES_O_QUE_FAZER: Record<string, LugarPlace[]> = {
       categoria: "SEGREDO LOCAL",
       descricao:
         "Ruelas históricas onde cariocas se reúnem ao pôr do sol para petiscos e cerveja gelada.",
-      image: require("../assets/images/secret1.png"),
+      image: ni("Centro"),
       ...resolvePin("rio", "Centro", 0),
     },
     {
@@ -162,7 +170,7 @@ export const LUGARES_O_QUE_FAZER: Record<string, LugarPlace[]> = {
       categoria: "ARTE & CULTURA",
       descricao:
         "Mosaico de azulejos de mais de 60 países, criado por Jorge Selarón ao longo de décadas.",
-      image: require("../assets/images/secret2.png"),
+      image: ni("Lapa"),
       ...resolvePin("rio", "Lapa", 0),
     },
     {
@@ -172,7 +180,7 @@ export const LUGARES_O_QUE_FAZER: Record<string, LugarPlace[]> = {
       categoria: "RITUAL CARIOCA",
       descricao:
         "Ao pôr do sol, cariocas e viajantes sobem a pedra e aplaudem o sol desaparecer no horizonte. Um dos rituais mais bonitos do mundo.",
-      image: require("../assets/images/ipanema.png"),
+      image: ni("Arpoador"),
       ...resolvePin("rio", "Arpoador", 0),
     },
     {
@@ -182,7 +190,7 @@ export const LUGARES_O_QUE_FAZER: Record<string, LugarPlace[]> = {
       categoria: "BAIRRO",
       descricao:
         "O bairro mais bohémio do Rio, com ruas de pedra, galerias de arte, bistrôs escondidos e vistas que cortam o fôlego.",
-      image: require("../assets/images/lapa.png"),
+      image: ni("Santa Teresa"),
       ...resolvePin("rio", "Santa Teresa", 0),
     },
     {
@@ -192,7 +200,7 @@ export const LUGARES_O_QUE_FAZER: Record<string, LugarPlace[]> = {
       categoria: "NATUREZA",
       descricao:
         "Mais de 8.000 espécies de plantas, uma alameda imperial de palmeiras e o silêncio da mata atlântica dentro da cidade.",
-      image: require("../assets/images/secret2.png"),
+      image: ni("Jardim Botânico"),
       ...resolvePin("rio", "Jardim Botânico", 0),
     },
     // ── Home screen card entries ─────────────────────────────────────────────
@@ -203,7 +211,7 @@ export const LUGARES_O_QUE_FAZER: Record<string, LugarPlace[]> = {
       categoria: "PATRIMÔNIO",
       descricao:
         "Aqueduto colonial do século XVIII que virou símbolo da boemia carioca. À noite, os Arcos enquadram o bonde de Santa Teresa e iluminam a entrada da Lapa.",
-      image: require("../assets/images/lapa.png"),
+      image: ni("Lapa"),
       ...resolvePin("rio", "Lapa", 1),
     },
   ],
@@ -220,7 +228,7 @@ export const LUGARES_COMER: Record<string, LugarPlace[]> = {
       categoria: "CONTEMPORÂNEO",
       descricao:
         "Fogão a lenha, ingredientes frescos e uma das adegas mais respeitadas do Rio. Mesa imperdível para quem leva a gastronomia a sério.",
-      image: require("../assets/images/restaurante1.png"),
+      image: ni("Leblon"),
       ...resolvePin("rio", "Leblon", 0),
       tipo_item: "restaurante",
       google_maps_url: "https://maps.app.goo.gl/Zuka-Leblon",
@@ -233,7 +241,7 @@ export const LUGARES_COMER: Record<string, LugarPlace[]> = {
       categoria: "EXPERIÊNCIA",
       descricao:
         "Jardim suspenso no morro de Santa Teresa, com vista para a Baía de Guanabara e culinária mineira revisitada entre flores e árvores frondosas.",
-      image: require("../assets/images/restaurante2.png"),
+      image: ni("Santa Teresa"),
       ...resolvePin("rio", "Santa Teresa", 0),
     },
     {
@@ -243,7 +251,7 @@ export const LUGARES_COMER: Record<string, LugarPlace[]> = {
       categoria: "ALTA GASTRONOMIA",
       descricao:
         "Felipe Bronze e sua equipe traduzem o Brasil em pratos de precisão técnica e alma local. Estrelado e autoral.",
-      image: require("../assets/images/restaurante1.png"),
+      image: ni("Jardim Botânico"),
       ...resolvePin("rio", "Jardim Botânico", 0),
     },
     {
@@ -253,7 +261,7 @@ export const LUGARES_COMER: Record<string, LugarPlace[]> = {
       categoria: "TRADICIONAL",
       descricao:
         "Feijoada às quartas e sábados, bolinho de bacalhau de rua e boteco com alma. O autêntico Rio de perto.",
-      image: require("../assets/images/restaurante2.png"),
+      image: ni("Santa Teresa"),
       ...resolvePin("rio", "Santa Teresa", 1),
     },
     {
@@ -263,7 +271,7 @@ export const LUGARES_COMER: Record<string, LugarPlace[]> = {
       categoria: "BISTRÔ",
       descricao:
         "Horta própria, menu-degustação com raízes brasileiras e uma das experiências mais honestas da cidade.",
-      image: require("../assets/images/restaurante1.png"),
+      image: ni("Botafogo"),
       ...resolvePin("rio", "Botafogo", 0),
     },
     // ── Home screen card entries ─────────────────────────────────────────────
@@ -274,7 +282,7 @@ export const LUGARES_COMER: Record<string, LugarPlace[]> = {
       categoria: "CAFÉ HISTÓRICO",
       descricao:
         "Um século de elegância servido em cada xícara. Vitrais art nouveau, mármore e o melhor bolo de mel do Rio — dentro do salão mais bonito da cidade.",
-      image: require("../assets/images/restaurante1.png"),
+      image: ni("Centro"),
       ...resolvePin("rio", "Centro", 1),
       tipo_item: "restaurante",
       google_maps_url: "https://maps.app.goo.gl/Colombo-Centro",
@@ -287,7 +295,7 @@ export const LUGARES_COMER: Record<string, LugarPlace[]> = {
       categoria: "BAR GASTRONÔMICO",
       descricao:
         "No coração do Mercado Municipal, o COBRI transforma o entorno histórico em cenário para coquetéis autorais e petiscos com sotaque carioca.",
-      image: require("../assets/images/restaurante1.png"),
+      image: ni("Centro"),
       ...resolvePin("rio", "Centro", 2),
       tipo_item: "restaurante",
     },
@@ -298,7 +306,7 @@ export const LUGARES_COMER: Record<string, LugarPlace[]> = {
       categoria: "AMAZÔNICA",
       descricao:
         "O chef Jefferson Rueda traz a Amazônia para a mesa carioca — ingredientes raros, receitas centenárias e uma das experiências gastronômicas mais únicas do Brasil.",
-      image: require("../assets/images/restaurante2.png"),
+      image: ni("Botafogo"),
       ...resolvePin("rio", "Botafogo", 1),
       tipo_item: "restaurante",
     },
@@ -316,7 +324,7 @@ export const LUGARES_FICAR: Record<string, LugarPlace[]> = {
       categoria: "ÍCONE",
       descricao:
         "Um século de elegância à beira-mar. O hotel mais celebrado do Rio recebe o mundo com serviço impecável e vista para o Atlântico.",
-      image: require("../assets/images/hotel1.png"),
+      image: ni("Copacabana"),
       ...resolvePin("rio", "Copacabana", 0),
       tipo_item: "hotel",
       google_maps_url: "https://maps.app.goo.gl/Copacabana-Palace",
@@ -330,7 +338,7 @@ export const LUGARES_FICAR: Record<string, LugarPlace[]> = {
       categoria: "BOUTIQUE",
       descricao:
         "Antiga mansão colonial transformada em refúgio de design. Piscina com vista para a Baía de Guanabara e atmosfera de artista.",
-      image: require("../assets/images/hotel2.png"),
+      image: ni("Santa Teresa"),
       ...resolvePin("rio", "Santa Teresa", 0),
     },
     {
@@ -340,7 +348,7 @@ export const LUGARES_FICAR: Record<string, LugarPlace[]> = {
       categoria: "LUXO",
       descricao:
         "Rooftop com piscina suspensa sobre Ipanema, design Philippe Starck e o melhor endereço da Zona Sul para quem não abre mão do requinte.",
-      image: require("../assets/images/hotel1.png"),
+      image: ni("Ipanema"),
       ...resolvePin("rio", "Ipanema", 0),
     },
     {
@@ -350,7 +358,7 @@ export const LUGARES_FICAR: Record<string, LugarPlace[]> = {
       categoria: "CHARME",
       descricao:
         "Apenas sete quartos numa villa francesa de 1920. Café da manhã em varanda, arte por toda a parte e a sensação de ser hóspede especial.",
-      image: require("../assets/images/hotel2.png"),
+      image: ni("Santa Teresa"),
       ...resolvePin("rio", "Santa Teresa", 1),
     },
     {
@@ -360,16 +368,13 @@ export const LUGARES_FICAR: Record<string, LugarPlace[]> = {
       categoria: "DESIGN",
       descricao:
         "Conceito lifestyle no coração de Botafogo, com rooftop aberto à cidade, piscina e uma vizinhança que pulsa gastronomia e cultura.",
-      image: require("../assets/images/hotel1.png"),
+      image: ni("Botafogo"),
       ...resolvePin("rio", "Botafogo", 0),
     },
   ],
 };
 
 // ── Lucky List — special curated picks ───────────────────────────────────────
-// These are the hidden gems, insider tips, and unmissable experiences that
-// make Lucky Trip feel like having a knowledgeable local friend.
-// Intentionally cross-category: a viewpoint, a bar, a café, a sunset ritual.
 
 export const LUGARES_LUCKY: Record<string, LugarPlace[]> = {
   rio: [
@@ -380,7 +385,7 @@ export const LUGARES_LUCKY: Record<string, LugarPlace[]> = {
       categoria: "SEGREDO LOCAL",
       descricao:
         "O pôr do sol mais silencioso do Rio. Enquanto todos vão ao Arpoador, os cariocas sobem até aqui — e ficam com a vista só para eles.",
-      image: require("../assets/images/secret1.png"),
+      image: ni("Leblon"),
       ...resolvePin("rio", "Leblon", 0),
     },
     {
@@ -390,7 +395,7 @@ export const LUGARES_LUCKY: Record<string, LugarPlace[]> = {
       categoria: "DESCOBERTA",
       descricao:
         "Uma mansão neoclássica no meio da floresta com café dentro, trilha para o Cristo e patos no espelho d'água. Entrada gratuita, impacto infinito.",
-      image: require("../assets/images/secret2.png"),
+      image: ni("Jardim Botânico"),
       ...resolvePin("rio", "Jardim Botânico", 0),
     },
     {
@@ -400,7 +405,7 @@ export const LUGARES_LUCKY: Record<string, LugarPlace[]> = {
       categoria: "RITUAL CARIOCA",
       descricao:
         "Todo dia, ao pôr do sol, cariocas e viajantes sobem a pedra e aplaudem o sol desaparecendo no horizonte. Um dos rituais mais bonitos do mundo.",
-      image: require("../assets/images/ipanema.png"),
+      image: ni("Arpoador"),
       ...resolvePin("rio", "Arpoador", 0),
     },
     {
@@ -410,7 +415,7 @@ export const LUGARES_LUCKY: Record<string, LugarPlace[]> = {
       categoria: "MIRANTE",
       descricao:
         "Um pagode de ferro no meio da mata atlântica, com vista para a Lagoa Rodrigo de Freitas e os dois irmãos. Quase ninguém sabe que existe.",
-      image: require("../assets/images/secret1.png"),
+      image: ni("Floresta da Tijuca"),
       ...resolvePin("rio", "Floresta da Tijuca", 0),
     },
     {
@@ -420,7 +425,7 @@ export const LUGARES_LUCKY: Record<string, LugarPlace[]> = {
       categoria: "ARTE VIVA",
       descricao:
         "Jorge Selarón passou décadas revestindo cada degrau com azulejos de mais de 60 países. Uma obra que cresceu com o artista até o último dia de sua vida.",
-      image: require("../assets/images/secret2.png"),
+      image: ni("Lapa"),
       ...resolvePin("rio", "Lapa", 0),
     },
     {
@@ -430,10 +435,9 @@ export const LUGARES_LUCKY: Record<string, LugarPlace[]> = {
       categoria: "ACHADO RARO",
       descricao:
         "O Museu Nacional de Belas Artes tem uma das coleções mais ricas do Brasil — e uma biblioteca quase desconhecida onde o tempo para. Grátis às quintas.",
-      image: require("../assets/images/secret1.png"),
+      image: ni("Centro"),
       ...resolvePin("rio", "Centro", 0),
     },
-    // ── Supabase-ready items: loaded from mock until DB is connected ──────────
     {
       id: "l7",
       titulo: "Aula de futevôlei na Barra",
@@ -441,7 +445,7 @@ export const LUGARES_LUCKY: Record<string, LugarPlace[]> = {
       categoria: "EXPERIÊNCIA LOCAL",
       descricao:
         "A praia da Barra é o templo do futevôlei carioca. Aulas com jogadores da comunidade local — esporte, sol e a energia que só o Rio tem.",
-      image: require("../assets/images/ipanema.png"),
+      image: ni("Barra da Tijuca"),
       ...resolvePin("rio", "Barra da Tijuca", 0),
     },
     {
@@ -451,7 +455,7 @@ export const LUGARES_LUCKY: Record<string, LugarPlace[]> = {
       categoria: "SEGREDO GASTRONÔMICO",
       descricao:
         "Dentro do Fashion Mall existe um cabeleireiro discreto com salgados que são, literalmente, segredo de salão. Um dos endereços preferidos de Carolina Dieckmann.",
-      image: require("../assets/images/restaurante1.png"),
+      image: ni("São Conrado"),
       ...resolvePin("rio", "São Conrado", 0),
     },
     {
@@ -461,7 +465,7 @@ export const LUGARES_LUCKY: Record<string, LugarPlace[]> = {
       categoria: "RITUAL CARIOCA",
       descricao:
         "O ASA não é uma sorveteria comum. É o ponto de referência do açaí autoral no Rio — cremoso, sem adição de xarope, servido da forma que deveria ser.",
-      image: require("../assets/images/restaurante2.png"),
+      image: ni("Leblon"),
       ...resolvePin("rio", "Leblon", 1),
     },
   ],

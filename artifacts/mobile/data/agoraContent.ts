@@ -12,6 +12,7 @@
 
 import { ImageSourcePropType } from "react-native";
 import { Periodo } from "@/data/mockData";
+import { getNeighborhoodImage } from "@/data/neighborhoodImages";
 
 export interface AgoraItem {
   id: string;
@@ -40,7 +41,7 @@ export const AGORA_CONTENT: Record<string, Record<Periodo, AgoraItem[]>> = {
         tag: "Praia",
         descricao:
           "O amanhecer mais bonito do Brasil — mar calmo, areia limpa e a cidade acordando devagar.",
-        image: require("../assets/images/ipanema.png"),
+        image: getNeighborhoodImage("Ipanema"),
         placeId: "1",
       },
       {
@@ -50,7 +51,7 @@ export const AGORA_CONTENT: Record<string, Record<Periodo, AgoraItem[]>> = {
         tag: "Natureza",
         descricao:
           "Vista de 360° antes do calor. O trilho sobe pela mata atlântica com sombra e frescor.",
-        image: require("../assets/images/cristo.png"),
+        image: getNeighborhoodImage("Corcovado"),
         placeId: "2",
       },
       {
@@ -60,7 +61,7 @@ export const AGORA_CONTENT: Record<string, Record<Periodo, AgoraItem[]>> = {
         tag: "Cultura",
         descricao:
           "Brunch dentro do art nouveau mais bonito do Rio. Café coado, croissant e décadas de história.",
-        image: require("../assets/images/restaurante1.png"),
+        image: getNeighborhoodImage("Centro"),
       },
     ],
     tarde: [
@@ -71,7 +72,7 @@ export const AGORA_CONTENT: Record<string, Record<Periodo, AgoraItem[]>> = {
         tag: "Mirante",
         descricao:
           "Vista panorâmica ao entardecer — a hora certa de subir de bondinho.",
-        image: require("../assets/images/pao-acucar.png"),
+        image: getNeighborhoodImage("Urca"),
         placeId: "3",
       },
       {
@@ -81,7 +82,7 @@ export const AGORA_CONTENT: Record<string, Record<Periodo, AgoraItem[]>> = {
         tag: "Arte",
         descricao:
           "O mosaico mais icônico do Brasil, com azulejos de mais de 60 países.",
-        image: require("../assets/images/lapa.png"),
+        image: getNeighborhoodImage("Lapa"),
         placeId: "5",
       },
       {
@@ -91,7 +92,7 @@ export const AGORA_CONTENT: Record<string, Record<Periodo, AgoraItem[]>> = {
         tag: "Bairro",
         descricao:
           "Galerias, bistrôs e charme colonial no bairro mais bohémio do Rio.",
-        image: require("../assets/images/hotel2.png"),
+        image: getNeighborhoodImage("Santa Teresa"),
         placeId: "7",
       },
     ],
@@ -103,7 +104,7 @@ export const AGORA_CONTENT: Record<string, Record<Periodo, AgoraItem[]>> = {
         tag: "Gastronomia",
         descricao:
           "Petiscos, chopp e a animação carioca mais autêntica do centro histórico.",
-        image: require("../assets/images/secret1.png"),
+        image: getNeighborhoodImage("Centro"),
         placeId: "4",
       },
       {
@@ -113,7 +114,7 @@ export const AGORA_CONTENT: Record<string, Record<Periodo, AgoraItem[]>> = {
         tag: "Fine Dining",
         descricao:
           "Uma estrela Michelin com menu autoral e vista para o Leblon ao entardecer.",
-        image: require("../assets/images/restaurante2.png"),
+        image: getNeighborhoodImage("Leblon"),
       },
       {
         id: "n3",
@@ -122,7 +123,7 @@ export const AGORA_CONTENT: Record<string, Record<Periodo, AgoraItem[]>> = {
         tag: "Vida Noturna",
         descricao:
           "Samba ao vivo, choperia aberta e a energia que fez a Lapa famosa no mundo.",
-        image: require("../assets/images/secret2.png"),
+        image: getNeighborhoodImage("Lapa"),
       },
     ],
   },
@@ -136,7 +137,7 @@ export const FALLBACK_CONTENT: Record<Periodo, AgoraItem[]> = {
       localizacao: "Centro",
       tag: "Cultura",
       descricao: "Comece o dia com sabores da cidade.",
-      image: require("../assets/images/restaurante1.png"),
+      image: getNeighborhoodImage("Centro"),
     },
   ],
   tarde: [
@@ -146,7 +147,7 @@ export const FALLBACK_CONTENT: Record<Periodo, AgoraItem[]> = {
       localizacao: "Centro",
       tag: "Cultura",
       descricao: "A melhor hora para explorar a cidade.",
-      image: require("../assets/images/secret2.png"),
+      image: getNeighborhoodImage("Centro"),
     },
   ],
   noite: [
@@ -156,7 +157,7 @@ export const FALLBACK_CONTENT: Record<Periodo, AgoraItem[]> = {
       localizacao: "Centro",
       tag: "Gastronomia",
       descricao: "Encerre o dia com sabor.",
-      image: require("../assets/images/restaurante2.png"),
+      image: getNeighborhoodImage("Centro"),
     },
   ],
 };
@@ -167,13 +168,13 @@ export const DESTAQUE_PRINCIPAL: Record<Periodo, DestaquePick[]> = {
       titulo: "Hotel Santa Teresa",
       localizacao: "Santa Teresa",
       tag: "Hospedagem",
-      image: require("../assets/images/hotel1.png"),
+      image: getNeighborhoodImage("Santa Teresa"),
     },
     {
       titulo: "Parque Lage",
       localizacao: "Jardim Botânico",
       tag: "Natureza",
-      image: require("../assets/images/secret2.png"),
+      image: getNeighborhoodImage("Jardim Botânico"),
     },
   ],
   tarde: [
@@ -181,13 +182,13 @@ export const DESTAQUE_PRINCIPAL: Record<Periodo, DestaquePick[]> = {
       titulo: "Confeitaria Colombo",
       localizacao: "Centro",
       tag: "Gastronomia",
-      image: require("../assets/images/restaurante1.png"),
+      image: getNeighborhoodImage("Centro"),
     },
     {
       titulo: "Copacabana Palace",
       localizacao: "Copacabana",
       tag: "Luxo",
-      image: require("../assets/images/hotel1.png"),
+      image: getNeighborhoodImage("Copacabana"),
     },
   ],
   noite: [
@@ -195,13 +196,13 @@ export const DESTAQUE_PRINCIPAL: Record<Periodo, DestaquePick[]> = {
       titulo: "Mirante do Leblon",
       localizacao: "Leblon",
       tag: "Vista",
-      image: require("../assets/images/secret1.png"),
+      image: getNeighborhoodImage("Leblon"),
     },
     {
       titulo: "Pôr do sol Arpoador",
       localizacao: "Arpoador",
       tag: "Ritual",
-      image: require("../assets/images/ipanema.png"),
+      image: getNeighborhoodImage("Arpoador"),
     },
   ],
 };
