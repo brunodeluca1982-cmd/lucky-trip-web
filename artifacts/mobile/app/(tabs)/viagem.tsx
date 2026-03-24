@@ -5,11 +5,11 @@
  *   Header → ActionArea (chips → AI CTA) → SavedGrid | EmptyHint → RoteiroSection
  *
  * Background:
- *   Empty  → static blurred Rio image + gradient overlay
- *   Saved  → rotating fade through saved item images + gradient
+ *   Empty  → static blurred Rio image + cinematic gradient
+ *   Saved  → rotating fade through saved item images + cinematic gradient
  *
- * Style system:
- *   Glassmorphism panels, transparent blocks, cream + terracotta + gold palette.
+ * Style: dark editorial cinematic — matches luckyBlock / Home dark sections.
+ *   rgba(10,5,2,x) panels · gold accent · cream text · no solid terracotta blocks.
  */
 
 import React, { useEffect, useRef, useState } from "react";
@@ -57,9 +57,9 @@ const CATEGORY_LABEL: Record<SavedCategory, string> = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function SceneBackground({ images }: { images: ImageSourcePropType[] }) {
-  const hasSaved   = images.length > 0;
+  const hasSaved      = images.length > 0;
   const [idx, setIdx] = useState(0);
-  const fadeAnim   = useRef(new Animated.Value(1)).current;
+  const fadeAnim      = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     if (images.length <= 1) return;
@@ -84,21 +84,22 @@ function SceneBackground({ images }: { images: ImageSourcePropType[] }) {
 
   return (
     <>
+      {/* Blurred destination image — fills screen */}
       <Animated.Image
         source={src}
         style={[StyleSheet.absoluteFillObject, { opacity: fadeAnim }]}
         resizeMode="cover"
-        blurRadius={Platform.OS === "ios" ? 32 : 20}
+        blurRadius={Platform.OS === "ios" ? 30 : 18}
       />
-      {/* 4-stop gradient: let image breathe at top, opaque cream at bottom */}
+      {/* Cinematic dark vignette — image visible at top, dark at bottom */}
       <LinearGradient
         colors={[
-          "rgba(245,240,232,0.30)",
-          "rgba(245,240,232,0.62)",
-          "rgba(245,240,232,0.88)",
-          "rgba(245,240,232,0.97)",
+          "rgba(10,5,2,0.08)",
+          "rgba(10,5,2,0.38)",
+          "rgba(10,5,2,0.68)",
+          "rgba(10,5,2,0.88)",
         ]}
-        locations={[0, 0.28, 0.55, 1]}
+        locations={[0, 0.30, 0.62, 1]}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
@@ -123,11 +124,11 @@ function SocialChip({
     <Pressable
       style={({ pressed }) => [
         act.socialChip,
-        pressed && { opacity: 0.72, transform: [{ scale: 0.95 }] },
+        pressed && { opacity: 0.65, transform: [{ scale: 0.95 }] },
       ]}
       onPress={onPress}
     >
-      <Feather name={icon} size={13} color={C.terracotta} />
+      <Feather name={icon} size={13} color="rgba(245,240,232,0.75)" />
       <Text style={act.socialLabel} numberOfLines={1}>{label}</Text>
     </Pressable>
   );
@@ -143,31 +144,24 @@ function ActionArea() {
         <SocialChip icon="link-2"    label="Link"      onPress={() => {}} />
       </View>
 
-      {/* Row 2 — primary AI CTA */}
+      {/* Row 2 — primary AI CTA (dark glass panel, gold accent) */}
       <Pressable
         style={({ pressed }) => [
           act.aiBtn,
-          pressed && { opacity: 0.88, transform: [{ scale: 0.985 }] },
+          pressed && { opacity: 0.82, transform: [{ scale: 0.985 }] },
         ]}
         onPress={() => {}}
       >
-        <LinearGradient
-          colors={[C.terracotta, "#B85D3A"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0.8 }}
-          style={act.aiGradient}
-        >
-          <View style={act.aiLeft}>
-            <View style={act.aiIconWrap}>
-              <Feather name="zap" size={15} color={C.white} />
-            </View>
-            <View>
-              <Text style={act.aiLabel}>Criar roteiro com IA</Text>
-              <Text style={act.aiSub}>Baseado nos seus lugares salvos</Text>
-            </View>
+        <View style={act.aiLeft}>
+          <View style={act.aiIconWrap}>
+            <Feather name="zap" size={15} color={GOLD} />
           </View>
-          <Feather name="arrow-right" size={16} color="rgba(255,255,255,0.65)" />
-        </LinearGradient>
+          <View>
+            <Text style={act.aiLabel}>Criar roteiro com IA</Text>
+            <Text style={act.aiSub}>Baseado nos seus lugares salvos</Text>
+          </View>
+        </View>
+        <Feather name="arrow-right" size={15} color={`${GOLD}90`} />
       </Pressable>
     </View>
   );
@@ -179,7 +173,7 @@ const act = StyleSheet.create({
     marginBottom: 28,
   },
 
-  // Social chips row
+  // Social chips — glass, cream tint
   socialRow: {
     flexDirection: "row",
     gap: 8,
@@ -192,28 +186,28 @@ const act = StyleSheet.create({
     gap: 6,
     paddingVertical: 11,
     borderRadius: 12,
-    backgroundColor: "rgba(245,240,232,0.72)",
+    backgroundColor: "rgba(245,240,232,0.07)",
     borderWidth: 1,
-    borderColor: "rgba(196,112,74,0.18)",
+    borderColor: "rgba(245,240,232,0.15)",
   },
   socialLabel: {
     fontFamily: "Inter_500Medium",
     fontSize: 12,
-    color: C.terracotta,
+    color: "rgba(245,240,232,0.75)",
   },
 
-  // AI CTA
+  // AI CTA — dark glass, gold accent (matches home's luckyBlock aesthetic)
   aiBtn: {
-    borderRadius: 16,
-    overflow: "hidden",
-    boxShadow: `0px 8px 24px rgba(196,112,74,0.30)`,
-  },
-  aiGradient: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: 16,
     paddingHorizontal: 20,
+    borderRadius: 16,
+    backgroundColor: "rgba(10,5,2,0.62)",
+    borderWidth: 1,
+    borderColor: `${GOLD}28`,
+    boxShadow: `0px 4px 20px rgba(201,168,76,0.12)`,
   },
   aiLeft: {
     flexDirection: "row",
@@ -225,20 +219,22 @@ const act = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.18)",
+    backgroundColor: `${GOLD}14`,
+    borderWidth: 1,
+    borderColor: `${GOLD}30`,
     alignItems: "center",
     justifyContent: "center",
   },
   aiLabel: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 15,
-    color: C.white,
+    color: C.cream,
     letterSpacing: 0.1,
   },
   aiSub: {
     fontFamily: "Inter_400Regular",
     fontSize: 11,
-    color: "rgba(255,255,255,0.68)",
+    color: "rgba(245,240,232,0.48)",
     marginTop: 1,
   },
 });
@@ -247,7 +243,7 @@ const act = StyleSheet.create({
 // Saved places — compact horizontal scroll
 // ─────────────────────────────────────────────────────────────────────────────
 
-const CARD_W = Math.round((SCREEN_W - 48 - 10) / 2.6); // ~2.6 cards visible
+const CARD_W = Math.round((SCREEN_W - 48 - 10) / 2.6);
 const CARD_H = Math.round(CARD_W * 1.3);
 
 function SavedCard({
@@ -266,27 +262,20 @@ function SavedCard({
       ]}
       onPress={() => router.push(`/lugar/rio/${item.id}`)}
     >
-      {/* Image */}
       <Image source={item.image} style={StyleSheet.absoluteFillObject as any} resizeMode="cover" />
-
-      {/* Bottom gradient */}
       <LinearGradient
-        colors={["transparent", "rgba(10,5,2,0.85)"]}
-        locations={[0.32, 1]}
+        colors={["transparent", "rgba(10,5,2,0.88)"]}
+        locations={[0.28, 1]}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
-
-      {/* Remove × */}
       <Pressable
         style={sc.removeBtn}
         onPress={(e) => { e.stopPropagation?.(); onRemove(item.id); }}
         hitSlop={8}
       >
-        <Feather name="x" size={9} color="rgba(255,255,255,0.88)" />
+        <Feather name="x" size={9} color="rgba(245,240,232,0.80)" />
       </Pressable>
-
-      {/* Footer */}
       <View style={sc.footer}>
         <Text style={sc.catLabel} numberOfLines={1}>
           {CATEGORY_LABEL[item.categoria].toUpperCase()}
@@ -301,7 +290,7 @@ const sc = StyleSheet.create({
   card: {
     borderRadius: 16,
     overflow: "hidden",
-    backgroundColor: "#1C1410",
+    backgroundColor: "#0F0A07",
     marginRight: 10,
     justifyContent: "flex-end",
   },
@@ -316,7 +305,7 @@ const sc = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
+    borderColor: "rgba(245,240,232,0.12)",
   },
   footer: {
     padding: 10,
@@ -331,7 +320,7 @@ const sc = StyleSheet.create({
   name: {
     fontFamily: "PlayfairDisplay_600SemiBold",
     fontSize: 12,
-    color: C.white,
+    color: C.cream,
     lineHeight: 16,
   },
 });
@@ -345,7 +334,6 @@ function SavedSection({
 }) {
   return (
     <View style={ss.wrap}>
-      {/* Section label */}
       <View style={ss.labelRow}>
         <Text style={ss.label}>
           {saved.length === 1 ? "1 lugar salvo" : `${saved.length} lugares salvos`}
@@ -353,8 +341,6 @@ function SavedSection({
         <View style={ss.dot} />
         <Text style={ss.sublabel}>toque para ver</Text>
       </View>
-
-      {/* Horizontal scroll */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -382,7 +368,7 @@ const ss = StyleSheet.create({
   label: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 11,
-    color: C.darkBrown,
+    color: "rgba(245,240,232,0.55)",
     letterSpacing: 1.4,
     textTransform: "uppercase",
   },
@@ -390,13 +376,12 @@ const ss = StyleSheet.create({
     width: 3,
     height: 3,
     borderRadius: 1.5,
-    backgroundColor: C.warmGray,
-    opacity: 0.5,
+    backgroundColor: "rgba(245,240,232,0.30)",
   },
   sublabel: {
     fontFamily: "Inter_400Regular",
     fontSize: 11,
-    color: C.warmGray,
+    color: "rgba(245,240,232,0.35)",
   },
   scroll: {
     paddingRight: 8,
@@ -404,14 +389,14 @@ const ss = StyleSheet.create({
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Empty hint — minimal, elegant, space-efficient
+// Empty hint — dark glass, cream text, gold icon
 // ─────────────────────────────────────────────────────────────────────────────
 
 function EmptyHint() {
   return (
     <View style={eh.wrap}>
       <View style={eh.iconRing}>
-        <Feather name="bookmark" size={20} color={C.terracotta} />
+        <Feather name="bookmark" size={20} color={GOLD} />
       </View>
       <View style={eh.body}>
         <Text style={eh.title}>Nenhum lugar salvo ainda</Text>
@@ -433,17 +418,17 @@ const eh = StyleSheet.create({
     paddingVertical: 20,
     paddingHorizontal: 18,
     borderRadius: 16,
-    backgroundColor: "rgba(245,240,232,0.68)",
+    backgroundColor: "rgba(10,5,2,0.55)",
     borderWidth: 1,
-    borderColor: "rgba(196,112,74,0.14)",
+    borderColor: "rgba(245,240,232,0.08)",
   },
   iconRing: {
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: "rgba(196,112,74,0.10)",
+    backgroundColor: `${GOLD}12`,
     borderWidth: 1,
-    borderColor: "rgba(196,112,74,0.18)",
+    borderColor: `${GOLD}28`,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
@@ -456,22 +441,22 @@ const eh = StyleSheet.create({
   title: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 14,
-    color: C.darkBrown,
+    color: C.cream,
   },
   desc: {
     fontFamily: "Inter_400Regular",
     fontSize: 13,
-    color: C.warmGray,
+    color: "rgba(245,240,232,0.50)",
     lineHeight: 20,
   },
   bold: {
     fontFamily: "Inter_600SemiBold",
-    color: C.terracotta,
+    color: GOLD,
   },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Roteiro Base — glass cards, day-by-day timetable
+// Roteiro Base — dark glass cards matching home's luckyBlock aesthetic
 // ─────────────────────────────────────────────────────────────────────────────
 
 function PeriodoBlock({ periodo, items }: DiaPeriodo) {
@@ -480,7 +465,7 @@ function PeriodoBlock({ periodo, items }: DiaPeriodo) {
   return (
     <View style={rot.periodoWrap}>
       <View style={rot.periodoHeader}>
-        <Feather name={icon} size={10} color={C.terracotta} />
+        <Feather name={icon} size={10} color={GOLD} />
         <Text style={rot.periodoLabel}>{label}</Text>
       </View>
       {items.map((item) => (
@@ -538,31 +523,31 @@ const rot = StyleSheet.create({
   sectionLabel: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 11,
-    color: C.darkBrown,
+    color: "rgba(245,240,232,0.55)",
     letterSpacing: 1.4,
     textTransform: "uppercase",
   },
   pill: {
-    backgroundColor: "rgba(196,112,74,0.10)",
+    backgroundColor: `${GOLD}10`,
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderWidth: 1,
-    borderColor: "rgba(196,112,74,0.16)",
+    borderColor: `${GOLD}24`,
   },
   pillText: {
     fontFamily: "Inter_500Medium",
     fontSize: 10,
-    color: C.terracotta,
+    color: GOLD,
   },
   diaCard: {
     borderRadius: 16,
-    backgroundColor: "rgba(245,240,232,0.78)",
+    backgroundColor: "rgba(10,5,2,0.60)",
     borderWidth: 1,
-    borderColor: "rgba(196,112,74,0.12)",
+    borderColor: `${GOLD}18`,
     paddingHorizontal: 18,
     paddingVertical: 16,
-    boxShadow: `0px 2px 12px rgba(10,5,2,0.06)`,
+    boxShadow: `0px 2px 12px rgba(10,5,2,0.20)`,
   },
   diaHeader: {
     marginBottom: 10,
@@ -571,19 +556,19 @@ const rot = StyleSheet.create({
   diaNum: {
     fontFamily: "Inter_700Bold",
     fontSize: 10,
-    color: C.terracotta,
+    color: GOLD,
     letterSpacing: 1.6,
     textTransform: "uppercase",
   },
   diaBairro: {
     fontFamily: "PlayfairDisplay_600SemiBold",
     fontSize: 20,
-    color: C.darkBrown,
+    color: C.cream,
     lineHeight: 26,
   },
   separator: {
     height: 1,
-    backgroundColor: "rgba(196,112,74,0.12)",
+    backgroundColor: `${GOLD}14`,
     marginBottom: 12,
   },
   periodoWrap: {
@@ -598,7 +583,7 @@ const rot = StyleSheet.create({
   periodoLabel: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 9,
-    color: C.terracotta,
+    color: GOLD,
     letterSpacing: 1.4,
     textTransform: "uppercase",
   },
@@ -612,14 +597,13 @@ const rot = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: C.warmGray,
-    opacity: 0.45,
+    backgroundColor: "rgba(245,240,232,0.25)",
     flexShrink: 0,
   },
   itemNome: {
     fontFamily: "Inter_400Regular",
     fontSize: 13,
-    color: C.darkBrown,
+    color: "rgba(245,240,232,0.75)",
     flex: 1,
   },
 });
@@ -641,7 +625,7 @@ export default function MinhaViagemScreen() {
   return (
     <View style={s.root}>
 
-      {/* ── Ambient background — always present ── */}
+      {/* ── Cinematic background — always present ── */}
       <SceneBackground images={bgImages} />
 
       <ScrollView
@@ -694,19 +678,19 @@ export default function MinhaViagemScreen() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Screen styles
+// Screen-level styles
 // ─────────────────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#100A06",
+    backgroundColor: "#0A0502",
   },
   content: {
     paddingHorizontal: 24,
   },
 
-  // Header
+  // Header — cream text on dark cinematic background
   header: {
     gap: 5,
     marginBottom: 22,
@@ -714,7 +698,7 @@ const s = StyleSheet.create({
   eyebrow: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 11,
-    color: C.terracotta,
+    color: GOLD,
     letterSpacing: 2.5,
   },
   titleRow: {
@@ -725,11 +709,11 @@ const s = StyleSheet.create({
   title: {
     fontFamily: "PlayfairDisplay_700Bold",
     fontSize: 36,
-    color: C.darkBrown,
+    color: C.cream,
     lineHeight: 42,
   },
   countBadge: {
-    backgroundColor: C.terracotta,
+    backgroundColor: `${GOLD}22`,
     borderRadius: 14,
     minWidth: 28,
     height: 28,
@@ -737,23 +721,25 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginTop: 4,
+    borderWidth: 1,
+    borderColor: `${GOLD}40`,
   },
   countText: {
     fontFamily: "Inter_700Bold",
     fontSize: 13,
-    color: C.white,
+    color: GOLD,
   },
   subtitle: {
     fontFamily: "Inter_400Regular",
     fontSize: 13.5,
-    color: C.warmGray,
+    color: "rgba(245,240,232,0.50)",
     lineHeight: 20,
   },
 
-  // Divider
+  // Rule
   rule: {
     height: 1,
-    backgroundColor: "rgba(196,112,74,0.14)",
+    backgroundColor: "rgba(245,240,232,0.08)",
     marginBottom: 22,
   },
 });
