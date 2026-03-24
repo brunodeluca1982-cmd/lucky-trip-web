@@ -31,6 +31,7 @@ import Colors from "@/constants/colors";
 import { destinos } from "@/data/mockData";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import { useNeighborhoods } from "@/hooks/useNeighborhoods";
+import { getNeighborhoodHero } from "@/utils/neighborhoodHero";
 
 const C = Colors.light;
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -80,7 +81,11 @@ export default function ComerBemBairroScreen() {
         {/* ── Hero ── */}
         <View style={[s.hero, { height: HERO_H }]}>
           <Image
-            source={destino.image}
+            source={getNeighborhoodHero(
+              supabaseNeighborhood?.image_url,
+              bairroNome,
+              destino.image,
+            )}
             style={StyleSheet.absoluteFillObject}
             resizeMode="cover"
           />

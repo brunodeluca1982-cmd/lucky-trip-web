@@ -34,6 +34,7 @@ import Colors from "@/constants/colors";
 import { destinos } from "@/data/mockData";
 import { useNeighborhoods } from "@/hooks/useNeighborhoods";
 import type { Hotel } from "@/lib/supabase";
+import { getNeighborhoodHero } from "@/utils/neighborhoodHero";
 
 const C = Colors.light;
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -124,7 +125,11 @@ export default function BairroDetailScreen() {
           {/* ── Hero ── */}
           <View style={[s.hero, { height: HERO_H }]}>
             <Image
-              source={destino.image}
+              source={getNeighborhoodHero(
+                neighborhood.image_url,
+                neighborhood.neighborhood_name,
+                destino.image,
+              )}
               style={StyleSheet.absoluteFillObject}
               resizeMode="cover"
             />

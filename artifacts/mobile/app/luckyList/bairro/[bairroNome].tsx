@@ -32,6 +32,7 @@ import Colors from "@/constants/colors";
 import { destinos } from "@/data/mockData";
 import { LUGARES_LUCKY } from "@/data/lugares";
 import { useNeighborhoods } from "@/hooks/useNeighborhoods";
+import { getNeighborhoodHero } from "@/utils/neighborhoodHero";
 
 const C    = Colors.light;
 const GOLD = "#C9A84C";
@@ -83,7 +84,11 @@ export default function LuckyListBairroScreen() {
         {/* ── Hero ── */}
         <View style={[s.hero, { height: HERO_H }]}>
           <Image
-            source={destino.image}
+            source={getNeighborhoodHero(
+              supabaseNeighborhood?.image_url,
+              bairroNome,
+              destino.image,
+            )}
             style={StyleSheet.absoluteFillObject}
             resizeMode="cover"
           />

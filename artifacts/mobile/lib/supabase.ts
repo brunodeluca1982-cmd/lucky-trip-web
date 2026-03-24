@@ -49,6 +49,7 @@ export type Neighborhood = {
   neighborhood_slug: string;
   title: string;
   identity_phrase: string;
+  image_url?: string | null;
   best_for_1: string;
   best_for_2: string;
   best_for_3: string;
