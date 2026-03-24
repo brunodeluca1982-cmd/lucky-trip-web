@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useHotel } from "@/hooks/useHotel";
-import { destinos } from "@/data/mockData";
+import { getImageForEntity } from "@/utils/getImageForEntity";
 
 const C = Colors.light;
 
@@ -42,8 +42,10 @@ export default function HotelDetailScreen() {
 
   const { hotel, loading, error } = useHotel(hotelId ?? "");
 
-  // Hero image — use the Rio destination photo (same image used across all Rio screens)
-  const heroImage = destinos.find((d) => d.id === "rio")?.image ?? destinos[0].image;
+  // Hero image — hotel-specific via resolver (curated → neighborhood context → local asset)
+  const heroImage = hotel
+    ? getImageForEntity("hotel", hotel.hotel_name, hotel.neighborhood.neighborhood_name)
+    : getImageForEntity("neighborhood", "Ipanema");
 
   return (
     <View style={s.root}>
