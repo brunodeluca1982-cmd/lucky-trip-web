@@ -257,7 +257,7 @@ export default function LugarDetailScreen() {
               <Feather
                 name={saved ? "check" : "bookmark"}
                 size={16}
-                color={saved ? C.terracotta : C.darkBrown}
+                color={saved ? "rgba(255,255,255,0.75)" : C.darkBrown}
               />
               <Text style={[s.btnPrimaryText, saved && s.btnPrimaryTextSaved]}>
                 {saved ? "Salvo" : "Salvar"}
@@ -473,9 +473,9 @@ const s = StyleSheet.create({
     paddingVertical: 17,
   },
   btnPrimarySaved: {
-    backgroundColor: "rgba(196,112,74,0.12)",
+    backgroundColor: "rgba(255,255,255,0.08)",
     borderWidth: 1,
-    borderColor: "rgba(196,112,74,0.30)",
+    borderColor: "rgba(255,255,255,0.16)",
   },
   btnPrimaryText: {
     fontFamily: "Inter_600SemiBold",
@@ -484,7 +484,7 @@ const s = StyleSheet.create({
     letterSpacing: 0.2,
   },
   btnPrimaryTextSaved: {
-    color: C.terracotta,
+    color: "rgba(255,255,255,0.75)",
   },
 
   // Secondary — Voltar

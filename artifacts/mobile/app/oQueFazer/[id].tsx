@@ -131,7 +131,7 @@ export default function OQueFazerScreen() {
             >
               {/* Image area */}
               <View style={s.cardImageWrap}>
-                <Image source={place.image} style={s.cardImage} resizeMode="cover" />
+                <Image source={place.image} style={s.cardImage} />
                 <LinearGradient
                   colors={["rgba(0,0,0,0.12)", "transparent"]}
                   locations={[0, 0.4]}
@@ -276,7 +276,7 @@ const s = StyleSheet.create({
   },
 
   cardsSection: {
-    backgroundColor: C.cream,
+    backgroundColor: "#100A06",
     paddingTop: 28,
     paddingHorizontal: 20,
     paddingBottom: 8,
@@ -284,17 +284,19 @@ const s = StyleSheet.create({
   cardsSectionLabel: {
     fontFamily: "Inter_500Medium",
     fontSize: 11,
-    color: C.warmGray,
+    color: "rgba(255,255,255,0.35)",
     letterSpacing: 1.8,
     textTransform: "uppercase",
     marginBottom: 20,
   },
 
   card: {
-    backgroundColor: "#1C1410",
+    backgroundColor: "rgba(255,255,255,0.04)",
     borderRadius: 18,
     overflow: "hidden",
     marginBottom: 24,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
   },
 
   cardImageWrap: {
@@ -361,7 +363,7 @@ const s = StyleSheet.create({
   cardCategoria: {
     fontFamily: "Inter_500Medium",
     fontSize: 10,
-    color: C.terracotta,
+    color: "rgba(255,255,255,0.50)",
     letterSpacing: 1.4,
   },
   cardLocWrap: {
@@ -396,15 +398,15 @@ const s = StyleSheet.create({
     justifyContent: "center",
     gap: 7,
     borderWidth: 1,
-    borderColor: "rgba(196,112,74,0.30)",
+    borderColor: "rgba(255,255,255,0.12)",
     borderRadius: 10,
     paddingVertical: 11,
-    backgroundColor: "rgba(196,112,74,0.06)",
+    backgroundColor: "rgba(255,255,255,0.06)",
   },
   verNoMapaText: {
     fontFamily: "Inter_500Medium",
     fontSize: 13,
-    color: C.terracotta,
+    color: "rgba(255,255,255,0.65)",
     letterSpacing: 0.2,
   },
 
@@ -430,24 +432,24 @@ const s = StyleSheet.create({
   },
 
   footer: {
-    backgroundColor: C.cream,
+    backgroundColor: "#100A06",
     marginTop: 4,
     paddingVertical: 32,
     paddingHorizontal: 24,
     borderTopWidth: 1,
-    borderTopColor: C.border,
+    borderTopColor: "rgba(255,255,255,0.06)",
     alignItems: "center",
     gap: 8,
   },
   footerL: {
     fontFamily: "PlayfairDisplay_700Bold",
     fontSize: 32,
-    color: C.terracotta,
+    color: "rgba(255,255,255,0.25)",
   },
   footerText: {
     fontFamily: "Inter_400Regular",
     fontSize: 13,
-    color: C.warmGray,
+    color: "rgba(255,255,255,0.35)",
     textAlign: "center",
     lineHeight: 20,
     maxWidth: 240,
