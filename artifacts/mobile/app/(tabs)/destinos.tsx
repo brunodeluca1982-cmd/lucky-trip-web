@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { memo } from "react";
 import {
   Dimensions,
   Image,
+  ImageSourcePropType,
   Platform,
   Pressable,
   ScrollView,
@@ -14,10 +15,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
-import Colors from "@/constants/colors";
 import { destinos } from "@/data/mockData";
 
-const C = Colors.light;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 const H_PAD = 14;
@@ -28,12 +27,71 @@ const CARD_H = Math.round(CARD_W * 1.18);
 
 const SELECTED_ID = "rio";
 
+// ── Memoized card: does not re-render when parent query state changes ──────────
+interface DestCardProps {
+  id: string;
+  cidade: string;
+  pais: string;
+  image: ImageSourcePropType;
+  selected: boolean;
+  onPress: () => void;
+}
+
+const DestCard = memo(function DestCard({
+  id,
+  cidade,
+  pais,
+  image,
+  selected,
+  onPress,
+}: DestCardProps) {
+  return (
+    <Pressable
+      key={id}
+      onPress={onPress}
+      style={({ pressed }) => [
+        s.card,
+        selected && s.cardSelected,
+        pressed && { opacity: 0.88, transform: [{ scale: 0.97 }] },
+      ]}
+    >
+      {/* Image fills card — identical pattern to DestinationCard.tsx */}
+      <Image source={image} style={s.cardImage} resizeMode="cover" />
+
+      {/* Bottom-anchored gradient — does NOT obscure the image on load */}
+      <LinearGradient
+        colors={["transparent", "rgba(0,0,0,0.20)", "rgba(0,0,0,0.82)"]}
+        locations={[0.25, 0.55, 1]}
+        style={s.cardGradient}
+      />
+
+      {/* Selected checkmark badge */}
+      {selected && (
+        <View style={s.checkBadge}>
+          <Feather name="check" size={10} color="#1C0E08" />
+        </View>
+      )}
+
+      {/* Labels */}
+      <View style={s.cardInfo}>
+        <Text style={s.cardCidade} numberOfLines={1}>
+          {cidade}
+        </Text>
+        <Text style={s.cardPais} numberOfLines={1}>
+          {pais}
+        </Text>
+      </View>
+    </Pressable>
+  );
+});
+
+// ── Screen ─────────────────────────────────────────────────────────────────────
 export default function DestinosScreen() {
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === "web" ? 67 : insets.top + 12;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = React.useState("");
 
   const filtered = query.trim()
     ? destinos.filter(
@@ -46,10 +104,6 @@ export default function DestinosScreen() {
   const rows: (typeof destinos)[] = [];
   for (let i = 0; i < filtered.length; i += COLS) {
     rows.push(filtered.slice(i, i + COLS));
-  }
-
-  function navigate(id: string) {
-    router.push({ pathname: "/cidade/[id]", params: { id } });
   }
 
   return (
@@ -112,48 +166,22 @@ export default function DestinosScreen() {
           <View style={s.grid}>
             {rows.map((row, ri) => (
               <View key={ri} style={s.row}>
-                {row.map((d) => {
-                  const selected = d.id === SELECTED_ID;
-                  return (
-                    <Pressable
-                      key={d.id}
-                      onPress={() => navigate(d.id)}
-                      style={({ pressed }) => [
-                        s.card,
-                        selected && s.cardSelected,
-                        pressed && { opacity: 0.88, transform: [{ scale: 0.97 }] },
-                      ]}
-                    >
-                      <Image
-                        source={d.image}
-                        style={s.cardImage}
-                        resizeMode="cover"
-                      />
-                      <LinearGradient
-                        colors={["transparent", "rgba(0,0,0,0.18)", "rgba(0,0,0,0.82)"]}
-                        locations={[0.25, 0.55, 1]}
-                        style={StyleSheet.absoluteFill}
-                      />
-
-                      {/* Selected checkmark */}
-                      {selected && (
-                        <View style={s.checkBadge}>
-                          <Feather name="check" size={10} color="#1C0E08" />
-                        </View>
-                      )}
-
-                      {/* Card labels */}
-                      <View style={s.cardInfo}>
-                        <Text style={s.cardCidade} numberOfLines={1}>
-                          {d.cidade}
-                        </Text>
-                        <Text style={s.cardPais} numberOfLines={1}>
-                          {d.pais}
-                        </Text>
-                      </View>
-                    </Pressable>
-                  );
-                })}
+                {row.map((d) => (
+                  <DestCard
+                    key={d.id}
+                    id={d.id}
+                    cidade={d.cidade}
+                    pais={d.pais}
+                    image={d.image}
+                    selected={d.id === SELECTED_ID}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/cidade/[id]",
+                        params: { id: d.id },
+                      })
+                    }
+                  />
+                ))}
                 {/* Fill trailing empty slots */}
                 {row.length < COLS &&
                   Array.from({ length: COLS - row.length }).map((_, i) => (
@@ -183,7 +211,6 @@ const s = StyleSheet.create({
     height: "100%",
     opacity: 0.55,
   },
-
   scroll: {
     paddingHorizontal: H_PAD,
   },
@@ -246,7 +273,7 @@ const s = StyleSheet.create({
     padding: 0,
   },
 
-  // 3-column grid
+  // Grid
   grid: {
     gap: GAP,
   },
@@ -254,6 +281,8 @@ const s = StyleSheet.create({
     flexDirection: "row",
     gap: GAP,
   },
+
+  // Card — mirrors DestinationCard.tsx pattern exactly
   card: {
     width: CARD_W,
     height: CARD_H,
@@ -268,6 +297,15 @@ const s = StyleSheet.create({
   cardImage: {
     width: "100%",
     height: "100%",
+    resizeMode: "cover",
+  },
+  // Bottom-anchored: image top half is never covered
+  cardGradient: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: "70%",
   },
   checkBadge: {
     position: "absolute",
