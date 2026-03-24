@@ -243,7 +243,7 @@ function HotelCard({
           )}
           {hotel.rooftop && (
             <View style={s.badge}>
-              <Text style={s.badgeTxt}>Rooftop</Text>
+              <Text style={s.badgeTxt}>Terraço</Text>
             </View>
           )}
         </View>

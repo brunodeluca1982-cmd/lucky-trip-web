@@ -114,7 +114,7 @@ export default function HotelDetailScreen() {
               )}
               {hotel.rooftop && (
                 <View style={s.featureBadge}>
-                  <Text style={s.featureBadgeText}>Rooftop</Text>
+                  <Text style={s.featureBadgeText}>Terraço</Text>
                 </View>
               )}
             </View>

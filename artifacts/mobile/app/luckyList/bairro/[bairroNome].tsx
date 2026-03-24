@@ -216,7 +216,7 @@ export default function LuckyListBairroScreen() {
         >
           <View style={s.listHeader}>
             <Text style={s.listLabel}>
-              {itemCount > 0 ? `${itemCount} Picks` : "Picks"} em {bairroNome}
+              {itemCount > 0 ? `${itemCount} seleções` : "Seleções"} em {bairroNome}
             </Text>
             <View style={s.listLine} />
           </View>
@@ -290,7 +290,7 @@ export default function LuckyListBairroScreen() {
           <Text style={s.footerGold}>✦</Text>
           <Text style={s.footerTitle}>Lucky Trip</Text>
           <Text style={s.footerSub}>
-            Picks curados para quem sabe escolher · {bairroNome}
+            Seleções curadas para quem sabe escolher · {bairroNome}
           </Text>
         </View>
       </ScrollView>

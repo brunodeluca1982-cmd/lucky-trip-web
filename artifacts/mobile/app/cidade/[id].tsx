@@ -88,8 +88,8 @@ const AGORA: Record<string, Record<Periodo, string>> = {
   },
   "nova-york": {
     manha: "Café no West Village",
-    tarde: "Golden hour no High Line",
-    noite: "Rooftop bar em Manhattan",
+    tarde: "Hora dourada no High Line",
+    noite: "Bar no terraço em Manhattan",
   },
   toquio: {
     manha: "Sakura no Shinjuku Gyoen",

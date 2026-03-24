@@ -350,7 +350,7 @@ function HotelCard({
           <View style={hc.badge}><Text style={hc.badgeTxt}>Frente ao mar</Text></View>
         )}
         {hotel.rooftop && (
-          <View style={hc.badge}><Text style={hc.badgeTxt}>Rooftop</Text></View>
+          <View style={hc.badge}><Text style={hc.badgeTxt}>Terraço</Text></View>
         )}
       </View>
 
