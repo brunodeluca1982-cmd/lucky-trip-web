@@ -1,6 +1,7 @@
 import React from "react";
 import {
   ActivityIndicator,
+  Image,
   Linking,
   Platform,
   Pressable,
@@ -15,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useHotel } from "@/hooks/useHotel";
+import { destinos } from "@/data/mockData";
 
 const C = Colors.light;
 
@@ -39,6 +41,9 @@ export default function HotelDetailScreen() {
   const bottomPad   = Platform.OS === "web" ? 34 : insets.bottom;
 
   const { hotel, loading, error } = useHotel(hotelId ?? "");
+
+  // Hero image — use the Rio destination photo (same image used across all Rio screens)
+  const heroImage = destinos.find((d) => d.id === "rio")?.image ?? destinos[0].image;
 
   return (
     <View style={s.root}>
@@ -84,13 +89,20 @@ export default function HotelDetailScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: bottomPad + 48 }}
         >
-          {/* Hero header */}
-          <LinearGradient
-            colors={["#2A1410", "#100A06"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={s.hero}
-          >
+          {/* Hero header — real destination image with gradient overlay */}
+          <View style={s.hero}>
+            <Image
+              source={heroImage}
+              style={StyleSheet.absoluteFillObject}
+              resizeMode="cover"
+            />
+            <LinearGradient
+              colors={["rgba(0,0,0,0.06)", "rgba(10,5,2,0.60)", "#0A0502"]}
+              locations={[0.10, 0.52, 0.90]}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
+
             {/* Feature badges */}
             <View style={s.heroBadges}>
               {hotel.front_beach && (
@@ -123,7 +135,7 @@ export default function HotelDetailScreen() {
                 </View>
               )}
             </View>
-          </LinearGradient>
+          </View>
 
           {/* Divider */}
           <View style={s.divider} />
@@ -285,6 +297,8 @@ const s = StyleSheet.create({
     paddingBottom: 28,
     minHeight: 200,
     justifyContent: "space-between",
+    overflow: "hidden",
+    position: "relative",
   },
   heroBadges: {
     flexDirection: "row",
@@ -292,17 +306,17 @@ const s = StyleSheet.create({
     justifyContent: "flex-end",
   },
   featureBadge: {
-    backgroundColor: "rgba(196,112,74,0.22)",
+    backgroundColor: "rgba(255,255,255,0.08)",
     borderRadius: 20,
     paddingHorizontal: 11,
     paddingVertical: 5,
     borderWidth: 1,
-    borderColor: "rgba(196,112,74,0.35)",
+    borderColor: "rgba(255,255,255,0.14)",
   },
   featureBadgeText: {
     fontFamily: "Inter_500Medium",
     fontSize: 10,
-    color: C.terracotta,
+    color: "rgba(255,255,255,0.75)",
     letterSpacing: 0.4,
   },
   neighborhoodWatermark: {
@@ -390,7 +404,7 @@ const s = StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: 2.5,
-    backgroundColor: C.terracotta,
+    backgroundColor: "rgba(201,168,76,0.55)",
     marginTop: 9,
     flexShrink: 0,
   },
@@ -441,14 +455,14 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 9,
-    backgroundColor: C.terracotta,
+    backgroundColor: C.cream,
     borderRadius: 14,
     paddingVertical: 16,
   },
   reservarText: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 15,
-    color: "#0A0502",
+    color: C.darkBrown,
     letterSpacing: 0.2,
   },
   mapsBtn: {
@@ -457,15 +471,15 @@ const s = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     borderWidth: 1,
-    borderColor: "rgba(196,112,74,0.30)",
+    borderColor: "rgba(255,255,255,0.10)",
     borderRadius: 14,
     paddingVertical: 14,
-    backgroundColor: "rgba(196,112,74,0.06)",
+    backgroundColor: "rgba(255,255,255,0.06)",
   },
   mapsBtnText: {
     fontFamily: "Inter_500Medium",
     fontSize: 14,
-    color: C.terracotta,
+    color: "rgba(255,255,255,0.68)",
     letterSpacing: 0.1,
   },
 
