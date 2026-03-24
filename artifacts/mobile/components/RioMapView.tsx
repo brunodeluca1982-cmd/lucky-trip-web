@@ -74,19 +74,38 @@ function buildLeafletHTML(
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body, #map { width: 100%; height: 100%; background: #E8E2D8; }
+    html, body { width: 100%; height: 100%; background: #0C0804; }
+    #map { width: 100%; height: 100%; }
 
     /*
-     * voyager_nolabels tiles: natural cartographic colors (blue water, green parks,
-     * warm beige roads) with zero built-in text labels — our custom markers are
-     * the only labels on the map.
-     *
-     * Subtle filter: slightly reduce saturation for a premium editorial tone,
-     * very gentle contrast reduction to soften the tile rendering.
-     * No heavy overlay; no dark wash.
+     * Tile layer: voyager_nolabels — natural cartographic colors, zero built-in
+     * text labels. Subtle filter: desaturate slightly (premium tone) + very faint
+     * blur so tiles read as a background canvas, not a tool interface.
      */
-    .leaflet-layer {
-      filter: saturate(0.78) contrast(0.92) brightness(1.04);
+    .leaflet-tile-pane {
+      filter: saturate(0.72) brightness(0.98) blur(0.55px);
+    }
+
+    /*
+     * GRADIENT OVERLAY — makes the map feel like a rich background image that
+     * fades into the app's dark background. Light dark wash at top (for legibility
+     * of the floating controls), transparent in the middle (full map visibility),
+     * deep warm fade at the bottom (seamless transition to app content below).
+     * z-index 450 sits above tiles but below Leaflet controls (z-index 1000).
+     */
+    #map-gradient {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+      z-index: 450;
+      background: linear-gradient(
+        180deg,
+        rgba(10, 5, 2, 0.38) 0%,
+        rgba(10, 5, 2, 0.00) 22%,
+        rgba(10, 5, 2, 0.00) 54%,
+        rgba(10, 5, 2, 0.62) 80%,
+        rgba(10, 5, 2, 0.88) 100%
+      );
     }
 
     .neigh-marker {
@@ -96,72 +115,73 @@ function buildLeafletHTML(
       cursor: pointer;
     }
 
-    /* Dots — terracotta with a white halo so they pop on the light map */
+    /* Neighbourhood dots — warm terracotta, white ring, subtle drop shadow */
     .neigh-dot {
       width: 10px; height: 10px;
       border-radius: 50%;
       background: #C4704A;
-      border: 2px solid #fff;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.30);
+      border: 2px solid rgba(255,255,255,0.80);
+      box-shadow: 0 1px 5px rgba(0,0,0,0.40), 0 0 0 1px rgba(196,112,74,0.20);
       transition: transform 0.15s, box-shadow 0.15s;
     }
     .neigh-dot.selected {
-      background: #C4704A;
-      border-color: #fff;
-      box-shadow: 0 0 0 4px rgba(196,112,74,0.30), 0 1px 6px rgba(0,0,0,0.35);
+      background: #D4845C;
+      border-color: rgba(255,255,255,0.95);
+      box-shadow: 0 0 0 5px rgba(196,112,74,0.28), 0 2px 8px rgba(0,0,0,0.45);
       transform: scale(1.45);
     }
-    /* Visual-only landmarks: smaller, muted dot */
     .neigh-dot.visual {
       width: 7px; height: 7px;
-      background: rgba(100,85,70,0.45);
-      border: 1.5px solid rgba(100,85,70,0.55);
-      box-shadow: none;
+      background: rgba(201,168,76,0.55);
+      border: 1.5px solid rgba(201,168,76,0.60);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.30);
     }
 
-    /* Labels — dark text on light map, white halo for legibility */
+    /* Labels — white text with warm shadow, readable over both map & gradient */
     .neigh-label {
       margin-top: 4px;
       font-family: -apple-system, 'Inter', sans-serif;
       font-size: 10px;
       font-weight: 600;
-      color: rgba(30,18,10,0.88);
+      color: rgba(255,255,255,0.90);
       white-space: nowrap;
-      letter-spacing: 0.15px;
+      letter-spacing: 0.25px;
       text-shadow:
-        0 0 4px rgba(255,255,255,0.95),
-        0 0 8px rgba(255,255,255,0.80),
-        1px 1px 0 rgba(255,255,255,0.70),
-        -1px -1px 0 rgba(255,255,255,0.70);
+        0 1px 4px rgba(0,0,0,0.75),
+        0 0 10px rgba(0,0,0,0.55);
       pointer-events: none;
     }
     .neigh-label.selected {
-      color: #9E3D1A;
-      font-weight: 700;
+      color: #F5C89A;
+      text-shadow: 0 1px 6px rgba(0,0,0,0.80), 0 0 14px rgba(196,112,74,0.40);
     }
-    /* Landmark labels — italic, smaller, muted brown */
     .neigh-label.visual {
       font-size: 9px;
       font-weight: 400;
       font-style: italic;
-      color: rgba(60,45,30,0.60);
-      text-shadow:
-        0 0 4px rgba(255,255,255,0.90),
-        0 0 8px rgba(255,255,255,0.70);
+      color: rgba(201,168,76,0.78);
+      text-shadow: 0 1px 4px rgba(0,0,0,0.70);
     }
 
-    /* Leaflet chrome — clean white buttons to match the light map */
-    .leaflet-control-attribution { font-size: 8px; opacity: 0.28; }
+    /* Leaflet chrome — glass style matching the app's floating UI */
+    .leaflet-control-attribution { font-size: 8px; opacity: 0.22; }
     .leaflet-bar a {
-      background: rgba(255,255,255,0.88);
-      color: rgba(40,28,18,0.80);
-      border-color: rgba(180,160,140,0.40);
+      background: rgba(255,255,255,0.14);
+      color: rgba(255,255,255,0.80);
+      border-color: rgba(255,255,255,0.20);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
     }
-    .leaflet-bar a:hover { background: rgba(255,255,255,1); }
+    .leaflet-bar a:hover {
+      background: rgba(255,255,255,0.22);
+      color: rgba(255,255,255,0.95);
+    }
+    .leaflet-bar { border: 1px solid rgba(255,255,255,0.15) !important; border-radius: 10px !important; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.35); }
   </style>
 </head>
 <body>
   <div id="map"></div>
+  <div id="map-gradient"></div>
   <script>
     var NEIGHBORHOODS = ${neighborhoodsJSON};
     var SELECTED = ${JSON.stringify(selected)};
@@ -174,9 +194,9 @@ function buildLeafletHTML(
     });
 
     /*
-     * voyager_nolabels — CartoDB Voyager style with NO built-in text labels.
-     * All map text you see comes exclusively from our custom markers below.
-     * Natural colors: blue Atlantic, green Tijuca forest, warm beige city fabric.
+     * voyager_nolabels — CartoDB Voyager with NO built-in text labels.
+     * Natural colors: blue Atlantic, green Tijuca, warm beige city fabric.
+     * All visible text comes only from our 14 custom markers below.
      */
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://openstreetmap.org/copyright">OSM</a>',

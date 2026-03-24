@@ -296,45 +296,48 @@ function NeighborhoodCard({
   onDismiss: () => void;
 }) {
   return (
-    <View style={nc.card}>
+    <LinearGradient
+      colors={["rgba(28,16,8,0.97)", "rgba(10,5,2,0.98)"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0.6, y: 1 }}
+      style={nc.card}
+    >
       {/* Header */}
       <View style={nc.header}>
         <View style={nc.headerLeft}>
+          {/* Best-for tags — above the title like the detail screen category tags */}
+          <View style={nc.tags}>
+            {[neighborhood.best_for_1, neighborhood.best_for_2, neighborhood.best_for_3]
+              .filter(Boolean)
+              .map((tag, i) => (
+                <View key={i} style={nc.tag}>
+                  <Text style={nc.tagText}>{(tag as string).toUpperCase()}</Text>
+                </View>
+              ))}
+          </View>
           <Text style={nc.name}>{neighborhood.neighborhood_name}</Text>
           <Text style={nc.phrase} numberOfLines={2}>
             {neighborhood.identity_phrase}
           </Text>
         </View>
-        <Pressable style={nc.closeBtn} onPress={onDismiss} hitSlop={10}>
-          <Feather name="x" size={14} color="rgba(255,255,255,0.40)" />
+        <Pressable style={nc.closeBtn} onPress={onDismiss} hitSlop={12}>
+          <Feather name="x" size={13} color="rgba(255,255,255,0.35)" />
         </Pressable>
-      </View>
-
-      {/* Best-for tags */}
-      <View style={nc.tags}>
-        {[neighborhood.best_for_1, neighborhood.best_for_2, neighborhood.best_for_3]
-          .filter(Boolean)
-          .map((tag, i) => (
-            <View key={i} style={nc.tag}>
-              <Text style={nc.tagText}>{tag}</Text>
-            </View>
-          ))}
       </View>
 
       {/* Action buttons */}
       <View style={nc.actions}>
         <Pressable style={nc.hotBtn} onPress={onVerHoteis}>
-          <Feather name="list" size={13} color="#0A0502" />
           <Text style={nc.hotBtnText}>
             {hotelCount} hotel{hotelCount !== 1 ? "s" : ""}
           </Text>
         </Pressable>
         <Pressable style={nc.ghostBtn} onPress={onPorDentro}>
           <Text style={nc.ghostBtnText}>Por dentro</Text>
-          <Feather name="arrow-right" size={13} color={C.terracotta} />
+          <Feather name="arrow-right" size={12} color="rgba(255,255,255,0.55)" />
         </Pressable>
       </View>
-    </View>
+    </LinearGradient>
   );
 }
 
@@ -461,18 +464,19 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "rgba(5,2,0,0.62)",
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    backgroundColor: "rgba(10,5,2,0.46)",
+    borderRadius: 22,
+    paddingHorizontal: 15,
+    paddingVertical: 9,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.16)",
-    boxShadow: "0px 2px 10px rgba(0,0,0,0.40)",
+    borderColor: "rgba(255,255,255,0.14)",
+    boxShadow: "0px 2px 16px rgba(0,0,0,0.38), 0px 0px 0px 1px rgba(255,255,255,0.06)",
   } as any,
   pillText: {
-    fontFamily: "Inter_500Medium",
+    fontFamily: "Inter_400Regular",
     fontSize: 13,
-    color: "rgba(255,255,255,0.90)",
+    color: "rgba(255,255,255,0.88)",
+    letterSpacing: 0.1,
   },
   badgeDot: {
     width: 6,
@@ -485,7 +489,7 @@ const s = StyleSheet.create({
   },
   mapHint: {
     position: "absolute",
-    bottom: 10,
+    bottom: 14,
     left: 0,
     right: 0,
     alignItems: "center",
@@ -493,13 +497,11 @@ const s = StyleSheet.create({
   },
   mapHintText: {
     fontFamily: "Inter_400Regular",
-    fontSize: 10,
-    color: "rgba(255,255,255,0.45)",
-    letterSpacing: 0.3,
-    backgroundColor: "rgba(5,2,0,0.52)",
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
+    fontSize: 11,
+    color: "rgba(255,255,255,0.52)",
+    letterSpacing: 0.4,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
   },
 
   // ── Scrollable list ──
@@ -516,24 +518,25 @@ const s = StyleSheet.create({
   },
   introTitle: {
     fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 22,
+    fontSize: 28,
     color: C.white,
-    lineHeight: 30,
-    letterSpacing: -0.2,
-    marginBottom: 6,
+    lineHeight: 36,
+    letterSpacing: -0.4,
+    marginBottom: 8,
   },
   introPhrase: {
     fontFamily: "PlayfairDisplay_400Regular",
-    fontSize: 14,
+    fontSize: 15,
     color: C.gold,
-    letterSpacing: 0.2,
-    marginBottom: 14,
+    letterSpacing: 0.1,
+    marginBottom: 16,
     fontStyle: "italic",
+    opacity: 0.82,
   },
   introPara: {
     fontFamily: "Inter_400Regular",
     fontSize: 15,
-    color: "rgba(255,255,255,0.70)",
+    color: "rgba(255,255,255,0.62)",
     lineHeight: 26,
     marginBottom: 14,
   },
@@ -736,56 +739,62 @@ const s = StyleSheet.create({
 
 const nc = StyleSheet.create({
   card: {
-    backgroundColor: "rgba(14, 9, 5, 0.94)",
-    borderRadius: 20,
-    paddingHorizontal: 18,
-    paddingTop: 16,
-    paddingBottom: 14,
+    borderRadius: 22,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 16,
     borderWidth: 1,
-    borderColor: "rgba(196,112,74,0.28)",
-    boxShadow: "0px 6px 28px rgba(0,0,0,0.62), 0px 0px 0px 1px rgba(255,255,255,0.06)",
+    borderColor: "rgba(255,255,255,0.09)",
+    overflow: "hidden",
+    boxShadow: "0px 8px 32px rgba(0,0,0,0.65), 0px 0px 0px 1px rgba(255,255,255,0.05)",
   } as any,
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 10,
+    marginBottom: 14,
   },
-  headerLeft: { flex: 1, paddingRight: 10 },
+  headerLeft: { flex: 1, paddingRight: 12 },
   name: {
     fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 19,
+    fontSize: 24,
     color: C.white,
-    letterSpacing: -0.2,
-    marginBottom: 3,
+    letterSpacing: -0.3,
+    lineHeight: 30,
+    marginBottom: 5,
   },
   phrase: {
     fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: "rgba(255,255,255,0.50)",
-    lineHeight: 18,
+    fontSize: 13,
+    color: "rgba(255,255,255,0.46)",
+    lineHeight: 19,
+    fontStyle: "italic",
   },
   closeBtn: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: "rgba(255,255,255,0.07)",
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
     alignItems: "center",
     justifyContent: "center",
+    marginTop: 2,
   },
-  tags: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 14 },
+  tags: { flexDirection: "row", flexWrap: "wrap", gap: 5, marginBottom: 10 },
   tag: {
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "rgba(255,255,255,0.05)",
     borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
+    borderColor: "rgba(255,255,255,0.12)",
   },
   tagText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    color: "rgba(255,255,255,0.50)",
+    fontFamily: "Inter_500Medium",
+    fontSize: 9,
+    color: "rgba(255,255,255,0.45)",
+    letterSpacing: 0.8,
   },
   actions: { flexDirection: "row", gap: 10 },
   hotBtn: {
@@ -794,30 +803,32 @@ const nc = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    backgroundColor: C.terracotta,
-    borderRadius: 12,
-    paddingVertical: 11,
+    backgroundColor: "rgba(255,255,255,0.92)",
+    borderRadius: 13,
+    paddingVertical: 12,
   },
   hotBtnText: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 13,
     color: "#0A0502",
+    letterSpacing: 0.1,
   },
   ghostBtn: {
     flex: 1.3,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
+    gap: 5,
     borderWidth: 1,
-    borderColor: "rgba(196,112,74,0.28)",
-    borderRadius: 12,
-    paddingVertical: 11,
-    backgroundColor: "rgba(196,112,74,0.06)",
+    borderColor: "rgba(255,255,255,0.14)",
+    borderRadius: 13,
+    paddingVertical: 12,
+    backgroundColor: "rgba(255,255,255,0.06)",
   },
   ghostBtnText: {
     fontFamily: "Inter_500Medium",
     fontSize: 13,
-    color: C.terracotta,
+    color: "rgba(255,255,255,0.72)",
+    letterSpacing: 0.1,
   },
 });
