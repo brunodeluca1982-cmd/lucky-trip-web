@@ -166,6 +166,45 @@ function RoteiroCTA() {
   );
 }
 
+// ── Home card → lugar ID mappings ────────────────────────────────────────────
+// Maps every Home card ID to the correct /lugar/rio/[placeId] detail route.
+// Using the unified LugarDetail template (matches the Ciclovia reference).
+
+// Destaques use sequential IDs "1"-"4" that don't all match LUGARES numeric IDs.
+const DESTAQUE_MAP: Record<string, string> = {
+  "1": "1",         // Praia de Ipanema ✅
+  "2": "colombo",   // Confeitaria Colombo → LUGARES_COMER
+  "3": "h1",        // Copacabana Palace → LUGARES_FICAR
+  "4": "l5",        // Escadaria Selarón → LUGARES_LUCKY
+};
+
+// oQueFazerPorMomento period items → closest lugar by content / location
+const O_QUE_FAZER_MAP: Record<string, string> = {
+  m1: "1",         // Praia de Ipanema
+  m2: "2",         // Cristo Redentor / caminhada
+  m3: "colombo",   // Café na Colombo
+  t1: "3",         // Pão de Açúcar
+  t2: "5",         // Escadaria Selarón
+  t3: "7",         // Santa Teresa
+  n1: "4",         // Beco das Sardinhas
+  n2: "c3",        // Oro Restaurant
+  n3: "arcos",     // Arcos da Lapa
+};
+
+// Curados para você
+const CURADO_MAP: Record<string, string> = {
+  cp1: "6",        // Arpoador (pedra do pôr do sol)
+  cp2: "cobri",    // COBRI · Bar do Mercado
+  cp3: "banzeiro", // Banzeiro
+  cp4: "l2",       // Parque Lage → LUGARES_LUCKY
+};
+
+// Restaurantes (mock IDs "1"/"2") → LUGARES_COMER IDs
+const RESTAURANTE_MAP: Record<string, string> = {
+  "1": "colombo",  // Confeitaria Colombo
+  "2": "c3",       // Oro Restaurant
+};
+
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
@@ -223,7 +262,7 @@ export default function HomeScreen() {
                 localizacao={d.localizacao}
                 image={d.image}
                 size="large"
-                onPress={() => router.push(`/lugar/rio/${d.id}`)}
+                onPress={() => router.push(`/lugar/rio/${DESTAQUE_MAP[d.id] ?? d.id}`)}
               />
             ))}
           </HorizontalScroll>
@@ -251,7 +290,7 @@ export default function HomeScreen() {
                   localizacao={item.localizacao}
                   image={item.image}
                   size="medium"
-                  onPress={() => router.push({ pathname: "/cidade/[id]", params: { id: "rio" } })}
+                  onPress={() => router.push(`/lugar/rio/${O_QUE_FAZER_MAP[item.id] ?? "1"}`)}
                 />
               ))}
             </HorizontalScroll>
@@ -278,7 +317,7 @@ export default function HomeScreen() {
                 localizacao={item.localizacao}
                 image={item.image}
                 size="medium"
-                onPress={() => router.push({ pathname: "/cidade/[id]", params: { id: "rio" } })}
+                onPress={() => router.push(`/lugar/rio/${CURADO_MAP[item.id] ?? "1"}`)}
               />
             ))}
           </HorizontalScroll>
@@ -303,7 +342,7 @@ export default function HomeScreen() {
                 bairro={r.bairro}
                 categoria={r.categoria}
                 image={r.image}
-                onPress={() => router.push({ pathname: "/cidade/[id]", params: { id: "rio" } })}
+                onPress={() => router.push(`/lugar/rio/${RESTAURANTE_MAP[r.id] ?? "c1"}`)}
               />
             ))}
           </HorizontalScroll>
@@ -328,7 +367,7 @@ export default function HomeScreen() {
                 localizacao={h.localizacao}
                 tipo={h.tipo}
                 image={h.image}
-                onPress={() => router.push({ pathname: "/cidade/[id]", params: { id: "rio" } })}
+                onPress={() => router.push(`/lugar/rio/h${h.id}`)}
               />
             ))}
           </HorizontalScroll>

@@ -195,6 +195,17 @@ export const LUGARES_O_QUE_FAZER: Record<string, LugarPlace[]> = {
       image: require("../assets/images/secret2.png"),
       ...resolvePin("rio", "Jardim Botânico", 0),
     },
+    // ── Home screen card entries ─────────────────────────────────────────────
+    {
+      id: "arcos",
+      titulo: "Arcos da Lapa",
+      localizacao: "Lapa",
+      categoria: "PATRIMÔNIO",
+      descricao:
+        "Aqueduto colonial do século XVIII que virou símbolo da boemia carioca. À noite, os Arcos enquadram o bonde de Santa Teresa e iluminam a entrada da Lapa.",
+      image: require("../assets/images/lapa.png"),
+      ...resolvePin("rio", "Lapa", 1),
+    },
   ],
 };
 
@@ -254,6 +265,42 @@ export const LUGARES_COMER: Record<string, LugarPlace[]> = {
         "Horta própria, menu-degustação com raízes brasileiras e uma das experiências mais honestas da cidade.",
       image: require("../assets/images/restaurante1.png"),
       ...resolvePin("rio", "Botafogo", 0),
+    },
+    // ── Home screen card entries ─────────────────────────────────────────────
+    {
+      id: "colombo",
+      titulo: "Confeitaria Colombo",
+      localizacao: "Centro",
+      categoria: "CAFÉ HISTÓRICO",
+      descricao:
+        "Um século de elegância servido em cada xícara. Vitrais art nouveau, mármore e o melhor bolo de mel do Rio — dentro do salão mais bonito da cidade.",
+      image: require("../assets/images/restaurante1.png"),
+      ...resolvePin("rio", "Centro", 1),
+      tipo_item: "restaurante",
+      google_maps_url: "https://maps.app.goo.gl/Colombo-Centro",
+      instagram_handle: "confeitariacolombo",
+    },
+    {
+      id: "cobri",
+      titulo: "COBRI · Bar do Mercado",
+      localizacao: "Centro",
+      categoria: "BAR GASTRONÔMICO",
+      descricao:
+        "No coração do Mercado Municipal, o COBRI transforma o entorno histórico em cenário para coquetéis autorais e petiscos com sotaque carioca.",
+      image: require("../assets/images/restaurante1.png"),
+      ...resolvePin("rio", "Centro", 2),
+      tipo_item: "restaurante",
+    },
+    {
+      id: "banzeiro",
+      titulo: "Banzeiro",
+      localizacao: "Botafogo",
+      categoria: "AMAZÔNICA",
+      descricao:
+        "O chef Jefferson Rueda traz a Amazônia para a mesa carioca — ingredientes raros, receitas centenárias e uma das experiências gastronômicas mais únicas do Brasil.",
+      image: require("../assets/images/restaurante2.png"),
+      ...resolvePin("rio", "Botafogo", 1),
+      tipo_item: "restaurante",
     },
   ],
 };
