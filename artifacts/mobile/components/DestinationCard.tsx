@@ -36,7 +36,7 @@ export function DestinationCard({ cidade, pais, image, onPress, featured }: Dest
         pressed && { opacity: 0.88, transform: [{ scale: 0.96 }] },
       ]}
     >
-      <Image source={image} style={styles.image} />
+      <Image source={image} style={styles.image} resizeMode="cover" />
       <LinearGradient
         colors={["transparent", "rgba(0,0,0,0.18)", "rgba(0,0,0,0.75)"]}
         locations={[0.3, 0.6, 1]}

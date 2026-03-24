@@ -40,7 +40,7 @@ export function FeaturedDestinationCard({
         pressed && { opacity: 0.94, transform: [{ scale: 0.99 }] },
       ]}
     >
-      <Image source={image} style={styles.image} />
+      <Image source={image} style={styles.image} resizeMode="cover" />
 
       {/* Cinematic dual gradient — light top burn, deep bottom */}
       <LinearGradient

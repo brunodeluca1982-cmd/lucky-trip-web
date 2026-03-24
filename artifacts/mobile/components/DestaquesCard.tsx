@@ -38,7 +38,7 @@ function OQueFazerCard({ id, titulo, localizacao, descricao, image, categoria }:
         pressed && { opacity: 0.93, transform: [{ scale: 0.988 }] },
       ]}
     >
-      <Image source={image} style={styles.image} />
+      <Image source={image} style={styles.image} resizeMode="cover" />
       <LinearGradient
         colors={["transparent", "rgba(0,0,0,0.04)", "rgba(0,0,0,0.88)"]}
         locations={[0.3, 0.48, 1]}
@@ -152,7 +152,7 @@ function RestauranteCard({ id, titulo, localizacao, descricao, image, categoria 
         pressed && { opacity: 0.93, transform: [{ scale: 0.988 }] },
       ]}
     >
-      <Image source={image} style={styles.image} />
+      <Image source={image} style={styles.image} resizeMode="cover" />
       <View style={lb.tintLayer} />
       <LinearGradient
         colors={["transparent", "rgba(40,18,4,0.5)", "rgba(40,18,4,0.94)"]}
@@ -262,7 +262,7 @@ function HotelCard({ id, titulo, localizacao, descricao, image, categoria }: Car
         pressed && { opacity: 0.93, transform: [{ scale: 0.988 }] },
       ]}
     >
-      <Image source={image} style={styles.image} />
+      <Image source={image} style={styles.image} resizeMode="cover" />
       <LinearGradient
         colors={["rgba(12,18,32,0.55)", "transparent"]}
         locations={[0, 0.4]}
@@ -376,7 +376,7 @@ function LuckyCard({ id, titulo, localizacao, descricao, image, categoria }: Car
         pressed && { opacity: 0.93, transform: [{ scale: 0.988 }] },
       ]}
     >
-      <Image source={image} style={styles.image} />
+      <Image source={image} style={styles.image} resizeMode="cover" />
       <LinearGradient
         colors={["transparent", "rgba(44,22,8,0.44)", "rgba(44,22,8,0.9)"]}
         locations={[0.2, 0.55, 1]}

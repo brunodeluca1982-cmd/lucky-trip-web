@@ -94,7 +94,7 @@ function LuckyHighlight() {
 function RoteiroCard({ roteiro }: { roteiro: Roteiro }) {
   return (
     <View style={s.roteiroCard}>
-      <Image source={roteiro.image} style={s.roteiroImage} />
+      <Image source={roteiro.image} style={s.roteiroImage} resizeMode="cover" />
       <LinearGradient
         colors={["rgba(0,0,0,0.02)", "rgba(10,5,2,0.84)"]}
         locations={[0.2, 1]}
@@ -122,7 +122,7 @@ function RoteiroCard({ roteiro }: { roteiro: Roteiro }) {
 function InfluencerCard({ influencer }: { influencer: Influencer }) {
   return (
     <Pressable style={s.influencerCard}>
-      <Image source={influencer.image} style={s.influencerImage} />
+      <Image source={influencer.image} style={s.influencerImage} resizeMode="cover" />
       <LinearGradient
         colors={["rgba(0,0,0,0.04)", "rgba(10,5,2,0.78)"]}
         locations={[0.35, 1]}
@@ -172,7 +172,7 @@ export default function HomeScreen() {
   return (
     <View style={s.root}>
       {/* Fullscreen background image — persists behind all content */}
-      <Image source={BG_IMAGE} style={s.bgImage} />
+      <Image source={BG_IMAGE} style={s.bgImage} resizeMode="cover" />
       {/* Dark overlay to ensure legibility everywhere */}
       <LinearGradient
         colors={["rgba(10,5,2,0.72)", "rgba(10,5,2,0.88)", "#0A0502"]}

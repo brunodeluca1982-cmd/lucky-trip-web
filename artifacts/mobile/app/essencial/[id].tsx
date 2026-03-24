@@ -103,7 +103,7 @@ function ClassicoCard({ item }: { item: ClassicoItem }) {
       ]}
       onPress={() => router.push(`/lugar/rio/${item.id}`)}
     >
-      <Image source={item.image} style={s.classicoImage} />
+      <Image source={item.image} style={s.classicoImage} resizeMode="cover" />
       <LinearGradient
         colors={["rgba(0,0,0,0.02)", "rgba(10,5,2,0.82)"]}
         locations={[0.25, 1]}
@@ -140,7 +140,7 @@ function LuckyCard({
     >
       {/* Image */}
       <View style={s.luckyImageWrap}>
-        <Image source={item.image} style={s.luckyImage} />
+        <Image source={item.image} style={s.luckyImage} resizeMode="cover" />
         <LinearGradient
           colors={["rgba(0,0,0,0.06)", "rgba(10,5,2,0.55)"]}
           locations={[0.2, 1]}
@@ -199,7 +199,7 @@ export default function EssencialScreen() {
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* ── Fullscreen background ── */}
-      <Image source={destino.image} style={s.bgImage} />
+      <Image source={destino.image} style={s.bgImage} resizeMode="cover" />
       <LinearGradient
         colors={["rgba(10,5,2,0.78)", "rgba(10,5,2,0.60)", "#0A0502"]}
         locations={[0, 0.30, 0.55]}

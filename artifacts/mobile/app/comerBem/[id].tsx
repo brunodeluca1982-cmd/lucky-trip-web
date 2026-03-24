@@ -131,7 +131,7 @@ export default function ComerBemScreen() {
             >
               {/* Image area */}
               <View style={s.cardImageWrap}>
-                <Image source={place.image} style={s.cardImage} />
+                <Image source={place.image} style={s.cardImage} resizeMode="cover" />
                 <LinearGradient
                   colors={["rgba(0,0,0,0.12)", "transparent"]}
                   locations={[0, 0.4]}

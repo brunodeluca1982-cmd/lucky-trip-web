@@ -32,7 +32,7 @@ interface HeroCarouselProps {
 function HeroSlide({ item }: { item: HeroItem }) {
   return (
     <View style={styles.slide}>
-      <Image source={item.image} style={styles.image} />
+      <Image source={item.image} style={styles.image} resizeMode="cover" />
       <LinearGradient
         colors={["transparent", "rgba(0,0,0,0.25)", "rgba(0,0,0,0.72)"]}
         style={styles.gradient}

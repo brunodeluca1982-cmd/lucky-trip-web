@@ -176,7 +176,7 @@ export default function CidadeScreen() {
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* ── Fullscreen background image — fixed behind everything ── */}
-      <Image source={destino.image} style={s.bgImage} />
+      <Image source={destino.image} style={s.bgImage} resizeMode="cover" />
 
       {/* ── Cinematic gradient overlay — full screen, fixed ──
           Designed in three zones:

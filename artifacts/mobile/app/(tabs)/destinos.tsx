@@ -60,6 +60,7 @@ export default function DestinosScreen() {
         <Image
           source={destinos[0].image}
           style={s.bgImage}
+          resizeMode="cover"
         />
         <LinearGradient
           colors={["rgba(8,4,2,0.84)", "rgba(8,4,2,0.76)", "rgba(8,4,2,0.90)"]}
@@ -124,7 +125,7 @@ export default function DestinosScreen() {
                         pressed && { opacity: 0.88, transform: [{ scale: 0.97 }] },
                       ]}
                     >
-                      <Image source={d.image} style={s.cardImage} />
+                      <Image source={d.image} style={s.cardImage} resizeMode="cover" />
                       <LinearGradient
                         colors={["transparent", "rgba(0,0,0,0.20)", "rgba(0,0,0,0.82)"]}
                         locations={[0.3, 0.6, 1]}

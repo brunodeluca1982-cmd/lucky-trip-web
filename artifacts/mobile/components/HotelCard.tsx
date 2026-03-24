@@ -40,7 +40,7 @@ export function HotelCard({ id, nome, localizacao, tipo, image }: HotelCardProps
         pressed && { opacity: 0.92, transform: [{ scale: 0.97 }] },
       ]}
     >
-      <Image source={image} style={styles.image} />
+      <Image source={image} style={styles.image} resizeMode="cover" />
       <LinearGradient
         colors={["transparent", "rgba(0,0,0,0.78)"]}
         style={styles.gradient}

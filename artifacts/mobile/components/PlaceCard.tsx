@@ -59,7 +59,7 @@ export function PlaceCard({
   if (variant === "secret") {
     return (
       <Pressable style={[styles.secretCard, { width: SCREEN_WIDTH - 48 }]}>
-        <Image source={image} style={styles.secretImage} />
+        <Image source={image} style={styles.secretImage} resizeMode="cover" />
         <View style={styles.secretContent}>
           {localizacao ? (
             <View style={styles.tagRow}>
@@ -94,7 +94,7 @@ export function PlaceCard({
         pressed && { opacity: 0.93, transform: [{ scale: 0.98 }] },
       ]}
     >
-      <Image source={image} style={styles.image} />
+      <Image source={image} style={styles.image} resizeMode="cover" />
       <LinearGradient
         colors={["transparent", "rgba(0,0,0,0.72)"]}
         style={styles.gradient}

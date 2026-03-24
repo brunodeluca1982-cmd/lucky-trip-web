@@ -130,7 +130,7 @@ export default function LuckyListScreen() {
             >
               {/* Image area */}
               <View style={s.cardImageWrap}>
-                <Image source={place.image} style={s.cardImage} />
+                <Image source={place.image} style={s.cardImage} resizeMode="cover" />
 
                 {/* Vignette */}
                 <LinearGradient

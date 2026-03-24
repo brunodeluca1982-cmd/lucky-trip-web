@@ -95,7 +95,7 @@ function SavedItemRow({ item, onRemove, isLast }: SavedItemRowProps) {
   const accent = CATEGORY_ACCENT[item.categoria];
   return (
     <View style={[row.wrap, !isLast && row.bordered]}>
-      <Image source={item.image} style={row.thumb} />
+      <Image source={item.image} style={row.thumb} resizeMode="cover" />
       <View style={row.content}>
         <Text style={row.titulo} numberOfLines={1}>{item.titulo}</Text>
         <View style={row.meta}>
