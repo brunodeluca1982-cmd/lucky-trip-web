@@ -13,7 +13,7 @@
  *   4 — Estilo        (budget, auto-advance → triggers generation)
  */
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
@@ -28,9 +28,8 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, Stack } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
@@ -58,8 +57,6 @@ const { width: SW } = Dimensions.get("window");
 
 type TravelVibe  = "solo" | "casal" | "amigos" | "família";
 type BudgetStyle = "essencial" | "conforto" | "sofisticado";
-
-const TOTAL_STEPS = 5;
 
 const COMPANIONS: { id: TravelVibe; label: string; icon: string }[] = [
   { id: "solo",    label: "Solo",    icon: "🚶" },
@@ -152,341 +149,21 @@ function calDays(month: Date): (Date | null)[] {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// StepCard — animated entrance wrapper
+// Inspiration cards data — image-based 3×2 grid
 // ─────────────────────────────────────────────────────────────────────────────
 
-function StepCard({ children }: { children: React.ReactNode }) {
-  const opacity  = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(28)).current;
+const INSPIRATIONS_DATA: { id: Inspiration; label: string; image: ReturnType<typeof require> }[] = [
+  { id: "natureza",   label: "Natureza",    image: require("@/assets/images/rio-aerial-clean.png") },
+  { id: "gastronomy", label: "Gastronomia", image: require("@/assets/images/restaurante1.png") },
+  { id: "culture",    label: "Cultura",     image: require("@/assets/images/cristo.png") },
+  { id: "adventure",  label: "Aventura",    image: require("@/assets/images/pao-acucar.png") },
+  { id: "beach",      label: "Relaxamento", image: require("@/assets/images/ipanema.png") },
+  { id: "festa",      label: "Festa",       image: require("@/assets/images/lapa.png") },
+];
 
-  useEffect(() => {
-    Animated.parallel([
-      Animated.spring(opacity,    { toValue: 1, useNativeDriver: true, damping: 26, stiffness: 260 }),
-      Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 26, stiffness: 260 }),
-    ]).start();
-  }, []);
-
-  return (
-    <Animated.View style={[jn.card, { opacity, transform: [{ translateY }] }]}>
-      {children}
-    </Animated.View>
-  );
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
-// StepDots — progress indicator
-// ─────────────────────────────────────────────────────────────────────────────
-
-function StepDots({ current }: { current: number }) {
-  return (
-    <View style={jn.dots}>
-      {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
-        <View
-          key={i}
-          style={[
-            jn.dot,
-            i < current  ? jn.dotDone   :
-            i === current ? jn.dotActive : jn.dotFuture,
-          ]}
-        />
-      ))}
-    </View>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Step 0 — Destino confirm
-// ─────────────────────────────────────────────────────────────────────────────
-
-function StepDestino({ onNext, savedCount }: { onNext: () => void; savedCount: number }) {
-  return (
-    <StepCard>
-      <StepDots current={0} />
-      <Text style={jn.stepLabel}>SEU DESTINO</Text>
-      <View style={jn.destHero}>
-        <LinearGradient
-          colors={[`${GOLD}12`, `${C.darkBrown}F0`]}
-          locations={[0, 1]}
-          style={StyleSheet.absoluteFill}
-        />
-        <Text style={jn.destFlag}>🇧🇷</Text>
-        <Text style={jn.destCity}>Rio de Janeiro</Text>
-        <Text style={jn.destSub}>Brasil · América do Sul</Text>
-        {savedCount > 0 && (
-          <View style={jn.destBadge}>
-            <Text style={jn.destBadgeText}>{savedCount} {savedCount === 1 ? "lugar salvo" : "lugares salvos"}</Text>
-          </View>
-        )}
-      </View>
-      <Pressable
-        style={({ pressed }) => [jn.ctaBtn, pressed && { opacity: 0.82 }]}
-        onPress={onNext}
-      >
-        <Text style={jn.ctaBtnText}>Começar</Text>
-        <Feather name="arrow-right" size={15} color={C.cream} />
-      </Pressable>
-    </StepCard>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Step 1 — Date range picker
-// ─────────────────────────────────────────────────────────────────────────────
-
-function StepDatas({
-  onNext,
-}: {
-  onNext: (nights: number) => void;
-}) {
-  const today       = new Date();
-  const todayStart  = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const initMonth   = new Date(today.getFullYear(), today.getMonth(), 1);
-
-  const [calMonth,   setCalMonth]   = useState<Date>(initMonth);
-  const [arrival,    setArrival]    = useState<Date | null>(null);
-  const [departure,  setDeparture]  = useState<Date | null>(null);
-  const [picking,    setPicking]    = useState<"arrival" | "departure">("arrival");
-
-  const cells = calDays(calMonth);
-  const canBack = calMonth > initMonth;
-
-  function fmt(d: Date) {
-    return `${d.getDate()} ${MONTH_PT[d.getMonth()].slice(0, 3)}`;
-  }
-
-  function handleDay(day: Date) {
-    if (isBeforeDay(day, todayStart)) return;
-    if (picking === "arrival") {
-      setArrival(day);
-      setDeparture(null);
-      setPicking("departure");
-    } else {
-      if (!arrival || isSameDay(day, arrival) || isBeforeDay(day, arrival)) return;
-      setDeparture(day);
-      const nights = Math.round((day.getTime() - arrival!.getTime()) / 86400000);
-      setTimeout(() => onNext(nights), 420);
-    }
-  }
-
-  return (
-    <StepCard>
-      <StepDots current={1} />
-      <Text style={jn.stepLabel}>QUANDO VOCÊ VIAJA?</Text>
-
-      {/* Arrival / departure tags */}
-      <View style={jn.dateTags}>
-        <View style={[jn.dateTag, picking === "arrival" && jn.dateTagActive]}>
-          <Text style={jn.dateTagLabel}>Chegada</Text>
-          <Text style={jn.dateTagVal}>{arrival ? fmt(arrival) : "—"}</Text>
-        </View>
-        <Feather name="arrow-right" size={13} color={`${C.darkBrown}44`} />
-        <View style={[jn.dateTag, picking === "departure" && jn.dateTagActive]}>
-          <Text style={jn.dateTagLabel}>Partida</Text>
-          <Text style={jn.dateTagVal}>{departure ? fmt(departure) : "—"}</Text>
-        </View>
-      </View>
-
-      {/* Month nav */}
-      <View style={jn.calNav}>
-        <Pressable hitSlop={10} onPress={() => canBack && setCalMonth(addMonths(calMonth, -1))}>
-          <Feather name="chevron-left" size={18} color={canBack ? C.darkBrown : C.border} />
-        </Pressable>
-        <Text style={jn.calNavMonth}>{MONTH_PT[calMonth.getMonth()]} {calMonth.getFullYear()}</Text>
-        <Pressable hitSlop={10} onPress={() => setCalMonth(addMonths(calMonth, 1))}>
-          <Feather name="chevron-right" size={18} color={C.darkBrown} />
-        </Pressable>
-      </View>
-
-      {/* Day-of-week header */}
-      <View style={jn.calWeek}>
-        {DAY_PT.map((d, i) => <Text key={i} style={jn.calWeekDay}>{d}</Text>)}
-      </View>
-
-      {/* Grid */}
-      <View style={jn.calGrid}>
-        {cells.map((day, i) => {
-          if (!day) return <View key={`e-${i}`} style={jn.calCell} />;
-          const past    = isBeforeDay(day, todayStart);
-          const isArr   = !!arrival   && isSameDay(day, arrival);
-          const isDep   = !!departure && isSameDay(day, departure);
-          const inRange = !!arrival && !!departure && isBetweenDays(day, arrival, departure);
-          return (
-            <Pressable
-              key={day.toISOString()}
-              style={({ pressed }) => [
-                jn.calCell,
-                isArr    && jn.calArr,
-                isDep    && jn.calDep,
-                inRange  && jn.calRange,
-                past     && jn.calPast,
-                pressed && !past && { opacity: 0.68 },
-              ]}
-              onPress={() => handleDay(day)}
-              disabled={past}
-            >
-              <Text style={[
-                jn.calDayNum,
-                (isArr || isDep) && jn.calDayNumSel,
-                past && jn.calDayNumPast,
-              ]}>
-                {day.getDate()}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <Text style={jn.calHint}>
-        {picking === "arrival" ? "Toque na data de chegada" : "Agora toque na data de partida"}
-      </Text>
-    </StepCard>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Step 2 — Companion
-// ─────────────────────────────────────────────────────────────────────────────
-
-function StepCompanhia({
-  value,
-  onSelect,
-}: {
-  value: TravelVibe;
-  onSelect: (v: TravelVibe) => void;
-}) {
-  return (
-    <StepCard>
-      <StepDots current={2} />
-      <Text style={jn.stepLabel}>COM QUEM VIAJA?</Text>
-      <Text style={jn.stepSub}>Avançamos automaticamente após a seleção</Text>
-      <View style={jn.compGrid}>
-        {COMPANIONS.map((c) => {
-          const active = value === c.id;
-          return (
-            <Pressable
-              key={c.id}
-              style={({ pressed }) => [
-                jn.compChip,
-                active && jn.compChipActive,
-                pressed && { opacity: 0.76 },
-              ]}
-              onPress={() => onSelect(c.id)}
-            >
-              <Text style={jn.compIcon}>{c.icon}</Text>
-              <Text style={[jn.compLabel, active && jn.compLabelActive]}>{c.label}</Text>
-              {active && (
-                <View style={jn.compCheck}>
-                  <Feather name="check" size={10} color="#fff" />
-                </View>
-              )}
-            </Pressable>
-          );
-        })}
-      </View>
-    </StepCard>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Step 3 — Inspiration (multi-select)
-// ─────────────────────────────────────────────────────────────────────────────
-
-function StepInspiracao({
-  value,
-  onToggle,
-  onNext,
-}: {
-  value: Inspiration[];
-  onToggle: (id: Inspiration) => void;
-  onNext: () => void;
-}) {
-  return (
-    <StepCard>
-      <StepDots current={3} />
-      <Text style={jn.stepLabel}>O QUE QUER FAZER?</Text>
-      <Text style={jn.stepSub}>Selecione quantas quiser</Text>
-      <View style={jn.inspGrid}>
-        {INSPIRATIONS.map((ins) => {
-          const active = value.includes(ins.id);
-          return (
-            <Pressable
-              key={ins.id}
-              style={({ pressed }) => [
-                jn.inspChip,
-                active && jn.inspChipActive,
-                pressed && { opacity: 0.76 },
-              ]}
-              onPress={() => onToggle(ins.id)}
-            >
-              <Text style={jn.inspIcon}>{ins.icon}</Text>
-              <Text style={[jn.inspLabel, active && jn.inspLabelActive]}>{ins.label}</Text>
-              {active && <Feather name="check" size={11} color={GOLD} />}
-            </Pressable>
-          );
-        })}
-      </View>
-      <Pressable
-        style={({ pressed }) => [jn.ctaBtn, pressed && { opacity: 0.82 }]}
-        onPress={onNext}
-      >
-        <Text style={jn.ctaBtnText}>Continuar</Text>
-        <Feather name="arrow-right" size={15} color={C.cream} />
-      </Pressable>
-    </StepCard>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Step 4 — Budget / travel style (auto-advance → generate)
-// ─────────────────────────────────────────────────────────────────────────────
-
-function StepEstilo({
-  value,
-  onSelect,
-}: {
-  value: BudgetStyle;
-  onSelect: (b: BudgetStyle) => void;
-}) {
-  return (
-    <StepCard>
-      <StepDots current={4} />
-      <Text style={jn.stepLabel}>ESTILO DE VIAGEM</Text>
-      <Text style={jn.stepSub}>Geramos seu roteiro após a seleção</Text>
-      <View style={jn.budgetCol}>
-        {BUDGETS.map((b) => {
-          const active = value === b.id;
-          return (
-            <Pressable
-              key={b.id}
-              style={({ pressed }) => [
-                jn.budgetRow,
-                active && jn.budgetRowActive,
-                pressed && { opacity: 0.80 },
-              ]}
-              onPress={() => onSelect(b.id)}
-            >
-              <View style={[jn.budgetRadio, active && jn.budgetRadioActive]}>
-                {active && <View style={jn.budgetDot} />}
-              </View>
-              <View style={jn.budgetText}>
-                <Text style={[jn.budgetLabel, active && jn.budgetLabelActive]}>{b.label}</Text>
-                <Text style={jn.budgetDesc}>{b.desc}</Text>
-              </View>
-              {active && (
-                <Animated.View>
-                  <Feather name="check-circle" size={18} color={GOLD} />
-                </Animated.View>
-              )}
-            </Pressable>
-          );
-        })}
-      </View>
-    </StepCard>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// JourneyOverlay — coordinates all 5 steps over the blurred background
+// Journey types
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface JourneyGenerateProps {
@@ -497,490 +174,681 @@ interface JourneyGenerateProps {
   vibe:         Vibe;
 }
 
-interface JourneyOverlayProps {
-  savedCount: number;
-  onGenerate: (p: JourneyGenerateProps) => void;
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// InlineCalendar — compact date picker rendered inline in the scroll view
+// ─────────────────────────────────────────────────────────────────────────────
 
-function JourneyOverlay({ savedCount, onGenerate }: JourneyOverlayProps) {
-  const [step,         setStep]         = useState(0);
-  const [stepKey,      setStepKey]      = useState(0);
-  const [nights,       setNights]       = useState(3);
-  const [travelVibe,   setTravelVibe]   = useState<TravelVibe>("amigos");
-  const [inspirations, setInspirations] = useState<Inspiration[]>([]);
-  const [budget,       setBudget]       = useState<BudgetStyle>("conforto");
-
-  function advance(toStep?: number) {
-    const next = toStep ?? step + 1;
-    setStep(next);
-    setStepKey((k) => k + 1);
-  }
-
-  function handleCompanion(v: TravelVibe) {
-    setTravelVibe(v);
-    setTimeout(() => advance(), 360);
-  }
-
-  function handleBudget(b: BudgetStyle) {
-    setBudget(b);
-    setTimeout(() =>
-      onGenerate({ nights, travelVibe, inspirations, budget: b, vibe: "moderado" }),
-    380);
-  }
-
-  function handleToggle(id: Inspiration) {
-    setInspirations((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
-  }
-
-  const blurIntensity = Platform.OS === "ios" ? 65 : Platform.OS === "android" ? 30 : 55;
+function InlineCalendar({
+  value,
+  minDate,
+  onSelect,
+}: {
+  value: Date | null;
+  minDate?: Date | null;
+  onSelect: (d: Date) => void;
+}) {
+  const today = new Date();
+  const [viewMonth, setViewMonth] = useState(value ?? today);
+  const days = calDays(viewMonth);
+  const min  = minDate ?? today;
 
   return (
-    <View style={[StyleSheet.absoluteFill, { pointerEvents: "box-none" }]}>
-      {/* Blur layer */}
-      <BlurView
-        intensity={blurIntensity}
-        tint="light"
-        style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}
-      />
-      {/* Semi-transparent cream wash on top of blur */}
-      <View
-        style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(245,240,232,0.30)", pointerEvents: "none" }]}
-      />
-
-      {/* Back button — shown from step 1 */}
-      {step > 0 && (
-        <Pressable
-          style={[jn.backBtn, { top: Platform.OS === "web" ? 74 : 54 }]}
-          onPress={() => { setStep((s) => s - 1); setStepKey((k) => k + 1); }}
-          hitSlop={12}
-        >
-          <Feather name="chevron-left" size={20} color={C.darkBrown} />
-          <Text style={jn.backBtnText}>Voltar</Text>
+    <View style={fp.cal}>
+      <View style={fp.calHeader}>
+        <Pressable onPress={() => setViewMonth(addMonths(viewMonth, -1))} hitSlop={12}>
+          <Feather name="chevron-left" size={18} color={CREAM} />
         </Pressable>
-      )}
-
-      {/* Centered card */}
-      <View style={[jn.overlay, { pointerEvents: "box-none" }]} key={stepKey}>
-        {step === 0 && (
-          <StepDestino onNext={() => advance()} savedCount={savedCount} />
-        )}
-        {step === 1 && (
-          <StepDatas onNext={(n) => { setNights(n); advance(); }} />
-        )}
-        {step === 2 && (
-          <StepCompanhia value={travelVibe} onSelect={handleCompanion} />
-        )}
-        {step === 3 && (
-          <StepInspiracao
-            value={inspirations}
-            onToggle={handleToggle}
-            onNext={() => advance()}
-          />
-        )}
-        {step === 4 && (
-          <StepEstilo value={budget} onSelect={handleBudget} />
-        )}
+        <Text style={fp.calMonth}>
+          {MONTH_PT[viewMonth.getMonth()]} {viewMonth.getFullYear()}
+        </Text>
+        <Pressable onPress={() => setViewMonth(addMonths(viewMonth, 1))} hitSlop={12}>
+          <Feather name="chevron-right" size={18} color={CREAM} />
+        </Pressable>
+      </View>
+      <View style={fp.calWeek}>
+        {DAY_PT.map((d, i) => (
+          <Text key={i} style={fp.calWeekDay}>{d}</Text>
+        ))}
+      </View>
+      <View style={fp.calGrid}>
+        {days.map((d, i) => {
+          if (!d) return <View key={i} style={fp.calCell} />;
+          const selected = value ? isSameDay(d, value) : false;
+          const past = isBeforeDay(d, min) && !isSameDay(d, min);
+          return (
+            <Pressable
+              key={i}
+              style={[fp.calCell, selected && fp.calCellActive, past && fp.calCellPast]}
+              onPress={() => !past && onSelect(d)}
+              disabled={past}
+            >
+              <Text style={[
+                fp.calDayText,
+                selected && fp.calDayTextActive,
+                past && fp.calDayTextPast,
+              ]}>
+                {d.getDate()}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
     </View>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Journey styles
+// FlowPage1 — Destination (optional) + Dates
 // ─────────────────────────────────────────────────────────────────────────────
 
-const jn = StyleSheet.create({
-  // Overlay wrapper
-  overlay: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 20,
-    paddingBottom: 24,
+interface FlowPage1Props {
+  showDestination: boolean;
+  destination: string;
+  onDestinationChange: (v: string) => void;
+  arrivalDate: Date | null;
+  departureDate: Date | null;
+  onArrivalChange: (d: Date) => void;
+  onDepartureChange: (d: Date) => void;
+  onNext: () => void;
+}
+
+function FlowPage1({
+  showDestination,
+  destination,
+  onDestinationChange,
+  arrivalDate,
+  departureDate,
+  onArrivalChange,
+  onDepartureChange,
+  onNext,
+}: FlowPage1Props) {
+  const insets = useSafeAreaInsets();
+  const topPad = Platform.OS === "web" ? 72 : insets.top + 20;
+  const [openCal, setOpenCal] = useState<"arrival" | "departure" | null>(null);
+
+  function fmtDate(d: Date | null): string | null {
+    if (!d) return null;
+    return `${d.getDate()} de ${MONTH_PT[d.getMonth()].toLowerCase()} de ${d.getFullYear()}`;
+  }
+
+  function handleArrival(d: Date) {
+    onArrivalChange(d);
+    setOpenCal("departure");
+    if (departureDate && !isBeforeDay(d, departureDate)) {
+      onDepartureChange(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1));
+    }
+  }
+
+  function handleDeparture(d: Date) {
+    onDepartureChange(d);
+    setOpenCal(null);
+  }
+
+  return (
+    <ScrollView
+      style={{ flex: 1 }}
+      contentContainerStyle={[fp.page, { paddingTop: topPad, paddingBottom: 56 }]}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
+      <Text style={fp.bigTitle}>Criar roteiro</Text>
+      <Text style={fp.bigSub}>Vamos organizar sua viagem em poucos passos.</Text>
+      <View style={fp.divider} />
+
+      {showDestination && (
+        <View style={fp.section}>
+          <Text style={fp.sectionLabel}>Vai pra onde?</Text>
+          <View style={fp.searchRow}>
+            <Feather name="search" size={16} color="rgba(245,240,232,0.50)" />
+            <TextInput
+              style={fp.searchInput}
+              placeholder="Rio de Janeiro"
+              placeholderTextColor="rgba(245,240,232,0.38)"
+              value={destination}
+              onChangeText={onDestinationChange}
+              autoCorrect={false}
+            />
+          </View>
+        </View>
+      )}
+
+      <View style={fp.section}>
+        <Text style={fp.sectionLabel}>Quando será a viagem?</Text>
+        <Text style={fp.sectionSub}>Informe as datas de chegada e partida. (Opcional)</Text>
+
+        <Pressable
+          style={[fp.dateField, openCal === "arrival" && fp.dateFieldActive]}
+          onPress={() => setOpenCal(openCal === "arrival" ? null : "arrival")}
+        >
+          <Feather name="calendar" size={15} color="rgba(245,240,232,0.50)" />
+          <Text style={[fp.dateFieldText, !arrivalDate && fp.dateFieldPlaceholder]}>
+            {fmtDate(arrivalDate) ?? "Data de chegada"}
+          </Text>
+          <Feather
+            name={openCal === "arrival" ? "chevron-up" : "chevron-down"}
+            size={13}
+            color="rgba(245,240,232,0.35)"
+          />
+        </Pressable>
+        {openCal === "arrival" && (
+          <InlineCalendar value={arrivalDate} onSelect={handleArrival} />
+        )}
+
+        <Pressable
+          style={[fp.dateField, openCal === "departure" && fp.dateFieldActive]}
+          onPress={() => setOpenCal(openCal === "departure" ? null : "departure")}
+        >
+          <Feather name="calendar" size={15} color="rgba(245,240,232,0.50)" />
+          <Text style={[fp.dateFieldText, !departureDate && fp.dateFieldPlaceholder]}>
+            {fmtDate(departureDate) ?? "Data de partida"}
+          </Text>
+          <Feather
+            name={openCal === "departure" ? "chevron-up" : "chevron-down"}
+            size={13}
+            color="rgba(245,240,232,0.35)"
+          />
+        </Pressable>
+        {openCal === "departure" && (
+          <InlineCalendar
+            value={departureDate}
+            minDate={arrivalDate}
+            onSelect={handleDeparture}
+          />
+        )}
+      </View>
+
+      <Pressable
+        style={({ pressed }) => [fp.cta, pressed && { opacity: 0.85 }]}
+        onPress={onNext}
+      >
+        <Text style={fp.ctaText}>Continuar</Text>
+        <Feather name="chevron-right" size={17} color={C.darkBrown} />
+      </Pressable>
+    </ScrollView>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FlowPage2 — Inspirations + Vibe + Budget
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface FlowPage2Props {
+  inspirations: Inspiration[];
+  onToggleInspiration: (id: Inspiration) => void;
+  travelVibe: TravelVibe;
+  onTravelVibeChange: (v: TravelVibe) => void;
+  budget: BudgetStyle;
+  onBudgetChange: (b: BudgetStyle) => void;
+  onBack: () => void;
+  onGenerate: () => void;
+}
+
+function FlowPage2({
+  inspirations,
+  onToggleInspiration,
+  travelVibe,
+  onTravelVibeChange,
+  budget,
+  onBudgetChange,
+  onBack,
+  onGenerate,
+}: FlowPage2Props) {
+  const insets = useSafeAreaInsets();
+  const topPad = Platform.OS === "web" ? 72 : insets.top + 20;
+
+  return (
+    <ScrollView
+      style={{ flex: 1 }}
+      contentContainerStyle={[fp.page, { paddingTop: topPad, paddingBottom: 56 }]}
+      showsVerticalScrollIndicator={false}
+    >
+      <Pressable style={fp.backRow} onPress={onBack} hitSlop={12}>
+        <Feather name="chevron-left" size={20} color={CREAM} />
+        <Text style={fp.backText}>Voltar</Text>
+      </Pressable>
+
+      <Text style={fp.bigTitle}>O que te inspira?</Text>
+      <Text style={fp.bigSub}>
+        Selecione o que você ama para personalizarmos seu roteiro
+      </Text>
+
+      <View style={fp.insGrid}>
+        {INSPIRATIONS_DATA.map((ins) => {
+          const active = inspirations.includes(ins.id);
+          return (
+            <Pressable
+              key={ins.id}
+              style={[fp.insCard, active && fp.insCardActive]}
+              onPress={() => onToggleInspiration(ins.id)}
+            >
+              <Image source={ins.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
+              <LinearGradient
+                colors={["transparent", "rgba(8,4,1,0.80)"]}
+                locations={[0.25, 1]}
+                style={StyleSheet.absoluteFill}
+              />
+              {active && (
+                <View style={fp.insCheck}>
+                  <Feather name="check" size={11} color={GOLD} />
+                </View>
+              )}
+              <Text style={fp.insLabel}>{ins.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <View style={fp.glassSection}>
+        <Text style={fp.glassSectionLabel}>Qual a vibe da viagem?</Text>
+        <View style={fp.pillRow}>
+          {COMPANIONS.map((c) => {
+            const active = travelVibe === c.id;
+            return (
+              <Pressable
+                key={c.id}
+                style={[fp.pill, active && fp.pillActive]}
+                onPress={() => onTravelVibeChange(c.id)}
+              >
+                <Text style={fp.pillIcon}>{c.icon}</Text>
+                <Text style={[fp.pillText, active && fp.pillTextActive]}>{c.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      <View style={fp.glassSection}>
+        <Text style={fp.glassSectionLabel}>Estilo da viagem (opcional)</Text>
+        <View style={fp.pillRow}>
+          {BUDGETS.map((b) => {
+            const active = budget === b.id;
+            return (
+              <Pressable
+                key={b.id}
+                style={[fp.pill, active && fp.pillActive]}
+                onPress={() => onBudgetChange(b.id)}
+              >
+                <Text style={[fp.pillText, active && fp.pillTextActive]}>{b.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      <Pressable
+        style={({ pressed }) => [fp.cta, pressed && { opacity: 0.85 }]}
+        onPress={onGenerate}
+      >
+        <Text style={fp.ctaText}>Criar meu roteiro</Text>
+        <Feather name="chevron-right" size={17} color={C.darkBrown} />
+      </Pressable>
+    </ScrollView>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TripFlow — coordinates the 2-page journey flow
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface TripFlowProps {
+  savedCount:   number;
+  isContextual: boolean;
+  onGenerate:   (p: JourneyGenerateProps) => void;
+}
+
+function TripFlow({ savedCount: _savedCount, isContextual, onGenerate }: TripFlowProps) {
+  const [page,          setPage]          = useState(0);
+  const [destination,   setDestination]   = useState("Rio de Janeiro");
+  const [arrivalDate,   setArrivalDate]   = useState<Date | null>(null);
+  const [departureDate, setDepartureDate] = useState<Date | null>(null);
+  const [travelVibe,    setTravelVibe]    = useState<TravelVibe>("amigos");
+  const [inspirations,  setInspirations]  = useState<Inspiration[]>([]);
+  const [budget,        setBudget]        = useState<BudgetStyle>("conforto");
+
+  function handleNext() { setPage(1); }
+  function handleBack() { setPage(0); }
+
+  function handleGenerate() {
+    const n =
+      arrivalDate && departureDate
+        ? Math.max(1, Math.round(
+            (departureDate.getTime() - arrivalDate.getTime()) / 86400000,
+          ))
+        : 3;
+    onGenerate({ nights: n, travelVibe, inspirations, budget, vibe: "moderado" });
+  }
+
+  function toggleInspiration(id: Inspiration) {
+    setInspirations((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
+
+  return page === 0 ? (
+    <FlowPage1
+      showDestination={!isContextual}
+      destination={destination}
+      onDestinationChange={setDestination}
+      arrivalDate={arrivalDate}
+      departureDate={departureDate}
+      onArrivalChange={setArrivalDate}
+      onDepartureChange={setDepartureDate}
+      onNext={handleNext}
+    />
+  ) : (
+    <FlowPage2
+      inspirations={inspirations}
+      onToggleInspiration={toggleInspiration}
+      travelVibe={travelVibe}
+      onTravelVibeChange={setTravelVibe}
+      budget={budget}
+      onBudgetChange={setBudget}
+      onBack={handleBack}
+      onGenerate={handleGenerate}
+    />
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Flow page styles
+// ─────────────────────────────────────────────────────────────────────────────
+
+const CARD_W = (SW - 44 - 10) / 2;
+
+const fp = StyleSheet.create({
+  page: {
+    paddingHorizontal: 22,
   },
 
-  // Glass card
-  card: {
-    width: "100%",
-    maxWidth: 400,
-    backgroundColor: "rgba(252,249,244,0.96)",
-    borderRadius: 28,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: "rgba(201,168,76,0.18)",
-    boxShadow: "0px 16px 48px rgba(10,5,2,0.18), 0px 4px 12px rgba(10,5,2,0.08)",
+  bigTitle: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 36,
+    color: CREAM,
+    lineHeight: 44,
+    marginBottom: 8,
+    marginTop: 4,
   },
 
-  // Progress dots
-  dots: {
-    flexDirection: "row",
-    gap: 6,
-    alignSelf: "center",
-    marginBottom: 20,
-  },
-  dot: {
-    height: 5,
-    borderRadius: 3,
-  },
-  dotDone: {
-    width: 16,
-    backgroundColor: `${GOLD}60`,
-  },
-  dotActive: {
-    width: 24,
-    backgroundColor: GOLD,
-  },
-  dotFuture: {
-    width: 8,
-    backgroundColor: `${C.darkBrown}18`,
-  },
-
-  // Step label
-  stepLabel: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 10,
-    letterSpacing: 1.8,
-    color: GOLD,
-    marginBottom: 6,
-    textAlign: "center",
-  },
-  stepSub: {
+  bigSub: {
     fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: C.warmGray,
-    textAlign: "center",
-    marginBottom: 20,
+    fontSize: 14,
+    color: "rgba(245,240,232,0.56)",
+    lineHeight: 22,
+    marginBottom: 24,
   },
 
-  // Back button
-  backBtn: {
-    position: "absolute",
-    left: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    zIndex: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    backgroundColor: "rgba(252,249,244,0.80)",
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: `${C.darkBrown}14`,
-  },
-  backBtnText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 13,
-    color: C.darkBrown,
+  divider: {
+    height: 1,
+    backgroundColor: GLASS_BORDER,
+    marginBottom: 28,
   },
 
-  // CTA button
-  ctaBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    marginTop: 20,
-    paddingVertical: 15,
-    borderRadius: 18,
-    backgroundColor: C.darkBrown,
-    borderWidth: 1,
-    borderColor: `${GOLD}22`,
+  section: {
+    marginBottom: 24,
   },
-  ctaBtnText: {
+
+  sectionLabel: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 15,
-    color: C.cream,
-    letterSpacing: 0.2,
-  },
-
-  // ── Step 0: Destination hero ───────────────────────────────────────────────
-  destHero: {
-    borderRadius: 18,
-    overflow: "hidden",
-    alignItems: "center",
-    paddingVertical: 28,
-    paddingHorizontal: 16,
-    gap: 4,
-    marginBottom: 4,
-    borderWidth: 1,
-    borderColor: `${GOLD}20`,
-  },
-  destFlag: {
-    fontSize: 32,
+    color: CREAM,
     marginBottom: 6,
   },
-  destCity: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 26,
-    color: C.cream,
-    textAlign: "center",
-  },
-  destSub: {
+
+  sectionSub: {
     fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: "rgba(245,240,232,0.55)",
-  },
-  destBadge: {
-    marginTop: 10,
-    backgroundColor: `${GOLD}20`,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: `${GOLD}30`,
-  },
-  destBadgeText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 11,
-    color: GOLD,
+    fontSize: 12,
+    color: "rgba(245,240,232,0.42)",
+    marginBottom: 12,
+    lineHeight: 18,
   },
 
-  // ── Step 1: Calendar ───────────────────────────────────────────────────────
-  dateTags: {
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: GLASS_BG,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: GLASS_BORDER,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    gap: 10,
+  },
+
+  searchInput: {
+    flex: 1,
+    fontFamily: "Inter_400Regular",
+    fontSize: 15,
+    color: CREAM,
+  },
+
+  dateField: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: GLASS_BG,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: GLASS_BORDER,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    gap: 10,
+    marginBottom: 10,
+  },
+
+  dateFieldActive: {
+    borderColor: `${GOLD}70`,
+  },
+
+  dateFieldText: {
+    flex: 1,
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    color: CREAM,
+  },
+
+  dateFieldPlaceholder: {
+    color: "rgba(245,240,232,0.38)",
+  },
+
+  cta: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 10,
-    marginBottom: 18,
+    backgroundColor: CREAM,
+    borderRadius: 50,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    gap: 8,
+    marginTop: 8,
   },
-  dateTag: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 10,
-    borderRadius: 14,
-    backgroundColor: `${C.darkBrown}08`,
-    borderWidth: 1,
-    borderColor: `${C.darkBrown}12`,
-    gap: 2,
-  },
-  dateTagActive: {
-    backgroundColor: `${GOLD}12`,
-    borderColor: `${GOLD}40`,
-  },
-  dateTagLabel: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 10,
-    color: C.warmGray,
-    letterSpacing: 0.6,
-  },
-  dateTagVal: {
+
+  ctaText: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
+    fontSize: 16,
     color: C.darkBrown,
   },
-  calNav: {
+
+  backRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginBottom: 20,
+  },
+
+  backText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    color: CREAM,
+  },
+
+  insGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 20,
+  },
+
+  insCard: {
+    width: CARD_W,
+    height: 115,
+    borderRadius: 16,
+    overflow: "hidden",
+    borderWidth: 2,
+    borderColor: "transparent",
+    justifyContent: "flex-end",
+    padding: 10,
+  },
+
+  insCardActive: {
+    borderColor: GOLD,
+  },
+
+  insLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: CREAM,
+  },
+
+  insCheck: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "rgba(8,4,1,0.70)",
+    borderWidth: 1,
+    borderColor: GOLD,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  glassSection: {
+    backgroundColor: GLASS_BG,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: GLASS_BORDER,
+    padding: 16,
+    marginBottom: 12,
+  },
+
+  glassSectionLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: CREAM,
+    marginBottom: 12,
+  },
+
+  pillRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+
+  pill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 50,
+    borderWidth: 1,
+    borderColor: GLASS_BORDER,
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+
+  pillActive: {
+    backgroundColor: GOLD,
+    borderColor: GOLD,
+  },
+
+  pillIcon: {
+    fontSize: 14,
+  },
+
+  pillText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: "rgba(245,240,232,0.78)",
+  },
+
+  pillTextActive: {
+    color: C.darkBrown,
+    fontFamily: "Inter_600SemiBold",
+  },
+
+  // ── Inline Calendar ──────────────────────────────────────────────────────────
+  cal: {
+    backgroundColor: "rgba(10,5,2,0.92)",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: GLASS_BORDER,
+    padding: 12,
+    marginBottom: 10,
+  },
+
+  calHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 10,
-    paddingHorizontal: 2,
   },
-  calNavMonth: {
+
+  calMonth: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 14,
-    color: C.darkBrown,
+    color: CREAM,
   },
+
   calWeek: {
     flexDirection: "row",
     marginBottom: 4,
   },
+
   calWeekDay: {
     flex: 1,
     textAlign: "center",
     fontFamily: "Inter_500Medium",
-    fontSize: 10,
-    color: C.warmGray,
-    letterSpacing: 0.4,
+    fontSize: 11,
+    color: "rgba(245,240,232,0.40)",
   },
+
   calGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
   },
+
   calCell: {
-    width: `${100 / 7}%`,
+    width: "14.285714285714286%",
     aspectRatio: 1,
     alignItems: "center",
     justifyContent: "center",
-  },
-  calArr: {
-    backgroundColor: C.darkBrown,
-    borderRadius: 999,
-  },
-  calDep: {
-    backgroundColor: C.darkBrown,
-    borderRadius: 999,
-  },
-  calRange: {
-    backgroundColor: `${GOLD}16`,
-  },
-  calPast: {
-    opacity: 0.28,
-  },
-  calDayNum: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: C.darkBrown,
-  },
-  calDayNumSel: {
-    color: C.cream,
-    fontFamily: "Inter_600SemiBold",
-  },
-  calDayNumPast: {
-    color: C.warmGray,
-  },
-  calHint: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    color: C.warmGray,
-    textAlign: "center",
-    marginTop: 8,
+    borderRadius: 100,
   },
 
-  // ── Step 2: Companion ──────────────────────────────────────────────────────
-  compGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginTop: 4,
-    marginBottom: 4,
-  },
-  compChip: {
-    width: (SW - 40 - 48 - 10) / 2,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 18,
-    backgroundColor: `${C.darkBrown}06`,
-    borderWidth: 1,
-    borderColor: `${C.darkBrown}14`,
-    position: "relative",
-  },
-  compChipActive: {
-    backgroundColor: `${C.darkBrown}08`,
-    borderColor: GOLD,
-    borderWidth: 1.5,
-  },
-  compIcon: {
-    fontSize: 22,
-  },
-  compLabel: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 14,
-    color: C.darkBrown,
-  },
-  compLabelActive: {
-    fontFamily: "Inter_600SemiBold",
-    color: C.darkBrown,
-  },
-  compCheck: {
-    position: "absolute",
-    top: 8,
-    right: 8,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: GOLD,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  // ── Step 3: Inspiration ────────────────────────────────────────────────────
-  inspGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 4,
-    marginBottom: 4,
-  },
-  inspChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 22,
-    backgroundColor: `${C.darkBrown}06`,
-    borderWidth: 1,
-    borderColor: `${C.darkBrown}14`,
-  },
-  inspChipActive: {
-    backgroundColor: `${GOLD}12`,
-    borderColor: `${GOLD}55`,
-  },
-  inspIcon: {
-    fontSize: 14,
-  },
-  inspLabel: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 13,
-    color: C.darkBrown,
-  },
-  inspLabelActive: {
-    fontFamily: "Inter_600SemiBold",
-    color: C.darkBrown,
-  },
-
-  // ── Step 4: Budget ─────────────────────────────────────────────────────────
-  budgetCol: {
-    gap: 10,
-    marginTop: 4,
-  },
-  budgetRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    borderRadius: 18,
-    backgroundColor: `${C.darkBrown}06`,
-    borderWidth: 1,
-    borderColor: `${C.darkBrown}12`,
-  },
-  budgetRowActive: {
-    backgroundColor: `${GOLD}08`,
-    borderColor: `${GOLD}50`,
-    borderWidth: 1.5,
-  },
-  budgetRadio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: C.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  budgetRadioActive: {
-    borderColor: GOLD,
-  },
-  budgetDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  calCellActive: {
     backgroundColor: GOLD,
   },
-  budgetText: {
-    flex: 1,
-    gap: 2,
+
+  calCellPast: {
+    opacity: 0.25,
   },
-  budgetLabel: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
-    color: C.darkBrown,
-  },
-  budgetLabelActive: {
-    color: C.darkBrown,
-  },
-  budgetDesc: {
+
+  calDayText: {
     fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    color: C.warmGray,
+    fontSize: 13,
+    color: CREAM,
+  },
+
+  calDayTextActive: {
+    color: C.darkBrown,
+    fontFamily: "Inter_600SemiBold",
+  },
+
+  calDayTextPast: {
+    color: "rgba(245,240,232,0.30)",
   },
 });
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ReplaceSheet — in-context item replacement overlay
@@ -993,6 +861,37 @@ interface Suggestion {
   image: ReturnType<typeof getNeighborhoodImage>;
   categoria: SavedCategory;
   subtitle?: string;
+  isExternal?: boolean;
+}
+
+const GOOGLE_PLACES_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_KEY ?? "";
+
+async function fetchGooglePlaces(
+  query: string,
+  categoria: SavedCategory,
+): Promise<Suggestion[]> {
+  if (!GOOGLE_PLACES_KEY || query.length < 3) return [];
+  try {
+    const type = categoria === "restaurante" ? "&types=restaurant" : "";
+    const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&location=-22.9068,-43.1729&radius=50000&language=pt-BR${type}&key=${GOOGLE_PLACES_KEY}`;
+    const res  = await fetch(url);
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (data.status !== "OK") return [];
+    return (data.predictions as Record<string, unknown>[]).map((p) => ({
+      id:          (p.place_id as string),
+      titulo:      ((p as Record<string, Record<string, string>>).structured_formatting?.main_text)
+                     ?? (p.description as string),
+      localizacao: ((p as Record<string, Record<string, string>>).structured_formatting?.secondary_text)
+                     ?? "Rio de Janeiro",
+      image:       getNeighborhoodImage(""),
+      categoria,
+      subtitle:    "Adicionado por você",
+      isExternal:  true,
+    }));
+  } catch {
+    return [];
+  }
 }
 
 interface ReplaceSheetProps {
@@ -1003,13 +902,27 @@ interface ReplaceSheetProps {
 }
 
 function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
-  const [suggestions,  setSuggestions]  = useState<Suggestion[]>([]);
-  const [loading,      setLoading]      = useState(true);
-  const [searchQuery,  setSearchQuery]  = useState("");
+  const [suggestions,    setSuggestions]    = useState<Suggestion[]>([]);
+  const [externalResults, setExternalResults] = useState<Suggestion[]>([]);
+  const [loading,        setLoading]        = useState(true);
+  const [extLoading,     setExtLoading]     = useState(false);
+  const [searchQuery,    setSearchQuery]    = useState("");
 
   useEffect(() => {
     fetchSuggestions();
   }, [item.id]);
+
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (q.length < 3) { setExternalResults([]); return; }
+    const timer = setTimeout(async () => {
+      setExtLoading(true);
+      const results = await fetchGooglePlaces(q, item.categoria);
+      setExternalResults(results);
+      setExtLoading(false);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [searchQuery, item.categoria]);
 
   async function fetchSuggestions() {
     setLoading(true);
@@ -1069,12 +982,16 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
     }
   }
 
-  const filtered = searchQuery.trim()
+  const q = searchQuery.trim();
+  const localFiltered = q
     ? suggestions.filter((s) =>
-        s.titulo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.localizacao.toLowerCase().includes(searchQuery.toLowerCase())
+        s.titulo.toLowerCase().includes(q.toLowerCase()) ||
+        s.localizacao.toLowerCase().includes(q.toLowerCase())
       )
     : suggestions;
+  const filtered = q.length >= 3
+    ? [...localFiltered, ...externalResults.filter((e) => !localFiltered.some((l) => l.id === e.id))]
+    : localFiltered;
 
   function confirmReplace(sug: Suggestion) {
     const newItem: SavedItem = {
@@ -1120,9 +1037,14 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
         )}
       </View>
 
-      <Text style={rs.sectionLabel}>
-        {searchQuery ? `${filtered.length} resultado${filtered.length !== 1 ? "s" : ""}` : "✦ Sugestões para substituir"}
-      </Text>
+      <View style={rs.sectionLabelRow}>
+        <Text style={rs.sectionLabel}>
+          {q ? `${filtered.length} resultado${filtered.length !== 1 ? "s" : ""}` : "✦ Sugestões para substituir"}
+        </Text>
+        {extLoading && (
+          <Text style={rs.sectionLabelSub}>buscando lugares…</Text>
+        )}
+      </View>
 
       {/* Suggestions list */}
       {loading ? (
@@ -1238,14 +1160,24 @@ const rs = StyleSheet.create({
     color: CREAM,
     padding: 0,
   },
+  sectionLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 10,
+  },
   sectionLabel: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 11,
     color: `${GOLD}90`,
     letterSpacing: 0.8,
-    marginHorizontal: 20,
-    marginTop: 20,
-    marginBottom: 10,
+  },
+  sectionLabelSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: "rgba(245,240,232,0.40)",
   },
   loadingRow: {
     flexDirection: "row",
@@ -2151,6 +2083,9 @@ export default function RoteiroScreen() {
   const topPad    = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
+  const params      = useLocalSearchParams<{ contextual?: string }>();
+  const isContextual = params.contextual === "1";
+
   const { saved } = useGuia();
 
   const [result,        setResult]        = useState<ItineraryResult | null>(null);
@@ -2265,30 +2200,15 @@ export default function RoteiroScreen() {
     <View style={sc.root}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* ── Light atmospheric background (journey phase only) ── */}
-      {phase === "journey" && (
-        <View style={[sc.heroBg, { pointerEvents: "none" }]}>
-          <LinearGradient
-            colors={[C.cream, "#EDE5D6", "#E4D9C5"]}
-            locations={[0, 0.5, 1]}
-            style={StyleSheet.absoluteFill}
-          />
-          <Text style={sc.heroWatermark}>{"RIO\nDE\nJAN."}</Text>
-          <View style={sc.heroAccent} />
-        </View>
-      )}
-
-      {/* ── Cinematic dark background (loading + result phases) ── */}
-      {phase !== "journey" && (
-        <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}>
-          <Image source={heroImg} style={StyleSheet.absoluteFill} resizeMode="cover" />
-          <LinearGradient
-            colors={["rgba(12,6,2,0.78)", "rgba(8,4,1,0.90)", "rgba(5,2,0,0.97)"]}
-            locations={[0, 0.45, 1]}
-            style={StyleSheet.absoluteFill}
-          />
-        </View>
-      )}
+      {/* ── Cinematic dark background — all phases ── */}
+      <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}>
+        <Image source={heroImg} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        <LinearGradient
+          colors={["rgba(12,6,2,0.78)", "rgba(8,4,1,0.90)", "rgba(5,2,0,0.97)"]}
+          locations={[0, 0.45, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+      </View>
 
       {/* ── Header (hidden in journey phase) ── */}
       {phase !== "journey" && (
@@ -2303,7 +2223,11 @@ export default function RoteiroScreen() {
 
       {/* ── Phase content ── */}
       {phase === "journey" && (
-        <JourneyOverlay savedCount={saved.length} onGenerate={handleGenerate} />
+        <TripFlow
+          savedCount={saved.length}
+          isContextual={isContextual}
+          onGenerate={handleGenerate}
+        />
       )}
 
       {phase === "loading" && <LoadingPhase />}
@@ -2345,7 +2269,7 @@ export default function RoteiroScreen() {
 const sc = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: C.cream,
+    backgroundColor: "#080401",
   },
   heroBg: {
     ...StyleSheet.absoluteFillObject,

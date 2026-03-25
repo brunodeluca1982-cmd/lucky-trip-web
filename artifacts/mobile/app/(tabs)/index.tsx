@@ -158,7 +158,7 @@ function RoteiroCTA() {
       <Text style={s.ctaSub}>
         Use nosso planejador intuitivo para criar experiências únicas no seu destino.
       </Text>
-      <Pressable style={s.ctaBtn} onPress={() => router.push("/(tabs)/viagem")}>
+      <Pressable style={s.ctaBtn} onPress={() => router.push("/roteiro")}>
         <Feather name="plus" size={15} color={C.white} />
         <Text style={s.ctaBtnText}>Criar roteiro</Text>
       </Pressable>

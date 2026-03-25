@@ -23,7 +23,9 @@ export type Inspiration =
   | "culture"
   | "beach"
   | "adventure"
-  | "lucky";
+  | "lucky"
+  | "natureza"
+  | "festa";
 
 export type Vibe = "tranquilo" | "moderado" | "intenso";
 
@@ -54,6 +56,8 @@ const CATEGORY_AFFINITY: Record<Inspiration, Partial<Record<SavedCategory, numbe
   beach:      { restaurante: 1, oQueFazer: 2, lucky: 1, hotel: 0 },
   adventure:  { restaurante: 0, oQueFazer: 2, lucky: 2, hotel: 0 },
   lucky:      { restaurante: 1, oQueFazer: 1, lucky: 3, hotel: 0 },
+  natureza:   { restaurante: 0, oQueFazer: 2, lucky: 1, hotel: 0 },
+  festa:      { restaurante: 2, oQueFazer: 1, lucky: 2, hotel: 0 },
 };
 
 // ── Vibe → day density limit ──────────────────────────────────────────────────

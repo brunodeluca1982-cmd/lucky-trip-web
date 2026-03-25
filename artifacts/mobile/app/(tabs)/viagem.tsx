@@ -134,7 +134,7 @@ function SocialChip({
   );
 }
 
-function ActionArea() {
+function ActionArea({ hasSaved }: { hasSaved: boolean }) {
   return (
     <View style={act.wrap}>
       {/* Row 1 — social import chips */}
@@ -150,7 +150,11 @@ function ActionArea() {
           act.aiBtn,
           pressed && { opacity: 0.82, transform: [{ scale: 0.985 }] },
         ]}
-        onPress={() => router.push("/roteiro")}
+        onPress={() =>
+          hasSaved
+            ? router.push({ pathname: "/roteiro", params: { contextual: "1" } })
+            : router.push("/roteiro")
+        }
       >
         <View style={act.aiLeft}>
           <View style={act.aiIconWrap}>
@@ -660,7 +664,7 @@ export default function MinhaViagemScreen() {
         <View style={s.rule} />
 
         {/* ── Actions (social chips → AI CTA) ── */}
-        <ActionArea />
+        <ActionArea hasSaved={totalSaved > 0} />
 
         {/* ── Saved places or empty hint ── */}
         {totalSaved > 0 ? (

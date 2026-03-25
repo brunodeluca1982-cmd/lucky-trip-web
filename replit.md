@@ -192,6 +192,7 @@ Map tap → navigate directly to bairro page (no floating card). Bairro pages ha
 ### Environment Variables (Mobile)
 - `EXPO_PUBLIC_SUPABASE_URL` — passed via dev script from `$SUPABASE_URL`
 - `EXPO_PUBLIC_SUPABASE_ANON_KEY` — passed via dev script from `$SUPABASE_ANON_KEY`
+- `EXPO_PUBLIC_GOOGLE_PLACES_KEY` — optional; enables Google Places Autocomplete in ReplaceSheet search (degrades gracefully when missing)
 
 ### Save + Trip System (Roteiro Base)
 
@@ -214,3 +215,24 @@ Map tap → navigate directly to bairro page (no floating card). Bairro pages ha
 - `lugar/[cityId]/[placeId].tsx` — bookmark button on detail screen (all categories)
 - `luckyList/[id].tsx` — "Salvar" button on each lucky pick card (toggles Salvar↔Salvo with gold fill)
 - `luckyList/bairro/[bairroNome].tsx` — same "Salvar" button in neighborhood lucky picks view
+
+### Roteiro AI Flow (roteiro/index.tsx)
+
+**Entry routing**:
+- Home CTA "Criar roteiro" → `/roteiro` (full flow, 2 pages)
+- Viagem "Criar roteiro com IA" → `/roteiro` (no saved) or `/roteiro?contextual=1` (has saved items, skips destination field)
+
+**Journey phases** — all use dark cinematic background (ipanema.png + dark gradient overlay):
+- `journey`: 2-page `TripFlow` component (full-page scrollable, no modal)
+  - `FlowPage1`: destination search (optional via contextual param) + arrival/departure date fields + inline calendar
+  - `FlowPage2`: 6-card inspiration image grid + vibe pills + budget pills → triggers generation
+- `loading`: animated loading card (glassmorphism)
+- `result`: itinerary with hotel card + day timeline + share/edit
+
+**Inspiration types** (utils/buildItinerary.ts): `gastronomy | culture | beach | adventure | lucky | natureza | festa`
+
+**INSPIRATIONS_DATA** (FlowPage2 image cards):
+- natureza→rio-aerial-clean.png, gastronomy→restaurante1.png, culture→cristo.png
+- adventure→pao-acucar.png, beach→ipanema.png, festa→lapa.png
+
+**ReplaceSheet**: Supabase curated suggestions + Google Places Autocomplete (600ms debounce, 3+ chars query, requires `EXPO_PUBLIC_GOOGLE_PLACES_KEY`).
