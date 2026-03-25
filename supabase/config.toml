@@ -28,4 +28,3 @@ site_url = "http://localhost:3000"
 jwt_expiry = 3600
 
 [functions]
-enabled = true
