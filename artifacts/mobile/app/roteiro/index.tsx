@@ -22,8 +22,10 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { BlurView } from "expo-blur";
@@ -35,6 +37,7 @@ import Colors from "@/constants/colors";
 import { useGuia } from "@/context/GuiaContext";
 import type { SavedCategory, SavedItem } from "@/context/GuiaContext";
 import { supabase } from "@/lib/supabase";
+import { getNeighborhoodImage } from "@/data/neighborhoodImages";
 import {
   buildItinerary,
   type Inspiration,
@@ -980,15 +983,384 @@ const jn = StyleSheet.create({
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ReplaceSheet — in-context item replacement overlay
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface Suggestion {
+  id: string;
+  titulo: string;
+  localizacao: string;
+  image: ReturnType<typeof getNeighborhoodImage>;
+  categoria: SavedCategory;
+  subtitle?: string;
+}
+
+interface ReplaceSheetProps {
+  item:      SavedItem;
+  diaNum:    number;
+  onClose:   () => void;
+  onReplace: (diaNum: number, itemId: string, newItem: SavedItem) => void;
+}
+
+function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
+  const [suggestions,  setSuggestions]  = useState<Suggestion[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [searchQuery,  setSearchQuery]  = useState("");
+
+  useEffect(() => {
+    fetchSuggestions();
+  }, [item.id]);
+
+  async function fetchSuggestions() {
+    setLoading(true);
+    try {
+      let rows: Suggestion[] = [];
+
+      if (item.categoria === "restaurante") {
+        const { data } = await supabase
+          .from("restaurantes")
+          .select("id, nome, bairro, especialidade, categoria")
+          .eq("ativo", true)
+          .limit(14);
+        rows = (data ?? []).map((r: Record<string, unknown>) => ({
+          id:          String(r.id),
+          titulo:      (r.nome as string) || "Restaurante",
+          localizacao: (r.bairro as string) || "",
+          image:       getNeighborhoodImage((r.bairro as string) || ""),
+          categoria:   "restaurante" as SavedCategory,
+          subtitle:    (r.especialidade as string) ?? (r.categoria as string) ?? undefined,
+        }));
+      } else if (item.categoria === "lucky") {
+        const { data } = await supabase
+          .from("lucky_list_rio")
+          .select("id, nome, bairro, tipo")
+          .limit(14);
+        rows = (data ?? []).map((r: Record<string, unknown>) => ({
+          id:          String(r.id),
+          titulo:      (r.nome as string) || "Lucky pick",
+          localizacao: (r.bairro as string) || "",
+          image:       getNeighborhoodImage((r.bairro as string) || ""),
+          categoria:   "lucky" as SavedCategory,
+          subtitle:    (r.tipo as string) ?? undefined,
+        }));
+      } else {
+        const { data } = await supabase
+          .from("o_que_fazer_rio")
+          .select("id, nome, bairro, categoria")
+          .limit(14);
+        rows = (data ?? []).map((r: Record<string, unknown>) => ({
+          id:          String(r.id),
+          titulo:      (r.nome as string) || "Experiência",
+          localizacao: (r.bairro as string) || "",
+          image:       getNeighborhoodImage((r.bairro as string) || ""),
+          categoria:   "oQueFazer" as SavedCategory,
+          subtitle:    (r.categoria as string) ?? undefined,
+        }));
+      }
+
+      // Exclude the item being replaced; prefer same bairro
+      const same  = rows.filter((r) => r.localizacao === item.localizacao && r.id !== item.id);
+      const other = rows.filter((r) => r.localizacao !== item.localizacao && r.id !== item.id);
+      setSuggestions([...same, ...other]);
+    } catch {
+      setSuggestions([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const filtered = searchQuery.trim()
+    ? suggestions.filter((s) =>
+        s.titulo.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        s.localizacao.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : suggestions;
+
+  function confirmReplace(sug: Suggestion) {
+    const newItem: SavedItem = {
+      id:          sug.id,
+      titulo:      sug.titulo,
+      localizacao: sug.localizacao,
+      image:       sug.image,
+      categoria:   sug.categoria,
+    };
+    onReplace(diaNum, item.id, newItem);
+    onClose();
+  }
+
+  return (
+    <View style={rs.overlay}>
+      {/* Header */}
+      <View style={rs.header}>
+        <Pressable style={({ pressed }) => [rs.headerBtn, pressed && { opacity: 0.65 }]} onPress={onClose}>
+          <Feather name="arrow-left" size={18} color={CREAM} />
+        </Pressable>
+        <View style={rs.headerCenter}>
+          <Text style={rs.headerTitle}>Substituir lugar</Text>
+          <Text style={rs.headerSub} numberOfLines={1}>{item.titulo}</Text>
+        </View>
+        <View style={rs.headerBtn} />
+      </View>
+
+      {/* Search */}
+      <View style={rs.searchRow}>
+        <Feather name="search" size={14} color={`${GOLD}80`} style={rs.searchIcon} />
+        <TextInput
+          style={rs.searchInput}
+          placeholder="Buscar outro lugar…"
+          placeholderTextColor="rgba(245,240,232,0.30)"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          returnKeyType="search"
+        />
+        {searchQuery.length > 0 && (
+          <Pressable onPress={() => setSearchQuery("")} hitSlop={8}>
+            <Feather name="x" size={14} color={`${GOLD}80`} />
+          </Pressable>
+        )}
+      </View>
+
+      <Text style={rs.sectionLabel}>
+        {searchQuery ? `${filtered.length} resultado${filtered.length !== 1 ? "s" : ""}` : "✦ Sugestões para substituir"}
+      </Text>
+
+      {/* Suggestions list */}
+      {loading ? (
+        <View style={rs.loadingRow}>
+          <Feather name="loader" size={20} color={GOLD} />
+          <Text style={rs.loadingText}>Buscando opções…</Text>
+        </View>
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={rs.listContent}
+        >
+          {filtered.map((sug) => (
+            <Pressable
+              key={sug.id}
+              style={({ pressed }) => [rs.sugCard, pressed && { opacity: 0.82 }]}
+              onPress={() => confirmReplace(sug)}
+            >
+              <View style={rs.sugThumb}>
+                <Image source={sug.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                <LinearGradient colors={["transparent", "rgba(8,4,1,0.50)"]} style={StyleSheet.absoluteFill} />
+              </View>
+              <View style={rs.sugInfo}>
+                <Text style={rs.sugName} numberOfLines={1}>{sug.titulo}</Text>
+                <View style={rs.sugLocRow}>
+                  <Feather name="map-pin" size={9} color={`${GOLD}80`} />
+                  <Text style={rs.sugLoc} numberOfLines={1}>{sug.localizacao}</Text>
+                </View>
+                {sug.subtitle ? (
+                  <View style={rs.sugBadge}>
+                    <Text style={rs.sugBadgeText}>{sug.subtitle}</Text>
+                  </View>
+                ) : null}
+              </View>
+              <View style={rs.useBtn}>
+                <Text style={rs.useBtnText}>Usar</Text>
+              </View>
+            </Pressable>
+          ))}
+
+          {filtered.length === 0 && !loading && (
+            <View style={rs.emptyState}>
+              <Feather name="search" size={24} color={`${GOLD}50`} />
+              <Text style={rs.emptyText}>Nenhum lugar encontrado</Text>
+              <Text style={rs.emptySub}>Tente outro termo de busca</Text>
+            </View>
+          )}
+        </ScrollView>
+      )}
+    </View>
+  );
+}
+
+const rs = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(8,4,1,0.97)",
+    zIndex: 100,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    paddingTop: 60,
+    borderBottomWidth: 1,
+    borderBottomColor: GLASS_BORDER,
+    gap: 12,
+  },
+  headerBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(201,168,76,0.10)",
+    borderWidth: 1,
+    borderColor: GLASS_BORDER,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: "center",
+  },
+  headerTitle: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 17,
+    color: CREAM,
+  },
+  headerSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: "rgba(245,240,232,0.45)",
+    marginTop: 2,
+  },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 20,
+    marginTop: 16,
+    backgroundColor: "rgba(245,240,232,0.07)",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: GLASS_BORDER,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 10,
+  },
+  searchIcon: {},
+  searchInput: {
+    flex: 1,
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    color: CREAM,
+    padding: 0,
+  },
+  sectionLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    color: `${GOLD}90`,
+    letterSpacing: 0.8,
+    marginHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  loadingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    marginTop: 40,
+  },
+  loadingText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: "rgba(245,240,232,0.45)",
+  },
+  listContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 60,
+    gap: 10,
+  },
+  sugCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: GLASS_BG,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: GLASS_BORDER,
+    padding: 12,
+  },
+  sugThumb: {
+    width: 56,
+    height: 56,
+    borderRadius: 10,
+    overflow: "hidden",
+    backgroundColor: "rgba(30,15,5,0.60)",
+    flexShrink: 0,
+  },
+  sugInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  sugName: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: CREAM,
+    lineHeight: 17,
+  },
+  sugLocRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  sugLoc: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: "rgba(245,240,232,0.45)",
+    flex: 1,
+  },
+  sugBadge: {
+    backgroundColor: "rgba(201,168,76,0.10)",
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: "rgba(201,168,76,0.18)",
+    alignSelf: "flex-start",
+  },
+  sugBadgeText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 9,
+    color: `${GOLD}CC`,
+  },
+  useBtn: {
+    backgroundColor: "rgba(201,168,76,0.16)",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(201,168,76,0.28)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flexShrink: 0,
+  },
+  useBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: GOLD,
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingTop: 60,
+  },
+  emptyText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: "rgba(245,240,232,0.50)",
+  },
+  emptySub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: "rgba(245,240,232,0.30)",
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Screen header
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ScreenHeader({
   phase,
   onBack,
+  onShare,
 }: {
   phase: "journey" | "loading" | "result";
   onBack: () => void;
+  onShare?: () => void;
 }) {
   if (phase === "journey") return null;
 
@@ -1012,7 +1384,11 @@ function ScreenHeader({
       </View>
 
       {isResult ? (
-        <Pressable style={({ pressed }) => [hd.btn, pressed && { opacity: 0.65 }]} hitSlop={10}>
+        <Pressable
+          style={({ pressed }) => [hd.btn, pressed && { opacity: 0.65 }]}
+          onPress={onShare}
+          hitSlop={10}
+        >
           <Feather name="share" size={18} color={CREAM} />
         </Pressable>
       ) : (
@@ -1108,13 +1484,24 @@ function LoadingPhase() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface ResultPhaseProps {
-  result:      ItineraryResult;
-  hotelItem:   SavedItem | null;
-  totalPlaces: number;
-  onReset:     () => void;
+  result:         ItineraryResult;
+  hotelItem:      SavedItem | null;
+  totalPlaces:    number;
+  editMode:       boolean;
+  onToggleEdit:   () => void;
+  onReplaceItem:  (diaNum: number, itemId: string, newItem: SavedItem) => void;
+  onShareResult:  () => void;
 }
 
-function ResultPhase({ result, hotelItem, totalPlaces, onReset }: ResultPhaseProps) {
+function ResultPhase({
+  result,
+  hotelItem,
+  totalPlaces,
+  editMode,
+  onToggleEdit,
+  onReplaceItem,
+  onShareResult,
+}: ResultPhaseProps) {
   const { totalDays, totalItems } = result.summary;
 
   function handleWhatsApp() {
@@ -1126,9 +1513,23 @@ function ResultPhase({ result, hotelItem, totalPlaces, onReset }: ResultPhasePro
 
   return (
     <>
+      {/* ── Edit mode banner ── */}
+      {editMode && (
+        <View style={re.editBanner}>
+          <Feather name="edit-2" size={12} color={GOLD} />
+          <Text style={re.editBannerText}>Toque em um item para substituí-lo</Text>
+          <Pressable onPress={onToggleEdit} hitSlop={8}>
+            <Text style={re.editBannerDone}>Concluir</Text>
+          </Pressable>
+        </View>
+      )}
+
       {/* ── Hotel card ── */}
       {hotelItem && (
-        <Pressable style={re.hotelCard} onPress={() => {}}>
+        <Pressable
+          style={re.hotelCard}
+          onPress={() => router.push({ pathname: "/ondeFicar/hotel/[hotelId]", params: { hotelId: hotelItem.id } })}
+        >
           {/* Thumbnail */}
           <View style={re.hotelThumb}>
             <Image source={hotelItem.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
@@ -1181,10 +1582,12 @@ function ResultPhase({ result, hotelItem, totalPlaces, onReset }: ResultPhasePro
         </Pressable>
         <Pressable
           style={({ pressed }) => [re.actionBtn, re.actionBtnEdit, pressed && { opacity: 0.82 }]}
-          onPress={onReset}
+          onPress={onToggleEdit}
         >
           <Feather name="edit-2" size={15} color={GOLD} />
-          <Text style={[re.actionBtnText, { color: GOLD }]}>Editar roteiro</Text>
+          <Text style={[re.actionBtnText, { color: GOLD }]}>
+            {editMode ? "Sair da edição" : "Editar roteiro"}
+          </Text>
         </Pressable>
       </View>
 
@@ -1204,13 +1607,42 @@ function ResultPhase({ result, hotelItem, totalPlaces, onReset }: ResultPhasePro
 
       {/* ── Day cards ── */}
       {result.days.map((dia) => (
-        <ResultDayCard key={`${dia.numero}-${dia.bairro}`} dia={dia} />
+        <ResultDayCard
+          key={`${dia.numero}-${dia.bairro}`}
+          dia={dia}
+          editMode={editMode}
+          onReplaceItem={onReplaceItem}
+        />
       ))}
     </>
   );
 }
 
-function ResultDayCard({ dia }: { dia: DiaRoteiro }) {
+function navigateToItem(item: SavedItem) {
+  switch (item.categoria) {
+    case "restaurante":
+      router.push({ pathname: "/comerBem/[id]", params: { id: item.id } });
+      break;
+    case "hotel":
+      router.push({ pathname: "/ondeFicar/hotel/[hotelId]", params: { hotelId: item.id } });
+      break;
+    case "oQueFazer":
+    case "lucky":
+    default:
+      router.push({ pathname: "/lugar/[cityId]/[placeId]", params: { cityId: "rio", placeId: item.id } });
+      break;
+  }
+}
+
+function ResultDayCard({
+  dia,
+  editMode,
+  onReplaceItem,
+}: {
+  dia:           DiaRoteiro;
+  editMode:      boolean;
+  onReplaceItem: (diaNum: number, itemId: string, newItem: SavedItem) => void;
+}) {
   const weather = getDayWeather(dia.numero);
   const allItems = dia.periodos.flatMap((p) => p.items);
   const travelMinTotal = Math.max(25, allItems.length * 16);
@@ -1255,7 +1687,13 @@ function ResultDayCard({ dia }: { dia: DiaRoteiro }) {
                 <React.Fragment key={item.id}>
                   <Pressable
                     style={({ pressed }) => [re.itemRow, pressed && { opacity: 0.80 }]}
-                    onPress={() => router.push(`/lugar/rio/${item.id}`)}
+                    onPress={() => {
+                      if (editMode) {
+                        onReplaceItem(dia.numero, item.id, item);
+                      } else {
+                        navigateToItem(item);
+                      }
+                    }}
                   >
                     {/* Left: time */}
                     <View style={re.timeCol}>
@@ -1289,7 +1727,13 @@ function ResultDayCard({ dia }: { dia: DiaRoteiro }) {
                       </View>
                     </View>
 
-                    <Feather name="chevron-right" size={14} color="rgba(245,240,232,0.25)" />
+                    {editMode ? (
+                      <View style={re.swapBtn}>
+                        <Feather name="refresh-cw" size={13} color={GOLD} />
+                      </View>
+                    ) : (
+                      <Feather name="chevron-right" size={14} color="rgba(245,240,232,0.25)" />
+                    )}
                   </Pressable>
 
                   {/* Travel connector between items */}
@@ -1662,6 +2106,40 @@ const re = StyleSheet.create({
     fontSize: 10,
     color: "rgba(245,240,232,0.35)",
   },
+  editBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(201,168,76,0.10)",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(201,168,76,0.22)",
+    marginHorizontal: 20,
+    marginBottom: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  editBannerText: {
+    flex: 1,
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: "rgba(245,240,232,0.70)",
+  },
+  editBannerDone: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: GOLD,
+  },
+  swapBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "rgba(201,168,76,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(201,168,76,0.25)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1675,8 +2153,55 @@ export default function RoteiroScreen() {
 
   const { saved } = useGuia();
 
-  const [result,     setResult]     = useState<ItineraryResult | null>(null);
-  const [generating, setGenerating] = useState(false);
+  const [result,        setResult]        = useState<ItineraryResult | null>(null);
+  const [generating,    setGenerating]    = useState(false);
+  const [editMode,      setEditMode]      = useState(false);
+  const [replacingItem, setReplacingItem] = useState<{ item: SavedItem; diaNum: number } | null>(null);
+
+  function replaceItem(diaNum: number, itemId: string, newItem: SavedItem) {
+    setResult((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        days: prev.days.map((dia) => {
+          if (dia.numero !== diaNum) return dia;
+          return {
+            ...dia,
+            periodos: dia.periodos.map((periodo) => ({
+              ...periodo,
+              items: periodo.items.map((it) => (it.id === itemId ? newItem : it)),
+            })),
+          };
+        }),
+      };
+    });
+  }
+
+  function openReplaceSheet(diaNum: number, _itemId: string, item: SavedItem) {
+    setReplacingItem({ item, diaNum });
+  }
+
+  async function handleShare() {
+    if (!result) return;
+    const lines: string[] = [`✦ Roteiro Rio de Janeiro — The Lucky Trip\n`];
+    for (const dia of result.days) {
+      lines.push(`📍 Dia ${dia.numero} — ${dia.bairro}`);
+      for (const periodo of dia.periodos) {
+        const label = PERIODO_LABEL[periodo.periodo];
+        const items = periodo.items.map((it) => `  • ${it.titulo} (${it.localizacao || dia.bairro})`).join("\n");
+        if (items) lines.push(`${label}\n${items}`);
+      }
+      lines.push("");
+    }
+    try {
+      await Share.share({
+        message: lines.join("\n").trim(),
+        title:   "Roteiro Rio de Janeiro",
+      });
+    } catch {
+      // dismissed
+    }
+  }
 
   const hotelItem   = saved.find((s) => s.categoria === "hotel") ?? null;
   const totalPlaces = saved.filter((s) => s.categoria !== "hotel").length;
@@ -1740,8 +2265,8 @@ export default function RoteiroScreen() {
     <View style={sc.root}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* ── Light atmospheric background (journey + loading phases) ── */}
-      {phase !== "result" && (
+      {/* ── Light atmospheric background (journey phase only) ── */}
+      {phase === "journey" && (
         <View style={[sc.heroBg, { pointerEvents: "none" }]}>
           <LinearGradient
             colors={[C.cream, "#EDE5D6", "#E4D9C5"]}
@@ -1753,12 +2278,12 @@ export default function RoteiroScreen() {
         </View>
       )}
 
-      {/* ── Cinematic dark background (result phase only) ── */}
-      {phase === "result" && (
+      {/* ── Cinematic dark background (loading + result phases) ── */}
+      {phase !== "journey" && (
         <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}>
           <Image source={heroImg} style={StyleSheet.absoluteFill} resizeMode="cover" />
           <LinearGradient
-            colors={["rgba(12,6,2,0.62)", "rgba(8,4,1,0.82)", "rgba(5,2,0,0.93)"]}
+            colors={["rgba(12,6,2,0.78)", "rgba(8,4,1,0.90)", "rgba(5,2,0,0.97)"]}
             locations={[0, 0.45, 1]}
             style={StyleSheet.absoluteFill}
           />
@@ -1770,7 +2295,8 @@ export default function RoteiroScreen() {
         <View style={{ paddingTop: topPad }}>
           <ScreenHeader
             phase={phase}
-            onBack={() => { setResult(null); setGenerating(false); }}
+            onBack={() => { setResult(null); setGenerating(false); setEditMode(false); }}
+            onShare={handleShare}
           />
         </View>
       )}
@@ -1792,9 +2318,25 @@ export default function RoteiroScreen() {
             result={result!}
             hotelItem={hotelItem}
             totalPlaces={totalPlaces}
-            onReset={() => setResult(null)}
+            editMode={editMode}
+            onToggleEdit={() => setEditMode((v) => !v)}
+            onReplaceItem={openReplaceSheet}
+            onShareResult={handleShare}
           />
         </ScrollView>
+      )}
+
+      {/* ── Replace sheet overlay ── */}
+      {replacingItem && (
+        <ReplaceSheet
+          item={replacingItem.item}
+          diaNum={replacingItem.diaNum}
+          onClose={() => setReplacingItem(null)}
+          onReplace={(diaNum, itemId, newItem) => {
+            replaceItem(diaNum, itemId, newItem);
+            setReplacingItem(null);
+          }}
+        />
       )}
     </View>
   );
@@ -1854,14 +2396,14 @@ const sc = StyleSheet.create({
   loadingText: {
     fontFamily: "PlayfairDisplay_700Bold",
     fontSize: 20,
-    color: C.darkBrown,
+    color: CREAM,
     textAlign: "center",
     lineHeight: 28,
   },
   loadingSubText: {
     fontFamily: "Inter_400Regular",
     fontSize: 13,
-    color: C.warmGray,
+    color: "rgba(245,240,232,0.55)",
     textAlign: "center",
     lineHeight: 20,
   },
