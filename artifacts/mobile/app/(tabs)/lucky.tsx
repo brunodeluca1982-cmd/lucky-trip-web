@@ -1,95 +1,355 @@
-import React from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
+  Keyboard,
+  KeyboardAvoidingView,
+  Linking,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
-import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { HorizontalScroll } from "@/components/HorizontalScroll";
-import { PlaceCard } from "@/components/PlaceCard";
-import { SectionHeader } from "@/components/SectionHeader";
+import { Feather } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { supabase } from "@/lib/supabase";
 import Colors from "@/constants/colors";
-import { segredos, oQueFazer } from "@/data/mockData";
+import { getDeviceId } from "@/utils/deviceId";
 
 const C = Colors.light;
 
+const FREE_LIMIT          = 2;
+const RESPONSES_USED_KEY  = "@luckytrip/lucky_responses_v1";
+const IS_PREMIUM_KEY      = "@luckytrip/lucky_premium_v1";
+
+const SUGGESTED_PROMPTS = [
+  "O que fazer hoje no Rio?",
+  "Melhores restaurantes em Ipanema",
+  "Onde ficar para gastronomia?",
+  "Lugares bons para ir sozinha",
+  "Ideias românticas no Rio",
+  "O que fazer com amigos no fim de semana?",
+];
+
+interface Message {
+  role:    "user" | "assistant";
+  content: string;
+}
+
+// ── Lucky screen ───────────────────────────────────────────────────────────────
+
 export default function LuckyScreen() {
-  const insets = useSafeAreaInsets();
-  const topPad = Platform.OS === "web" ? 67 : insets.top + 16;
+  const insets    = useSafeAreaInsets();
+  const topPad    = Platform.OS === "web" ? 67 : insets.top + 16;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
+  const scrollRef = useRef<ScrollView>(null);
+
+  const [messages,      setMessages]      = useState<Message[]>([]);
+  const [responsesUsed, setResponsesUsed] = useState(0);
+  const [isPremium,     setIsPremium]     = useState(false);
+  const [loading,       setLoading]       = useState(false);
+  const [checkingOut,   setCheckingOut]   = useState(false);
+  const [inputText,     setInputText]     = useState("");
+  const [deviceId,      setDeviceId]      = useState<string | null>(null);
+
+  const isAtLimit = !isPremium && responsesUsed >= FREE_LIMIT;
+
+  useEffect(() => {
+    (async () => {
+      const [id, countStr, premiumStr] = await Promise.all([
+        getDeviceId(),
+        AsyncStorage.getItem(RESPONSES_USED_KEY),
+        AsyncStorage.getItem(IS_PREMIUM_KEY),
+      ]);
+      setDeviceId(id);
+      setResponsesUsed(countStr ? parseInt(countStr, 10) : 0);
+
+      if (premiumStr === "true") {
+        setIsPremium(true);
+        return;
+      }
+
+      const { data } = await supabase
+        .from("access_levels")
+        .select("plan_type, access_until")
+        .eq("device_id", id)
+        .maybeSingle();
+
+      if (
+        data?.plan_type === "premium" &&
+        data.access_until &&
+        new Date(data.access_until) > new Date()
+      ) {
+        setIsPremium(true);
+        await AsyncStorage.setItem(IS_PREMIUM_KEY, "true");
+      }
+    })();
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120);
+  }, []);
+
+  const sendQuery = useCallback(
+    async (query: string) => {
+      if (!query.trim() || loading || isAtLimit || !deviceId) return;
+
+      Keyboard.dismiss();
+      setInputText("");
+
+      const userMsg: Message = { role: "user", content: query.trim() };
+      const nextHistory      = [...messages, userMsg];
+      setMessages(nextHistory);
+      setLoading(true);
+      scrollToBottom();
+
+      try {
+        const { data, error } = await supabase.functions.invoke("lucky-concierge", {
+          body: {
+            query:   query.trim(),
+            history: messages.slice(-6),
+            deviceId,
+            destination: "Rio de Janeiro",
+          },
+        });
+
+        if (error || !data?.answer) {
+          throw new Error(error?.message ?? "Sem resposta");
+        }
+
+        const assistantMsg: Message = { role: "assistant", content: data.answer };
+        setMessages([...nextHistory, assistantMsg]);
+
+        const newCount = responsesUsed + 1;
+        setResponsesUsed(newCount);
+        await AsyncStorage.setItem(RESPONSES_USED_KEY, String(newCount));
+
+        if (data.isPremium && !isPremium) {
+          setIsPremium(true);
+          await AsyncStorage.setItem(IS_PREMIUM_KEY, "true");
+        }
+      } catch (err) {
+        const errMsg: Message = {
+          role:    "assistant",
+          content: "Desculpe, tive um problema ao buscar as informações. Tente novamente em instantes.",
+        };
+        setMessages([...nextHistory, errMsg]);
+      } finally {
+        setLoading(false);
+        scrollToBottom();
+      }
+    },
+    [loading, isAtLimit, deviceId, messages, responsesUsed, isPremium, scrollToBottom],
+  );
+
+  const handleUpgrade = useCallback(async () => {
+    if (!deviceId || checkingOut) return;
+    setCheckingOut(true);
+    try {
+      const baseUrl = process.env.EXPO_PUBLIC_DOMAIN
+        ? `https://${process.env.EXPO_PUBLIC_DOMAIN}`
+        : "https://theluckytrip.app";
+
+      const { data, error } = await supabase.functions.invoke("create-checkout", {
+        body: {
+          deviceId,
+          successUrl: `${baseUrl}/lucky-success`,
+          cancelUrl:  `${baseUrl}/lucky`,
+        },
+      });
+
+      if (error || !data?.url) {
+        throw new Error(error?.message ?? "Checkout indisponível");
+      }
+
+      await Linking.openURL(data.url);
+    } catch {
+      await Linking.openURL("mailto:ola@theluckytrip.com?subject=Premium%20Lucky");
+    } finally {
+      setCheckingOut(false);
+    }
+  }, [deviceId, checkingOut]);
+
+  const hasMessages = messages.length > 0;
+  const remaining   = Math.max(0, FREE_LIMIT - responsesUsed);
+
   return (
-    <View style={styles.root}>
+    <KeyboardAvoidingView
+      style={styles.root}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={bottomPad + 60}
+    >
       <ScrollView
+        ref={scrollRef}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={[
           styles.content,
-          { paddingTop: topPad + 8, paddingBottom: bottomPad + 80 },
+          { paddingTop: topPad + 8, paddingBottom: bottomPad + 120 },
         ]}
       >
+        {/* ── Header ── */}
         <View style={styles.header}>
-          <Text style={styles.eyebrow}>Curadoria</Text>
-          <Text style={styles.title}>Lucky Picks</Text>
-          <Text style={styles.subtitle}>
-            Seleções exclusivas feitas por especialistas para viajantes de alto padrão.
-          </Text>
+          <View style={styles.headerTop}>
+            <View>
+              <Text style={styles.eyebrow}>Concierge</Text>
+              <Text style={styles.title}>Lucky</Text>
+            </View>
+            <View style={styles.logoMark}>
+              <Text style={styles.logoMarkText}>L.</Text>
+            </View>
+          </View>
+          {!hasMessages && (
+            <Text style={styles.subtitle}>
+              Pergunte sobre o Rio, peça sugestões ou deixe{"\n"}me guiar a sua viagem.
+            </Text>
+          )}
+          {!isPremium && hasMessages && (
+            <View style={styles.counterBadge}>
+              <Feather name="zap" size={11} color={remaining === 0 ? C.terracotta : C.gold} />
+              <Text style={[styles.counterText, remaining === 0 && { color: C.terracotta }]}>
+                {remaining === 0 ? "Limite gratuito atingido" : `${remaining} de ${FREE_LIMIT} respostas gratuitas restantes`}
+              </Text>
+            </View>
+          )}
+          {isPremium && (
+            <View style={styles.premiumBadge}>
+              <Feather name="star" size={11} color={C.gold} />
+              <Text style={styles.premiumBadgeText}>Lucky Premium</Text>
+            </View>
+          )}
         </View>
 
-        <View style={styles.goldCard}>
-          <Text style={styles.goldCardEmoji}>L.</Text>
-          <Text style={styles.goldCardTitle}>O Toque Lucky</Text>
-          <Text style={styles.goldCardText}>
-            Experiências exclusivas e segredos de viagem selecionados a dedo pela nossa equipe editorial.
-          </Text>
-        </View>
+        {/* ── Entry prompts (no messages yet) ── */}
+        {!hasMessages && (
+          <View style={styles.promptsSection}>
+            <Text style={styles.promptsLabel}>Sugestões</Text>
+            <View style={styles.promptsGrid}>
+              {SUGGESTED_PROMPTS.map((prompt) => (
+                <Pressable
+                  key={prompt}
+                  style={({ pressed }) => [
+                    styles.promptChip,
+                    pressed && styles.promptChipPressed,
+                  ]}
+                  onPress={() => sendQuery(prompt)}
+                >
+                  <Text style={styles.promptChipText}>{prompt}</Text>
+                  <Feather name="arrow-right" size={12} color={C.gold} />
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        )}
 
-        <View style={{ height: 24 }} />
-
-        <SectionHeader
-          title="Segredos da semana"
-          subtitle="Descobertas que poucos conhecem."
-        />
-        {segredos.map((s) => (
-          <PlaceCard
-            key={s.id}
-            id={s.id}
-            saveCategoria="oQueFazer"
-            titulo={s.titulo}
-            localizacao={s.localizacao}
-            descricao={s.descricao}
-            image={s.image}
-            variant="secret"
-            onPress={() => router.push(`/lugar/rio/${s.id}`)}
-          />
+        {/* ── Message thread ── */}
+        {messages.map((msg, i) => (
+          <View key={i} style={styles.messageBlock}>
+            {msg.role === "user" ? (
+              <View style={styles.userBubbleRow}>
+                <View style={styles.userBubble}>
+                  <Text style={styles.userBubbleText}>{msg.content}</Text>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.luckyCard}>
+                <View style={styles.luckyCardHeader}>
+                  <View style={styles.luckyAvatarSmall}>
+                    <Text style={styles.luckyAvatarSmallText}>L.</Text>
+                  </View>
+                  <Text style={styles.luckyCardLabel}>Lucky</Text>
+                </View>
+                <Text style={styles.luckyCardText}>{msg.content}</Text>
+              </View>
+            )}
+          </View>
         ))}
 
-        <View style={{ height: 24 }} />
+        {/* ── Loading state ── */}
+        {loading && (
+          <View style={styles.loadingCard}>
+            <View style={styles.luckyCardHeader}>
+              <View style={styles.luckyAvatarSmall}>
+                <Text style={styles.luckyAvatarSmallText}>L.</Text>
+              </View>
+              <Text style={styles.luckyCardLabel}>Lucky</Text>
+            </View>
+            <View style={styles.loadingDots}>
+              <ActivityIndicator size="small" color={C.gold} />
+              <Text style={styles.loadingText}>Consultando a curadoria...</Text>
+            </View>
+          </View>
+        )}
 
-        <SectionHeader
-          title="Momentos únicos"
-          subtitle="Experiências para guardar na memória."
-        />
-        <HorizontalScroll>
-          {oQueFazer.map((item) => (
-            <PlaceCard
-              key={item.id}
-              id={item.id}
-              saveCategoria="oQueFazer"
-              titulo={item.titulo}
-              localizacao={item.localizacao}
-              image={item.image}
-              size="medium"
-              onPress={() => router.push(`/lugar/rio/${item.id}`)}
-            />
-          ))}
-        </HorizontalScroll>
+        {/* ── Paywall gate ── */}
+        {isAtLimit && !loading && (
+          <View style={styles.paywallCard}>
+            <View style={styles.paywallTop}>
+              <Text style={styles.paywallLogo}>L.</Text>
+              <View style={styles.paywallBadge}>
+                <Feather name="lock" size={11} color={C.gold} />
+                <Text style={styles.paywallBadgeText}>Lucky Premium</Text>
+              </View>
+            </View>
+            <Text style={styles.paywallTitle}>Continue com o Lucky</Text>
+            <Text style={styles.paywallBody}>
+              Você usou as 2 respostas gratuitas. Assine para refinamentos ilimitados, recomendações personalizadas e acesso completo ao concierge.
+            </Text>
+            <Pressable
+              style={({ pressed }) => [
+                styles.paywallCTA,
+                pressed && { opacity: 0.85 },
+                checkingOut && { opacity: 0.6 },
+              ]}
+              onPress={handleUpgrade}
+              disabled={checkingOut}
+            >
+              {checkingOut
+                ? <ActivityIndicator size="small" color={C.darkBrown} />
+                : <Text style={styles.paywallCTAText}>Assinar para continuar</Text>
+              }
+            </Pressable>
+            <Text style={styles.paywallSub}>Cancele quando quiser · Sem taxas ocultas</Text>
+          </View>
+        )}
       </ScrollView>
-    </View>
+
+      {/* ── Input bar ── */}
+      {!isAtLimit && (
+        <View style={[styles.inputBar, { paddingBottom: bottomPad + 12 }]}>
+          <TextInput
+            style={styles.input}
+            value={inputText}
+            onChangeText={setInputText}
+            placeholder="Pergunte sobre o Rio..."
+            placeholderTextColor={C.warmGray}
+            onSubmitEditing={() => sendQuery(inputText)}
+            returnKeyType="send"
+            editable={!loading}
+            multiline={false}
+          />
+          <Pressable
+            style={({ pressed }) => [
+              styles.sendBtn,
+              (!inputText.trim() || loading) && styles.sendBtnDisabled,
+              pressed && inputText.trim() && !loading && { opacity: 0.8 },
+            ]}
+            onPress={() => sendQuery(inputText)}
+            disabled={!inputText.trim() || loading}
+          >
+            <Feather name="send" size={18} color={!inputText.trim() || loading ? C.warmGray : C.white} />
+          </Pressable>
+        </View>
+      )}
+    </KeyboardAvoidingView>
   );
 }
+
+// ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   root: {
@@ -97,60 +357,317 @@ const styles = StyleSheet.create({
     backgroundColor: C.cream,
   },
   content: {
-    gap: 0,
+    paddingHorizontal: 20,
   },
+
+  // Header
   header: {
-    paddingHorizontal: 24,
-    marginBottom: 24,
-    gap: 6,
+    marginBottom: 28,
+    gap: 10,
+  },
+  headerTop: {
+    flexDirection:  "row",
+    alignItems:     "flex-start",
+    justifyContent: "space-between",
   },
   eyebrow: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 12,
-    color: C.gold,
-    letterSpacing: 2,
+    fontFamily:    "Inter_500Medium",
+    fontSize:      11,
+    color:         C.gold,
+    letterSpacing: 2.5,
     textTransform: "uppercase",
+    marginBottom:  4,
   },
   title: {
     fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 34,
-    color: C.darkBrown,
-    lineHeight: 40,
+    fontSize:   38,
+    color:      C.darkBrown,
+    lineHeight: 44,
+  },
+  logoMark: {
+    width:           52,
+    height:          52,
+    borderRadius:    26,
+    backgroundColor: C.darkBrown,
+    alignItems:      "center",
+    justifyContent:  "center",
+    marginTop:       4,
+  },
+  logoMarkText: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize:   22,
+    color:      C.gold,
   },
   subtitle: {
     fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    color: C.warmGray,
-    lineHeight: 20,
-    maxWidth: 280,
+    fontSize:   15,
+    color:      C.warmGray,
+    lineHeight: 22,
   },
-  goldCard: {
-    marginHorizontal: 24,
-    backgroundColor: C.darkBrown,
-    borderRadius: 20,
-    padding: 24,
+  counterBadge: {
+    flexDirection:  "row",
+    alignItems:     "center",
+    gap:            5,
+    alignSelf:      "flex-start",
+    backgroundColor: "rgba(201,168,76,0.10)",
+    borderRadius:   20,
+    paddingHorizontal: 10,
+    paddingVertical:   5,
+    borderWidth:    1,
+    borderColor:    "rgba(201,168,76,0.22)",
+  },
+  counterText: {
+    fontFamily: "Inter_500Medium",
+    fontSize:   12,
+    color:      C.gold,
+  },
+  premiumBadge: {
+    flexDirection:  "row",
+    alignItems:     "center",
+    gap:            5,
+    alignSelf:      "flex-start",
+    backgroundColor: "rgba(201,168,76,0.10)",
+    borderRadius:   20,
+    paddingHorizontal: 10,
+    paddingVertical:   5,
+    borderWidth:    1,
+    borderColor:    "rgba(201,168,76,0.22)",
+  },
+  premiumBadgeText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize:   12,
+    color:      C.gold,
+  },
+
+  // Suggested prompts
+  promptsSection: {
+    marginBottom: 8,
+  },
+  promptsLabel: {
+    fontFamily:    "Inter_500Medium",
+    fontSize:      11,
+    color:         C.warmGray,
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
+    marginBottom:  12,
+  },
+  promptsGrid: {
     gap: 8,
-    shadowColor: C.darkBrown,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 14,
-    elevation: 6,
   },
-  goldCardEmoji: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 28,
-    color: C.gold,
+  promptChip: {
+    flexDirection:   "row",
+    alignItems:      "center",
+    justifyContent:  "space-between",
+    backgroundColor: C.white,
+    borderRadius:    14,
+    paddingHorizontal: 16,
+    paddingVertical:   13,
+    borderWidth:     1,
+    borderColor:     C.border,
+    boxShadow:       "0px 1px 4px rgba(0,0,0,0.05)",
+  } as never,
+  promptChipPressed: {
+    backgroundColor: C.warmBeige,
+    borderColor:     "rgba(201,168,76,0.35)",
   },
-  goldCardTitle: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 20,
-    color: C.white,
-    lineHeight: 26,
+  promptChipText: {
+    fontFamily: "Inter_500Medium",
+    fontSize:   14,
+    color:      C.darkBrown,
+    flex:       1,
   },
-  goldCardText: {
+
+  // Messages
+  messageBlock: {
+    marginBottom: 14,
+  },
+  userBubbleRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+  },
+  userBubble: {
+    backgroundColor: C.warmBeige,
+    borderRadius:    16,
+    borderBottomRightRadius: 4,
+    paddingHorizontal: 14,
+    paddingVertical:   10,
+    maxWidth:        "80%",
+    borderWidth:     1,
+    borderColor:     C.border,
+  },
+  userBubbleText: {
     fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    color: "rgba(255,255,255,0.72)",
+    fontSize:   14,
+    color:      C.darkBrown,
     lineHeight: 20,
+  },
+
+  // Lucky response card
+  luckyCard: {
+    backgroundColor: C.white,
+    borderRadius:    18,
+    padding:         18,
+    gap:             12,
+    borderWidth:     1,
+    borderColor:     C.border,
+    boxShadow:       "0px 2px 8px rgba(44,24,16,0.07)",
+  } as never,
+  luckyCardHeader: {
+    flexDirection: "row",
+    alignItems:    "center",
+    gap:           8,
+  },
+  luckyAvatarSmall: {
+    width:           28,
+    height:          28,
+    borderRadius:    14,
+    backgroundColor: C.darkBrown,
+    alignItems:      "center",
+    justifyContent:  "center",
+  },
+  luckyAvatarSmallText: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize:   13,
+    color:      C.gold,
+  },
+  luckyCardLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize:   13,
+    color:      C.darkBrown,
+  },
+  luckyCardText: {
+    fontFamily: "Inter_400Regular",
+    fontSize:   15,
+    color:      C.darkBrown,
+    lineHeight: 23,
+  },
+
+  // Loading
+  loadingCard: {
+    backgroundColor: C.white,
+    borderRadius:    18,
+    padding:         18,
+    gap:             12,
+    borderWidth:     1,
+    borderColor:     C.border,
+    marginBottom:    14,
+  },
+  loadingDots: {
+    flexDirection: "row",
+    alignItems:    "center",
+    gap:           10,
+  },
+  loadingText: {
+    fontFamily: "Inter_400Regular",
+    fontSize:   14,
+    color:      C.warmGray,
+  },
+
+  // Paywall
+  paywallCard: {
+    backgroundColor: C.darkBrown,
+    borderRadius:    20,
+    padding:         24,
+    gap:             12,
+    marginTop:       8,
+    borderWidth:     1,
+    borderColor:     "rgba(201,168,76,0.25)",
+    boxShadow:       "0px 4px 20px rgba(44,24,16,0.22)",
+  } as never,
+  paywallTop: {
+    flexDirection:  "row",
+    alignItems:     "center",
+    justifyContent: "space-between",
+    marginBottom:   4,
+  },
+  paywallLogo: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize:   26,
+    color:      C.gold,
+  },
+  paywallBadge: {
+    flexDirection:     "row",
+    alignItems:        "center",
+    gap:               5,
+    backgroundColor:   "rgba(201,168,76,0.15)",
+    borderRadius:      20,
+    paddingHorizontal: 10,
+    paddingVertical:   5,
+    borderWidth:       1,
+    borderColor:       "rgba(201,168,76,0.30)",
+  },
+  paywallBadgeText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize:   11,
+    color:      C.gold,
+  },
+  paywallTitle: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize:   22,
+    color:      C.white,
+    lineHeight: 28,
+  },
+  paywallBody: {
+    fontFamily: "Inter_400Regular",
+    fontSize:   14,
+    color:      "rgba(255,255,255,0.72)",
+    lineHeight: 21,
+  },
+  paywallCTA: {
+    backgroundColor: C.gold,
+    borderRadius:    14,
+    paddingVertical: 15,
+    alignItems:      "center",
+    marginTop:       4,
+  },
+  paywallCTAText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize:   15,
+    color:      C.darkBrown,
+  },
+  paywallSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize:   12,
+    color:      "rgba(255,255,255,0.45)",
+    textAlign:  "center",
+  },
+
+  // Input bar
+  inputBar: {
+    position:        "absolute",
+    bottom:          0,
+    left:            0,
+    right:           0,
+    flexDirection:   "row",
+    alignItems:      "center",
+    gap:             10,
+    paddingHorizontal: 16,
+    paddingTop:      12,
+    backgroundColor: C.cream,
+    borderTopWidth:  1,
+    borderTopColor:  C.border,
+  },
+  input: {
+    flex:              1,
+    backgroundColor:   C.white,
+    borderRadius:      14,
+    paddingHorizontal: 16,
+    paddingVertical:   12,
+    fontFamily:        "Inter_400Regular",
+    fontSize:          15,
+    color:             C.darkBrown,
+    borderWidth:       1,
+    borderColor:       C.border,
+  },
+  sendBtn: {
+    width:           44,
+    height:          44,
+    borderRadius:    22,
+    backgroundColor: C.darkBrown,
+    alignItems:      "center",
+    justifyContent:  "center",
+  },
+  sendBtnDisabled: {
+    backgroundColor: C.warmBeige,
   },
 });
