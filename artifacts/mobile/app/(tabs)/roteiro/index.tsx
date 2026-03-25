@@ -1113,35 +1113,86 @@ interface Suggestion {
   categoria: SavedCategory;
   subtitle?: string;
   isExternal?: boolean;
+  // External places (Google Places)
+  placeId?: string;
+  address?: string;
+  lat?: number;
+  lng?: number;
 }
 
 const GOOGLE_PLACES_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_KEY ?? "";
 
+/**
+ * Calls Google Places Autocomplete API (biased to Rio de Janeiro).
+ * Returns up to 5 place suggestions with placeId + address.
+ * Coordinates are fetched separately via fetchPlaceDetails when user selects a result.
+ *
+ * Endpoint: https://maps.googleapis.com/maps/api/place/autocomplete/json
+ * Key: EXPO_PUBLIC_GOOGLE_PLACES_KEY (configured in Expo env)
+ */
 async function fetchGooglePlaces(
   query: string,
   categoria: SavedCategory,
 ): Promise<Suggestion[]> {
-  if (!GOOGLE_PLACES_KEY || query.length < 3) return [];
+  if (!GOOGLE_PLACES_KEY || query.trim().length < 2) return [];
   try {
-    const type = categoria === "restaurante" ? "&types=restaurant" : "";
-    const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&location=-22.9068,-43.1729&radius=50000&language=pt-BR${type}&key=${GOOGLE_PLACES_KEY}`;
-    const res  = await fetch(url);
+    const typeParam = categoria === "restaurante"
+      ? "&types=restaurant"
+      : "&types=tourist_attraction|point_of_interest|establishment";
+    const biasedQuery = `${query.trim()} Rio de Janeiro`;
+    const url =
+      `https://maps.googleapis.com/maps/api/place/autocomplete/json` +
+      `?input=${encodeURIComponent(biasedQuery)}` +
+      `&location=-22.9068,-43.1729&radius=80000&language=pt-BR` +
+      `${typeParam}&key=${GOOGLE_PLACES_KEY}`;
+    const res = await fetch(url);
     if (!res.ok) return [];
     const data = await res.json();
-    if (data.status !== "OK") return [];
-    return (data.predictions as Record<string, unknown>[]).map((p) => ({
-      id:          (p.place_id as string),
-      titulo:      ((p as Record<string, Record<string, string>>).structured_formatting?.main_text)
-                     ?? (p.description as string),
-      localizacao: ((p as Record<string, Record<string, string>>).structured_formatting?.secondary_text)
-                     ?? "Rio de Janeiro",
-      image:       getNeighborhoodImage(""),
-      categoria,
-      subtitle:    "Adicionado por você",
-      isExternal:  true,
-    }));
+    if (!data.predictions?.length) return [];
+    return (data.predictions as Record<string, unknown>[]).map((p) => {
+      const fmt = (p as Record<string, Record<string, string>>).structured_formatting;
+      return {
+        id:          p.place_id as string,
+        placeId:     p.place_id as string,
+        titulo:      fmt?.main_text ?? (p.description as string),
+        localizacao: fmt?.secondary_text ?? "Rio de Janeiro",
+        address:     p.description as string,
+        image:       getNeighborhoodImage(""),
+        categoria,
+        subtitle:    "Lugar externo",
+        isExternal:  true,
+      };
+    });
   } catch {
     return [];
+  }
+}
+
+/**
+ * Calls Google Places Details API to fetch lat/lng for a given place_id.
+ * Only called on item selection to avoid unnecessary API quota usage.
+ *
+ * Endpoint: https://maps.googleapis.com/maps/api/place/details/json
+ */
+async function fetchPlaceDetails(
+  placeId: string,
+): Promise<{ lat: number; lng: number } | null> {
+  if (!GOOGLE_PLACES_KEY || !placeId) return null;
+  try {
+    const url =
+      `https://maps.googleapis.com/maps/api/place/details/json` +
+      `?place_id=${encodeURIComponent(placeId)}&fields=geometry&language=pt-BR` +
+      `&key=${GOOGLE_PLACES_KEY}`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const loc = data?.result?.geometry?.location as
+      | { lat: number; lng: number }
+      | undefined;
+    if (!loc) return null;
+    return { lat: loc.lat, lng: loc.lng };
+  } catch {
+    return null;
   }
 }
 
@@ -1153,25 +1204,25 @@ interface ReplaceSheetProps {
 }
 
 function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
-  const [suggestions,    setSuggestions]    = useState<Suggestion[]>([]);
+  const [suggestions,     setSuggestions]     = useState<Suggestion[]>([]);
   const [externalResults, setExternalResults] = useState<Suggestion[]>([]);
-  const [loading,        setLoading]        = useState(true);
-  const [extLoading,     setExtLoading]     = useState(false);
-  const [searchQuery,    setSearchQuery]    = useState("");
+  const [loading,         setLoading]         = useState(true);
+  const [extLoading,      setExtLoading]      = useState(false);
+  const [isConfirming,    setIsConfirming]    = useState(false);
+  const [searchQuery,     setSearchQuery]     = useState("");
 
-  useEffect(() => {
-    fetchSuggestions();
-  }, [item.id]);
+  useEffect(() => { fetchSuggestions(); }, [item.id]);
 
+  // Debounce Google Places search — starts at 2 chars, 500ms delay
   useEffect(() => {
     const q = searchQuery.trim();
-    if (q.length < 3) { setExternalResults([]); return; }
+    if (q.length < 2) { setExternalResults([]); setExtLoading(false); return; }
+    setExtLoading(true);
     const timer = setTimeout(async () => {
-      setExtLoading(true);
       const results = await fetchGooglePlaces(q, item.categoria);
       setExternalResults(results);
       setExtLoading(false);
-    }, 600);
+    }, 500);
     return () => clearTimeout(timer);
   }, [searchQuery, item.categoria]);
 
@@ -1222,7 +1273,7 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
         }));
       }
 
-      // Exclude the item being replaced; prefer same bairro
+      // Exclude the current item; prefer same bairro
       const same  = rows.filter((r) => r.localizacao === item.localizacao && r.id !== item.id);
       const other = rows.filter((r) => r.localizacao !== item.localizacao && r.id !== item.id);
       setSuggestions([...same, ...other]);
@@ -1234,34 +1285,114 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
   }
 
   const q = searchQuery.trim();
+
+  // Internal DB results (filtered by query when searching, else show all suggestions)
   const localFiltered = q
-    ? suggestions.filter((s) =>
-        s.titulo.toLowerCase().includes(q.toLowerCase()) ||
-        s.localizacao.toLowerCase().includes(q.toLowerCase())
+    ? suggestions.filter(
+        (s) =>
+          s.titulo.toLowerCase().includes(q.toLowerCase()) ||
+          s.localizacao.toLowerCase().includes(q.toLowerCase()),
       )
     : suggestions;
-  const filtered = q.length >= 3
-    ? [...localFiltered, ...externalResults.filter((e) => !localFiltered.some((l) => l.id === e.id))]
-    : localFiltered;
 
-  function confirmReplace(sug: Suggestion) {
-    const newItem: SavedItem = {
-      id:          sug.id,
-      titulo:      sug.titulo,
-      localizacao: sug.localizacao,
-      image:       sug.image,
-      categoria:   sug.categoria,
-      ...(sug.isExternal ? { isExternal: true } : {}),
-    };
-    onReplace(diaNum, item.id, newItem);
-    onClose();
+  // External results — deduplicate against internal list
+  const externalDeduped = externalResults.filter(
+    (e) => !localFiltered.some((l) => l.id === e.id),
+  );
+
+  /**
+   * On confirm: fetch lat/lng from Place Details API for external items, then
+   * create a fully-hydrated SavedItem and pass it up to the roteiro context.
+   */
+  async function confirmReplace(sug: Suggestion) {
+    if (isConfirming) return;
+    setIsConfirming(true);
+    try {
+      let lat = sug.lat;
+      let lng = sug.lng;
+
+      // Fetch coordinates from Place Details API (only for external results)
+      if (sug.isExternal && sug.placeId) {
+        const geo = await fetchPlaceDetails(sug.placeId);
+        if (geo) { lat = geo.lat; lng = geo.lng; }
+      }
+
+      const newItem: SavedItem = {
+        id:          sug.id,
+        titulo:      sug.titulo,
+        localizacao: sug.localizacao,
+        image:       sug.image,
+        categoria:   sug.categoria,
+        ...(sug.isExternal
+          ? {
+              isExternal: true,
+              placeId:    sug.placeId,
+              address:    sug.address,
+              lat,
+              lng,
+            }
+          : {}),
+      };
+      onReplace(diaNum, item.id, newItem);
+      onClose();
+    } finally {
+      setIsConfirming(false);
+    }
+  }
+
+  /** Render a single suggestion card (shared for internal + external) */
+  function renderSugCard(sug: Suggestion) {
+    return (
+      <Pressable
+        key={sug.id}
+        style={({ pressed }) => [rs.sugCard, (pressed || isConfirming) && { opacity: 0.75 }]}
+        onPress={() => confirmReplace(sug)}
+        disabled={isConfirming}
+      >
+        <View style={rs.sugThumb}>
+          <Image source={sug.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          <LinearGradient
+            colors={["transparent", "rgba(0,0,0,0.50)"]}
+            style={StyleSheet.absoluteFill}
+          />
+          {sug.isExternal && (
+            <View style={rs.externalMark}>
+              <Feather name="globe" size={9} color={GOLD} />
+            </View>
+          )}
+        </View>
+        <View style={rs.sugInfo}>
+          <Text style={rs.sugName} numberOfLines={1}>{sug.titulo}</Text>
+          <View style={rs.sugLocRow}>
+            <Feather name="map-pin" size={9} color={`${GOLD}80`} />
+            <Text style={rs.sugLoc} numberOfLines={1}>
+              {sug.isExternal ? (sug.address ?? sug.localizacao) : sug.localizacao}
+            </Text>
+          </View>
+          {sug.subtitle ? (
+            <View style={[rs.sugBadge, sug.isExternal && rs.sugBadgeExternal]}>
+              <Text style={rs.sugBadgeText}>{sug.subtitle}</Text>
+            </View>
+          ) : null}
+        </View>
+        <View style={rs.useBtn}>
+          {isConfirming
+            ? <Feather name="loader" size={11} color="#000" />
+            : <Text style={rs.useBtnText}>Usar</Text>}
+        </View>
+      </Pressable>
+    );
   }
 
   return (
     <View style={rs.overlay}>
       {/* Header */}
       <View style={rs.header}>
-        <Pressable style={({ pressed }) => [rs.headerBtn, pressed && { opacity: 0.65 }]} onPress={onClose}>
+        <Pressable
+          style={({ pressed }) => [rs.headerBtn, pressed && { opacity: 0.65 }]}
+          onPress={onClose}
+          disabled={isConfirming}
+        >
           <Feather name="arrow-left" size={18} color={CREAM} />
         </Pressable>
         <View style={rs.headerCenter}>
@@ -1271,30 +1402,22 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
         <View style={rs.headerBtn} />
       </View>
 
-      {/* Search */}
+      {/* Search bar */}
       <View style={rs.searchRow}>
         <Feather name="search" size={14} color={`${GOLD}80`} style={rs.searchIcon} />
         <TextInput
           style={rs.searchInput}
-          placeholder="Buscar outro lugar…"
+          placeholder="Buscar qualquer lugar no Rio…"
           placeholderTextColor="rgba(255,255,255,0.30)"
           value={searchQuery}
           onChangeText={setSearchQuery}
           returnKeyType="search"
+          autoCorrect={false}
         />
         {searchQuery.length > 0 && (
           <Pressable onPress={() => setSearchQuery("")} hitSlop={8}>
             <Feather name="x" size={14} color={`${GOLD}80`} />
           </Pressable>
-        )}
-      </View>
-
-      <View style={rs.sectionLabelRow}>
-        <Text style={rs.sectionLabel}>
-          {q ? `${filtered.length} resultado${filtered.length !== 1 ? "s" : ""}` : "✦ Sugestões para substituir"}
-        </Text>
-        {extLoading && (
-          <Text style={rs.sectionLabelSub}>buscando lugares…</Text>
         )}
       </View>
 
@@ -1308,40 +1431,52 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={rs.listContent}
+          keyboardShouldPersistTaps="handled"
         >
-          {filtered.map((sug) => (
-            <Pressable
-              key={sug.id}
-              style={({ pressed }) => [rs.sugCard, pressed && { opacity: 0.82 }]}
-              onPress={() => confirmReplace(sug)}
-            >
-              <View style={rs.sugThumb}>
-                <Image source={sug.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                <LinearGradient colors={["transparent", "rgba(0,0,0,0.50)"]} style={StyleSheet.absoluteFill} />
+          {/* ── Internal DB results ─── */}
+          {localFiltered.length > 0 && (
+            <>
+              <View style={rs.sectionLabelRow}>
+                <Text style={rs.sectionLabel}>
+                  {q ? "✦ Na sua lista" : "✦ Sugestões para substituir"}
+                </Text>
               </View>
-              <View style={rs.sugInfo}>
-                <Text style={rs.sugName} numberOfLines={1}>{sug.titulo}</Text>
-                <View style={rs.sugLocRow}>
-                  <Feather name="map-pin" size={9} color={`${GOLD}80`} />
-                  <Text style={rs.sugLoc} numberOfLines={1}>{sug.localizacao}</Text>
-                </View>
-                {sug.subtitle ? (
-                  <View style={rs.sugBadge}>
-                    <Text style={rs.sugBadgeText}>{sug.subtitle}</Text>
-                  </View>
-                ) : null}
-              </View>
-              <View style={rs.useBtn}>
-                <Text style={rs.useBtnText}>Usar</Text>
-              </View>
-            </Pressable>
-          ))}
+              {localFiltered.map(renderSugCard)}
+            </>
+          )}
 
-          {filtered.length === 0 && !loading && (
+          {/* ── Google Places results ─── */}
+          {q.length >= 2 && (
+            <>
+              <View style={rs.sectionLabelRow}>
+                <Text style={rs.sectionLabel}>✦ Google Places</Text>
+                {extLoading && (
+                  <Text style={rs.sectionLabelSub}>buscando…</Text>
+                )}
+              </View>
+              {extLoading && externalDeduped.length === 0 ? (
+                <View style={rs.googleLoadingRow}>
+                  <Feather name="loader" size={16} color={`${GOLD}70`} />
+                  <Text style={rs.googleLoadingText}>Buscando lugares externos…</Text>
+                </View>
+              ) : externalDeduped.length > 0 ? (
+                externalDeduped.map(renderSugCard)
+              ) : (
+                !extLoading && (
+                  <View style={rs.googleEmptyRow}>
+                    <Text style={rs.googleEmptyText}>Nenhum resultado do Google Places</Text>
+                  </View>
+                )
+              )}
+            </>
+          )}
+
+          {/* ── True empty state — only shown when no results anywhere and not loading ── */}
+          {localFiltered.length === 0 && externalDeduped.length === 0 && !extLoading && q.length < 2 && (
             <View style={rs.emptyState}>
               <Feather name="search" size={24} color={`${GOLD}50`} />
               <Text style={rs.emptyText}>Nenhum lugar encontrado</Text>
-              <Text style={rs.emptySub}>Tente outro termo de busca</Text>
+              <Text style={rs.emptySub}>Digite para buscar no Google Places</Text>
             </View>
           )}
         </ScrollView>
@@ -1527,6 +1662,43 @@ const rs = StyleSheet.create({
     color: "rgba(255,255,255,0.50)",
   },
   emptySub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: "rgba(255,255,255,0.30)",
+  },
+  // External place marker (globe icon in thumb corner)
+  externalMark: {
+    position: "absolute",
+    bottom: 4,
+    right: 4,
+    backgroundColor: "rgba(0,0,0,0.70)",
+    borderRadius: 5,
+    padding: 2,
+  },
+  // Badge variant for external/Google Places results
+  sugBadgeExternal: {
+    backgroundColor: "rgba(212,175,55,0.06)",
+    borderColor: "rgba(212,175,55,0.22)",
+  },
+  // Google Places section loading state
+  googleLoadingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+  },
+  googleLoadingText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: "rgba(255,255,255,0.35)",
+  },
+  // Google Places section — no results
+  googleEmptyRow: {
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+  },
+  googleEmptyText: {
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     color: "rgba(255,255,255,0.30)",
@@ -2642,8 +2814,13 @@ export default function RoteiroScreen() {
             order_in_day:  idx,
             time_slot:     periodo.periodo,
             source:        item.isExternal ? "external" : "saved",
+            ref_table:     item.isExternal ? "external" : null,
+            place_id:      item.isExternal ? (item.placeId ?? null) : null,
             neighborhood:  item.localizacao ?? dia.bairro,
+            address:       item.isExternal ? (item.address ?? null) : null,
             city:          "Rio de Janeiro",
+            lat:           item.isExternal ? (item.lat ?? null) : null,
+            lng:           item.isExternal ? (item.lng ?? null) : null,
           }))
         )
       );

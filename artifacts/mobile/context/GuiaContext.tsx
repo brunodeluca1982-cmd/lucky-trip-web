@@ -49,6 +49,13 @@ export interface SavedItem {
   image: ImageSourcePropType;
   /** True when the item was added manually via external search (Google Places) */
   isExternal?: boolean;
+  /** Google Places ID — only set for external items */
+  placeId?: string;
+  /** Geographic coordinates — only set for external items */
+  lat?: number;
+  lng?: number;
+  /** Full formatted address from Google Places */
+  address?: string;
 }
 
 // ── Viagem entity ─────────────────────────────────────────────────────────────
