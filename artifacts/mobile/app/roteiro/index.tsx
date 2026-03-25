@@ -47,8 +47,9 @@ import {
 import { PERIODO_LABEL, PERIODO_ICON } from "@/utils/buildRoteiro";
 import type { DiaRoteiro } from "@/utils/buildRoteiro";
 
-const C    = Colors.light;
-const GOLD = "#C9A84C";
+const C          = Colors.light;
+const GOLD       = "#C9A84C";
+const DARK_BROWN = "#2C1810";
 const { width: SW } = Dimensions.get("window");
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1675,6 +1676,7 @@ interface ResultPhaseProps {
   onToggleEdit:   () => void;
   onReplaceItem:  (diaNum: number, itemId: string, newItem: SavedItem) => void;
   onShareResult:  () => void;
+  scrollRef:      React.RefObject<ScrollView>;
 }
 
 function ResultPhase({
@@ -1685,14 +1687,29 @@ function ResultPhase({
   onToggleEdit,
   onReplaceItem,
   onShareResult,
+  scrollRef,
 }: ResultPhaseProps) {
   const { totalDays, totalItems } = result.summary;
+  const [dayOffsets, setDayOffsets]     = React.useState<Record<number, number>>({});
+  const [activeDayChip, setActiveDayChip] = React.useState<number | null>(null);
 
   function handleWhatsApp() {
     const msg = encodeURIComponent(
       `Olá! Criei meu roteiro de ${totalDays} dias no Rio de Janeiro com o Lucky Trip. Pode me ajudar a refinar?`
     );
     Linking.openURL(`https://wa.me/?text=${msg}`);
+  }
+
+  function handleOpenMap() {
+    const allItems = result.days.flatMap((d) => d.periodos.flatMap((p) => p.items));
+    const query    = allItems.slice(0, 3).map((i) => i.titulo).join(" + ") + " Rio de Janeiro";
+    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`);
+  }
+
+  function handleDayChipPress(diaNum: number) {
+    setActiveDayChip(diaNum);
+    const y = dayOffsets[diaNum] ?? 0;
+    scrollRef.current?.scrollTo({ y: Math.max(0, y - 12), animated: true });
   }
 
   return (
@@ -1744,14 +1761,32 @@ function ResultPhase({
         </Text>
         <Text style={re.summarySub}>Roteiro otimizado por proximidade geográfica</Text>
         {result.days.length > 0 && (
-          <View style={re.dayPills}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={re.dayPillsScroll}
+            contentContainerStyle={re.dayPills}
+          >
             <Text style={re.dayPillsLabel}>Ir para: </Text>
-            {result.days.map((dia) => (
-              <View key={dia.numero} style={re.dayPill}>
-                <Text style={re.dayPillText}>Dia {dia.numero}</Text>
-              </View>
-            ))}
-          </View>
+            {result.days.map((dia) => {
+              const isActive = activeDayChip === dia.numero;
+              return (
+                <Pressable
+                  key={dia.numero}
+                  style={({ pressed }) => [
+                    re.dayPill,
+                    isActive && re.dayPillActive,
+                    pressed && { opacity: 0.70 },
+                  ]}
+                  onPress={() => handleDayChipPress(dia.numero)}
+                >
+                  <Text style={[re.dayPillText, isActive && re.dayPillTextActive]}>
+                    Dia {dia.numero}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
         )}
       </View>
 
@@ -1776,7 +1811,7 @@ function ResultPhase({
       </View>
 
       {/* ── Map CTA ── */}
-      <Pressable style={({ pressed }) => [re.mapCta, pressed && { opacity: 0.80 }]} onPress={() => {}}>
+      <Pressable style={({ pressed }) => [re.mapCta, pressed && { opacity: 0.80 }]} onPress={handleOpenMap}>
         <View style={re.mapCtaLeft}>
           <View style={re.mapCtaIcon}>
             <Feather name="map-pin" size={14} color={GOLD} />
@@ -1796,6 +1831,7 @@ function ResultPhase({
           dia={dia}
           editMode={editMode}
           onReplaceItem={onReplaceItem}
+          onLayout={(y) => setDayOffsets((prev) => ({ ...prev, [dia.numero]: y }))}
         />
       ))}
     </>
@@ -1819,21 +1855,31 @@ function navigateToItem(item: SavedItem) {
   }
 }
 
+function getItemFallbackImage(categoria: SavedCategory): ReturnType<typeof require> {
+  switch (categoria) {
+    case "restaurante": return require("@/assets/images/restaurante1.png");
+    case "hotel":       return require("@/assets/images/hotel1.png");
+    default:            return require("@/assets/images/pao-acucar.png");
+  }
+}
+
 function ResultDayCard({
   dia,
   editMode,
   onReplaceItem,
+  onLayout,
 }: {
   dia:           DiaRoteiro;
   editMode:      boolean;
   onReplaceItem: (diaNum: number, itemId: string, newItem: SavedItem) => void;
+  onLayout?:     (y: number) => void;
 }) {
   const weather = getDayWeather(dia.numero);
   const allItems = dia.periodos.flatMap((p) => p.items);
   const travelMinTotal = Math.max(25, allItems.length * 16);
 
   return (
-    <View style={re.dayCard}>
+    <View style={re.dayCard} onLayout={(e) => onLayout?.(e.nativeEvent.layout.y)}>
       {/* ── Day header ── */}
       <View style={re.dayHeader}>
         <View style={re.dayNumBadge}>
@@ -1888,7 +1934,7 @@ function ResultDayCard({
                     {/* Thumbnail */}
                     <View style={re.thumb}>
                       <Image
-                        source={item.image}
+                        source={(item.image as ReturnType<typeof require> | undefined) ?? getItemFallbackImage(item.categoria)}
                         style={StyleSheet.absoluteFill}
                         resizeMode="cover"
                       />
@@ -2024,12 +2070,14 @@ const re = StyleSheet.create({
     color: "rgba(245,240,232,0.40)",
     lineHeight: 16,
   },
+  dayPillsScroll: {
+    marginTop: 8,
+  },
   dayPills: {
     flexDirection: "row",
     alignItems: "center",
-    flexWrap: "wrap",
     gap: 6,
-    marginTop: 8,
+    paddingRight: 4,
   },
   dayPillsLabel: {
     fontFamily: "Inter_400Regular",
@@ -2044,10 +2092,17 @@ const re = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
+  dayPillActive: {
+    backgroundColor: GOLD,
+    borderColor: GOLD,
+  },
   dayPillText: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 11,
     color: GOLD,
+  },
+  dayPillTextActive: {
+    color: DARK_BROWN,
   },
 
   // ── Action row ─────────────────────────────────────────────────────────────
@@ -2364,6 +2419,7 @@ export default function RoteiroScreen() {
   const [generating,    setGenerating]    = useState(false);
   const [editMode,      setEditMode]      = useState(false);
   const [replacingItem, setReplacingItem] = useState<{ item: SavedItem; diaNum: number } | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
 
   function replaceItem(diaNum: number, itemId: string, newItem: SavedItem) {
     setResult((prev) => {
@@ -2388,21 +2444,76 @@ export default function RoteiroScreen() {
     setReplacingItem({ item, diaNum });
   }
 
-  async function handleShare() {
-    if (!result) return;
+  function buildShareLines(shareSlug?: string): string {
+    if (!result) return "";
     const lines: string[] = [`✦ Roteiro Rio de Janeiro — The Lucky Trip\n`];
+    if (shareSlug) lines.push(`Ver roteiro completo: https://theluckytrip.app/r/${shareSlug}\n`);
     for (const dia of result.days) {
       lines.push(`📍 Dia ${dia.numero} — ${dia.bairro}`);
       for (const periodo of dia.periodos) {
         const label = PERIODO_LABEL[periodo.periodo];
-        const items = periodo.items.map((it) => `  • ${it.titulo} (${it.localizacao || dia.bairro})`).join("\n");
-        if (items) lines.push(`${label}\n${items}`);
+        const itens = periodo.items.map((it) => `  • ${it.titulo} (${it.localizacao || dia.bairro})`).join("\n");
+        if (itens) lines.push(`${label}\n${itens}`);
       }
       lines.push("");
     }
+    return lines.join("\n").trim();
+  }
+
+  async function handleShare() {
+    if (!result) return;
+    let shareSlug: string | undefined;
+
+    try {
+      // 1. Generate a unique slug
+      shareSlug = Array.from({ length: 8 }, () => Math.random().toString(36)[2]).join("");
+
+      // 2. Persist to user_itineraries
+      const { data: itinerary, error: itinErr } = await supabase
+        .from("user_itineraries")
+        .insert({
+          destination_id:        "rio-de-janeiro",
+          destination_name:      result.destination ?? "Rio de Janeiro",
+          status:                "generated",
+          is_public:             true,
+          share_slug:            shareSlug,
+          days_count:            result.summary.totalDays,
+          items_count:           result.summary.totalItems,
+          inspiration_tags:      (result.preferences?.inspirations ?? []) as string[],
+          travel_company:        null,
+          budget_style:          result.preferences?.vibe ?? null,
+          generated_at:          new Date().toISOString(),
+        })
+        .select("id")
+        .single();
+
+      if (itinErr || !itinerary) throw itinErr ?? new Error("no itinerary returned");
+
+      // 3. Persist items to roteiro_itens
+      const roteiroItens = result.days.flatMap((dia) =>
+        dia.periodos.flatMap((periodo, _pi) =>
+          periodo.items.map((item, idx) => ({
+            roteiro_id:    itinerary.id,
+            name:          item.titulo,
+            day_index:     dia.numero - 1,
+            order_in_day:  idx,
+            time_slot:     periodo.periodo,
+            source:        item.isExternal ? "external" : "saved",
+            neighborhood:  item.localizacao ?? dia.bairro,
+            city:          "Rio de Janeiro",
+          }))
+        )
+      );
+
+      await supabase.from("roteiro_itens").insert(roteiroItens);
+    } catch {
+      // If Supabase fails, still share without URL
+      shareSlug = undefined;
+    }
+
     try {
       await Share.share({
-        message: lines.join("\n").trim(),
+        message: buildShareLines(shareSlug),
         title:   "Roteiro Rio de Janeiro",
       });
     } catch {
@@ -2465,8 +2576,8 @@ export default function RoteiroScreen() {
   const phase: "journey" | "loading" | "result" =
     generating ? "loading" : result ? "result" : "journey";
 
-  // Hero image for cinematic result background — prefer hotel image
-  const heroImg = hotelItem?.image ?? require("@/assets/images/ipanema.png");
+  // Hero image for cinematic result background — prefer hotel image, fall back to editorial hero
+  const heroImg = hotelItem?.image ?? require("@/assets/images/hero-rio.png");
 
   return (
     <View style={sc.root}>
@@ -2506,6 +2617,7 @@ export default function RoteiroScreen() {
 
       {phase === "result" && (
         <ScrollView
+          ref={scrollRef}
           showsVerticalScrollIndicator={false}
           style={{ backgroundColor: "transparent" }}
           contentContainerStyle={[sc.content, { paddingBottom: bottomPad + 40 }]}
@@ -2518,6 +2630,7 @@ export default function RoteiroScreen() {
             onToggleEdit={() => setEditMode((v) => !v)}
             onReplaceItem={openReplaceSheet}
             onShareResult={handleShare}
+            scrollRef={scrollRef}
           />
         </ScrollView>
       )}
