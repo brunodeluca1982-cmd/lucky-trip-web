@@ -1713,6 +1713,46 @@ function ResultPhase({
 
   return (
     <>
+      {/* ── Result Hero ── */}
+      <View style={re.resultHero}>
+        <Text style={re.resultHeroEyebrow}>Rio de Janeiro</Text>
+        <Text style={re.resultHeroTitle}>
+          {totalDays} {totalDays === 1 ? "dia" : "dias"} no Rio
+        </Text>
+        <Text style={re.resultHeroMeta}>
+          {totalItems} {totalItems === 1 ? "experiência curada" : "experiências curadas"}
+        </Text>
+
+        {/* Day navigation chips */}
+        {result.days.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={re.dayNavScroll}
+            contentContainerStyle={re.dayNavRow}
+          >
+            {result.days.map((dia) => {
+              const isActive = activeDayChip === dia.numero;
+              return (
+                <Pressable
+                  key={dia.numero}
+                  style={({ pressed }) => [
+                    re.dayNavPill,
+                    isActive && re.dayNavPillActive,
+                    pressed && { opacity: 0.70 },
+                  ]}
+                  onPress={() => handleDayChipPress(dia.numero)}
+                >
+                  <Text style={[re.dayNavPillText, isActive && re.dayNavPillTextActive]}>
+                    Dia {dia.numero}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        )}
+      </View>
+
       {/* ── Edit mode banner ── */}
       {editMode && (
         <View style={re.editBanner}>
@@ -1753,59 +1793,30 @@ function ResultPhase({
         </Pressable>
       )}
 
-      {/* ── Summary card ── */}
-      <View style={re.summary}>
-        <Text style={re.summaryTitle}>
-          {totalItems} {totalItems === 1 ? "item" : "itens"} em {totalDays} {totalDays === 1 ? "dia" : "dias"}
-        </Text>
-        <Text style={re.summarySub}>Roteiro otimizado por proximidade geográfica</Text>
-        {result.days.length > 0 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={re.dayPillsScroll}
-            contentContainerStyle={re.dayPills}
-          >
-            <Text style={re.dayPillsLabel}>Ir para: </Text>
-            {result.days.map((dia) => {
-              const isActive = activeDayChip === dia.numero;
-              return (
-                <Pressable
-                  key={dia.numero}
-                  style={({ pressed }) => [
-                    re.dayPill,
-                    isActive && re.dayPillActive,
-                    pressed && { opacity: 0.70 },
-                  ]}
-                  onPress={() => handleDayChipPress(dia.numero)}
-                >
-                  <Text style={[re.dayPillText, isActive && re.dayPillTextActive]}>
-                    Dia {dia.numero}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        )}
-      </View>
-
       {/* ── Action row ── */}
       <View style={re.actionRow}>
-        <Pressable
-          style={({ pressed }) => [re.actionBtn, re.actionBtnWA, pressed && { opacity: 0.82 }]}
-          onPress={handleWhatsApp}
-        >
-          <Feather name="message-circle" size={15} color={CREAM} />
-          <Text style={re.actionBtnText}>Refinar no WhatsApp</Text>
-        </Pressable>
         <Pressable
           style={({ pressed }) => [re.actionBtn, re.actionBtnEdit, pressed && { opacity: 0.82 }]}
           onPress={onToggleEdit}
         >
-          <Feather name="edit-2" size={15} color={GOLD} />
+          <Feather name="edit-2" size={14} color={GOLD} />
           <Text style={[re.actionBtnText, { color: GOLD }]}>
-            {editMode ? "Sair da edição" : "Editar roteiro"}
+            {editMode ? "Sair" : "Editar"}
           </Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [re.actionBtn, re.actionBtnWA, pressed && { opacity: 0.82 }]}
+          onPress={handleWhatsApp}
+        >
+          <Feather name="message-circle" size={14} color={CREAM} />
+          <Text style={re.actionBtnText}>WhatsApp</Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [re.actionBtn, re.actionBtnExport, pressed && { opacity: 0.82 }]}
+          onPress={onShareResult}
+        >
+          <Feather name="share-2" size={14} color={CREAM} />
+          <Text style={re.actionBtnText}>Exportar</Text>
         </Pressable>
       </View>
 
@@ -1816,8 +1827,8 @@ function ResultPhase({
             <Feather name="map-pin" size={14} color={GOLD} />
           </View>
           <View>
-            <Text style={re.mapCtaLabel}>Ver no mapa</Text>
-            <Text style={re.mapCtaSub}>{totalPlaces} {totalPlaces === 1 ? "lugar" : "lugares"}</Text>
+            <Text style={re.mapCtaLabel}>Ver roteiro completo no mapa</Text>
+            <Text style={re.mapCtaSub}>{totalPlaces} {totalPlaces === 1 ? "lugar selecionado" : "lugares selecionados"}</Text>
           </View>
         </View>
         <Feather name="arrow-right" size={15} color={`${GOLD}70`} />
@@ -1876,102 +1887,130 @@ function ResultDayCard({
   const weather = getDayWeather(dia.numero);
   const allItems = dia.periodos.flatMap((p) => p.items);
   const travelMinTotal = Math.max(25, allItems.length * 16);
+  const [collapsed, setCollapsed] = React.useState(false);
+
+  function handleDayMap() {
+    const places = allItems.slice(0, 4).map((i) => i.titulo).join(" + ");
+    const query = `${places} ${dia.bairro} Rio de Janeiro`;
+    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`);
+  }
 
   return (
     <View style={re.dayCard} onLayout={(e) => onLayout?.(e.nativeEvent.layout.y)}>
-      {/* ── Day header ── */}
-      <View style={re.dayHeader}>
+      {/* ── Day header (tappable to collapse) ── */}
+      <Pressable
+        style={({ pressed }) => [re.dayHeader, pressed && { opacity: 0.88 }]}
+        onPress={() => setCollapsed((v) => !v)}
+      >
         <View style={re.dayNumBadge}>
           <Text style={re.dayNumText}>DIA {dia.numero}</Text>
         </View>
         <Text style={re.dayBairro} numberOfLines={1}>{dia.bairro}</Text>
-        <Feather name={weather} size={13} color="rgba(255,255,255,0.45)" />
-        <View style={re.travelChip}>
-          <Feather name="clock" size={10} color="rgba(255,255,255,0.45)" />
-          <Text style={re.travelChipText}>{travelMinTotal} min total</Text>
+        <Feather name={weather} size={13} color="rgba(255,255,255,0.40)" />
+        {!collapsed && (
+          <View style={re.travelChip}>
+            <Feather name="clock" size={10} color="rgba(255,255,255,0.40)" />
+            <Text style={re.travelChipText}>{travelMinTotal} min</Text>
+          </View>
+        )}
+        <Feather
+          name={collapsed ? "chevron-down" : "chevron-up"}
+          size={15}
+          color="rgba(255,255,255,0.35)"
+        />
+      </Pressable>
+
+      {/* ── Collapsed summary ── */}
+      {collapsed && (
+        <View style={re.dayCollapsedRow}>
+          <Text style={re.dayCollapsedText}>
+            {allItems.length} {allItems.length === 1 ? "lugar" : "lugares"} · {travelMinTotal} min
+          </Text>
+          <Feather name="clock" size={10} color="rgba(255,255,255,0.30)" />
         </View>
-      </View>
+      )}
 
       {/* ── Period blocks ── */}
-      <View style={re.dayBody}>
-        {dia.periodos.map((periodo) => (
-          <View key={periodo.periodo} style={re.periodSection}>
-            {/* Period label row */}
-            <View style={re.periodHeaderRow}>
-              <Feather
-                name={PERIODO_ICON[periodo.periodo] as any}
-                size={11}
-                color={GOLD}
-              />
-              <Text style={re.periodLabel}>{PERIODO_LABEL[periodo.periodo]}</Text>
-              <View style={re.periodDivider} />
-            </View>
+      {!collapsed && (
+        <View style={re.dayBody}>
+          {dia.periodos.map((periodo) => (
+            <View key={periodo.periodo} style={re.periodSection}>
+              {/* Period label row */}
+              <View style={re.periodHeaderRow}>
+                <Feather
+                  name={PERIODO_ICON[periodo.periodo] as any}
+                  size={11}
+                  color={GOLD}
+                />
+                <Text style={re.periodLabel}>{PERIODO_LABEL[periodo.periodo]}</Text>
+                <View style={re.periodDivider} />
+              </View>
 
-            {/* Items */}
-            {periodo.items.map((item, idx) => {
-              const timeStr = getItemTime(periodo.periodo, idx);
-              const travelMin = 10 + ((dia.numero * 7 + idx * 5) % 22);
-              const travelKm  = (1.8 + (dia.numero + idx) * 1.3).toFixed(1);
+              {/* Items */}
+              {periodo.items.map((item, idx) => {
+                const timeStr = getItemTime(periodo.periodo, idx);
+                const travelMin = 10 + ((dia.numero * 7 + idx * 5) % 22);
+                const travelKm  = (1.8 + (dia.numero + idx) * 1.3).toFixed(1);
 
-              return (
-                <React.Fragment key={item.id}>
-                  <Pressable
-                    style={({ pressed }) => [re.itemRow, pressed && { opacity: 0.80 }]}
-                    onPress={() => {
-                      if (editMode) {
-                        onReplaceItem(dia.numero, item.id, item);
-                      } else {
-                        navigateToItem(item);
-                      }
-                    }}
-                  >
-                    {/* Left: time */}
-                    <View style={re.timeCol}>
-                      <Text style={re.timeLabel}>{timeStr}</Text>
-                    </View>
-
-                    {/* Thumbnail */}
-                    <View style={re.thumb}>
-                      <Image
-                        source={(item.image as ReturnType<typeof require> | undefined) ?? getItemFallbackImage(item.categoria)}
-                        style={StyleSheet.absoluteFill}
-                        resizeMode="cover"
-                      />
-                      <LinearGradient
-                        colors={["transparent", "rgba(0,0,0,0.45)"]}
-                        style={StyleSheet.absoluteFill}
-                      />
-                    </View>
-
-                    {/* Info */}
-                    <View style={re.itemInfo}>
-                      <Text style={re.itemName} numberOfLines={1}>{item.titulo}</Text>
-                      <View style={re.itemLocRow}>
-                        <Feather name="map-pin" size={9} color={`${GOLD}80`} />
-                        <Text style={re.itemLoc} numberOfLines={1}>
-                          {item.localizacao ?? dia.bairro}
-                        </Text>
+                return (
+                  <React.Fragment key={item.id}>
+                    <Pressable
+                      style={({ pressed }) => [re.itemRow, pressed && { opacity: 0.80 }]}
+                      onPress={() => {
+                        if (editMode) {
+                          onReplaceItem(dia.numero, item.id, item);
+                        } else {
+                          navigateToItem(item);
+                        }
+                      }}
+                    >
+                      {/* Left: time */}
+                      <View style={re.timeCol}>
+                        <Text style={re.timeLabel}>{timeStr}</Text>
                       </View>
-                      {item.isExternal ? (
-                        <View style={[re.catBadge, re.catBadgeExternal]}>
-                          <Feather name="plus-circle" size={9} color={GOLD} />
-                          <Text style={[re.catBadgeText, re.catBadgeTextExternal]}>
-                            Adicionado por você
+
+                      {/* Thumbnail */}
+                      <View style={re.thumb}>
+                        <Image
+                          source={(item.image as ReturnType<typeof require> | undefined) ?? getItemFallbackImage(item.categoria)}
+                          style={StyleSheet.absoluteFill}
+                          resizeMode="cover"
+                        />
+                        <LinearGradient
+                          colors={["transparent", "rgba(0,0,0,0.45)"]}
+                          style={StyleSheet.absoluteFill}
+                        />
+                      </View>
+
+                      {/* Info */}
+                      <View style={re.itemInfo}>
+                        <Text style={re.itemName} numberOfLines={1}>{item.titulo}</Text>
+                        <View style={re.itemLocRow}>
+                          <Feather name="map-pin" size={9} color={`${GOLD}80`} />
+                          <Text style={re.itemLoc} numberOfLines={1}>
+                            {item.localizacao ?? dia.bairro}
                           </Text>
                         </View>
-                      ) : (
-                        <View style={re.catBadge}>
-                          <Text style={re.catBadgeText}>{CATEGORY_LABEL[item.categoria]}</Text>
-                        </View>
-                      )}
-                    </View>
-
-                    {editMode ? (
-                      <View style={re.swapBtn}>
-                        <Feather name="refresh-cw" size={13} color={GOLD} />
+                        {item.isExternal ? (
+                          <View style={[re.catBadge, re.catBadgeExternal]}>
+                            <Feather name="plus-circle" size={9} color={GOLD} />
+                            <Text style={[re.catBadgeText, re.catBadgeTextExternal]}>
+                              Adicionado por você
+                            </Text>
+                          </View>
+                        ) : (
+                          <View style={re.catBadge}>
+                            <Text style={re.catBadgeText}>{CATEGORY_LABEL[item.categoria]}</Text>
+                          </View>
+                        )}
                       </View>
-                    ) : (
-                      <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.25)" />
+
+                      {editMode ? (
+                        <View style={re.swapBtn}>
+                          <Feather name="refresh-cw" size={13} color={GOLD} />
+                        </View>
+                      ) : (
+                        <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.22)" />
                     )}
                   </Pressable>
 
@@ -1992,7 +2031,18 @@ function ResultDayCard({
             })}
           </View>
         ))}
+
+        {/* ── Per-day map button ── */}
+        <Pressable
+          style={({ pressed }) => [re.dayMapBtn, pressed && { opacity: 0.75 }]}
+          onPress={handleDayMap}
+        >
+          <Feather name="map-pin" size={11} color={GOLD} />
+          <Text style={re.dayMapBtnText}>Ver Dia {dia.numero} no mapa</Text>
+          <Feather name="arrow-right" size={12} color={`${GOLD}55`} />
+        </Pressable>
       </View>
+      )}
     </View>
   );
 }
@@ -2107,7 +2157,7 @@ const re = StyleSheet.create({
   // ── Action row ─────────────────────────────────────────────────────────────
   actionRow: {
     flexDirection: "row",
-    gap: 10,
+    gap: 8,
     marginBottom: 14,
   },
   actionBtn: {
@@ -2115,22 +2165,26 @@ const re = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    paddingVertical: 14,
+    gap: 6,
+    paddingVertical: 13,
     borderRadius: 14,
     borderWidth: 1,
   },
   actionBtnWA: {
-    backgroundColor: "rgba(18,40,18,0.70)",
-    borderColor: "rgba(40,120,40,0.25)",
+    backgroundColor: "rgba(10,32,10,0.70)",
+    borderColor: "rgba(40,120,40,0.20)",
   },
   actionBtnEdit: {
     backgroundColor: GLASS_BG,
     borderColor: "rgba(212,175,55,0.22)",
   },
+  actionBtnExport: {
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderColor: "rgba(255,255,255,0.14)",
+  },
   actionBtnText: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
+    fontSize: 12,
     color: CREAM,
   },
 
@@ -2397,6 +2451,97 @@ const re = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+
+  // ── Result Hero ────────────────────────────────────────────────────────────
+  resultHero: {
+    paddingVertical: 28,
+    paddingBottom: 20,
+    gap: 6,
+  },
+  resultHeroEyebrow: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    color: GOLD,
+    letterSpacing: 2.0,
+  },
+  resultHeroTitle: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 34,
+    color: CREAM,
+    lineHeight: 42,
+    marginTop: 2,
+  },
+  resultHeroMeta: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.50)",
+    lineHeight: 18,
+    marginBottom: 4,
+  },
+  dayNavScroll: {
+    marginTop: 16,
+  },
+  dayNavRow: {
+    flexDirection: "row",
+    gap: 8,
+    paddingRight: 4,
+  },
+  dayNavPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    backgroundColor: "rgba(212,175,55,0.10)",
+    borderColor: "rgba(212,175,55,0.20)",
+  },
+  dayNavPillActive: {
+    backgroundColor: GOLD,
+    borderColor: GOLD,
+  },
+  dayNavPillText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: GOLD,
+  },
+  dayNavPillTextActive: {
+    color: "#000000",
+  },
+
+  // ── Collapsible row ────────────────────────────────────────────────────────
+  dayCollapsedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+  },
+  dayCollapsedText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: "rgba(255,255,255,0.38)",
+  },
+
+  // ── Per-day map button ─────────────────────────────────────────────────────
+  dayMapBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "rgba(212,175,55,0.07)",
+    borderWidth: 1,
+    borderColor: "rgba(212,175,55,0.16)",
+  },
+  dayMapBtnText: {
+    flex: 1,
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: `${GOLD}CC`,
+  },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2585,8 +2730,8 @@ export default function RoteiroScreen() {
       <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}>
         <Image source={heroImg} style={StyleSheet.absoluteFill} resizeMode="cover" />
         <LinearGradient
-          colors={["rgba(0,0,0,0.78)", "rgba(0,0,0,0.90)", "rgba(5,2,0,0.97)"]}
-          locations={[0, 0.45, 1]}
+          colors={["rgba(0,0,0,0.72)", "rgba(0,0,0,0.88)", "rgba(0,0,0,0.97)"]}
+          locations={[0, 0.40, 1]}
           style={StyleSheet.absoluteFill}
         />
       </View>
