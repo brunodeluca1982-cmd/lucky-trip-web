@@ -108,7 +108,7 @@ export default function LuckyListScreen() {
         ref={listRef}
         style={s.listScroll}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: bottomPad + 40 }}
+        contentContainerStyle={{ paddingBottom: bottomPad + 96 }}
       >
         {/* Hero editorial block */}
         <View style={s.heroBlock}>

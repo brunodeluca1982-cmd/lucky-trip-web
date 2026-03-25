@@ -172,7 +172,7 @@ export default function AgoraNoRioScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           s.scrollContent,
-          { paddingTop: topInset + 60, paddingBottom: bottomPad + 60 },
+          { paddingTop: topInset + 60, paddingBottom: bottomPad + 110 },
         ]}
       >
         {/* ── Hero header (text over background image) ── */}

@@ -140,8 +140,17 @@ function ClassicTabLayout() {
             ),
         }}
       />
-      {/* Destination detail screen — inside tabs so the tab bar stays visible */}
-      <Tabs.Screen name="cidade/[id]" options={{ href: null }} />
+      {/* Destination detail — inside tabs so tab bar stays visible */}
+      <Tabs.Screen name="cidade/[id]"    options={{ href: null }} />
+      {/* Section list pages from destination — inside tabs so tab bar stays visible */}
+      <Tabs.Screen name="comerBem/[id]"  options={{ href: null }} />
+      <Tabs.Screen name="ondeFicar/[id]" options={{ href: null }} />
+      <Tabs.Screen name="oQueFazer/[id]" options={{ href: null }} />
+      <Tabs.Screen name="essencial/[id]" options={{ href: null }} />
+      <Tabs.Screen name="agoraNoRio/[id]" options={{ href: null }} />
+      <Tabs.Screen name="luckyList/[id]" options={{ href: null }} />
+      {/* Itinerary creation + result — inside tabs so tab bar stays visible */}
+      <Tabs.Screen name="roteiro/index"  options={{ href: null }} />
     </Tabs>
   );
 }

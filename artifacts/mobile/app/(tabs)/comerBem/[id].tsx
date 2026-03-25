@@ -103,7 +103,7 @@ export default function ComerBemScreen() {
         ref={listRef}
         style={s.listScroll}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: bottomPad + 40 }}
+        contentContainerStyle={{ paddingBottom: bottomPad + 96 }}
       >
         {/* Intro hero */}
         <View style={s.introHeroWrap}>

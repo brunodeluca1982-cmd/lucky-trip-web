@@ -125,7 +125,7 @@ export default function OndeFicarScreen() {
         ref={listRef}
         style={s.listScroll}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: bottomPad + 40 }}
+        contentContainerStyle={{ paddingBottom: bottomPad + 96 }}
       >
         {/* Photo hero intro */}
         <View style={s.introHeroWrap}>

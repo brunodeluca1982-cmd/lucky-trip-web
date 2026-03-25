@@ -288,7 +288,7 @@ function FlowPage1({
   return (
     <ScrollView
       style={{ flex: 1 }}
-      contentContainerStyle={[fp.page, { paddingTop: topPad, paddingBottom: 56 }]}
+      contentContainerStyle={[fp.page, { paddingTop: topPad, paddingBottom: 110 }]}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
@@ -400,7 +400,7 @@ function FlowPage2({
   return (
     <ScrollView
       style={{ flex: 1 }}
-      contentContainerStyle={[fp.page, { paddingTop: topPad, paddingBottom: 56 }]}
+      contentContainerStyle={[fp.page, { paddingTop: topPad, paddingBottom: 110 }]}
       showsVerticalScrollIndicator={false}
     >
       <Pressable style={fp.backRow} onPress={onBack} hitSlop={12}>
@@ -622,7 +622,7 @@ function ContextualFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) 
   return (
     <ScrollView
       style={{ flex: 1 }}
-      contentContainerStyle={[fp.page, { paddingTop: topPad, paddingBottom: 56 }]}
+      contentContainerStyle={[fp.page, { paddingTop: topPad, paddingBottom: 110 }]}
       showsVerticalScrollIndicator={false}
     >
       {/* ── Progress indicators ── */}
@@ -2620,7 +2620,7 @@ export default function RoteiroScreen() {
           ref={scrollRef}
           showsVerticalScrollIndicator={false}
           style={{ backgroundColor: "transparent" }}
-          contentContainerStyle={[sc.content, { paddingBottom: bottomPad + 40 }]}
+          contentContainerStyle={[sc.content, { paddingBottom: bottomPad + 96 }]}
         >
           <ResultPhase
             result={result!}

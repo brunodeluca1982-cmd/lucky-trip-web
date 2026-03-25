@@ -99,7 +99,7 @@ export default function OQueFazerScreen() {
         ref={listRef}
         style={s.listScroll}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: bottomPad + 40 }}
+        contentContainerStyle={{ paddingBottom: bottomPad + 96 }}
       >
         <View style={s.introHeroWrap}>
           <Image

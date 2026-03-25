@@ -212,7 +212,7 @@ export default function CidadeScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           s.scrollContent,
-          { paddingTop: topInset + 44, paddingBottom: bottomPad + 40 },
+          { paddingTop: topInset + 44, paddingBottom: bottomPad + 96 },
         ]}
       >
         {/* City identity — in flow, sits in the clear zone of the gradient */}

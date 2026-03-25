@@ -214,7 +214,7 @@ export default function EssencialScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: bottomPad + 60 }}
+        contentContainerStyle={{ paddingBottom: bottomPad + 110 }}
       >
         {/* ── Hero image area — cinematic, full-opacity ── */}
         <View style={[s.heroWrap, { height: HERO_HEIGHT }]}>
