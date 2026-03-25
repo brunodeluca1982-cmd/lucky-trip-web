@@ -40,7 +40,9 @@ interface SavedItemInput {
 
 interface Preferences {
   inspirations: string[];
-  vibe:         string | null;
+  vibe:         string | null;   // pace: tranquilo / moderado / intenso
+  travelVibe?:  string | null;   // companion: solo / casal / amigos / família
+  budget?:      string | null;   // essencial / conforto / sofisticado
 }
 
 interface RequestBody {
@@ -48,6 +50,8 @@ interface RequestBody {
   destination?:   string;
   preferences?:   Preferences;
   requestedDays?: number;
+  arrivalDate?:   string;        // ISO date string "YYYY-MM-DD"
+  departureDate?: string;        // ISO date string "YYYY-MM-DD"
 }
 
 /** Fully enriched place — unified source of truth for all 5 deterministic steps */
@@ -725,7 +729,7 @@ STRICT RULES:
 
 Use "zone" and "area" to group geographically close items together within each período.
 Use "energia" to order high-energy items early in the período.
-Vibe: ${prefs.vibe ?? "moderado"} | Inspirations: ${prefs.inspirations.join(", ") || "any"}
+Pace: ${prefs.vibe ?? "moderado"} | Companion: ${prefs.travelVibe ?? "any"} | Budget: ${prefs.budget ?? "conforto"} | Inspirations: ${prefs.inspirations.join(", ") || "any"}
 Destination: ${dest}
 
 DRAFT TO REFINE:
@@ -836,6 +840,8 @@ serve(async (req) => {
       destination   = "Rio de Janeiro",
       preferences   = { inspirations: [], vibe: "moderado" },
       requestedDays,
+      arrivalDate,
+      departureDate,
     } = body;
 
     const supa = createClient(
@@ -843,8 +849,21 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
-    const dest = destination || "Rio de Janeiro";
-    const vibe = preferences.vibe ?? "moderado";
+    const dest       = destination || "Rio de Janeiro";
+    const vibe       = preferences.vibe       ?? "moderado";
+    const travelVibe = preferences.travelVibe ?? null;
+    const budget     = preferences.budget     ?? null;
+
+    // Compute requested days: priority order —
+    //   1. Explicit requestedDays from frontend (derived from arrival/departure dates)
+    //   2. Derived from arrivalDate + departureDate strings if provided
+    //   3. Fall through to computeTripLength item-based estimate
+    let resolvedDays: number | undefined = requestedDays;
+    if (!resolvedDays && arrivalDate && departureDate) {
+      const ms = new Date(departureDate).getTime() - new Date(arrivalDate).getTime();
+      const diff = Math.round(ms / 86_400_000); // ms → days
+      if (diff >= 1) resolvedDays = diff;
+    }
 
     // ── Step 1+2: Normalize + Enrich from Supabase ────────────────────────────
     let places = await enrichPlaces(savedItems, supa);
@@ -861,7 +880,7 @@ serve(async (req) => {
     places = classifyAllPeriodos(places, vibe);
 
     // ── Trip length is locked here — Gemini cannot change it ──────────────────
-    const tripLength = computeTripLength(places.length, vibe, requestedDays);
+    const tripLength = computeTripLength(places.length, vibe, resolvedDays);
 
     // ── Step 4: Macro-region clustering (oeste + norte isolated from centro + sul)
     const { dayGroups, dayRestaurants } = groupByGeography(places, tripLength, vibe);

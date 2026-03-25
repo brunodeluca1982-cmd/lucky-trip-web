@@ -13,10 +13,11 @@
  * Style: cream + dark-brown, matches Lucky / Destinos content screens.
  */
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
+  Animated,
   Image,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -30,7 +31,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useGuia } from "@/context/GuiaContext";
-import type { SavedCategory } from "@/context/GuiaContext";
+import type { SavedCategory, SavedItem } from "@/context/GuiaContext";
 import { supabase } from "@/lib/supabase";
 import {
   buildItinerary,
@@ -81,14 +82,36 @@ const CATEGORY_ICON: Record<SavedCategory, string> = {
 // Setup phase — preference pickers
 // ─────────────────────────────────────────────────────────────────────────────
 
+type TravelVibe   = "solo" | "casal" | "amigos" | "família";
+type BudgetStyle  = "essencial" | "conforto" | "sofisticado";
+
+const COMPANIONS: { id: TravelVibe; label: string; icon: string }[] = [
+  { id: "solo",     label: "Solo",     icon: "🚶" },
+  { id: "casal",    label: "Casal",    icon: "💑" },
+  { id: "amigos",   label: "Amigos",   icon: "👥" },
+  { id: "família",  label: "Família",  icon: "👨‍👩‍👧" },
+];
+
+const BUDGETS: { id: BudgetStyle; label: string; desc: string }[] = [
+  { id: "essencial",    label: "Essencial",    desc: "Custo-benefício · experiências acessíveis" },
+  { id: "conforto",     label: "Conforto",     desc: "Qualidade equilibrada · bom e bem feito" },
+  { id: "sofisticado",  label: "Sofisticado",  desc: "Melhor de Rio · exclusivo e premium" },
+];
+
 interface SetupProps {
-  savedCount: number;
-  categoryCounts: Record<SavedCategory, number>;
-  inspirations: Inspiration[];
-  vibe: Vibe | null;
+  savedCount:          number;
+  categoryCounts:      Record<SavedCategory, number>;
+  inspirations:        Inspiration[];
+  vibe:                Vibe | null;
+  nights:              number;
+  travelVibe:          TravelVibe;
+  budget:              BudgetStyle;
   onToggleInspiration: (id: Inspiration) => void;
-  onSetVibe: (id: Vibe) => void;
-  onGenerate: () => void;
+  onSetVibe:           (id: Vibe) => void;
+  onSetNights:         (n: number) => void;
+  onSetTravelVibe:     (id: TravelVibe) => void;
+  onSetBudget:         (id: BudgetStyle) => void;
+  onGenerate:          () => void;
 }
 
 function SetupPhase({
@@ -96,8 +119,14 @@ function SetupPhase({
   categoryCounts,
   inspirations,
   vibe,
+  nights,
+  travelVibe,
+  budget,
   onToggleInspiration,
   onSetVibe,
+  onSetNights,
+  onSetTravelVibe,
+  onSetBudget,
   onGenerate,
 }: SetupProps) {
   const hasNone = savedCount === 0;
@@ -151,8 +180,32 @@ function SetupPhase({
         </View>
       )}
 
+      {/* Duração da viagem — nights stepper */}
+      <Text style={su.sectionLabel}>Duração da viagem</Text>
+      <Text style={su.sectionSub}>Quantas noites em Rio?</Text>
+      <View style={su.stepperRow}>
+        <Pressable
+          style={({ pressed }) => [su.stepperBtn, pressed && { opacity: 0.65 }]}
+          onPress={() => onSetNights(Math.max(1, nights - 1))}
+          hitSlop={8}
+        >
+          <Feather name="minus" size={18} color={nights <= 1 ? C.border : C.darkBrown} />
+        </Pressable>
+        <View style={su.stepperCenter}>
+          <Text style={su.stepperVal}>{nights}</Text>
+          <Text style={su.stepperUnit}>{nights === 1 ? "noite" : "noites"}</Text>
+        </View>
+        <Pressable
+          style={({ pressed }) => [su.stepperBtn, pressed && { opacity: 0.65 }]}
+          onPress={() => onSetNights(Math.min(14, nights + 1))}
+          hitSlop={8}
+        >
+          <Feather name="plus" size={18} color={nights >= 14 ? C.border : C.darkBrown} />
+        </Pressable>
+      </View>
+
       {/* Inspiração */}
-      <Text style={su.sectionLabel}>Inspiração</Text>
+      <Text style={[su.sectionLabel, { marginTop: 24 }]}>Inspiração</Text>
       <Text style={su.sectionSub}>Selecione uma ou mais categorias</Text>
       <View style={su.inspGrid}>
         {INSPIRATIONS.map((ins) => {
@@ -174,6 +227,32 @@ function SetupPhase({
               {active && (
                 <Feather name="check" size={11} color={GOLD} />
               )}
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {/* Com quem viaja */}
+      <Text style={[su.sectionLabel, { marginTop: 24 }]}>Com quem viaja?</Text>
+      <Text style={su.sectionSub}>Perfil da experiência</Text>
+      <View style={su.inspGrid}>
+        {COMPANIONS.map((c) => {
+          const active = travelVibe === c.id;
+          return (
+            <Pressable
+              key={c.id}
+              style={({ pressed }) => [
+                su.inspChip,
+                active && su.inspChipActive,
+                pressed && { opacity: 0.78 },
+              ]}
+              onPress={() => onSetTravelVibe(c.id)}
+            >
+              <Text style={su.inspIcon}>{c.icon}</Text>
+              <Text style={[su.inspLabel, active && su.inspLabelActive]}>
+                {c.label}
+              </Text>
+              {active && <Feather name="check" size={11} color={GOLD} />}
             </Pressable>
           );
         })}
@@ -203,6 +282,36 @@ function SetupPhase({
                   {v.label}
                 </Text>
                 <Text style={su.vibeDesc}>{v.desc}</Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {/* Estilo de viagem (budget) */}
+      <Text style={[su.sectionLabel, { marginTop: 24 }]}>Estilo de viagem</Text>
+      <Text style={su.sectionSub}>Como prefere experienciar?</Text>
+      <View style={su.vibeCol}>
+        {BUDGETS.map((b) => {
+          const active = budget === b.id;
+          return (
+            <Pressable
+              key={b.id}
+              style={({ pressed }) => [
+                su.vibeRow,
+                active && su.vibeRowActive,
+                pressed && { opacity: 0.80 },
+              ]}
+              onPress={() => onSetBudget(b.id)}
+            >
+              <View style={[su.vibeRadio, active && su.vibeRadioActive]}>
+                {active && <View style={su.vibeRadioDot} />}
+              </View>
+              <View style={su.vibeText}>
+                <Text style={[su.vibeLabel, active && su.vibeLabelActive]}>
+                  {b.label}
+                </Text>
+                <Text style={su.vibeDesc}>{b.desc}</Text>
               </View>
             </Pressable>
           );
@@ -302,6 +411,46 @@ const su = StyleSheet.create({
     fontSize: 12,
     color: C.warmGray,
     flex: 1,
+  },
+
+  stepperRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 0,
+    backgroundColor: C.warmBeige,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: C.border,
+    overflow: "hidden",
+    marginBottom: 4,
+  },
+  stepperBtn: {
+    width: 52,
+    height: 52,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepperCenter: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: C.border,
+    paddingVertical: 10,
+    gap: 1,
+  },
+  stepperVal: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 26,
+    color: C.darkBrown,
+    lineHeight: 32,
+  },
+  stepperUnit: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: C.warmGray,
   },
 
   sectionLabel: {
@@ -438,50 +587,112 @@ const su = StyleSheet.create({
 // Result phase — day-by-day itinerary
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ResultPhase({
-  result,
-  onReset,
-}: {
-  result: ItineraryResult;
-  onReset: () => void;
-}) {
+interface ResultPhaseProps {
+  result:      ItineraryResult;
+  hotelItem:   SavedItem | null;
+  totalPlaces: number;
+  onReset:     () => void;
+}
+
+function ResultPhase({ result, hotelItem, totalPlaces, onReset }: ResultPhaseProps) {
+  const { totalDays, totalItems } = result.summary;
+
+  function handleWhatsApp() {
+    const msg = encodeURIComponent(
+      `Olá! Acabei de criar meu roteiro de ${totalDays} dias no Rio de Janeiro com o Lucky Trip. Pode me ajudar a refinar?`
+    );
+    Linking.openURL(`https://wa.me/?text=${msg}`);
+  }
+
   return (
     <>
-      {/* Summary */}
+      {/* Hotel recommendation — shown first if user saved a hotel */}
+      {hotelItem && (
+        <View style={re.hotelCard}>
+          <Image
+            source={hotelItem.image}
+            style={re.hotelImg}
+            resizeMode="cover"
+          />
+          <LinearGradient
+            colors={["transparent", "rgba(10,5,2,0.90)"]}
+            locations={[0.3, 1]}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
+          <View style={re.hotelBadge}>
+            <Text style={re.hotelBadgeText}>✦ HOSPEDAGEM RECOMENDADA</Text>
+          </View>
+          <View style={re.hotelInfo}>
+            <Text style={re.hotelName} numberOfLines={1}>{hotelItem.titulo}</Text>
+            {hotelItem.localizacao ? (
+              <Text style={re.hotelLoc}>{hotelItem.localizacao}</Text>
+            ) : null}
+          </View>
+        </View>
+      )}
+
+      {/* Summary card */}
       <View style={re.summary}>
         <View style={re.summaryInner}>
           <View style={re.statBlock}>
-            <Text style={re.statVal}>{result.summary.totalDays}</Text>
-            <Text style={re.statLbl}>{result.summary.totalDays === 1 ? "dia" : "dias"}</Text>
+            <Text style={re.statVal}>{totalItems}</Text>
+            <Text style={re.statLbl}>itens</Text>
           </View>
           <View style={re.statDivider} />
           <View style={re.statBlock}>
-            <Text style={re.statVal}>{result.summary.totalItems}</Text>
-            <Text style={re.statLbl}>lugares</Text>
+            <Text style={re.statVal}>{totalDays}</Text>
+            <Text style={re.statLbl}>{totalDays === 1 ? "dia" : "dias"}</Text>
           </View>
           <View style={re.statDivider} />
           <View style={re.statBlock}>
-            <Text style={re.statVal}>{result.destination.split(" ").slice(-1)[0]}</Text>
+            <Text style={re.statVal}>Rio</Text>
             <Text style={re.statLbl}>destino</Text>
           </View>
         </View>
+        <Text style={re.summaryLine}>
+          {totalItems} {totalItems === 1 ? "item" : "itens"} em {totalDays} {totalDays === 1 ? "dia" : "dias"}
+        </Text>
+      </View>
+
+      {/* Action buttons */}
+      <View style={re.actionRow}>
+        <Pressable
+          style={({ pressed }) => [re.actionBtn, re.actionBtnPrimary, pressed && { opacity: 0.80 }]}
+          onPress={handleWhatsApp}
+        >
+          <Feather name="message-circle" size={15} color={C.cream} />
+          <Text style={re.actionBtnText}>Refinar com assistente</Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [re.actionBtn, re.actionBtnSecondary, pressed && { opacity: 0.80 }]}
+          onPress={onReset}
+        >
+          <Feather name="edit-2" size={15} color={C.darkBrown} />
+          <Text style={re.actionBtnTextSecondary}>Editar roteiro</Text>
+        </Pressable>
       </View>
 
       {/* Day cards */}
       {result.days.map((dia) => (
-        <ResultDayCard key={dia.bairro} dia={dia} />
+        <ResultDayCard key={`${dia.numero}-${dia.bairro}`} dia={dia} />
       ))}
 
-      {/* Redo */}
+      {/* Map CTA */}
       <Pressable
-        style={({ pressed }) => [
-          re.redoBtn,
-          pressed && { opacity: 0.75 },
-        ]}
-        onPress={onReset}
+        style={({ pressed }) => [re.mapCta, pressed && { opacity: 0.78 }]}
+        onPress={() => {}}
       >
-        <Feather name="refresh-cw" size={14} color={C.terracotta} />
-        <Text style={re.redoBtnText}>Ajustar preferências</Text>
+        <View style={re.mapCtaLeft}>
+          <View style={re.mapCtaIcon}>
+            <Feather name="map-pin" size={15} color={GOLD} />
+          </View>
+          <View>
+            <Text style={re.mapCtaLabel}>Ver no mapa</Text>
+            <Text style={re.mapCtaSub}>{totalPlaces} {totalPlaces === 1 ? "lugar" : "lugares"}</Text>
+          </View>
+        </View>
+        <Feather name="arrow-right" size={15} color={`${GOLD}90`} />
       </Pressable>
     </>
   );
@@ -551,8 +762,52 @@ function ResultDayCard({ dia }: { dia: DiaRoteiro }) {
 }
 
 const re = StyleSheet.create({
+  hotelCard: {
+    height: 160,
+    borderRadius: 18,
+    overflow: "hidden",
+    marginBottom: 16,
+    justifyContent: "flex-end",
+    borderWidth: 1,
+    borderColor: `${GOLD}22`,
+  },
+  hotelImg: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  hotelBadge: {
+    position: "absolute",
+    top: 14,
+    left: 14,
+    backgroundColor: `${GOLD}22`,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: `${GOLD}44`,
+  },
+  hotelBadgeText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 9,
+    color: GOLD,
+    letterSpacing: 1.2,
+  },
+  hotelInfo: {
+    padding: 16,
+    gap: 2,
+  },
+  hotelName: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 18,
+    color: C.cream,
+  },
+  hotelLoc: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: "rgba(245,240,232,0.60)",
+  },
+
   summary: {
-    marginBottom: 24,
+    marginBottom: 16,
     borderRadius: 16,
     overflow: "hidden",
     borderWidth: 1,
@@ -584,6 +839,89 @@ const re = StyleSheet.create({
     backgroundColor: `${GOLD}18`,
     alignSelf: "stretch",
     marginVertical: 4,
+  },
+  summaryLine: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: "rgba(245,240,232,0.45)",
+    textAlign: "center",
+    paddingBottom: 14,
+    letterSpacing: 0.3,
+  },
+
+  actionRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 20,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+  },
+  actionBtnPrimary: {
+    backgroundColor: C.darkBrown,
+    borderWidth: 1,
+    borderColor: `${GOLD}30`,
+  },
+  actionBtnSecondary: {
+    backgroundColor: C.warmBeige,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  actionBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: C.cream,
+  },
+  actionBtnTextSecondary: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: C.darkBrown,
+  },
+
+  mapCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 8,
+    marginBottom: 8,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 16,
+    backgroundColor: C.darkBrown,
+    borderWidth: 1,
+    borderColor: `${GOLD}30`,
+  },
+  mapCtaLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  mapCtaIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: `${GOLD}14`,
+    borderWidth: 1,
+    borderColor: `${GOLD}30`,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mapCtaLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: C.cream,
+  },
+  mapCtaSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: "rgba(245,240,232,0.50)",
+    marginTop: 1,
   },
 
   dayCard: {
@@ -781,6 +1119,46 @@ const hdr = StyleSheet.create({
 // Main screen
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Premium loading screen — animated dots cycling through steps
+function LoadingPhase() {
+  const dot0 = useRef(new Animated.Value(0.3)).current;
+  const dot1 = useRef(new Animated.Value(0.3)).current;
+  const dot2 = useRef(new Animated.Value(0.3)).current;
+  const dots = [dot0, dot1, dot2];
+
+  useEffect(() => {
+    const animations = dots.map((dot, i) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(i * 260),
+          Animated.timing(dot, { toValue: 1, duration: 400, useNativeDriver: true }),
+          Animated.timing(dot, { toValue: 0.3, duration: 400, useNativeDriver: true }),
+          Animated.delay((dots.length - i - 1) * 260),
+        ])
+      )
+    );
+    animations.forEach((a) => a.start());
+    return () => animations.forEach((a) => a.stop());
+  }, []);
+
+  return (
+    <View style={sc.loadingWrap}>
+      <View style={sc.loadingIconRing}>
+        <Feather name="zap" size={22} color={GOLD} />
+      </View>
+      <Text style={sc.loadingText}>Estamos organizando sua viagem</Text>
+      <Text style={sc.loadingSubText}>
+        Selecionando as melhores experiências para você
+      </Text>
+      <View style={sc.loadingDots}>
+        {dots.map((dot, i) => (
+          <Animated.View key={i} style={[sc.loadingDot, { opacity: dot }]} />
+        ))}
+      </View>
+    </View>
+  );
+}
+
 export default function RoteiroScreen() {
   const insets    = useSafeAreaInsets();
   const topPad    = Platform.OS === "web" ? 67 : insets.top;
@@ -788,22 +1166,26 @@ export default function RoteiroScreen() {
 
   const { saved } = useGuia();
 
-  // Preference state
+  // Journey inputs
   const [inspirations, setInspirations] = useState<Inspiration[]>([]);
-  const [vibe, setVibe]                 = useState<Vibe | null>("moderado");
+  const [vibe,         setVibe]         = useState<Vibe | null>("moderado");
+  const [nights,       setNights]       = useState<number>(3);
+  const [travelVibe,   setTravelVibe]   = useState<TravelVibe>("amigos");
+  const [budget,       setBudget]       = useState<BudgetStyle>("conforto");
 
-  // Result state — null = setup phase, defined = result phase
-  const [result, setResult]     = useState<ItineraryResult | null>(null);
-  const [generating, setGenerating] = useState(false);
+  // Result state
+  const [result,      setResult]      = useState<ItineraryResult | null>(null);
+  const [generating,  setGenerating]  = useState(false);
 
   // Category counts for the summary card
   const categoryCounts = saved.reduce<Record<SavedCategory, number>>(
-    (acc, item) => {
-      acc[item.categoria] = (acc[item.categoria] ?? 0) + 1;
-      return acc;
-    },
+    (acc, item) => { acc[item.categoria] = (acc[item.categoria] ?? 0) + 1; return acc; },
     { oQueFazer: 0, restaurante: 0, hotel: 0, lucky: 0 },
   );
+
+  // Hotel item for result phase
+  const hotelItem = saved.find((s) => s.categoria === "hotel") ?? null;
+  const totalPlaces = saved.filter((s) => s.categoria !== "hotel").length;
 
   function handleToggleInspiration(id: Inspiration) {
     setInspirations((prev) =>
@@ -816,8 +1198,6 @@ export default function RoteiroScreen() {
     setGenerating(true);
 
     try {
-      // Serialize saved items — image objects are not JSON-safe, so we
-      // send only the plain fields and re-hydrate the result on the way back.
       const serializableItems = saved.map((s) => ({
         id:          s.id,
         titulo:      s.titulo,
@@ -825,36 +1205,28 @@ export default function RoteiroScreen() {
         localizacao: s.localizacao,
       }));
 
-      // Derive trip length from vibe and item count
-      const VIBE_PER_DAY: Record<string, number> = {
-        tranquilo: 3,
-        moderado:  4,
-        intenso:   6,
-      };
-      const actionableCount = saved.filter((s) => s.categoria !== "hotel").length;
-      const perDay          = VIBE_PER_DAY[vibe ?? "moderado"] ?? 4;
-      const requestedDays   = Math.max(1, Math.ceil(actionableCount / perDay));
+      // requestedDays comes directly from the nights stepper — this is the fix
+      // that ensures the engine produces a multi-day itinerary matching the trip duration.
+      const requestedDays = nights;
 
       const { data, error } = await supabase.functions.invoke("generate-itinerary", {
         body: {
           savedItems:   serializableItems,
           destination:  "Rio de Janeiro",
-          preferences:  { inspirations, vibe },
+          preferences:  { inspirations, vibe, travelVibe, budget },
           requestedDays,
         },
       });
 
       if (error || !data?.days) throw new Error(error?.message ?? "empty response");
 
-      // Re-hydrate each returned item with the original SavedItem (incl. image)
+      // Re-hydrate items with full SavedItem (incl. image)
       const savedMap = new Map(saved.map((s) => [s.id, s]));
       const hydratedDays: DiaRoteiro[] = (data.days as DiaRoteiro[]).map((day) => ({
         ...day,
         periodos: day.periodos.map((p) => ({
           ...p,
-          items: p.items
-            .map((item) => savedMap.get(item.id) ?? item)
-            .filter(Boolean),
+          items: p.items.map((item) => savedMap.get(item.id) ?? item).filter(Boolean),
         })),
       }));
 
@@ -866,7 +1238,6 @@ export default function RoteiroScreen() {
         days:        hydratedDays,
       });
     } catch (_) {
-      // Graceful fallback — run locally if the edge function is unavailable
       const prefs: ItineraryPreferences = { inspirations, vibe };
       setResult(buildItinerary(saved, prefs));
     } finally {
@@ -875,11 +1246,7 @@ export default function RoteiroScreen() {
   }
 
   function handleBack() {
-    if (result) {
-      setResult(null); // go back to setup
-    } else {
-      router.back();
-    }
+    if (result) { setResult(null); } else { router.back(); }
   }
 
   const phase: "setup" | "result" | "loading" =
@@ -889,24 +1256,16 @@ export default function RoteiroScreen() {
     <View style={sc.root}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* Custom header */}
       <View style={{ paddingTop: topPad }}>
         <ScreenHeader phase={phase} onBack={handleBack} />
       </View>
 
       {phase === "loading" ? (
-        <View style={sc.loadingWrap}>
-          <ActivityIndicator size="large" color={GOLD} />
-          <Text style={sc.loadingText}>Gerando roteiro com IA…</Text>
-          <Text style={sc.loadingSubText}>Isso pode levar alguns segundos</Text>
-        </View>
+        <LoadingPhase />
       ) : (
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={[
-            sc.content,
-            { paddingBottom: bottomPad + 40 },
-          ]}
+          contentContainerStyle={[sc.content, { paddingBottom: bottomPad + 40 }]}
         >
           {phase === "setup" ? (
             <SetupPhase
@@ -914,12 +1273,23 @@ export default function RoteiroScreen() {
               categoryCounts={categoryCounts}
               inspirations={inspirations}
               vibe={vibe}
+              nights={nights}
+              travelVibe={travelVibe}
+              budget={budget}
               onToggleInspiration={handleToggleInspiration}
               onSetVibe={setVibe}
+              onSetNights={setNights}
+              onSetTravelVibe={setTravelVibe}
+              onSetBudget={setBudget}
               onGenerate={handleGenerate}
             />
           ) : (
-            <ResultPhase result={result!} onReset={() => setResult(null)} />
+            <ResultPhase
+              result={result!}
+              hotelItem={hotelItem}
+              totalPlaces={totalPlaces}
+              onReset={() => setResult(null)}
+            />
           )}
         </ScrollView>
       )}
@@ -940,19 +1310,43 @@ const sc = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: 14,
+    gap: 16,
     paddingHorizontal: 40,
+  },
+  loadingIconRing: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: `${GOLD}12`,
+    borderWidth: 1,
+    borderColor: `${GOLD}30`,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
   },
   loadingText: {
     fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 18,
+    fontSize: 20,
     color: C.darkBrown,
     textAlign: "center",
+    lineHeight: 28,
   },
   loadingSubText: {
     fontFamily: "Inter_400Regular",
     fontSize: 13,
     color: C.warmGray,
     textAlign: "center",
+    lineHeight: 20,
+  },
+  loadingDots: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 8,
+  },
+  loadingDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: GOLD,
   },
 });
