@@ -1,21 +1,22 @@
 /**
- * roteiro/index.tsx — AI Itinerary Builder
+ * roteiro/index.tsx
  *
- * Two phases in a single screen:
- *   1. Setup   — preference selection (inspiration + vibe) with saved places summary
- *   2. Result  — deterministic day-by-day itinerary built from saved places
+ * Guided 5-step itinerary builder.
+ * Each step appears as a glass modal over an atmospheric background.
+ * Steps auto-advance on single-select; multi-select shows a CTA.
  *
- * Entry: viagem.tsx CTA → router.push("/roteiro")
- *
- * Data: reads saved items from GuiaContext; passes them through buildItinerary().
- * No Supabase calls needed — all data already in SavedItem from the save flow.
- *
- * Style: cream + dark-brown, matches Lucky / Destinos content screens.
+ * Steps:
+ *   0 — Destino       (confirm Rio, tap to begin)
+ *   1 — Datas         (arrival + departure calendar, auto-advance on range)
+ *   2 — Companhia     (solo/casal/amigos/família, auto-advance)
+ *   3 — Inspiração    (multi-select, CTA)
+ *   4 — Estilo        (budget, auto-advance → triggers generation)
  */
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
+  Dimensions,
   Image,
   Linking,
   Platform,
@@ -25,6 +26,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -45,446 +47,840 @@ import type { DiaRoteiro } from "@/utils/buildRoteiro";
 
 const C    = Colors.light;
 const GOLD = "#C9A84C";
+const { width: SW } = Dimensions.get("window");
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Static config
+// Types + static data
 // ─────────────────────────────────────────────────────────────────────────────
 
-const INSPIRATIONS: { id: Inspiration; label: string; icon: string }[] = [
-  { id: "gastronomy", label: "Gastronomia", icon: "🍽" },
-  { id: "culture",    label: "Cultura",     icon: "🎭" },
-  { id: "beach",      label: "Praia",       icon: "🏖" },
-  { id: "adventure",  label: "Aventura",    icon: "🧭" },
-  { id: "lucky",      label: "Lucky List",  icon: "✦" },
+type TravelVibe  = "solo" | "casal" | "amigos" | "família";
+type BudgetStyle = "essencial" | "conforto" | "sofisticado";
+
+const TOTAL_STEPS = 5;
+
+const COMPANIONS: { id: TravelVibe; label: string; icon: string }[] = [
+  { id: "solo",    label: "Solo",    icon: "🚶" },
+  { id: "casal",   label: "Casal",   icon: "💑" },
+  { id: "amigos",  label: "Amigos",  icon: "👥" },
+  { id: "família", label: "Família", icon: "👨‍👩‍👧" },
 ];
 
-const VIBES: { id: Vibe; label: string; desc: string }[] = [
-  { id: "tranquilo", label: "Tranquilo", desc: "Até 3 paradas por dia" },
-  { id: "moderado",  label: "Moderado",  desc: "4 a 5 paradas por dia" },
-  { id: "intenso",   label: "Intenso",   desc: "Aproveitar tudo" },
+const BUDGETS: { id: BudgetStyle; label: string; desc: string }[] = [
+  { id: "essencial",   label: "Essencial",   desc: "Custo-benefício · experiências acessíveis" },
+  { id: "conforto",    label: "Conforto",    desc: "Qualidade equilibrada · bom e bem feito" },
+  { id: "sofisticado", label: "Sofisticado", desc: "Melhor do Rio · exclusivo e premium" },
+];
+
+const INSPIRATIONS: { id: Inspiration; label: string; icon: string }[] = [
+  { id: "gastronomia", label: "Gastronomia", icon: "🍽️" },
+  { id: "cultura",     label: "Cultura",     icon: "🎭" },
+  { id: "praia",       label: "Praia",       icon: "🏖️" },
+  { id: "aventura",    label: "Aventura",    icon: "⚡" },
+  { id: "lucky",       label: "Lucky List",  icon: "✦" },
 ];
 
 const CATEGORY_LABEL: Record<SavedCategory, string> = {
-  oQueFazer:   "Experiência",
+  oQueFazer:   "O Que Fazer",
   restaurante: "Restaurante",
   hotel:       "Hotel",
   lucky:       "Lucky",
 };
 
-const CATEGORY_ICON: Record<SavedCategory, string> = {
-  oQueFazer:   "map-pin",
-  restaurante: "coffee",
-  hotel:       "home",
-  lucky:       "star",
-};
-
 // ─────────────────────────────────────────────────────────────────────────────
-// Setup phase — preference pickers
+// Calendar utilities
 // ─────────────────────────────────────────────────────────────────────────────
 
-type TravelVibe   = "solo" | "casal" | "amigos" | "família";
-type BudgetStyle  = "essencial" | "conforto" | "sofisticado";
-
-const COMPANIONS: { id: TravelVibe; label: string; icon: string }[] = [
-  { id: "solo",     label: "Solo",     icon: "🚶" },
-  { id: "casal",    label: "Casal",    icon: "💑" },
-  { id: "amigos",   label: "Amigos",   icon: "👥" },
-  { id: "família",  label: "Família",  icon: "👨‍👩‍👧" },
+const MONTH_PT = [
+  "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
+  "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro",
 ];
+const DAY_PT = ["D","S","T","Q","Q","S","S"];
 
-const BUDGETS: { id: BudgetStyle; label: string; desc: string }[] = [
-  { id: "essencial",    label: "Essencial",    desc: "Custo-benefício · experiências acessíveis" },
-  { id: "conforto",     label: "Conforto",     desc: "Qualidade equilibrada · bom e bem feito" },
-  { id: "sofisticado",  label: "Sofisticado",  desc: "Melhor de Rio · exclusivo e premium" },
-];
-
-interface SetupProps {
-  savedCount:          number;
-  categoryCounts:      Record<SavedCategory, number>;
-  inspirations:        Inspiration[];
-  vibe:                Vibe | null;
-  nights:              number;
-  travelVibe:          TravelVibe;
-  budget:              BudgetStyle;
-  onToggleInspiration: (id: Inspiration) => void;
-  onSetVibe:           (id: Vibe) => void;
-  onSetNights:         (n: number) => void;
-  onSetTravelVibe:     (id: TravelVibe) => void;
-  onSetBudget:         (id: BudgetStyle) => void;
-  onGenerate:          () => void;
+function isSameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() &&
+         a.getMonth()    === b.getMonth()    &&
+         a.getDate()     === b.getDate();
+}
+function isBeforeDay(a: Date, b: Date) {
+  const norm = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  return norm(a) < norm(b);
+}
+function isBetweenDays(d: Date, start: Date, end: Date) {
+  const norm = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  return norm(d) > norm(start) && norm(d) < norm(end);
+}
+function addMonths(date: Date, n: number): Date {
+  const d = new Date(date.getFullYear(), date.getMonth() + n, 1);
+  return d;
+}
+function calDays(month: Date): (Date | null)[] {
+  const y = month.getFullYear(), m = month.getMonth();
+  const first = new Date(y, m, 1).getDay();
+  const total = new Date(y, m + 1, 0).getDate();
+  const cells: (Date | null)[] = Array(first).fill(null);
+  for (let d = 1; d <= total; d++) cells.push(new Date(y, m, d));
+  return cells;
 }
 
-function SetupPhase({
-  savedCount,
-  categoryCounts,
-  inspirations,
-  vibe,
-  nights,
-  travelVibe,
-  budget,
-  onToggleInspiration,
-  onSetVibe,
-  onSetNights,
-  onSetTravelVibe,
-  onSetBudget,
-  onGenerate,
-}: SetupProps) {
-  const hasNone = savedCount === 0;
+// ─────────────────────────────────────────────────────────────────────────────
+// StepCard — animated entrance wrapper
+// ─────────────────────────────────────────────────────────────────────────────
+
+function StepCard({ children }: { children: React.ReactNode }) {
+  const opacity  = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(28)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(opacity,    { toValue: 1, useNativeDriver: true, damping: 26, stiffness: 260 }),
+      Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 26, stiffness: 260 }),
+    ]).start();
+  }, []);
 
   return (
-    <>
-      {/* Destination + summary */}
-      <View style={su.destCard}>
+    <Animated.View style={[jn.card, { opacity, transform: [{ translateY }] }]}>
+      {children}
+    </Animated.View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// StepDots — progress indicator
+// ─────────────────────────────────────────────────────────────────────────────
+
+function StepDots({ current }: { current: number }) {
+  return (
+    <View style={jn.dots}>
+      {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
+        <View
+          key={i}
+          style={[
+            jn.dot,
+            i < current  ? jn.dotDone   :
+            i === current ? jn.dotActive : jn.dotFuture,
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 0 — Destino confirm
+// ─────────────────────────────────────────────────────────────────────────────
+
+function StepDestino({ onNext, savedCount }: { onNext: () => void; savedCount: number }) {
+  return (
+    <StepCard>
+      <StepDots current={0} />
+      <Text style={jn.stepLabel}>SEU DESTINO</Text>
+      <View style={jn.destHero}>
         <LinearGradient
-          colors={["rgba(10,5,2,0.96)", "rgba(44,24,16,0.92)"]}
+          colors={[`${GOLD}12`, `${C.darkBrown}F0`]}
+          locations={[0, 1]}
           style={StyleSheet.absoluteFill}
         />
-        <View style={su.destRow}>
-          <Feather name="map-pin" size={13} color={GOLD} />
-          <Text style={su.destLabel}>Destino</Text>
-        </View>
-        <Text style={su.destName}>Rio de Janeiro</Text>
-        <View style={su.destDivider} />
-        {hasNone ? (
-          <Text style={su.noneText}>
-            Salve lugares em qualquer tela para incluí-los no roteiro.
-          </Text>
-        ) : (
-          <View style={su.catRow}>
-            {(Object.keys(categoryCounts) as SavedCategory[])
-              .filter((k) => categoryCounts[k] > 0)
-              .map((cat) => (
-                <View key={cat} style={su.catPill}>
-                  <Feather
-                    name={CATEGORY_ICON[cat] as any}
-                    size={10}
-                    color={GOLD}
-                  />
-                  <Text style={su.catPillText}>
-                    {categoryCounts[cat]} {CATEGORY_LABEL[cat]}
-                    {categoryCounts[cat] > 1 ? "s" : ""}
-                  </Text>
-                </View>
-              ))}
+        <Text style={jn.destFlag}>🇧🇷</Text>
+        <Text style={jn.destCity}>Rio de Janeiro</Text>
+        <Text style={jn.destSub}>Brasil · América do Sul</Text>
+        {savedCount > 0 && (
+          <View style={jn.destBadge}>
+            <Text style={jn.destBadgeText}>{savedCount} {savedCount === 1 ? "lugar salvo" : "lugares salvos"}</Text>
           </View>
         )}
       </View>
+      <Pressable
+        style={({ pressed }) => [jn.ctaBtn, pressed && { opacity: 0.82 }]}
+        onPress={onNext}
+      >
+        <Text style={jn.ctaBtnText}>Começar</Text>
+        <Feather name="arrow-right" size={15} color={C.cream} />
+      </Pressable>
+    </StepCard>
+  );
+}
 
-      {/* Light hint when very few places */}
-      {savedCount > 0 && savedCount < 2 && (
-        <View style={su.hintRow}>
-          <Feather name="info" size={12} color={C.warmGray} />
-          <Text style={su.hintText}>
-            Adicione mais lugares para um roteiro mais rico.
-          </Text>
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 1 — Date range picker
+// ─────────────────────────────────────────────────────────────────────────────
+
+function StepDatas({
+  onNext,
+}: {
+  onNext: (nights: number) => void;
+}) {
+  const today       = new Date();
+  const todayStart  = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const initMonth   = new Date(today.getFullYear(), today.getMonth(), 1);
+
+  const [calMonth,   setCalMonth]   = useState<Date>(initMonth);
+  const [arrival,    setArrival]    = useState<Date | null>(null);
+  const [departure,  setDeparture]  = useState<Date | null>(null);
+  const [picking,    setPicking]    = useState<"arrival" | "departure">("arrival");
+
+  const cells = calDays(calMonth);
+  const canBack = calMonth > initMonth;
+
+  function fmt(d: Date) {
+    return `${d.getDate()} ${MONTH_PT[d.getMonth()].slice(0, 3)}`;
+  }
+
+  function handleDay(day: Date) {
+    if (isBeforeDay(day, todayStart)) return;
+    if (picking === "arrival") {
+      setArrival(day);
+      setDeparture(null);
+      setPicking("departure");
+    } else {
+      if (!arrival || isSameDay(day, arrival) || isBeforeDay(day, arrival)) return;
+      setDeparture(day);
+      const nights = Math.round((day.getTime() - arrival!.getTime()) / 86400000);
+      setTimeout(() => onNext(nights), 420);
+    }
+  }
+
+  return (
+    <StepCard>
+      <StepDots current={1} />
+      <Text style={jn.stepLabel}>QUANDO VOCÊ VIAJA?</Text>
+
+      {/* Arrival / departure tags */}
+      <View style={jn.dateTags}>
+        <View style={[jn.dateTag, picking === "arrival" && jn.dateTagActive]}>
+          <Text style={jn.dateTagLabel}>Chegada</Text>
+          <Text style={jn.dateTagVal}>{arrival ? fmt(arrival) : "—"}</Text>
         </View>
-      )}
+        <Feather name="arrow-right" size={13} color={`${C.darkBrown}44`} />
+        <View style={[jn.dateTag, picking === "departure" && jn.dateTagActive]}>
+          <Text style={jn.dateTagLabel}>Partida</Text>
+          <Text style={jn.dateTagVal}>{departure ? fmt(departure) : "—"}</Text>
+        </View>
+      </View>
 
-      {/* Duração da viagem — nights stepper */}
-      <Text style={su.sectionLabel}>Duração da viagem</Text>
-      <Text style={su.sectionSub}>Quantas noites em Rio?</Text>
-      <View style={su.stepperRow}>
-        <Pressable
-          style={({ pressed }) => [su.stepperBtn, pressed && { opacity: 0.65 }]}
-          onPress={() => onSetNights(Math.max(1, nights - 1))}
-          hitSlop={8}
-        >
-          <Feather name="minus" size={18} color={nights <= 1 ? C.border : C.darkBrown} />
+      {/* Month nav */}
+      <View style={jn.calNav}>
+        <Pressable hitSlop={10} onPress={() => canBack && setCalMonth(addMonths(calMonth, -1))}>
+          <Feather name="chevron-left" size={18} color={canBack ? C.darkBrown : C.border} />
         </Pressable>
-        <View style={su.stepperCenter}>
-          <Text style={su.stepperVal}>{nights}</Text>
-          <Text style={su.stepperUnit}>{nights === 1 ? "noite" : "noites"}</Text>
-        </View>
-        <Pressable
-          style={({ pressed }) => [su.stepperBtn, pressed && { opacity: 0.65 }]}
-          onPress={() => onSetNights(Math.min(14, nights + 1))}
-          hitSlop={8}
-        >
-          <Feather name="plus" size={18} color={nights >= 14 ? C.border : C.darkBrown} />
+        <Text style={jn.calNavMonth}>{MONTH_PT[calMonth.getMonth()]} {calMonth.getFullYear()}</Text>
+        <Pressable hitSlop={10} onPress={() => setCalMonth(addMonths(calMonth, 1))}>
+          <Feather name="chevron-right" size={18} color={C.darkBrown} />
         </Pressable>
       </View>
 
-      {/* Inspiração */}
-      <Text style={[su.sectionLabel, { marginTop: 24 }]}>Inspiração</Text>
-      <Text style={su.sectionSub}>Selecione uma ou mais categorias</Text>
-      <View style={su.inspGrid}>
-        {INSPIRATIONS.map((ins) => {
-          const active = inspirations.includes(ins.id);
+      {/* Day-of-week header */}
+      <View style={jn.calWeek}>
+        {DAY_PT.map((d, i) => <Text key={i} style={jn.calWeekDay}>{d}</Text>)}
+      </View>
+
+      {/* Grid */}
+      <View style={jn.calGrid}>
+        {cells.map((day, i) => {
+          if (!day) return <View key={`e-${i}`} style={jn.calCell} />;
+          const past    = isBeforeDay(day, todayStart);
+          const isArr   = !!arrival   && isSameDay(day, arrival);
+          const isDep   = !!departure && isSameDay(day, departure);
+          const inRange = !!arrival && !!departure && isBetweenDays(day, arrival, departure);
           return (
             <Pressable
-              key={ins.id}
+              key={day.toISOString()}
               style={({ pressed }) => [
-                su.inspChip,
-                active && su.inspChipActive,
-                pressed && { opacity: 0.78 },
+                jn.calCell,
+                isArr    && jn.calArr,
+                isDep    && jn.calDep,
+                inRange  && jn.calRange,
+                past     && jn.calPast,
+                pressed && !past && { opacity: 0.68 },
               ]}
-              onPress={() => onToggleInspiration(ins.id)}
+              onPress={() => handleDay(day)}
+              disabled={past}
             >
-              <Text style={su.inspIcon}>{ins.icon}</Text>
-              <Text style={[su.inspLabel, active && su.inspLabelActive]}>
-                {ins.label}
+              <Text style={[
+                jn.calDayNum,
+                (isArr || isDep) && jn.calDayNumSel,
+                past && jn.calDayNumPast,
+              ]}>
+                {day.getDate()}
               </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <Text style={jn.calHint}>
+        {picking === "arrival" ? "Toque na data de chegada" : "Agora toque na data de partida"}
+      </Text>
+    </StepCard>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 2 — Companion
+// ─────────────────────────────────────────────────────────────────────────────
+
+function StepCompanhia({
+  value,
+  onSelect,
+}: {
+  value: TravelVibe;
+  onSelect: (v: TravelVibe) => void;
+}) {
+  return (
+    <StepCard>
+      <StepDots current={2} />
+      <Text style={jn.stepLabel}>COM QUEM VIAJA?</Text>
+      <Text style={jn.stepSub}>Avançamos automaticamente após a seleção</Text>
+      <View style={jn.compGrid}>
+        {COMPANIONS.map((c) => {
+          const active = value === c.id;
+          return (
+            <Pressable
+              key={c.id}
+              style={({ pressed }) => [
+                jn.compChip,
+                active && jn.compChipActive,
+                pressed && { opacity: 0.76 },
+              ]}
+              onPress={() => onSelect(c.id)}
+            >
+              <Text style={jn.compIcon}>{c.icon}</Text>
+              <Text style={[jn.compLabel, active && jn.compLabelActive]}>{c.label}</Text>
               {active && (
-                <Feather name="check" size={11} color={GOLD} />
+                <View style={jn.compCheck}>
+                  <Feather name="check" size={10} color="#fff" />
+                </View>
               )}
             </Pressable>
           );
         })}
       </View>
+    </StepCard>
+  );
+}
 
-      {/* Com quem viaja */}
-      <Text style={[su.sectionLabel, { marginTop: 24 }]}>Com quem viaja?</Text>
-      <Text style={su.sectionSub}>Perfil da experiência</Text>
-      <View style={su.inspGrid}>
-        {COMPANIONS.map((c) => {
-          const active = travelVibe === c.id;
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 3 — Inspiration (multi-select)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function StepInspiracao({
+  value,
+  onToggle,
+  onNext,
+}: {
+  value: Inspiration[];
+  onToggle: (id: Inspiration) => void;
+  onNext: () => void;
+}) {
+  return (
+    <StepCard>
+      <StepDots current={3} />
+      <Text style={jn.stepLabel}>O QUE QUER FAZER?</Text>
+      <Text style={jn.stepSub}>Selecione quantas quiser</Text>
+      <View style={jn.inspGrid}>
+        {INSPIRATIONS.map((ins) => {
+          const active = value.includes(ins.id);
           return (
             <Pressable
-              key={c.id}
+              key={ins.id}
               style={({ pressed }) => [
-                su.inspChip,
-                active && su.inspChipActive,
-                pressed && { opacity: 0.78 },
+                jn.inspChip,
+                active && jn.inspChipActive,
+                pressed && { opacity: 0.76 },
               ]}
-              onPress={() => onSetTravelVibe(c.id)}
+              onPress={() => onToggle(ins.id)}
             >
-              <Text style={su.inspIcon}>{c.icon}</Text>
-              <Text style={[su.inspLabel, active && su.inspLabelActive]}>
-                {c.label}
-              </Text>
+              <Text style={jn.inspIcon}>{ins.icon}</Text>
+              <Text style={[jn.inspLabel, active && jn.inspLabelActive]}>{ins.label}</Text>
               {active && <Feather name="check" size={11} color={GOLD} />}
             </Pressable>
           );
         })}
       </View>
+      <Pressable
+        style={({ pressed }) => [jn.ctaBtn, pressed && { opacity: 0.82 }]}
+        onPress={onNext}
+      >
+        <Text style={jn.ctaBtnText}>Continuar</Text>
+        <Feather name="arrow-right" size={15} color={C.cream} />
+      </Pressable>
+    </StepCard>
+  );
+}
 
-      {/* Ritmo */}
-      <Text style={[su.sectionLabel, { marginTop: 24 }]}>Ritmo de viagem</Text>
-      <Text style={su.sectionSub}>Quantas paradas por dia?</Text>
-      <View style={su.vibeCol}>
-        {VIBES.map((v) => {
-          const active = vibe === v.id;
-          return (
-            <Pressable
-              key={v.id}
-              style={({ pressed }) => [
-                su.vibeRow,
-                active && su.vibeRowActive,
-                pressed && { opacity: 0.80 },
-              ]}
-              onPress={() => onSetVibe(v.id)}
-            >
-              <View style={[su.vibeRadio, active && su.vibeRadioActive]}>
-                {active && <View style={su.vibeRadioDot} />}
-              </View>
-              <View style={su.vibeText}>
-                <Text style={[su.vibeLabel, active && su.vibeLabelActive]}>
-                  {v.label}
-                </Text>
-                <Text style={su.vibeDesc}>{v.desc}</Text>
-              </View>
-            </Pressable>
-          );
-        })}
-      </View>
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 4 — Budget / travel style (auto-advance → generate)
+// ─────────────────────────────────────────────────────────────────────────────
 
-      {/* Estilo de viagem (budget) */}
-      <Text style={[su.sectionLabel, { marginTop: 24 }]}>Estilo de viagem</Text>
-      <Text style={su.sectionSub}>Como prefere experienciar?</Text>
-      <View style={su.vibeCol}>
+function StepEstilo({
+  value,
+  onSelect,
+}: {
+  value: BudgetStyle;
+  onSelect: (b: BudgetStyle) => void;
+}) {
+  return (
+    <StepCard>
+      <StepDots current={4} />
+      <Text style={jn.stepLabel}>ESTILO DE VIAGEM</Text>
+      <Text style={jn.stepSub}>Geramos seu roteiro após a seleção</Text>
+      <View style={jn.budgetCol}>
         {BUDGETS.map((b) => {
-          const active = budget === b.id;
+          const active = value === b.id;
           return (
             <Pressable
               key={b.id}
               style={({ pressed }) => [
-                su.vibeRow,
-                active && su.vibeRowActive,
+                jn.budgetRow,
+                active && jn.budgetRowActive,
                 pressed && { opacity: 0.80 },
               ]}
-              onPress={() => onSetBudget(b.id)}
+              onPress={() => onSelect(b.id)}
             >
-              <View style={[su.vibeRadio, active && su.vibeRadioActive]}>
-                {active && <View style={su.vibeRadioDot} />}
+              <View style={[jn.budgetRadio, active && jn.budgetRadioActive]}>
+                {active && <View style={jn.budgetDot} />}
               </View>
-              <View style={su.vibeText}>
-                <Text style={[su.vibeLabel, active && su.vibeLabelActive]}>
-                  {b.label}
-                </Text>
-                <Text style={su.vibeDesc}>{b.desc}</Text>
+              <View style={jn.budgetText}>
+                <Text style={[jn.budgetLabel, active && jn.budgetLabelActive]}>{b.label}</Text>
+                <Text style={jn.budgetDesc}>{b.desc}</Text>
               </View>
+              {active && (
+                <Animated.View>
+                  <Feather name="check-circle" size={18} color={GOLD} />
+                </Animated.View>
+              )}
             </Pressable>
           );
         })}
       </View>
-
-      {/* Generate CTA */}
-      <Pressable
-        style={({ pressed }) => [
-          su.genBtn,
-          hasNone && su.genBtnDisabled,
-          pressed && !hasNone && { opacity: 0.84, transform: [{ scale: 0.985 }] },
-        ]}
-        onPress={hasNone ? undefined : onGenerate}
-        disabled={hasNone}
-      >
-        <Feather name="zap" size={16} color={hasNone ? C.warmGray : GOLD} />
-        <Text style={[su.genBtnText, hasNone && su.genBtnTextDisabled]}>
-          Gerar roteiro
-        </Text>
-      </Pressable>
-    </>
+    </StepCard>
   );
 }
 
-const su = StyleSheet.create({
-  destCard: {
-    borderRadius: 18,
-    overflow: "hidden",
-    padding: 20,
-    marginBottom: 28,
-    borderWidth: 1,
-    borderColor: `${GOLD}20`,
-    gap: 6,
-  },
-  destRow: {
-    flexDirection: "row",
+// ─────────────────────────────────────────────────────────────────────────────
+// JourneyOverlay — coordinates all 5 steps over the blurred background
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface JourneyGenerateProps {
+  nights:       number;
+  travelVibe:   TravelVibe;
+  inspirations: Inspiration[];
+  budget:       BudgetStyle;
+  vibe:         Vibe;
+}
+
+interface JourneyOverlayProps {
+  savedCount: number;
+  onGenerate: (p: JourneyGenerateProps) => void;
+}
+
+function JourneyOverlay({ savedCount, onGenerate }: JourneyOverlayProps) {
+  const [step,         setStep]         = useState(0);
+  const [stepKey,      setStepKey]      = useState(0);
+  const [nights,       setNights]       = useState(3);
+  const [travelVibe,   setTravelVibe]   = useState<TravelVibe>("amigos");
+  const [inspirations, setInspirations] = useState<Inspiration[]>([]);
+  const [budget,       setBudget]       = useState<BudgetStyle>("conforto");
+
+  function advance(toStep?: number) {
+    const next = toStep ?? step + 1;
+    setStep(next);
+    setStepKey((k) => k + 1);
+  }
+
+  function handleCompanion(v: TravelVibe) {
+    setTravelVibe(v);
+    setTimeout(() => advance(), 360);
+  }
+
+  function handleBudget(b: BudgetStyle) {
+    setBudget(b);
+    setTimeout(() =>
+      onGenerate({ nights, travelVibe, inspirations, budget: b, vibe: "moderado" }),
+    380);
+  }
+
+  function handleToggle(id: Inspiration) {
+    setInspirations((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
+
+  const blurIntensity = Platform.OS === "ios" ? 65 : Platform.OS === "android" ? 30 : 55;
+
+  return (
+    <View style={[StyleSheet.absoluteFill, { pointerEvents: "box-none" }]}>
+      {/* Blur layer */}
+      <BlurView
+        intensity={blurIntensity}
+        tint="light"
+        style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}
+      />
+      {/* Semi-transparent cream wash on top of blur */}
+      <View
+        style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(245,240,232,0.30)", pointerEvents: "none" }]}
+      />
+
+      {/* Back button — shown from step 1 */}
+      {step > 0 && (
+        <Pressable
+          style={[jn.backBtn, { top: Platform.OS === "web" ? 74 : 54 }]}
+          onPress={() => { setStep((s) => s - 1); setStepKey((k) => k + 1); }}
+          hitSlop={12}
+        >
+          <Feather name="chevron-left" size={20} color={C.darkBrown} />
+          <Text style={jn.backBtnText}>Voltar</Text>
+        </Pressable>
+      )}
+
+      {/* Centered card */}
+      <View style={[jn.overlay, { pointerEvents: "box-none" }]} key={stepKey}>
+        {step === 0 && (
+          <StepDestino onNext={() => advance()} savedCount={savedCount} />
+        )}
+        {step === 1 && (
+          <StepDatas onNext={(n) => { setNights(n); advance(); }} />
+        )}
+        {step === 2 && (
+          <StepCompanhia value={travelVibe} onSelect={handleCompanion} />
+        )}
+        {step === 3 && (
+          <StepInspiracao
+            value={inspirations}
+            onToggle={handleToggle}
+            onNext={() => advance()}
+          />
+        )}
+        {step === 4 && (
+          <StepEstilo value={budget} onSelect={handleBudget} />
+        )}
+      </View>
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Journey styles
+// ─────────────────────────────────────────────────────────────────────────────
+
+const jn = StyleSheet.create({
+  // Overlay wrapper
+  overlay: {
+    flex: 1,
     alignItems: "center",
-    gap: 6,
-  },
-  destLabel: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 10,
-    color: GOLD,
-    letterSpacing: 1.8,
-    textTransform: "uppercase",
-  },
-  destName: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 24,
-    color: C.cream,
-    lineHeight: 30,
-  },
-  destDivider: {
-    height: 1,
-    backgroundColor: `${GOLD}16`,
-    marginVertical: 4,
-  },
-  noneText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: "rgba(245,240,232,0.52)",
-    lineHeight: 20,
-  },
-  catRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 2,
-  },
-  catPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    backgroundColor: `${GOLD}12`,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: `${GOLD}24`,
-  },
-  catPillText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 11,
-    color: GOLD,
+    justifyContent: "center",
+    paddingHorizontal: 20,
+    paddingBottom: 24,
   },
 
-  hintRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    marginBottom: 24,
-    marginTop: -12,
+  // Glass card
+  card: {
+    width: "100%",
+    maxWidth: 400,
+    backgroundColor: "rgba(252,249,244,0.96)",
+    borderRadius: 28,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: "rgba(201,168,76,0.18)",
+    boxShadow: "0px 16px 48px rgba(10,5,2,0.18), 0px 4px 12px rgba(10,5,2,0.08)",
   },
-  hintText: {
+
+  // Progress dots
+  dots: {
+    flexDirection: "row",
+    gap: 6,
+    alignSelf: "center",
+    marginBottom: 20,
+  },
+  dot: {
+    height: 5,
+    borderRadius: 3,
+  },
+  dotDone: {
+    width: 16,
+    backgroundColor: `${GOLD}60`,
+  },
+  dotActive: {
+    width: 24,
+    backgroundColor: GOLD,
+  },
+  dotFuture: {
+    width: 8,
+    backgroundColor: `${C.darkBrown}18`,
+  },
+
+  // Step label
+  stepLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+    letterSpacing: 1.8,
+    color: GOLD,
+    marginBottom: 6,
+    textAlign: "center",
+  },
+  stepSub: {
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     color: C.warmGray,
-    flex: 1,
+    textAlign: "center",
+    marginBottom: 20,
   },
 
-  stepperRow: {
+  // Back button
+  backBtn: {
+    position: "absolute",
+    left: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    zIndex: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: "rgba(252,249,244,0.80)",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: `${C.darkBrown}14`,
+  },
+  backBtnText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: C.darkBrown,
+  },
+
+  // CTA button
+  ctaBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 0,
-    backgroundColor: C.warmBeige,
-    borderRadius: 16,
+    gap: 8,
+    marginTop: 20,
+    paddingVertical: 15,
+    borderRadius: 18,
+    backgroundColor: C.darkBrown,
     borderWidth: 1,
-    borderColor: C.border,
-    overflow: "hidden",
-    marginBottom: 4,
+    borderColor: `${GOLD}22`,
   },
-  stepperBtn: {
-    width: 52,
-    height: 52,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepperCenter: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: C.border,
-    paddingVertical: 10,
-    gap: 1,
-  },
-  stepperVal: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 26,
-    color: C.darkBrown,
-    lineHeight: 32,
-  },
-  stepperUnit: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    color: C.warmGray,
-  },
-
-  sectionLabel: {
+  ctaBtnText: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 15,
-    color: C.darkBrown,
-    marginBottom: 2,
-  },
-  sectionSub: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: C.warmGray,
-    marginBottom: 14,
+    color: C.cream,
+    letterSpacing: 0.2,
   },
 
+  // ── Step 0: Destination hero ───────────────────────────────────────────────
+  destHero: {
+    borderRadius: 18,
+    overflow: "hidden",
+    alignItems: "center",
+    paddingVertical: 28,
+    paddingHorizontal: 16,
+    gap: 4,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: `${GOLD}20`,
+  },
+  destFlag: {
+    fontSize: 32,
+    marginBottom: 6,
+  },
+  destCity: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 26,
+    color: C.cream,
+    textAlign: "center",
+  },
+  destSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: "rgba(245,240,232,0.55)",
+  },
+  destBadge: {
+    marginTop: 10,
+    backgroundColor: `${GOLD}20`,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: `${GOLD}30`,
+  },
+  destBadgeText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    color: GOLD,
+  },
+
+  // ── Step 1: Calendar ───────────────────────────────────────────────────────
+  dateTags: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    marginBottom: 18,
+  },
+  dateTag: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: `${C.darkBrown}08`,
+    borderWidth: 1,
+    borderColor: `${C.darkBrown}12`,
+    gap: 2,
+  },
+  dateTagActive: {
+    backgroundColor: `${GOLD}12`,
+    borderColor: `${GOLD}40`,
+  },
+  dateTagLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: C.warmGray,
+    letterSpacing: 0.6,
+  },
+  dateTagVal: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: C.darkBrown,
+  },
+  calNav: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+    paddingHorizontal: 2,
+  },
+  calNavMonth: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: C.darkBrown,
+  },
+  calWeek: {
+    flexDirection: "row",
+    marginBottom: 4,
+  },
+  calWeekDay: {
+    flex: 1,
+    textAlign: "center",
+    fontFamily: "Inter_500Medium",
+    fontSize: 10,
+    color: C.warmGray,
+    letterSpacing: 0.4,
+  },
+  calGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  calCell: {
+    width: `${100 / 7}%`,
+    aspectRatio: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  calArr: {
+    backgroundColor: C.darkBrown,
+    borderRadius: 999,
+  },
+  calDep: {
+    backgroundColor: C.darkBrown,
+    borderRadius: 999,
+  },
+  calRange: {
+    backgroundColor: `${GOLD}16`,
+  },
+  calPast: {
+    opacity: 0.28,
+  },
+  calDayNum: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: C.darkBrown,
+  },
+  calDayNumSel: {
+    color: C.cream,
+    fontFamily: "Inter_600SemiBold",
+  },
+  calDayNumPast: {
+    color: C.warmGray,
+  },
+  calHint: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: C.warmGray,
+    textAlign: "center",
+    marginTop: 8,
+  },
+
+  // ── Step 2: Companion ──────────────────────────────────────────────────────
+  compGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  compChip: {
+    width: (SW - 40 - 48 - 10) / 2,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 18,
+    backgroundColor: `${C.darkBrown}06`,
+    borderWidth: 1,
+    borderColor: `${C.darkBrown}14`,
+    position: "relative",
+  },
+  compChipActive: {
+    backgroundColor: `${C.darkBrown}08`,
+    borderColor: GOLD,
+    borderWidth: 1.5,
+  },
+  compIcon: {
+    fontSize: 22,
+  },
+  compLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    color: C.darkBrown,
+  },
+  compLabelActive: {
+    fontFamily: "Inter_600SemiBold",
+    color: C.darkBrown,
+  },
+  compCheck: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: GOLD,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  // ── Step 3: Inspiration ────────────────────────────────────────────────────
   inspGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
+    marginTop: 4,
+    marginBottom: 4,
   },
   inspChip: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: C.warmBeige,
+    paddingHorizontal: 14,
+    borderRadius: 22,
+    backgroundColor: `${C.darkBrown}06`,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: `${C.darkBrown}14`,
   },
   inspChipActive: {
     backgroundColor: `${GOLD}12`,
-    borderColor: `${GOLD}40`,
+    borderColor: `${GOLD}55`,
   },
   inspIcon: {
     fontSize: 14,
@@ -492,32 +888,35 @@ const su = StyleSheet.create({
   inspLabel: {
     fontFamily: "Inter_500Medium",
     fontSize: 13,
-    color: C.warmGray,
+    color: C.darkBrown,
   },
   inspLabelActive: {
-    color: C.darkBrown,
     fontFamily: "Inter_600SemiBold",
+    color: C.darkBrown,
   },
 
-  vibeCol: {
-    gap: 8,
+  // ── Step 4: Budget ─────────────────────────────────────────────────────────
+  budgetCol: {
+    gap: 10,
+    marginTop: 4,
   },
-  vibeRow: {
+  budgetRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
-    paddingVertical: 14,
+    paddingVertical: 16,
     paddingHorizontal: 16,
-    borderRadius: 14,
-    backgroundColor: C.warmBeige,
+    borderRadius: 18,
+    backgroundColor: `${C.darkBrown}06`,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: `${C.darkBrown}12`,
   },
-  vibeRowActive: {
-    backgroundColor: `${GOLD}10`,
-    borderColor: `${GOLD}35`,
+  budgetRowActive: {
+    backgroundColor: `${GOLD}08`,
+    borderColor: `${GOLD}50`,
+    borderWidth: 1.5,
   },
-  vibeRadio: {
+  budgetRadio: {
     width: 20,
     height: 20,
     borderRadius: 10,
@@ -525,63 +924,145 @@ const su = StyleSheet.create({
     borderColor: C.border,
     alignItems: "center",
     justifyContent: "center",
-    flexShrink: 0,
   },
-  vibeRadioActive: {
+  budgetRadioActive: {
     borderColor: GOLD,
   },
-  vibeRadioDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
+  budgetDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: GOLD,
   },
-  vibeText: {
+  budgetText: {
     flex: 1,
-    gap: 1,
+    gap: 2,
   },
-  vibeLabel: {
+  budgetLabel: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 14,
-    color: C.charcoal,
-  },
-  vibeLabelActive: {
     color: C.darkBrown,
   },
-  vibeDesc: {
+  budgetLabelActive: {
+    color: C.darkBrown,
+  },
+  budgetDesc: {
     fontFamily: "Inter_400Regular",
     fontSize: 11,
     color: C.warmGray,
   },
+});
 
-  genBtn: {
+// ─────────────────────────────────────────────────────────────────────────────
+// Screen header
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ScreenHeader({
+  phase,
+  onBack,
+}: {
+  phase: "journey" | "loading" | "result";
+  onBack: () => void;
+}) {
+  const title =
+    phase === "result" ? "Seu Roteiro" :
+    phase === "loading" ? "Criando roteiro…" :
+    "";
+  const sub =
+    phase === "result" ? "Rio de Janeiro" :
+    phase === "loading" ? "Rio de Janeiro" :
+    "";
+
+  if (phase === "journey") return null;
+
+  return (
+    <View style={hd.wrap}>
+      <Pressable style={({ pressed }) => [hd.back, pressed && { opacity: 0.65 }]} onPress={onBack} hitSlop={10}>
+        <Feather name="arrow-left" size={20} color={C.darkBrown} />
+      </Pressable>
+      <View style={hd.center}>
+        <Text style={hd.title}>{title}</Text>
+        {sub ? <Text style={hd.sub}>{sub}</Text> : null}
+      </View>
+      <View style={hd.placeholder} />
+    </View>
+  );
+}
+
+const hd = StyleSheet.create({
+  wrap: {
     flexDirection: "row",
     alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  back: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: `${C.darkBrown}10`,
+    alignItems: "center",
     justifyContent: "center",
-    gap: 10,
-    marginTop: 28,
-    paddingVertical: 17,
-    borderRadius: 16,
-    backgroundColor: C.darkBrown,
-    borderWidth: 1,
-    borderColor: `${GOLD}30`,
-    boxShadow: `0px 6px 20px rgba(10,5,2,0.22)`,
   },
-  genBtnDisabled: {
-    backgroundColor: C.warmBeige,
-    borderColor: C.border,
-    boxShadow: "none",
+  center: {
+    flex: 1,
+    alignItems: "center",
   },
-  genBtnText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
-    color: C.cream,
-    letterSpacing: 0.2,
+  title: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 17,
+    color: C.darkBrown,
   },
-  genBtnTextDisabled: {
+  sub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
     color: C.warmGray,
   },
+  placeholder: {
+    width: 36,
+  },
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Loading phase — premium animated loader
+// ─────────────────────────────────────────────────────────────────────────────
+
+function LoadingPhase() {
+  const dot0 = useRef(new Animated.Value(0.3)).current;
+  const dot1 = useRef(new Animated.Value(0.3)).current;
+  const dot2 = useRef(new Animated.Value(0.3)).current;
+  const dots = [dot0, dot1, dot2];
+
+  useEffect(() => {
+    const animations = dots.map((dot, i) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(i * 260),
+          Animated.timing(dot, { toValue: 1, duration: 400, useNativeDriver: true }),
+          Animated.timing(dot, { toValue: 0.3, duration: 400, useNativeDriver: true }),
+          Animated.delay((dots.length - i - 1) * 260),
+        ])
+      )
+    );
+    animations.forEach((a) => a.start());
+    return () => animations.forEach((a) => a.stop());
+  }, []);
+
+  return (
+    <View style={sc.loadingWrap}>
+      <View style={sc.loadingIconRing}>
+        <Feather name="zap" size={22} color={GOLD} />
+      </View>
+      <Text style={sc.loadingText}>Estamos organizando sua viagem</Text>
+      <Text style={sc.loadingSubText}>Selecionando as melhores experiências para você</Text>
+      <View style={sc.loadingDots}>
+        {dots.map((dot, i) => (
+          <Animated.View key={i} style={[sc.loadingDot, { opacity: dot }]} />
+        ))}
+      </View>
+    </View>
+  );
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Result phase — day-by-day itinerary
@@ -599,26 +1080,21 @@ function ResultPhase({ result, hotelItem, totalPlaces, onReset }: ResultPhasePro
 
   function handleWhatsApp() {
     const msg = encodeURIComponent(
-      `Olá! Acabei de criar meu roteiro de ${totalDays} dias no Rio de Janeiro com o Lucky Trip. Pode me ajudar a refinar?`
+      `Olá! Criei meu roteiro de ${totalDays} dias no Rio de Janeiro com o Lucky Trip. Pode me ajudar a refinar?`
     );
     Linking.openURL(`https://wa.me/?text=${msg}`);
   }
 
   return (
     <>
-      {/* Hotel recommendation — shown first if user saved a hotel */}
+      {/* Hotel card */}
       {hotelItem && (
         <View style={re.hotelCard}>
-          <Image
-            source={hotelItem.image}
-            style={re.hotelImg}
-            resizeMode="cover"
-          />
+          <Image source={hotelItem.image} style={re.hotelImg} resizeMode="cover" />
           <LinearGradient
             colors={["transparent", "rgba(10,5,2,0.90)"]}
             locations={[0.3, 1]}
-            style={StyleSheet.absoluteFill}
-            pointerEvents="none"
+            style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}
           />
           <View style={re.hotelBadge}>
             <Text style={re.hotelBadgeText}>✦ HOSPEDAGEM RECOMENDADA</Text>
@@ -701,17 +1177,14 @@ function ResultPhase({ result, hotelItem, totalPlaces, onReset }: ResultPhasePro
 function ResultDayCard({ dia }: { dia: DiaRoteiro }) {
   return (
     <View style={re.dayCard}>
-      {/* Day label */}
       <View style={re.dayHeader}>
         <View style={re.dayNumBadge}>
           <Text style={re.dayNumText}>DIA {dia.numero}</Text>
         </View>
         <Text style={re.dayBairro}>{dia.bairro}</Text>
       </View>
-
-      {/* Periods */}
       {dia.periodos.map((periodo) => {
-        const icon = PERIODO_ICON[periodo.periodo] as any;
+        const icon  = PERIODO_ICON[periodo.periodo] as any;
         const label = PERIODO_LABEL[periodo.periodo];
         return (
           <View key={periodo.periodo} style={re.periodBlock}>
@@ -723,31 +1196,18 @@ function ResultDayCard({ dia }: { dia: DiaRoteiro }) {
             {periodo.items.map((item) => (
               <Pressable
                 key={item.id}
-                style={({ pressed }) => [
-                  re.itemRow,
-                  pressed && { opacity: 0.78 },
-                ]}
+                style={({ pressed }) => [re.itemRow, pressed && { opacity: 0.78 }]}
                 onPress={() => router.push(`/lugar/rio/${item.id}`)}
               >
-                {/* Thumbnail */}
-                <Image
-                  source={item.image}
-                  style={re.thumb}
-                  resizeMode="cover"
-                />
-                {/* Info */}
+                <Image source={item.image} style={re.thumb} resizeMode="cover" />
                 <View style={re.itemInfo}>
                   <Text style={re.itemName} numberOfLines={1}>{item.titulo}</Text>
                   <View style={re.itemMeta}>
                     <View style={re.catBadge}>
-                      <Text style={re.catBadgeText}>
-                        {CATEGORY_LABEL[item.categoria]}
-                      </Text>
+                      <Text style={re.catBadgeText}>{CATEGORY_LABEL[item.categoria]}</Text>
                     </View>
                     {item.localizacao ? (
-                      <Text style={re.itemLoc} numberOfLines={1}>
-                        {item.localizacao}
-                      </Text>
+                      <Text style={re.itemLoc} numberOfLines={1}>{item.localizacao}</Text>
                     ) : null}
                   </View>
                 </View>
@@ -925,77 +1385,75 @@ const re = StyleSheet.create({
   },
 
   dayCard: {
-    borderRadius: 16,
-    backgroundColor: C.white,
+    marginBottom: 20,
+    borderRadius: 20,
+    backgroundColor: C.warmBeige,
     borderWidth: 1,
     borderColor: C.border,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    marginBottom: 12,
-    boxShadow: `0px 2px 10px rgba(0,0,0,0.05)`,
+    overflow: "hidden",
   },
   dayHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    marginBottom: 16,
+    gap: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    backgroundColor: C.darkBrown,
+    borderBottomWidth: 1,
+    borderBottomColor: `${GOLD}18`,
   },
   dayNumBadge: {
-    backgroundColor: C.darkBrown,
+    backgroundColor: `${GOLD}18`,
     borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: `${GOLD}30`,
   },
   dayNumText: {
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
     fontSize: 9,
     color: GOLD,
     letterSpacing: 1.4,
-    textTransform: "uppercase",
   },
   dayBairro: {
-    fontFamily: "PlayfairDisplay_600SemiBold",
-    fontSize: 18,
-    color: C.darkBrown,
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 16,
+    color: C.cream,
     flex: 1,
   },
-
   periodBlock: {
-    marginBottom: 12,
+    paddingHorizontal: 16,
+    paddingTop: 14,
   },
   periodHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    marginBottom: 8,
+    marginBottom: 10,
   },
   periodLabel: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 10,
+    fontSize: 11,
     color: GOLD,
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
+    letterSpacing: 0.8,
   },
   periodLine: {
     flex: 1,
     height: 1,
-    backgroundColor: `${GOLD}14`,
+    backgroundColor: `${GOLD}20`,
   },
-
   itemRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    marginBottom: 12,
   },
   thumb: {
-    width: 48,
-    height: 48,
-    borderRadius: 10,
-    backgroundColor: C.sand,
-    flexShrink: 0,
+    width: 52,
+    height: 52,
+    borderRadius: 12,
+    backgroundColor: C.border,
   },
   itemInfo: {
     flex: 1,
@@ -1003,7 +1461,7 @@ const re = StyleSheet.create({
   },
   itemName: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
+    fontSize: 13,
     color: C.darkBrown,
   },
   itemMeta: {
@@ -1012,15 +1470,16 @@ const re = StyleSheet.create({
     gap: 6,
   },
   catBadge: {
-    backgroundColor: C.warmBeige,
-    borderRadius: 5,
+    backgroundColor: `${C.darkBrown}10`,
+    borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
   catBadgeText: {
     fontFamily: "Inter_500Medium",
-    fontSize: 10,
+    fontSize: 9,
     color: C.warmGray,
+    letterSpacing: 0.3,
   },
   itemLoc: {
     fontFamily: "Inter_400Regular",
@@ -1028,136 +1487,11 @@ const re = StyleSheet.create({
     color: C.warmGray,
     flex: 1,
   },
-
-  redoBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    marginTop: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "rgba(196,112,74,0.22)",
-  },
-  redoBtnText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 13,
-    color: C.terracotta,
-  },
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Custom header
-// ─────────────────────────────────────────────────────────────────────────────
-
-function ScreenHeader({
-  phase,
-  onBack,
-}: {
-  phase: "setup" | "result" | "loading";
-  onBack: () => void;
-}) {
-  const title =
-    phase === "result"  ? "Seu Roteiro"   :
-    phase === "loading" ? "Criando…"      :
-    "Criar Roteiro";
-
-  return (
-    <View style={hdr.wrap}>
-      <Pressable style={hdr.back} onPress={onBack} hitSlop={8}>
-        <Feather name="arrow-left" size={20} color={C.darkBrown} />
-      </Pressable>
-      <View style={hdr.center}>
-        <Text style={hdr.title}>{title}</Text>
-        <Text style={hdr.sub}>Rio de Janeiro</Text>
-      </View>
-      <View style={hdr.spacer} />
-    </View>
-  );
-}
-
-const hdr = StyleSheet.create({
-  wrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
-    backgroundColor: C.cream,
-  },
-  back: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: C.warmBeige,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  center: {
-    flex: 1,
-    alignItems: "center",
-    gap: 1,
-  },
-  title: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 17,
-    color: C.darkBrown,
-  },
-  sub: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    color: C.warmGray,
-  },
-  spacer: {
-    width: 36,
-  },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main screen
 // ─────────────────────────────────────────────────────────────────────────────
-
-// Premium loading screen — animated dots cycling through steps
-function LoadingPhase() {
-  const dot0 = useRef(new Animated.Value(0.3)).current;
-  const dot1 = useRef(new Animated.Value(0.3)).current;
-  const dot2 = useRef(new Animated.Value(0.3)).current;
-  const dots = [dot0, dot1, dot2];
-
-  useEffect(() => {
-    const animations = dots.map((dot, i) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(i * 260),
-          Animated.timing(dot, { toValue: 1, duration: 400, useNativeDriver: true }),
-          Animated.timing(dot, { toValue: 0.3, duration: 400, useNativeDriver: true }),
-          Animated.delay((dots.length - i - 1) * 260),
-        ])
-      )
-    );
-    animations.forEach((a) => a.start());
-    return () => animations.forEach((a) => a.stop());
-  }, []);
-
-  return (
-    <View style={sc.loadingWrap}>
-      <View style={sc.loadingIconRing}>
-        <Feather name="zap" size={22} color={GOLD} />
-      </View>
-      <Text style={sc.loadingText}>Estamos organizando sua viagem</Text>
-      <Text style={sc.loadingSubText}>
-        Selecionando as melhores experiências para você
-      </Text>
-      <View style={sc.loadingDots}>
-        {dots.map((dot, i) => (
-          <Animated.View key={i} style={[sc.loadingDot, { opacity: dot }]} />
-        ))}
-      </View>
-    </View>
-  );
-}
 
 export default function RoteiroScreen() {
   const insets    = useSafeAreaInsets();
@@ -1166,34 +1500,15 @@ export default function RoteiroScreen() {
 
   const { saved } = useGuia();
 
-  // Journey inputs
-  const [inspirations, setInspirations] = useState<Inspiration[]>([]);
-  const [vibe,         setVibe]         = useState<Vibe | null>("moderado");
-  const [nights,       setNights]       = useState<number>(3);
-  const [travelVibe,   setTravelVibe]   = useState<TravelVibe>("amigos");
-  const [budget,       setBudget]       = useState<BudgetStyle>("conforto");
+  const [result,     setResult]     = useState<ItineraryResult | null>(null);
+  const [generating, setGenerating] = useState(false);
 
-  // Result state
-  const [result,      setResult]      = useState<ItineraryResult | null>(null);
-  const [generating,  setGenerating]  = useState(false);
-
-  // Category counts for the summary card
-  const categoryCounts = saved.reduce<Record<SavedCategory, number>>(
-    (acc, item) => { acc[item.categoria] = (acc[item.categoria] ?? 0) + 1; return acc; },
-    { oQueFazer: 0, restaurante: 0, hotel: 0, lucky: 0 },
-  );
-
-  // Hotel item for result phase
-  const hotelItem = saved.find((s) => s.categoria === "hotel") ?? null;
+  const hotelItem   = saved.find((s) => s.categoria === "hotel") ?? null;
   const totalPlaces = saved.filter((s) => s.categoria !== "hotel").length;
 
-  function handleToggleInspiration(id: Inspiration) {
-    setInspirations((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
-  }
-
-  async function handleGenerate() {
+  async function handleGenerate({
+    nights, travelVibe, inspirations, budget, vibe,
+  }: JourneyGenerateProps) {
     if (generating) return;
     setGenerating(true);
 
@@ -1205,22 +1520,17 @@ export default function RoteiroScreen() {
         localizacao: s.localizacao,
       }));
 
-      // requestedDays comes directly from the nights stepper — this is the fix
-      // that ensures the engine produces a multi-day itinerary matching the trip duration.
-      const requestedDays = nights;
-
       const { data, error } = await supabase.functions.invoke("generate-itinerary", {
         body: {
           savedItems:   serializableItems,
           destination:  "Rio de Janeiro",
           preferences:  { inspirations, vibe, travelVibe, budget },
-          requestedDays,
+          requestedDays: nights,
         },
       });
 
       if (error || !data?.days) throw new Error(error?.message ?? "empty response");
 
-      // Re-hydrate items with full SavedItem (incl. image)
       const savedMap = new Map(saved.map((s) => [s.id, s]));
       const hydratedDays: DiaRoteiro[] = (data.days as DiaRoteiro[]).map((day) => ({
         ...day,
@@ -1245,52 +1555,52 @@ export default function RoteiroScreen() {
     }
   }
 
-  function handleBack() {
-    if (result) { setResult(null); } else { router.back(); }
-  }
-
-  const phase: "setup" | "result" | "loading" =
-    generating ? "loading" : result ? "result" : "setup";
+  const phase: "journey" | "loading" | "result" =
+    generating ? "loading" : result ? "result" : "journey";
 
   return (
     <View style={sc.root}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      <View style={{ paddingTop: topPad }}>
-        <ScreenHeader phase={phase} onBack={handleBack} />
+      {/* Atmospheric background — always rendered, blurred over in journey */}
+      <View style={[sc.heroBg, { pointerEvents: "none" }]}>
+        <LinearGradient
+          colors={[C.cream, "#EDE5D6", "#E4D9C5"]}
+          locations={[0, 0.5, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+        <Text style={sc.heroWatermark}>{"RIO\nDE\nJAN."}</Text>
+        <View style={sc.heroAccent} />
       </View>
 
-      {phase === "loading" ? (
-        <LoadingPhase />
-      ) : (
+      {/* Header (hidden in journey phase) */}
+      {phase !== "journey" && (
+        <View style={{ paddingTop: topPad }}>
+          <ScreenHeader
+            phase={phase}
+            onBack={() => { setResult(null); setGenerating(false); }}
+          />
+        </View>
+      )}
+
+      {/* Phase content */}
+      {phase === "journey" && (
+        <JourneyOverlay savedCount={saved.length} onGenerate={handleGenerate} />
+      )}
+
+      {phase === "loading" && <LoadingPhase />}
+
+      {phase === "result" && (
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[sc.content, { paddingBottom: bottomPad + 40 }]}
         >
-          {phase === "setup" ? (
-            <SetupPhase
-              savedCount={saved.length}
-              categoryCounts={categoryCounts}
-              inspirations={inspirations}
-              vibe={vibe}
-              nights={nights}
-              travelVibe={travelVibe}
-              budget={budget}
-              onToggleInspiration={handleToggleInspiration}
-              onSetVibe={setVibe}
-              onSetNights={setNights}
-              onSetTravelVibe={setTravelVibe}
-              onSetBudget={setBudget}
-              onGenerate={handleGenerate}
-            />
-          ) : (
-            <ResultPhase
-              result={result!}
-              hotelItem={hotelItem}
-              totalPlaces={totalPlaces}
-              onReset={() => setResult(null)}
-            />
-          )}
+          <ResultPhase
+            result={result!}
+            hotelItem={hotelItem}
+            totalPlaces={totalPlaces}
+            onReset={() => setResult(null)}
+          />
         </ScrollView>
       )}
     </View>
@@ -1301,6 +1611,30 @@ const sc = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: C.cream,
+  },
+  heroBg: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: "hidden",
+  },
+  heroWatermark: {
+    position: "absolute",
+    right: -8,
+    bottom: 60,
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 64,
+    lineHeight: 68,
+    color: `${C.darkBrown}07`,
+    textAlign: "right",
+    letterSpacing: -2,
+  },
+  heroAccent: {
+    position: "absolute",
+    top: "30%",
+    left: -40,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: `${GOLD}06`,
   },
   content: {
     paddingHorizontal: 24,
@@ -1350,3 +1684,4 @@ const sc = StyleSheet.create({
     backgroundColor: GOLD,
   },
 });
+
