@@ -825,11 +825,22 @@ export default function RoteiroScreen() {
         localizacao: s.localizacao,
       }));
 
+      // Derive trip length from vibe and item count
+      const VIBE_PER_DAY: Record<string, number> = {
+        tranquilo: 3,
+        moderado:  4,
+        intenso:   6,
+      };
+      const actionableCount = saved.filter((s) => s.categoria !== "hotel").length;
+      const perDay          = VIBE_PER_DAY[vibe ?? "moderado"] ?? 4;
+      const requestedDays   = Math.max(1, Math.ceil(actionableCount / perDay));
+
       const { data, error } = await supabase.functions.invoke("lucky-trip-ai", {
         body: {
-          savedItems:  serializableItems,
-          destination: "Rio de Janeiro",
-          preferences: { inspirations, vibe },
+          savedItems:   serializableItems,
+          destination:  "Rio de Janeiro",
+          preferences:  { inspirations, vibe },
+          requestedDays,
         },
       });
 

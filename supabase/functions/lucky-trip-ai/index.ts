@@ -14,9 +14,9 @@ type Vibe          = "tranquilo" | "moderado" | "intenso";
 type Inspiration   = "gastronomy" | "culture" | "beach" | "adventure" | "lucky";
 
 interface SerializableItem {
-  id:         string;
-  titulo:     string;
-  categoria:  SavedCategory;
+  id:          string;
+  titulo:      string;
+  categoria:   SavedCategory;
   localizacao: string;
 }
 
@@ -26,9 +26,12 @@ interface Preferences {
 }
 
 interface RequestBody {
-  savedItems:  SerializableItem[];
-  destination: string;
-  preferences: Preferences;
+  savedItems:    SerializableItem[];
+  destination:   string;
+  preferences:   Preferences;
+  requestedDays?: number;
+  startDate?:    string;
+  endDate?:      string;
 }
 
 interface DiaPeriodo {
@@ -53,6 +56,24 @@ interface ItineraryResult {
   days: DiaRoteiro[];
 }
 
+// Gemini output shape
+interface GeminiDayItem {
+  time:     "morning" | "afternoon" | "evening";
+  place_id: string;
+  name:     string;
+}
+
+interface GeminiDay {
+  day:   number;
+  area:  string;
+  items: GeminiDayItem[];
+}
+
+interface GeminiResult {
+  destination: string;
+  days:        GeminiDay[];
+}
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const CATEGORY_AFFINITY: Record<Inspiration, Partial<Record<SavedCategory, number>>> = {
@@ -63,39 +84,28 @@ const CATEGORY_AFFINITY: Record<Inspiration, Partial<Record<SavedCategory, numbe
   lucky:      { restaurante: 1, oQueFazer: 1, lucky: 3, hotel: 0 },
 };
 
-const VIBE_MAX_ITEMS: Record<Vibe, number> = {
+const VIBE_ITEMS_PER_DAY: Record<Vibe, number> = {
   tranquilo: 3,
-  moderado:  5,
-  intenso:   99,
+  moderado:  4,
+  intenso:   6,
 };
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// Map Gemini time slot → DiaRoteiro periodo
+const TIME_TO_PERIODO: Record<string, PeriodoDia> = {
+  morning:   "manha",
+  afternoon: "tarde",
+  evening:   "noite",
+};
 
-function tipoFromCategoria(cat: SavedCategory): "atividade" | "restaurante" | "hotel" {
-  if (cat === "restaurante") return "restaurante";
-  if (cat === "hotel")       return "hotel";
-  return "atividade";
-}
-
-function itemScore(cat: SavedCategory, inspirations: Inspiration[]): number {
-  if (!inspirations.length) return 0;
-  return inspirations.reduce(
-    (sum, ins) => sum + (CATEGORY_AFFINITY[ins][cat] ?? 0),
-    0,
-  );
-}
-
-// ── getSavedPlacesForUser ────────────────────────────────────────────────────
-// Items are passed from the frontend (already resolved). This function validates
-// and normalises them so the rest of the pipeline is always clean.
+// ── getSavedPlacesForUser ─────────────────────────────────────────────────────
 
 function getSavedPlacesForUser(raw: SerializableItem[]): SerializableItem[] {
-  return raw.filter(
+  return (raw ?? []).filter(
     (i) =>
       i &&
-      typeof i.id         === "string" &&
-      typeof i.titulo     === "string" &&
-      typeof i.categoria  === "string" &&
+      typeof i.id          === "string" &&
+      typeof i.titulo      === "string" &&
+      typeof i.categoria   === "string" &&
       typeof i.localizacao === "string",
   );
 }
@@ -107,6 +117,18 @@ function inferDestinationFromSavedPlaces(
   fallback: string,
 ): string {
   return fallback || "Rio de Janeiro";
+}
+
+// ── computeTripLength ─────────────────────────────────────────────────────────
+
+function computeTripLength(
+  items: SerializableItem[],
+  vibe: Vibe | null,
+  requested?: number,
+): number {
+  if (requested && requested > 0) return requested;
+  const perDay = VIBE_ITEMS_PER_DAY[vibe ?? "moderado"];
+  return Math.max(1, Math.ceil(items.length / perDay));
 }
 
 // ── groupPlacesByArea ─────────────────────────────────────────────────────────
@@ -123,141 +145,241 @@ function groupPlacesByArea(
   return map;
 }
 
-// ── distributePlacesIntoDays ──────────────────────────────────────────────────
+// ── distributePlacesIntoDays (deterministic fallback) ─────────────────────────
+
+function itemScore(cat: SavedCategory, inspirations: Inspiration[]): number {
+  if (!inspirations.length) return 0;
+  return inspirations.reduce(
+    (sum, ins) => sum + (CATEGORY_AFFINITY[ins][cat] ?? 0),
+    0,
+  );
+}
+
+function tipoFromCategoria(cat: SavedCategory): "atividade" | "restaurante" | "hotel" {
+  if (cat === "restaurante") return "restaurante";
+  if (cat === "hotel")       return "hotel";
+  return "atividade";
+}
 
 function distributePlacesIntoDays(
-  byArea: Map<string, SerializableItem[]>,
+  items: SerializableItem[],
   preferences: Preferences,
+  tripLength: number,
 ): DiaRoteiro[] {
   const { inspirations, vibe } = preferences;
-  let diaNum = 1;
+
+  // Sort by affinity then group by area
+  const sorted = inspirations.length > 0
+    ? [...items].sort((a, b) => itemScore(b.categoria, inspirations) - itemScore(a.categoria, inspirations))
+    : [...items];
+
+  const byArea = groupPlacesByArea(sorted);
+  const perDay = VIBE_ITEMS_PER_DAY[vibe ?? "moderado"];
+  let diaNum   = 1;
   const days: DiaRoteiro[] = [];
 
   for (const [bairro, areaItems] of byArea) {
     const atividades   = areaItems.filter(i => tipoFromCategoria(i.categoria) === "atividade");
     const restaurantes = areaItems.filter(i => tipoFromCategoria(i.categoria) === "restaurante");
 
-    if (inspirations.length > 0) {
-      atividades.sort((a, b) => itemScore(b.categoria, inspirations) - itemScore(a.categoria, inspirations));
-      restaurantes.sort((a, b) => itemScore(b.categoria, inspirations) - itemScore(a.categoria, inspirations));
+    // Chunk area items into days based on perDay cap
+    const allForArea = [
+      ...atividades.slice(0, Math.ceil(perDay * 0.6)),
+      ...restaurantes,
+    ];
+
+    const chunks: SerializableItem[][] = [];
+    for (let i = 0; i < allForArea.length; i += perDay) {
+      chunks.push(allForArea.slice(i, i + perDay));
     }
 
-    const meio   = Math.ceil(atividades.length / 2);
-    const manha  = atividades.slice(0, meio);
-    const tarde  = atividades.slice(meio);
-    const almoco = restaurantes.slice(0, 1);
-    const noite  = restaurantes.slice(1);
+    for (const chunk of chunks) {
+      const periodos: DiaPeriodo[] = [];
+      const atv  = chunk.filter(i => tipoFromCategoria(i.categoria) === "atividade");
+      const rest = chunk.filter(i => tipoFromCategoria(i.categoria) === "restaurante");
 
-    const periodos: DiaPeriodo[] = [];
-    if (manha.length)  periodos.push({ periodo: "manha",  items: manha  });
-    if (almoco.length) periodos.push({ periodo: "almoco", items: almoco });
-    if (tarde.length)  periodos.push({ periodo: "tarde",  items: tarde  });
-    if (noite.length)  periodos.push({ periodo: "noite",  items: noite  });
+      const meio   = Math.ceil(atv.length / 2);
+      const manha  = atv.slice(0, meio);
+      const tarde  = atv.slice(meio);
+      const almoco = rest.slice(0, 1);
+      const noite  = rest.slice(1);
 
-    if (!periodos.length) continue;
-    days.push({ numero: diaNum++, bairro, periodos });
-  }
+      if (manha.length)  periodos.push({ periodo: "manha",  items: manha  });
+      if (almoco.length) periodos.push({ periodo: "almoco", items: almoco });
+      if (tarde.length)  periodos.push({ periodo: "tarde",  items: tarde  });
+      if (noite.length)  periodos.push({ periodo: "noite",  items: noite  });
 
-  if (!vibe) return days;
-
-  const maxItems = VIBE_MAX_ITEMS[vibe];
-  const capped: DiaRoteiro[] = [];
-  let num = 1;
-
-  for (const dia of days) {
-    let remaining = maxItems;
-    const cappedPeriodos: DiaPeriodo[] = [];
-
-    for (const p of dia.periodos) {
-      if (remaining <= 0) break;
-      const sliced = p.items.slice(0, remaining);
-      remaining -= sliced.length;
-      if (sliced.length) cappedPeriodos.push({ ...p, items: sliced });
-    }
-
-    if (cappedPeriodos.length) {
-      capped.push({ ...dia, numero: num++, periodos: cappedPeriodos });
+      if (periodos.length) days.push({ numero: diaNum++, bairro, periodos });
     }
   }
 
-  return capped;
+  // Renumber sequentially
+  return days
+    .slice(0, Math.max(tripLength, days.length))
+    .map((d, i) => ({ ...d, numero: i + 1 }));
 }
 
-// ── refineItineraryWithGemini ─────────────────────────────────────────────────
-// Optional pass — gracefully skipped if GEMINI_API_KEY is not set.
-// Sends compact structured data; Gemini may only reorder items within periods.
+// ── generateItineraryWithGemini (primary) ─────────────────────────────────────
+// Uses the full generation prompt — Gemini builds the complete itinerary.
+// Falls back to distributePlacesIntoDays on any failure.
 
-async function refineItineraryWithGemini(
-  days: DiaRoteiro[],
-  preferences: Preferences,
+async function generateItineraryWithGemini(
+  items: SerializableItem[],
   destination: string,
-): Promise<DiaRoteiro[]> {
+  preferences: Preferences,
+  tripLength: number,
+  startDate: string,
+  endDate: string,
+): Promise<DiaRoteiro[] | null> {
   const apiKey = Deno.env.get("GEMINI_API_KEY");
-  if (!apiKey || !days.length) return days;
+  if (!apiKey) return null;
 
-  const compact = days.map((d) => ({
-    numero: d.numero,
-    bairro: d.bairro,
-    periodos: d.periodos.map((p) => ({
-      periodo: p.periodo,
-      items: p.items.map((i) => ({ id: i.id, titulo: i.titulo, categoria: i.categoria })),
-    })),
+  // Build a compact places array for the prompt
+  const places = items.map((i) => ({
+    id:       i.id,
+    name:     i.titulo,
+    category: i.categoria,
+    area:     i.localizacao || "Rio de Janeiro",
   }));
 
-  const prompt =
-    `You are a travel planner for ${destination}.\n` +
-    `Below is a structured JSON itinerary. Return an improved version.\n` +
-    `Rules:\n` +
-    `- ONLY reorder items within each periodo for better flow\n` +
-    `- Do NOT add, remove, or rename any place\n` +
-    `- Do NOT change bairros, IDs, or categories\n` +
-    `- Keep the same JSON structure exactly\n` +
-    `User preferences: inspirations=[${preferences.inspirations.join(",")}], vibe=${preferences.vibe ?? "moderado"}\n\n` +
-    `JSON:\n${JSON.stringify(compact)}\n\n` +
-    `Return ONLY the JSON array. No markdown, no prose.`;
+  const prompt = `
+You are an expert travel planner generating structured itineraries.
+
+Your job is to create a COMPLETE travel plan.
+
+CRITICAL RULES (MUST FOLLOW):
+- You MUST create EXACTLY ${tripLength} days
+- You MUST distribute ALL places across days
+- You CANNOT put all places in one day
+- You MUST spread places evenly across days
+- Each day MUST have at least 2 items
+- Prefer 2–4 items per day depending on total places
+- Group places by proximity (area)
+- Do NOT invent places
+- Use ONLY the provided places
+- Output STRICT JSON (no markdown, no text)
+
+TIME LOGIC:
+- morning → attractions, experiences (oQueFazer, lucky)
+- afternoon → attractions or light activities
+- evening → restaurants (restaurante) or nightlife
+
+USER CONTEXT:
+Destination: ${destination}
+Trip length: ${tripLength} days
+Start date: ${startDate}
+End date: ${endDate}
+
+Preferences:
+${JSON.stringify({ inspirations: preferences.inspirations, vibe: preferences.vibe })}
+
+Places:
+${JSON.stringify(places)}
+
+OUTPUT FORMAT (STRICT):
+{
+  "destination": "${destination}",
+  "days": [
+    {
+      "day": 1,
+      "area": "string",
+      "items": [
+        {
+          "time": "morning",
+          "place_id": "id",
+          "name": "name"
+        },
+        {
+          "time": "afternoon",
+          "place_id": "id",
+          "name": "name"
+        },
+        {
+          "time": "evening",
+          "place_id": "id",
+          "name": "name"
+        }
+      ]
+    }
+  ]
+}
+
+VALIDATION BEFORE RETURN:
+- Check if number of days == ${tripLength}
+- Check if places are distributed
+- Check if no day is empty
+- Check if JSON is valid
+
+If any rule is broken, FIX before returning.
+You are NOT allowed to return fewer than ${tripLength} days.
+You are NOT allowed to cluster all items in one day.
+Failure to comply is an error.
+`.trim();
 
   try {
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
-        method: "POST",
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.2, maxOutputTokens: 2048 },
+          generationConfig: {
+            temperature:     0.3,
+            maxOutputTokens: 4096,
+          },
         }),
       },
     );
 
-    if (!res.ok) return days;
+    if (!res.ok) return null;
 
-    const data   = await res.json();
-    const text   = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-    const clean  = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-    const refined = JSON.parse(clean) as typeof compact;
+    const data  = await res.json();
+    const text  = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const clean = text
+      .replace(/```json\n?/gi, "")
+      .replace(/```\n?/g, "")
+      .trim();
 
-    if (!Array.isArray(refined) || !refined.length) return days;
+    const parsed: GeminiResult = JSON.parse(clean);
+    if (!parsed?.days?.length) return null;
 
-    // Re-hydrate full items from the original days map
-    const itemMap = new Map<string, SerializableItem>();
-    for (const dia of days) {
-      for (const p of dia.periodos) {
-        for (const item of p.items) itemMap.set(item.id, item);
-      }
-    }
+    // Build a lookup so we can re-attach full SerializableItem data by place_id
+    const itemMap = new Map(items.map((i) => [i.id, i]));
 
-    return refined.map((d, i) => ({
-      numero: i + 1,
-      bairro: d.bairro,
-      periodos: d.periodos.map((p) => ({
-        periodo: p.periodo as PeriodoDia,
-        items: p.items
-          .map((ri) => itemMap.get(ri.id))
-          .filter(Boolean) as SerializableItem[],
-      })).filter((p) => p.items.length > 0),
-    })).filter((d) => d.periodos.length > 0);
+    const days: DiaRoteiro[] = parsed.days
+      .map((gDay) => {
+        // Group items by time slot → periodo
+        const byTime = new Map<PeriodoDia, SerializableItem[]>();
+
+        for (const gItem of gDay.items ?? []) {
+          const periodo = TIME_TO_PERIODO[gItem.time] ?? "tarde";
+          const full    = itemMap.get(gItem.place_id);
+          if (!full) continue; // skip invented places
+
+          if (!byTime.has(periodo)) byTime.set(periodo, []);
+          byTime.get(periodo)!.push(full);
+        }
+
+        // Preserve natural period order: manha, almoco, tarde, noite
+        const ORDER: PeriodoDia[] = ["manha", "almoco", "tarde", "noite"];
+        const periodos: DiaPeriodo[] = ORDER
+          .filter((p) => byTime.has(p))
+          .map((p) => ({ periodo: p, items: byTime.get(p)! }));
+
+        return {
+          numero:   gDay.day,
+          bairro:   gDay.area || "Rio de Janeiro",
+          periodos,
+        };
+      })
+      .filter((d) => d.periodos.length > 0);
+
+    if (!days.length) return null;
+
+    return days.map((d, i) => ({ ...d, numero: i + 1 }));
   } catch (_) {
-    return days;
+    return null;
   }
 }
 
@@ -271,18 +393,27 @@ serve(async (req) => {
   try {
     const body: RequestBody = await req.json();
     const {
-      savedItems  = [],
-      destination = "Rio de Janeiro",
-      preferences = { inspirations: [], vibe: "moderado" },
+      savedItems    = [],
+      destination   = "Rio de Janeiro",
+      preferences   = { inspirations: [], vibe: "moderado" },
+      requestedDays,
+      startDate     = "",
+      endDate       = "",
     } = body;
 
     const items      = getSavedPlacesForUser(savedItems);
     const actionable = items.filter((i) => i.categoria !== "hotel");
     const dest       = inferDestinationFromSavedPlaces(actionable, destination);
-    const byArea     = groupPlacesByArea(actionable);
-    let days         = distributePlacesIntoDays(byArea, preferences);
+    const tripLength = computeTripLength(actionable, preferences.vibe ?? "moderado", requestedDays);
 
-    days = await refineItineraryWithGemini(days, preferences, dest);
+    // Try AI-first generation; fall back to deterministic if unavailable
+    let days =
+      await generateItineraryWithGemini(
+        actionable, dest, preferences, tripLength, startDate, endDate,
+      ) ??
+      distributePlacesIntoDays(actionable, preferences, tripLength);
+
+    // Always ensure sequential numbering
     days = days.map((d, i) => ({ ...d, numero: i + 1 }));
 
     const result: ItineraryResult = {
