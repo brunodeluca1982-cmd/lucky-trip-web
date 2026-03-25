@@ -172,7 +172,7 @@ async function enrichPlaces(
   const [oqResult, luckyResult, restResult] = await Promise.all([
     oqIds.length > 0
       ? supa.from("o_que_fazer_rio")
-          .select("id,nome,bairro,tags_ia,momento_ideal,vibe,energia,duracao_media,categoria_experiencia,perfil_ideal")
+          .select("id,nome,bairro,categoria,tags_ia,momento_ideal,vibe,energia,duracao_media")
           .in("id", oqIds)
       : Promise.resolve({ data: [] }),
     luckyIds.length > 0
