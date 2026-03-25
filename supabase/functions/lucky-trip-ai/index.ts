@@ -273,54 +273,107 @@ function buildDraft(
   return days.map((day, i) => ({ ...day, numero: i + 1 }));
 }
 
-// ── Gemini refinement (secondary — draft already built) ────────────────────────
-// Sends the structured draft to Gemini for flow-level refinement only.
-// Gemini may ONLY reorder items within existing periods — it cannot add,
-// remove, or reassign items to different days.
+// ── Best-time → PeriodoDia mapping ────────────────────────────────────────────
 
-async function refineWithGemini(
-  draft:       DiaRoteiro[],
+const BEST_TIME_TO_PERIODO: Record<string, PeriodoDia> = {
+  morning:   "manha",
+  lunch:     "almoco",
+  afternoon: "tarde",
+  evening:   "noite",
+  night:     "noite",
+  // Portuguese aliases
+  manha:     "manha",
+  almoco:    "almoco",
+  tarde:     "tarde",
+  noite:     "noite",
+};
+
+function bestTimeToPeriodo(bestTime: string, categoria: SavedCategory): PeriodoDia {
+  const mapped = BEST_TIME_TO_PERIODO[bestTime?.toLowerCase?.() ?? ""];
+  if (mapped) return mapped;
+  // Fallback by category when best_time is missing or unknown
+  if (categoria === "restaurante") return "almoco";
+  return "manha";
+}
+
+// ── Gemini skeleton-fill (secondary step) ────────────────────────────────────
+// Architecture: the number of days is PRE-DEFINED (the skeleton).
+// Gemini can ONLY assign places into those pre-built slots.
+// It cannot invent days, merge days, or change the total count.
+//
+// If Gemini fails or returns an invalid structure, buildDraft() result is used.
+
+async function fillSkeletonWithGemini(
+  items:       SerializableItem[],
+  tripLength:  number,
   destination: string,
   preferences: Preferences,
+  fallback:    DiaRoteiro[],
 ): Promise<DiaRoteiro[]> {
   const apiKey = Deno.env.get("GEMINI_API_KEY");
-  if (!apiKey || !draft.length) return draft;
+  if (!apiKey || !items.length) return fallback;
 
-  // Build a compact representation for Gemini (no excess data)
-  const compact = draft.map((d) => ({
-    day:      d.numero,
-    area:     d.bairro,
-    periodos: d.periodos.map((p) => ({
-      periodo: p.periodo,
-      items:   p.items.map((i) => ({
-        id:       i.id,
-        name:     i.titulo,
-        category: i.categoria,
-        area:     i.localizacao,
-      })),
-    })),
+  // 1. Build the empty skeleton — day count is locked
+  const skeleton = Array.from({ length: tripLength }, (_, i) => ({
+    day:   i + 1,
+    items: [] as unknown[],
   }));
 
-  const prompt = `You are a Rio de Janeiro travel expert optimizing a trip itinerary.
+  const totalPlaces = items.length;
+  const itemsPerDay = Math.ceil(totalPlaces / tripLength);
 
-Below is a structured itinerary draft. Your ONLY job is to improve the ORDER of items within each período for better geographic flow and realistic pacing.
+  // 2. Compact place list for the prompt (only what Gemini needs)
+  const places = items.map((i) => ({
+    place_id:  i.id,
+    name:      i.titulo,
+    category:  i.categoria,
+    area:      i.localizacao || "Rio de Janeiro",
+    zone:      getZone(i.localizacao),
+    best_time: i.categoria === "restaurante" ? "lunch" : "morning",
+  }));
 
-STRICT RULES:
-- Do NOT add any new places
-- Do NOT remove any places
-- Do NOT move items between different days
-- Do NOT move items between different períodos
-- Only reorder items within each período
-- Return the same JSON structure exactly
-- Output ONLY the JSON array — no markdown, no prose, no explanation
+  const prompt =
+`You are refining a pre-structured itinerary for ${destination}.
 
-User preferences: inspirations=${preferences.inspirations.join(",") || "any"}, vibe=${preferences.vibe ?? "moderado"}
-Destination: ${destination}
+The number of days is already defined and MUST NOT be changed.
 
-Draft to refine:
-${JSON.stringify(compact)}
+You MUST fill each day with places.
+You MUST NOT remove or merge days.
+You MUST distribute places across ALL days.
+Each day should contain around ${itemsPerDay} items.
 
-Return ONLY a valid JSON array with the same shape. Fix item order within each período for geographic flow.`;
+INPUT STRUCTURE:
+${JSON.stringify(skeleton)}
+
+PLACES:
+${JSON.stringify(places)}
+
+RULES:
+- Assign places to each day
+- Balance distribution evenly (around ${itemsPerDay} per day)
+- Group by proximity — prefer same or adjacent zone numbers on the same day
+- Respect best_time and category (restaurants → lunch, attractions → morning, beaches → afternoon, bars → evening)
+- Do not leave any day empty
+- Do not put all places in one day
+- Do not invent new places — only use the places listed above
+- User vibe: ${preferences.vibe ?? "moderado"}, inspirations: ${preferences.inspirations.join(",") || "any"}
+
+Return JSON in this EXACT structure (no other text):
+[
+  {
+    "day": 1,
+    "area": "main area name",
+    "items": [
+      { "place_id": "id", "name": "name", "best_time": "morning|lunch|afternoon|evening" }
+    ]
+  }
+]
+
+VALIDATION BEFORE RETURN:
+- Total days must equal ${tripLength}
+- Every day must have at least 1 item
+- All ${totalPlaces} places must appear exactly once
+- If any rule is broken, fix it before returning`;
 
   try {
     const res = await fetch(
@@ -330,48 +383,70 @@ Return ONLY a valid JSON array with the same shape. Fix item order within each p
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.2, maxOutputTokens: 3072 },
+          generationConfig: { temperature: 0.3, maxOutputTokens: 4096 },
         }),
       },
     );
 
-    if (!res.ok) return draft;
+    if (!res.ok) return fallback;
 
     const data  = await res.json();
-    const text  = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-    const clean = text
+    const raw   = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const clean = raw
       .replace(/```json\n?/gi, "")
       .replace(/```\n?/g, "")
       .trim();
 
-    const refined = JSON.parse(clean) as typeof compact;
-    if (!Array.isArray(refined) || refined.length !== draft.length) return draft;
+    const parsed = JSON.parse(clean) as Array<{
+      day:   number;
+      area:  string;
+      items: Array<{ place_id: string; name: string; best_time: string }>;
+    }>;
 
-    // Build item lookup from original draft so we re-attach full SerializableItem
-    const itemMap = new Map<string, SerializableItem>();
-    for (const day of draft) {
-      for (const p of day.periodos) {
-        for (const item of p.items) itemMap.set(item.id, item);
-      }
-    }
+    // Validate day count matches skeleton
+    if (!Array.isArray(parsed) || parsed.length !== tripLength) return fallback;
 
-    const result: DiaRoteiro[] = refined.map((rd, i) => ({
-      numero:   i + 1,
-      bairro:   rd.area || draft[i]?.bairro || "Rio de Janeiro",
-      periodos: rd.periodos
-        .map((rp) => ({
-          periodo: rp.periodo as PeriodoDia,
-          items:   rp.items
-            .map((ri: { id: string }) => itemMap.get(ri.id))
-            .filter(Boolean) as SerializableItem[],
-        }))
-        .filter((p) => p.items.length > 0),
-    })).filter((d) => d.periodos.length > 0);
+    // Build item lookup so we re-attach full SerializableItem by place_id
+    const itemMap = new Map(items.map((i) => [i.id, i]));
 
-    if (result.length !== draft.length) return draft;
-    return result;
+    const days: DiaRoteiro[] = parsed
+      .map((gDay, idx) => {
+        if (!gDay.items?.length) return null;
+
+        // Group items by best_time → periodo
+        const byPeriodo = new Map<PeriodoDia, SerializableItem[]>();
+
+        for (const gi of gDay.items) {
+          const full = itemMap.get(gi.place_id);
+          if (!full) continue; // Gemini cannot invent places
+
+          const periodo = bestTimeToPeriodo(gi.best_time, full.categoria);
+          if (!byPeriodo.has(periodo)) byPeriodo.set(periodo, []);
+          byPeriodo.get(periodo)!.push(full);
+        }
+
+        // Build periodos in canonical order
+        const ORDER: PeriodoDia[] = ["manha", "almoco", "tarde", "noite"];
+        const periodos: DiaPeriodo[] = ORDER
+          .filter((p) => byPeriodo.has(p) && byPeriodo.get(p)!.length > 0)
+          .map((p) => ({ periodo: p, items: byPeriodo.get(p)! }));
+
+        if (!periodos.length) return null;
+
+        return {
+          numero:   idx + 1,
+          bairro:   gDay.area || "Rio de Janeiro",
+          periodos,
+        } as DiaRoteiro;
+      })
+      .filter(Boolean) as DiaRoteiro[];
+
+    // Require that the filled result has exactly tripLength valid days
+    if (days.length !== tripLength) return fallback;
+
+    return days;
   } catch (_) {
-    return draft;
+    return fallback;
   }
 }
 
@@ -437,13 +512,22 @@ serve(async (req) => {
       requestedDays,
     );
 
-    // 2. Build a geographically coherent, time-correct draft deterministically
-    let days = buildDraft(actionable, preferences, tripLength);
+    // 2. Build a deterministic draft — this is the guaranteed fallback
+    const deterministicDraft = buildDraft(actionable, preferences, tripLength);
 
-    // 3. Refine ordering with Gemini (graceful fallback if unavailable)
-    days = await refineWithGemini(days, dest, preferences);
+    // 3. Skeleton-fill with Gemini:
+    //    - Pre-builds empty day slots (count locked to tripLength)
+    //    - Gemini assigns places into those slots only
+    //    - Falls back to deterministicDraft on any failure
+    let days = await fillSkeletonWithGemini(
+      actionable,
+      tripLength,
+      dest,
+      preferences,
+      deterministicDraft,
+    );
 
-    // 4. Validate — fix any items lost during refinement
+    // 4. Validate — fix any items dropped by Gemini
     days = validateAndFix(days, tripLength, actionable);
 
     const result: ItineraryResult = {
