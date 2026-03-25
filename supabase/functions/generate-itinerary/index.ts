@@ -1,14 +1,19 @@
 /**
  * generate-itinerary/index.ts
  *
- * Pipeline:
- *   1. Receive saved items (id + titulo + categoria + localizacao)
- *   2. Enrich each from Supabase (o_que_fazer_rio, restaurantes)
- *   3. Attach neighborhood metadata (stay_neighborhoods) per bairro
- *   4. Deterministic pre-processing: zone clustering → skeleton build
- *   5. Gemini skeleton-fill (locked day count) with full metadata
- *   6. Validate — fix gaps, renumber
- *   7. Return DiaRoteiro[] format (compatible with existing UI)
+ * Five deterministic steps BEFORE any AI call:
+ *
+ *  Step 1 — Normalize: unify o_que_fazer_rio + restaurantes into one EnrichedPlace type
+ *  Step 2 — Enrich: attach neighborhood metadata (stay_neighborhoods) per bairro
+ *  Step 3 — Classify: assign best_periodo to each place using metadata hard signals
+ *  Step 4 — Cluster: group places by geographic coherence (zone + neighborhood proximity)
+ *  Step 5 — Build: construct fully populated DiaRoteiro[] — Gemini gets a finished draft
+ *
+ *  Gemini refinement (step 6): receives the complete draft; may ONLY reorder items
+ *  within each período for better flow — cannot change days, add/remove places, or
+ *  reassign to different períodos.
+ *
+ *  Step 7 — Validate: re-attach any places dropped during refinement.
  */
 
 import { serve }        from "https://deno.land/std@0.168.0/http/server.ts";
@@ -27,9 +32,9 @@ type SavedCategory = "oQueFazer" | "restaurante" | "hotel" | "lucky";
 type PeriodoDia    = "manha" | "almoco" | "tarde" | "noite";
 
 interface SavedItemInput {
-  id:          string;
-  titulo:      string;
-  categoria:   SavedCategory;
+  id:           string;
+  titulo:       string;
+  categoria:    SavedCategory;
   localizacao?: string;
 }
 
@@ -39,38 +44,42 @@ interface Preferences {
 }
 
 interface RequestBody {
-  savedItems:    SavedItemInput[];
-  destination?:  string;
-  preferences?:  Preferences;
+  savedItems:     SavedItemInput[];
+  destination?:   string;
+  preferences?:   Preferences;
   requestedDays?: number;
 }
 
-// Enriched place — combines saved item + DB metadata + neighborhood context
+/** Fully enriched place — unified source of truth for all 5 deterministic steps */
 interface EnrichedPlace {
+  // ── Identity
   id:            string;
   name:          string;
   categoria:     SavedCategory;
-  area:          string;              // bairro
-  zone:          number;              // geographic zone 1-6
-  momento_ideal: string[];           // ["morning","afternoon","sunset"]
-  tags:          string[];
-  vibe_tags:     string[];
-  energia:       string;             // "low" | "medium" | "high"
-  duracao:       string;             // "1-2h"
-  especialidade?: string;            // restaurant specialty
-  perfil_publico?: string;           // restaurant audience
+  // ── Location
+  area:          string;          // bairro name
+  zone:          number;          // 1-6, South → North
+  // ── Time metadata (from DB)
+  momento_ideal: string[];        // ["morning","afternoon","sunset"]
+  energia:       string;          // "low" | "medium" | "high"
+  // ── Content metadata (from DB)
+  tags:          string[];        // tags_ia from o_que_fazer_rio
+  vibe_tags:     string[];        // vibe from o_que_fazer_rio
+  duracao:       string;          // "1-2h" | "2-4h" etc.
+  especialidade?: string;         // restaurant specialty
+  perfil_publico?: string;        // restaurant audience
+  // ── Computed in Step 3
+  best_periodo?: PeriodoDia;
+  // ── Neighborhood metadata (attached in Step 2)
   neighborhood?: {
     walkable:           string;
     better_for:         string;
     best_for_1:         string;
-    best_for_2:         string;
-    best_for_3:         string;
     safety_solo_woman:  string;
-    my_view:            string;
   };
 }
 
-// Output types (compatible with existing DiaRoteiro in the UI)
+/** Output types — must stay compatible with the existing DiaRoteiro UI shape */
 interface ItemRoteiro {
   id:          string;
   titulo:      string;
@@ -99,26 +108,25 @@ interface ItineraryResult {
 }
 
 // ── Geographic zone map ───────────────────────────────────────────────────────
-// 6 zones ordered roughly South → North, matching how a traveler moves through Rio.
+// 6 zones ordered South → North. Adjacent zones = walkable in the same day.
 
 const ZONE_MAP: Record<string, number> = {
-  // Zone 1 — Zona Sul (beach strip)
+  // Zone 1 — Zona Sul beach strip
   "Ipanema": 1, "Leblon": 1, "Copacabana": 1, "Arpoador": 1, "Leme": 1,
   // Zone 2 — Zona Sul inland
   "Lagoa": 2, "Jardim Botânico": 2, "Gávea": 2, "Cosme Velho": 2,
   "Humaitá": 2, "Alto da Boa Vista": 2,
-  // Zone 3 — Botafogo / Flamengo
-  "Botafogo": 3, "Urca": 3, "Flamengo": 3, "Catete": 3, "Laranjeiras": 3,
-  "Glória": 3,
-  // Zone 4 — Centro / Santa Teresa
+  // Zone 3 — Botafogo / Flamengo / Urca
+  "Botafogo": 3, "Urca": 3, "Flamengo": 3, "Catete": 3, "Laranjeiras": 3, "Glória": 3,
+  // Zone 4 — Centro / Santa Teresa / Lapa
   "Centro": 4, "Santa Teresa": 4, "Lapa": 4, "Porto Maravilha": 4,
   "Saúde": 4, "Gamboa": 4, "Santo Cristo": 4,
-  // Zone 5 — Zona Oeste (Barra / beaches)
+  // Zone 5 — Zona Oeste
   "Barra da Tijuca": 5, "Recreio": 5, "Prainha": 5, "Grumari": 5,
   "Joá": 5, "Guaratiba": 5,
   // Zone 6 — Zona Norte
-  "Tijuca": 6, "Maracanã": 6, "São Cristóvão": 6, "Ramos": 6,
-  "Penha": 6, "Méier": 6, "Madureira": 6,
+  "Tijuca": 6, "Maracanã": 6, "São Cristóvão": 6, "Penha": 6,
+  "Méier": 6, "Madureira": 6, "Ramos": 6,
 };
 
 function getZone(bairro?: string): number {
@@ -129,108 +137,97 @@ function getZone(bairro?: string): number {
   return 3;
 }
 
-// ── Trip length ───────────────────────────────────────────────────────────────
+// ── Vibe → items per day ──────────────────────────────────────────────────────
 
-const VIBE_PER_DAY: Record<string, number> = {
-  tranquilo: 3,
-  moderado:  4,
-  intenso:   6,
-};
+const VIBE_PER_DAY: Record<string, number> = { tranquilo: 3, moderado: 4, intenso: 6 };
 
-function computeTripLength(
-  items:        EnrichedPlace[],
-  vibe:         string,
-  requestedDays?: number,
-): number {
+function computeTripLength(count: number, vibe: string, requestedDays?: number): number {
   if (requestedDays && requestedDays >= 1) return requestedDays;
   const perDay = VIBE_PER_DAY[vibe] ?? 4;
-  return Math.max(1, Math.ceil(items.length / perDay));
+  return Math.max(1, Math.ceil(count / perDay));
 }
 
-// ── Supabase enrichment ───────────────────────────────────────────────────────
+// ── STEP 1 + 2: Normalize + Enrich from Supabase ─────────────────────────────
+// Queries o_que_fazer_rio and restaurantes, then merges into one EnrichedPlace array.
 
 async function enrichPlaces(
-  saved:   SavedItemInput[],
-  supa:    ReturnType<typeof createClient>,
+  saved: SavedItemInput[],
+  supa:  ReturnType<typeof createClient>,
 ): Promise<EnrichedPlace[]> {
-  // Split by category so we query the right tables
   const oqIds   = saved.filter((s) => s.categoria === "oQueFazer" || s.categoria === "lucky").map((s) => s.id);
   const restIds = saved.filter((s) => s.categoria === "restaurante").map((s) => Number(s.id));
 
-  // Fetch o_que_fazer_rio metadata
-  const oqMap = new Map<string, Record<string, unknown>>();
-  if (oqIds.length > 0) {
-    const { data } = await supa
-      .from("o_que_fazer_rio")
-      .select("id,bairro,tags_ia,momento_ideal,vibe,energia,duracao_media")
-      .in("id", oqIds);
-    for (const row of data ?? []) oqMap.set(String(row.id), row);
-  }
+  // Parallel fetch
+  const [oqResult, restResult] = await Promise.all([
+    oqIds.length > 0
+      ? supa.from("o_que_fazer_rio")
+          .select("id,bairro,tags_ia,momento_ideal,vibe,energia,duracao_media")
+          .in("id", oqIds)
+      : Promise.resolve({ data: [] }),
+    restIds.length > 0
+      ? supa.from("restaurantes")
+          .select("id,bairro,categoria,especialidade,perfil_publico")
+          .in("id", restIds)
+      : Promise.resolve({ data: [] }),
+  ]);
 
-  // Fetch restaurantes metadata
-  const restMap = new Map<number, Record<string, unknown>>();
-  if (restIds.length > 0) {
-    const { data } = await supa
-      .from("restaurantes")
-      .select("id,bairro,categoria,especialidade,perfil_publico")
-      .in("id", restIds);
-    for (const row of data ?? []) restMap.set(Number(row.id), row);
-  }
+  const oqMap   = new Map((oqResult.data   ?? []).map((r: Record<string, unknown>) => [String(r.id),  r]));
+  const restMap = new Map((restResult.data ?? []).map((r: Record<string, unknown>) => [Number(r.id), r]));
 
-  // Build enriched places (hotels skipped)
-  const enriched: EnrichedPlace[] = [];
+  const places: EnrichedPlace[] = [];
+
   for (const s of saved) {
     if (s.categoria === "hotel") continue;
 
-    let bairro     = s.localizacao ?? "";
-    let tags:       string[] = [];
-    let momento:    string[] = [];
-    let vibe_tags:  string[] = [];
-    let energia     = "medium";
-    let duracao     = "1-2h";
+    let area        = s.localizacao ?? "";
+    let tags:        string[]     = [];
+    let momento:     string[]     = [];
+    let vibe_tags:   string[]     = [];
+    let energia                   = "medium";
+    let duracao                   = "1-2h";
     let especialidade: string | undefined;
     let perfil:        string | undefined;
 
     if (s.categoria === "oQueFazer" || s.categoria === "lucky") {
       const row = oqMap.get(s.id);
       if (row) {
-        bairro    = (row.bairro as string) || bairro;
-        tags      = (row.tags_ia     as string[]) ?? [];
+        area      = (row.bairro        as string) || area;
+        tags      = (row.tags_ia       as string[]) ?? [];
         momento   = (row.momento_ideal as string[]) ?? [];
-        vibe_tags = (row.vibe        as string[]) ?? [];
-        energia   = (row.energia     as string) ?? "medium";
-        duracao   = (row.duracao_media as string) ?? "1-2h";
+        vibe_tags = (row.vibe          as string[]) ?? [];
+        energia   = (row.energia       as string)  ?? "medium";
+        duracao   = (row.duracao_media as string)  ?? "1-2h";
       }
     } else if (s.categoria === "restaurante") {
       const row = restMap.get(Number(s.id));
       if (row) {
-        bairro       = (row.bairro        as string) || bairro;
+        area          = (row.bairro        as string) || area;
         especialidade = row.especialidade  as string | undefined;
         perfil        = row.perfil_publico as string | undefined;
       }
-      momento = ["lunch"];
+      momento = ["lunch"]; // restaurants always prefer lunch slot by default
     }
 
-    enriched.push({
-      id:            s.id,
-      name:          s.titulo,
-      categoria:     s.categoria,
-      area:          bairro || "Rio de Janeiro",
-      zone:          getZone(bairro),
+    places.push({
+      id:          s.id,
+      name:        s.titulo,
+      categoria:   s.categoria,
+      area:        area || "Rio de Janeiro",
+      zone:        getZone(area),
       momento_ideal: momento,
+      energia,
       tags,
       vibe_tags,
-      energia,
       duracao,
       especialidade,
       perfil_publico: perfil,
     });
   }
 
-  return enriched;
+  return places;
 }
 
-// ── Neighborhood enrichment ───────────────────────────────────────────────────
+// ── STEP 2: Attach neighborhood metadata ──────────────────────────────────────
 
 async function attachNeighborhoodMeta(
   places: EnrichedPlace[],
@@ -241,11 +238,12 @@ async function attachNeighborhoodMeta(
 
   const { data } = await supa
     .from("stay_neighborhoods")
-    .select("neighborhood_name,walkable,better_for,best_for_1,best_for_2,best_for_3,safety_solo_woman,my_view")
+    .select("neighborhood_name,walkable,better_for,best_for_1,safety_solo_woman")
     .in("neighborhood_name", bairros);
 
-  const nbMap = new Map<string, Record<string, string>>();
-  for (const row of data ?? []) nbMap.set(row.neighborhood_name as string, row as Record<string, string>);
+  const nbMap = new Map(
+    (data ?? []).map((r: Record<string, string>) => [r.neighborhood_name, r]),
+  );
 
   return places.map((p) => {
     const nb = nbMap.get(p.area);
@@ -256,200 +254,216 @@ async function attachNeighborhoodMeta(
         walkable:          nb.walkable          ?? "",
         better_for:        nb.better_for        ?? "",
         best_for_1:        nb.best_for_1        ?? "",
-        best_for_2:        nb.best_for_2        ?? "",
-        best_for_3:        nb.best_for_3        ?? "",
         safety_solo_woman: nb.safety_solo_woman ?? "",
-        my_view:           nb.my_view           ?? "",
       },
     };
   });
 }
 
-// ── momento_ideal → PeriodoDia ────────────────────────────────────────────────
+// ── STEP 3: Classify best período using metadata hard signals ─────────────────
+// Rules applied in order of priority:
+//   1. categoria === "restaurante"  → almoco (will be overridden to noite if 2nd+ per day)
+//   2. momento_ideal from DB        → primary signal
+//   3. tags_ia contains "beach"     → tarde
+//   4. energia === "high"           → manha (high-energy = morning activity)
+//   5. default                      → manha
 
-function momentoToPeriodo(momento: string[]): PeriodoDia {
-  if (!momento || momento.length === 0) return "manha";
-  const first = momento[0].toLowerCase();
-  if (first === "morning")              return "manha";
-  if (first === "lunch")                return "almoco";
-  if (first === "afternoon" || first === "sunset") return "tarde";
-  if (first === "evening" || first === "night")    return "noite";
+const MOMENTO_TO_PERIODO: Record<string, PeriodoDia> = {
+  morning:   "manha",
+  lunch:     "almoco",
+  afternoon: "tarde",
+  sunset:    "tarde",
+  evening:   "noite",
+  night:     "noite",
+};
+
+function classifyPeriodo(p: EnrichedPlace): PeriodoDia {
+  // Rule 1 — restaurants anchor to almoco (day-level logic later handles overflow to noite)
+  if (p.categoria === "restaurante") return "almoco";
+
+  // Rule 2 — DB momento_ideal (most reliable signal)
+  for (const m of p.momento_ideal) {
+    const mapped = MOMENTO_TO_PERIODO[m.toLowerCase()];
+    if (mapped) return mapped;
+  }
+
+  // Rule 3 — beach tag → tarde (beaches are best in the afternoon)
+  if (p.tags.some((t) => t.includes("beach") || t.includes("praia"))) return "tarde";
+
+  // Rule 4 — high energy activities → morning (parks, viewpoints, hikes)
+  if (p.energia === "high") return "manha";
+
+  // Rule 5 — default
   return "manha";
 }
 
-function categoryToPeriodo(cat: SavedCategory): PeriodoDia {
-  if (cat === "restaurante") return "almoco";
-  return "manha";
+function classifyAllPeriodos(places: EnrichedPlace[]): EnrichedPlace[] {
+  return places.map((p) => ({ ...p, best_periodo: classifyPeriodo(p) }));
 }
 
-// ── Deterministic draft builder ───────────────────────────────────────────────
-// Zone-sorted sequential chunking: Day 1 gets first N zones, Day 2 next N, etc.
-// Restaurants matched to days by zone proximity.
+// ── STEP 4: Group places by geographic coherence ──────────────────────────────
+// Algorithm:
+//   1. Sort activities by zone (South → North keeps days geographically tight)
+//   2. Sequential chunking: first N activities → Day 1, next N → Day 2, etc.
+//   3. Within each day chunk, sub-sort by neighborhood to keep walkable places together
+//   4. Restaurants matched to the day whose zone center is closest
 
-function buildDraft(
+function groupByGeography(
   places:     EnrichedPlace[],
   tripLength: number,
-): DiaRoteiro[] {
+): { dayGroups: EnrichedPlace[][]; dayRestaurants: EnrichedPlace[][] } {
   const activities  = places.filter((p) => p.categoria !== "restaurante");
   const restaurants = places.filter((p) => p.categoria === "restaurante");
 
-  // Sort activities by zone
-  const sortedActs = [...activities].sort((a, b) => a.zone - b.zone);
-  const chunkSize  = Math.ceil(sortedActs.length / tripLength);
-
-  // Distribute activities across days
-  const dayActs: EnrichedPlace[][] = Array.from({ length: tripLength }, () => []);
-  sortedActs.forEach((act, i) => {
-    dayActs[Math.min(Math.floor(i / chunkSize), tripLength - 1)].push(act);
+  // Sort activities by zone, then by area name (keeps same-neighborhood items consecutive)
+  const sortedActs = [...activities].sort((a, b) => {
+    if (a.zone !== b.zone) return a.zone - b.zone;
+    return a.area.localeCompare(b.area);
   });
 
-  // Match each restaurant to the best day by zone proximity
+  // Sequential zone chunks — each day gets a contiguous slice of the sorted list
+  const chunkSize = Math.ceil(sortedActs.length / tripLength);
+  const dayGroups: EnrichedPlace[][] = Array.from({ length: tripLength }, () => []);
+  sortedActs.forEach((act, i) => {
+    dayGroups[Math.min(Math.floor(i / chunkSize), tripLength - 1)].push(act);
+  });
+
+  // Match each restaurant to the closest-zone day
   const dayRestaurants: EnrichedPlace[][] = Array.from({ length: tripLength }, () => []);
   for (const rest of restaurants) {
     let bestDay   = 0;
     let bestScore = Infinity;
-    dayActs.forEach((acts, di) => {
-      const repZone  = acts.length > 0 ? acts[Math.floor(acts.length / 2)].zone : 3;
-      const score    = Math.abs(rest.zone - repZone) * 10 + dayRestaurants[di].length;
+    dayGroups.forEach((acts, di) => {
+      // Representative zone = median item's zone for this day
+      const rep   = acts[Math.floor(acts.length / 2)]?.zone ?? 3;
+      // Score = zone distance (primary) + load penalty (secondary, avoids piling all on one day)
+      const score = Math.abs(rest.zone - rep) * 10 + dayRestaurants[di].length * 3;
       if (score < bestScore) { bestScore = score; bestDay = di; }
     });
     dayRestaurants[bestDay].push(rest);
   }
 
-  // Build DiaRoteiro
-  const ORDER: PeriodoDia[] = ["manha", "almoco", "tarde", "noite"];
-  const days: DiaRoteiro[]  = [];
+  return { dayGroups, dayRestaurants };
+}
 
-  for (let d = 0; d < tripLength; d++) {
-    const acts  = dayActs[d];
-    const rests = dayRestaurants[d];
-    if (acts.length === 0 && rests.length === 0) continue;
+// ── STEP 5: Build fully populated DiaRoteiro[] ────────────────────────────────
+// Produces a complete itinerary draft — Gemini will receive this, not an empty skeleton.
+//
+// Period assignment per day:
+//   • Each activity uses its pre-classified best_periodo
+//   • First restaurant in a day  → almoco
+//   • Second+ restaurant in a day → noite (dinner overflow)
+//   • Canonical order: manha → almoco → tarde → noite
+
+const PERIODO_ORDER: PeriodoDia[] = ["manha", "almoco", "tarde", "noite"];
+
+function buildFullDraft(
+  dayGroups:      EnrichedPlace[][],
+  dayRestaurants: EnrichedPlace[][],
+): DiaRoteiro[] {
+  const days: DiaRoteiro[] = [];
+
+  dayGroups.forEach((acts, di) => {
+    const rests = dayRestaurants[di] ?? [];
+    if (acts.length === 0 && rests.length === 0) return;
 
     const periodMap = new Map<PeriodoDia, ItemRoteiro[]>();
 
-    // Assign activities by momento_ideal
-    const half = Math.ceil(acts.length / 2);
-    acts.forEach((a, i) => {
-      const periodo = a.momento_ideal.length > 0
-        ? momentoToPeriodo(a.momento_ideal)
-        : (i < half ? "manha" : "tarde");
+    // Place activities using their pre-classified período
+    for (const act of acts) {
+      const periodo = act.best_periodo ?? "manha";
       if (!periodMap.has(periodo)) periodMap.set(periodo, []);
-      periodMap.get(periodo)!.push({ id: a.id, titulo: a.name, categoria: a.categoria, localizacao: a.area });
-    });
+      periodMap.get(periodo)!.push({
+        id: act.id, titulo: act.name, categoria: act.categoria, localizacao: act.area,
+      });
+    }
 
-    // First restaurant → almoco, rest → noite
+    // Place restaurants: 1st → almoco, 2nd+ → noite
     rests.forEach((r, i) => {
       const periodo: PeriodoDia = i === 0 ? "almoco" : "noite";
       if (!periodMap.has(periodo)) periodMap.set(periodo, []);
-      periodMap.get(periodo)!.push({ id: r.id, titulo: r.name, categoria: r.categoria, localizacao: r.area });
+      periodMap.get(periodo)!.push({
+        id: r.id, titulo: r.name, categoria: r.categoria, localizacao: r.area,
+      });
     });
 
-    const periodos: DiaPeriodo[] = ORDER
-      .filter((p) => periodMap.has(p) && periodMap.get(p)!.length > 0)
-      .map((p) => ({ periodo: p, items: periodMap.get(p)! }));
+    // Build ordered periodos
+    const periodos: DiaPeriodo[] = PERIODO_ORDER
+      .filter((p) => (periodMap.get(p) ?? []).length > 0)
+      .map((p)   => ({ periodo: p, items: periodMap.get(p)! }));
 
-    const repZone = acts[0]?.zone ?? rests[0]?.zone ?? 3;
-    const bairro  = acts[0]?.area ?? rests[0]?.area ?? "Rio de Janeiro";
+    if (periodos.length === 0) return;
 
-    if (periodos.length > 0) {
-      days.push({ numero: d + 1, bairro, periodos });
-    }
-  }
+    // Day bairro = the neighborhood with the most items (modal bairro)
+    const allItems = [...acts, ...rests];
+    const bairroCount = new Map<string, number>();
+    for (const item of allItems) bairroCount.set(item.area, (bairroCount.get(item.area) ?? 0) + 1);
+    const bairro = [...bairroCount.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "Rio de Janeiro";
 
-  return days.map((day, i) => ({ ...day, numero: i + 1 }));
+    days.push({ numero: di + 1, bairro, periodos });
+  });
+
+  // Renumber (some days may have been skipped if truly empty)
+  return days.map((d, i) => ({ ...d, numero: i + 1 }));
 }
 
-// ── Gemini skeleton-fill ──────────────────────────────────────────────────────
-// Sends empty day skeleton + FULL enriched place metadata to Gemini.
-// Gemini ONLY assigns places into pre-built day slots — day count is locked.
+// ── STEP 6: Gemini refinement (NOT generation) ────────────────────────────────
+// Receives the fully populated draft built by steps 1-5.
+// Gemini's ONLY allowed action: reorder items WITHIN each período for better flow.
+// It cannot: change day count, move items between days, move between períodos, add/remove.
 
-async function fillSkeletonWithGemini(
-  places:     EnrichedPlace[],
-  tripLength: number,
-  dest:       string,
-  prefs:      Preferences,
-  fallback:   DiaRoteiro[],
+async function refineWithGemini(
+  draft:   DiaRoteiro[],
+  dest:    string,
+  prefs:   Preferences,
+  allPlaces: EnrichedPlace[],
 ): Promise<DiaRoteiro[]> {
   const apiKey = Deno.env.get("GEMINI_API_KEY");
-  if (!apiKey || !places.length) return fallback;
+  if (!apiKey || !draft.length) return draft;
 
-  const skeleton    = Array.from({ length: tripLength }, (_, i) => ({ day: i + 1, items: [] }));
-  const itemsPerDay = Math.ceil(places.length / tripLength);
-
-  // Compact enriched payload — all useful metadata, nothing superfluous
-  const placePayload = places.map((p) => ({
-    place_id:      p.id,
-    name:          p.name,
-    category:      p.categoria,
-    area:          p.area,
-    zone:          p.zone,
-    momento_ideal: p.momento_ideal,
-    tags:          p.tags.slice(0, 8),
-    energia:       p.energia,
-    duracao:       p.duracao,
-    especialidade: p.especialidade,
-    perfil:        p.perfil_publico,
-    neighborhood:  p.neighborhood
-      ? {
-          walkable:           p.neighborhood.walkable,
-          better_for:         p.neighborhood.better_for,
-          best_for_1:         p.neighborhood.best_for_1,
-          best_for_2:         p.neighborhood.best_for_2,
-          best_for_3:         p.neighborhood.best_for_3,
-          safety_solo_woman:  p.neighborhood.safety_solo_woman,
-        }
-      : undefined,
+  // Compact representation — only what Gemini needs to decide order
+  const compact = draft.map((day) => ({
+    day:      day.numero,
+    area:     day.bairro,
+    periodos: day.periodos.map((p) => ({
+      periodo: p.periodo,
+      items:   p.items.map((it) => {
+        const full = allPlaces.find((pl) => pl.id === it.id);
+        return {
+          id:       it.id,
+          name:     it.titulo,
+          area:     it.localizacao,
+          zone:     full?.zone ?? 3,
+          energia:  full?.energia ?? "medium",
+          tags:     (full?.tags ?? []).slice(0, 5),
+        };
+      }),
+    })),
   }));
 
   const prompt =
-`You are a Rio de Janeiro expert building a real travel itinerary.
+`You are a Rio de Janeiro travel expert. You received a fully structured itinerary built from real Supabase data.
 
-The number of days is ALREADY DEFINED — do NOT change it.
-You MUST fill ALL ${tripLength} days with places.
-You MUST distribute places EVENLY — around ${itemsPerDay} items per day.
-You MUST NOT leave any day empty.
-You MUST NOT put all places in day 1.
+Your role is ONLY to improve the ORDER of items within each período for better geographic flow and realistic pacing.
 
-DESTINATION: ${dest}
-VIBE: ${prefs.vibe ?? "moderado"} | INSPIRATIONS: ${prefs.inspirations.join(", ") || "any"}
+STRICT RULES:
+- Do NOT add new places
+- Do NOT remove places
+- Do NOT move items between different days
+- Do NOT move items between different períodos (manha/almoco/tarde/noite)
+- Do NOT change the number of days
+- ONLY reorder items within each período
+- Return the EXACT same JSON structure
 
-EMPTY SKELETON (fill this exactly):
-${JSON.stringify(skeleton)}
+Use "zone" and "area" to group geographically close items together within each período.
+Use "energia" to order high-energy items early in the período.
+Vibe: ${prefs.vibe ?? "moderado"} | Inspirations: ${prefs.inspirations.join(", ") || "any"}
+Destination: ${dest}
 
-PLACES TO DISTRIBUTE (use only these — do not invent new ones):
-${JSON.stringify(placePayload)}
+DRAFT TO REFINE:
+${JSON.stringify(compact)}
 
-ASSIGNMENT RULES:
-- Group by geographic zone (same or adjacent zone numbers on same day — avoids cross-city jumps)
-- Use momento_ideal as a HARD signal for time-of-day:
-    morning → manha
-    lunch → almoco
-    afternoon or sunset → tarde
-    evening or night → noite
-- If categoria is "restaurante": default time is "lunch" (almoco)
-- If categoria is "oQueFazer" or "lucky": use momento_ideal[0]
-- Balance activities and restaurants across days
-- Use "walkable" neighborhood data to group walkable places together
-- Respect "energia" — pair high-energy with low-energy in same day
-- If "safety_solo_woman" is "limited", consider placing in daytime periods
-- Choose "area" for each day as the dominant neighborhood of that day's items
-
-VALIDATION BEFORE RETURNING:
-- Exactly ${tripLength} days in output
-- Every day has at least 1 item
-- All ${places.length} places appear exactly once
-- No unrealistic zone jumps within a single day (e.g. Barra da Tijuca + São Cristóvão)
-
-Return ONLY a valid JSON array — no markdown, no explanation:
-[
-  {
-    "day": 1,
-    "area": "dominant neighborhood",
-    "items": [
-      { "place_id": "id", "name": "name", "time": "morning|lunch|afternoon|evening" }
-    ]
-  }
-]`;
+Return ONLY a valid JSON array with the same structure — no markdown, no explanation.`;
 
   try {
     const res = await fetch(
@@ -459,97 +473,68 @@ Return ONLY a valid JSON array — no markdown, no explanation:
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents:         [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.25, maxOutputTokens: 4096 },
+          generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
         }),
       },
     );
-
-    if (!res.ok) return fallback;
+    if (!res.ok) return draft;
 
     const data  = await res.json();
     const raw   = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
     const clean = raw.replace(/```json\n?/gi, "").replace(/```\n?/g, "").trim();
 
-    const parsed = JSON.parse(clean) as Array<{
-      day:   number;
-      area:  string;
-      items: Array<{ place_id: string; name: string; time: string }>;
-    }>;
+    const refined = JSON.parse(clean) as typeof compact;
 
-    // Hard check: must have exactly tripLength days
-    if (!Array.isArray(parsed) || parsed.length !== tripLength) return fallback;
-
-    // Build item lookup by place_id
-    const placeMap = new Map(places.map((p) => [p.id, p]));
-
-    // Time string → PeriodoDia
-    const timeMap: Record<string, PeriodoDia> = {
-      morning:   "manha",
-      lunch:     "almoco",
-      afternoon: "tarde",
-      sunset:    "tarde",
-      evening:   "noite",
-      night:     "noite",
-    };
-
-    const ORDER: PeriodoDia[] = ["manha", "almoco", "tarde", "noite"];
-
-    const days: DiaRoteiro[] = parsed.map((gDay, idx) => {
-      const periodMap = new Map<PeriodoDia, ItemRoteiro[]>();
-
-      for (const gi of gDay.items ?? []) {
-        const full = placeMap.get(gi.place_id);
-        if (!full) continue; // Gemini cannot invent places
-
-        const periodo: PeriodoDia =
-          timeMap[gi.time?.toLowerCase() ?? ""] ??
-          categoryToPeriodo(full.categoria);
-
-        if (!periodMap.has(periodo)) periodMap.set(periodo, []);
-        periodMap.get(periodo)!.push({
-          id:          full.id,
-          titulo:      full.name,
-          categoria:   full.categoria,
-          localizacao: full.area,
-        });
+    // Hard checks: same day count and same item counts per período
+    if (!Array.isArray(refined) || refined.length !== draft.length) return draft;
+    for (let i = 0; i < refined.length; i++) {
+      const orig = draft[i];
+      const ref  = refined[i];
+      if (!ref.periodos || ref.periodos.length !== orig.periodos.length) return draft;
+      for (let j = 0; j < orig.periodos.length; j++) {
+        if ((ref.periodos[j]?.items?.length ?? 0) !== orig.periodos[j].items.length) return draft;
       }
+    }
 
-      const periodos: DiaPeriodo[] = ORDER
-        .filter((p) => periodMap.has(p) && periodMap.get(p)!.length > 0)
-        .map((p)  => ({ periodo: p, items: periodMap.get(p)! }));
+    // Re-attach full ItemRoteiro objects from the original draft (Gemini only had compact view)
+    const itemById = new Map<string, ItemRoteiro>();
+    for (const day of draft) {
+      for (const p of day.periodos) {
+        for (const it of p.items) itemById.set(it.id, it);
+      }
+    }
 
-      return {
-        numero:   idx + 1,
-        bairro:   gDay.area || places.find((p) => p.zone === 3)?.area || "Rio de Janeiro",
-        periodos,
-      };
-    }).filter((d) => d.periodos.length > 0);
-
-    if (days.length !== tripLength) return fallback;
-    return days;
+    return refined.map((rDay, i) => ({
+      numero:   i + 1,
+      bairro:   rDay.area || draft[i].bairro,
+      periodos: rDay.periodos.map((rp, j) => ({
+        periodo: rp.periodo as PeriodoDia,
+        items:   (rp.items as Array<{ id: string }>)
+          .map((ri) => itemById.get(ri.id))
+          .filter(Boolean) as ItemRoteiro[],
+      })).filter((p) => p.items.length > 0),
+    })).filter((d) => d.periodos.length > 0);
 
   } catch (_) {
-    return fallback;
+    return draft;
   }
 }
 
-// ── Validation pass ───────────────────────────────────────────────────────────
-// Ensures no saved places were silently dropped and all days are non-empty.
+// ── STEP 7: Validation ────────────────────────────────────────────────────────
+// Re-attaches any places dropped during Gemini refinement.
+// Verifies day count integrity.
 
 function validateAndFix(
   days:      DiaRoteiro[],
   allPlaces: EnrichedPlace[],
-  tripLength: number,
 ): DiaRoteiro[] {
-  // 1. Collect placed IDs
   const usedIds = new Set<string>();
   for (const day of days) {
     for (const p of day.periodos) {
-      for (const item of p.items) usedIds.add(item.id);
+      for (const it of p.items) usedIds.add(it.id);
     }
   }
 
-  // 2. Re-attach any dropped places to the last day
   const lost = allPlaces.filter((p) => !usedIds.has(p.id));
   if (lost.length > 0 && days.length > 0) {
     const lastDay = days[days.length - 1];
@@ -564,7 +549,6 @@ function validateAndFix(
     }
   }
 
-  // 3. Remove truly empty days and renumber
   return days
     .filter((d) => d.periodos.length > 0)
     .map((d, i) => ({ ...d, numero: i + 1 }));
@@ -586,7 +570,6 @@ serve(async (req) => {
       requestedDays,
     } = body;
 
-    // Supabase client — edge functions have these env vars automatically
     const supa = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
@@ -595,11 +578,9 @@ serve(async (req) => {
     const dest = destination || "Rio de Janeiro";
     const vibe = preferences.vibe ?? "moderado";
 
-    // 1. Enrich saved items from Supabase tables
+    // ── Step 1+2: Normalize + Enrich from Supabase ────────────────────────────
     let places = await enrichPlaces(savedItems, supa);
-
-    // 2. Attach neighborhood metadata per bairro
-    places = await attachNeighborhoodMeta(places, supa);
+    places     = await attachNeighborhoodMeta(places, supa);
 
     if (places.length === 0) {
       return new Response(
@@ -608,33 +589,29 @@ serve(async (req) => {
       );
     }
 
-    // 3. Compute trip length (locked — Gemini cannot change this)
-    const tripLength = computeTripLength(places, vibe, requestedDays);
+    // ── Step 3: Classify each place by best time-of-day ───────────────────────
+    places = classifyAllPeriodos(places);
 
-    // 4. Deterministic draft — guaranteed correct fallback
-    const deterministicDraft = buildDraft(places, tripLength);
+    // ── Trip length is locked here — Gemini cannot change it ──────────────────
+    const tripLength = computeTripLength(places.length, vibe, requestedDays);
 
-    // 5. Gemini skeleton-fill with full enriched metadata
-    //    Passes deterministicDraft as fallback; Gemini only fills pre-built slots
-    let days = await fillSkeletonWithGemini(
-      places,
-      tripLength,
-      dest,
-      preferences,
-      deterministicDraft,
-    );
+    // ── Step 4: Group places by geographic coherence ──────────────────────────
+    const { dayGroups, dayRestaurants } = groupByGeography(places, tripLength);
 
-    // 6. Validate — re-attach any dropped places
-    days = validateAndFix(days, places, tripLength);
+    // ── Step 5: Build fully populated DiaRoteiro[] ────────────────────────────
+    let days = buildFullDraft(dayGroups, dayRestaurants);
+
+    // ── Step 6: Gemini refinement — only reorders within existing períodos ─────
+    days = await refineWithGemini(days, dest, preferences, places);
+
+    // ── Step 7: Validation — recover any dropped places ───────────────────────
+    days = validateAndFix(days, places);
 
     const result: ItineraryResult = {
       destination: dest,
       source:      "trip_saved_places",
       preferences,
-      summary: {
-        totalDays:  days.length,
-        totalItems: places.length,
-      },
+      summary: { totalDays: days.length, totalItems: places.length },
       days,
     };
 
@@ -642,6 +619,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status:  200,
     });
+
   } catch (err) {
     return new Response(
       JSON.stringify({ error: (err as Error).message }),
