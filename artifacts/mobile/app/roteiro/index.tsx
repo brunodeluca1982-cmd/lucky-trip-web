@@ -86,6 +86,32 @@ const CATEGORY_LABEL: Record<SavedCategory, string> = {
   lucky:       "Lucky",
 };
 
+// Result phase helpers — time labels, weather, travel connectors
+const PERIODO_TIME: Record<string, number> = {
+  manha:  9 * 60,
+  almoco: 12 * 60 + 30,
+  tarde:  14 * 60,
+  noite:  19 * 60,
+};
+
+function getItemTime(periodo: string, idx: number): string {
+  const base = PERIODO_TIME[periodo] ?? 9 * 60;
+  const total = base + idx * 90;
+  const h = Math.floor(total / 60) % 24;
+  const m = total % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+const WEATHER_SEQ = ["☀️", "☀️", "🌤️", "⛅", "🌤️", "☀️", "🌥️", "☀️"];
+function getDayWeather(dayNum: number): string {
+  return WEATHER_SEQ[(dayNum - 1) % WEATHER_SEQ.length];
+}
+
+const GLASS_BG     = "rgba(15,8,3,0.62)";
+const GLASS_HEADER = "rgba(18,9,2,0.90)";
+const GLASS_BORDER = "rgba(201,168,76,0.14)";
+const CREAM        = "#F5F0E8";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Calendar utilities
 // ─────────────────────────────────────────────────────────────────────────────
@@ -964,27 +990,34 @@ function ScreenHeader({
   phase: "journey" | "loading" | "result";
   onBack: () => void;
 }) {
-  const title =
-    phase === "result" ? "Seu Roteiro" :
-    phase === "loading" ? "Criando roteiro…" :
-    "";
-  const sub =
-    phase === "result" ? "Rio de Janeiro" :
-    phase === "loading" ? "Rio de Janeiro" :
-    "";
-
   if (phase === "journey") return null;
+
+  const isResult = phase === "result";
 
   return (
     <View style={hd.wrap}>
-      <Pressable style={({ pressed }) => [hd.back, pressed && { opacity: 0.65 }]} onPress={onBack} hitSlop={10}>
-        <Feather name="arrow-left" size={20} color={C.darkBrown} />
+      <Pressable
+        style={({ pressed }) => [hd.btn, pressed && { opacity: 0.65 }]}
+        onPress={onBack}
+        hitSlop={10}
+      >
+        <Feather name="arrow-left" size={18} color={isResult ? CREAM : C.darkBrown} />
       </Pressable>
+
       <View style={hd.center}>
-        <Text style={hd.title}>{title}</Text>
-        {sub ? <Text style={hd.sub}>{sub}</Text> : null}
+        <Text style={[hd.title, isResult && hd.titleLight]}>
+          {isResult ? "Roteiro automático" : "Criando roteiro…"}
+        </Text>
+        <Text style={[hd.sub, isResult && hd.subLight]}>Rio de Janeiro</Text>
       </View>
-      <View style={hd.placeholder} />
+
+      {isResult ? (
+        <Pressable style={({ pressed }) => [hd.btn, pressed && { opacity: 0.65 }]} hitSlop={10}>
+          <Feather name="share" size={18} color={CREAM} />
+        </Pressable>
+      ) : (
+        <View style={hd.btn} />
+      )}
     </View>
   );
 }
@@ -993,14 +1026,16 @@ const hd = StyleSheet.create({
   wrap: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
   },
-  back: {
+  btn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: `${C.darkBrown}10`,
+    backgroundColor: "rgba(20,10,5,0.42)",
+    borderWidth: 1,
+    borderColor: GLASS_BORDER,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1013,13 +1048,17 @@ const hd = StyleSheet.create({
     fontSize: 17,
     color: C.darkBrown,
   },
+  titleLight: {
+    color: CREAM,
+  },
   sub: {
     fontFamily: "Inter_400Regular",
     fontSize: 11,
     color: C.warmGray,
+    marginTop: 1,
   },
-  placeholder: {
-    width: 36,
+  subLight: {
+    color: "rgba(245,240,232,0.45)",
   },
 });
 
@@ -1087,232 +1126,297 @@ function ResultPhase({ result, hotelItem, totalPlaces, onReset }: ResultPhasePro
 
   return (
     <>
-      {/* Hotel card */}
+      {/* ── Hotel card ── */}
       {hotelItem && (
-        <View style={re.hotelCard}>
-          <Image source={hotelItem.image} style={re.hotelImg} resizeMode="cover" />
-          <LinearGradient
-            colors={["transparent", "rgba(10,5,2,0.90)"]}
-            locations={[0.3, 1]}
-            style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}
-          />
-          <View style={re.hotelBadge}>
-            <Text style={re.hotelBadgeText}>✦ HOSPEDAGEM RECOMENDADA</Text>
+        <Pressable style={re.hotelCard} onPress={() => {}}>
+          {/* Thumbnail */}
+          <View style={re.hotelThumb}>
+            <Image source={hotelItem.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            <LinearGradient
+              colors={["transparent", "rgba(8,4,1,0.55)"]}
+              style={StyleSheet.absoluteFill}
+            />
           </View>
-          <View style={re.hotelInfo}>
+          {/* Content */}
+          <View style={re.hotelContent}>
+            <Text style={re.hotelLabel}>✦ Hotel recomendado</Text>
             <Text style={re.hotelName} numberOfLines={1}>{hotelItem.titulo}</Text>
             {hotelItem.localizacao ? (
-              <Text style={re.hotelLoc}>{hotelItem.localizacao}</Text>
+              <View style={re.hotelLocRow}>
+                <Feather name="map-pin" size={9} color={`${GOLD}90`} />
+                <Text style={re.hotelLoc} numberOfLines={1}>{hotelItem.localizacao}</Text>
+              </View>
             ) : null}
           </View>
-        </View>
+          <Feather name="chevron-right" size={16} color={`${GOLD}60`} />
+        </Pressable>
       )}
 
-      {/* Summary card */}
+      {/* ── Summary card ── */}
       <View style={re.summary}>
-        <View style={re.summaryInner}>
-          <View style={re.statBlock}>
-            <Text style={re.statVal}>{totalItems}</Text>
-            <Text style={re.statLbl}>itens</Text>
-          </View>
-          <View style={re.statDivider} />
-          <View style={re.statBlock}>
-            <Text style={re.statVal}>{totalDays}</Text>
-            <Text style={re.statLbl}>{totalDays === 1 ? "dia" : "dias"}</Text>
-          </View>
-          <View style={re.statDivider} />
-          <View style={re.statBlock}>
-            <Text style={re.statVal}>Rio</Text>
-            <Text style={re.statLbl}>destino</Text>
-          </View>
-        </View>
-        <Text style={re.summaryLine}>
+        <Text style={re.summaryTitle}>
           {totalItems} {totalItems === 1 ? "item" : "itens"} em {totalDays} {totalDays === 1 ? "dia" : "dias"}
         </Text>
+        <Text style={re.summarySub}>Roteiro otimizado por proximidade geográfica</Text>
+        {result.days.length > 0 && (
+          <View style={re.dayPills}>
+            <Text style={re.dayPillsLabel}>Ir para: </Text>
+            {result.days.map((dia) => (
+              <View key={dia.numero} style={re.dayPill}>
+                <Text style={re.dayPillText}>Dia {dia.numero}</Text>
+              </View>
+            ))}
+          </View>
+        )}
       </View>
 
-      {/* Action buttons */}
+      {/* ── Action row ── */}
       <View style={re.actionRow}>
         <Pressable
-          style={({ pressed }) => [re.actionBtn, re.actionBtnPrimary, pressed && { opacity: 0.80 }]}
+          style={({ pressed }) => [re.actionBtn, re.actionBtnWA, pressed && { opacity: 0.82 }]}
           onPress={handleWhatsApp}
         >
-          <Feather name="message-circle" size={15} color={C.cream} />
-          <Text style={re.actionBtnText}>Refinar com assistente</Text>
+          <Feather name="message-circle" size={15} color={CREAM} />
+          <Text style={re.actionBtnText}>Refinar no WhatsApp</Text>
         </Pressable>
         <Pressable
-          style={({ pressed }) => [re.actionBtn, re.actionBtnSecondary, pressed && { opacity: 0.80 }]}
+          style={({ pressed }) => [re.actionBtn, re.actionBtnEdit, pressed && { opacity: 0.82 }]}
           onPress={onReset}
         >
-          <Feather name="edit-2" size={15} color={C.darkBrown} />
-          <Text style={re.actionBtnTextSecondary}>Editar roteiro</Text>
+          <Feather name="edit-2" size={15} color={GOLD} />
+          <Text style={[re.actionBtnText, { color: GOLD }]}>Editar roteiro</Text>
         </Pressable>
       </View>
 
-      {/* Day cards */}
-      {result.days.map((dia) => (
-        <ResultDayCard key={`${dia.numero}-${dia.bairro}`} dia={dia} />
-      ))}
-
-      {/* Map CTA */}
-      <Pressable
-        style={({ pressed }) => [re.mapCta, pressed && { opacity: 0.78 }]}
-        onPress={() => {}}
-      >
+      {/* ── Map CTA ── */}
+      <Pressable style={({ pressed }) => [re.mapCta, pressed && { opacity: 0.80 }]} onPress={() => {}}>
         <View style={re.mapCtaLeft}>
           <View style={re.mapCtaIcon}>
-            <Feather name="map-pin" size={15} color={GOLD} />
+            <Feather name="map-pin" size={14} color={GOLD} />
           </View>
           <View>
             <Text style={re.mapCtaLabel}>Ver no mapa</Text>
             <Text style={re.mapCtaSub}>{totalPlaces} {totalPlaces === 1 ? "lugar" : "lugares"}</Text>
           </View>
         </View>
-        <Feather name="arrow-right" size={15} color={`${GOLD}90`} />
+        <Feather name="arrow-right" size={15} color={`${GOLD}70`} />
       </Pressable>
+
+      {/* ── Day cards ── */}
+      {result.days.map((dia) => (
+        <ResultDayCard key={`${dia.numero}-${dia.bairro}`} dia={dia} />
+      ))}
     </>
   );
 }
 
 function ResultDayCard({ dia }: { dia: DiaRoteiro }) {
+  const weather = getDayWeather(dia.numero);
+  const allItems = dia.periodos.flatMap((p) => p.items);
+  const travelMinTotal = Math.max(25, allItems.length * 16);
+
   return (
     <View style={re.dayCard}>
+      {/* ── Day header ── */}
       <View style={re.dayHeader}>
         <View style={re.dayNumBadge}>
           <Text style={re.dayNumText}>DIA {dia.numero}</Text>
         </View>
-        <Text style={re.dayBairro}>{dia.bairro}</Text>
+        <Text style={re.dayBairro} numberOfLines={1}>{dia.bairro}</Text>
+        <Text style={re.weatherEmoji}>{weather}</Text>
+        <View style={re.travelChip}>
+          <Feather name="clock" size={10} color="rgba(245,240,232,0.45)" />
+          <Text style={re.travelChipText}>{travelMinTotal} min total</Text>
+        </View>
       </View>
-      {dia.periodos.map((periodo) => {
-        const icon  = PERIODO_ICON[periodo.periodo] as any;
-        const label = PERIODO_LABEL[periodo.periodo];
-        return (
-          <View key={periodo.periodo} style={re.periodBlock}>
-            <View style={re.periodHeader}>
-              <Feather name={icon} size={11} color={GOLD} />
-              <Text style={re.periodLabel}>{label}</Text>
-              <View style={re.periodLine} />
+
+      {/* ── Period blocks ── */}
+      <View style={re.dayBody}>
+        {dia.periodos.map((periodo) => (
+          <View key={periodo.periodo} style={re.periodSection}>
+            {/* Period label row */}
+            <View style={re.periodHeaderRow}>
+              <Feather
+                name={PERIODO_ICON[periodo.periodo] as any}
+                size={11}
+                color={GOLD}
+              />
+              <Text style={re.periodLabel}>{PERIODO_LABEL[periodo.periodo]}</Text>
+              <View style={re.periodDivider} />
             </View>
-            {periodo.items.map((item) => (
-              <Pressable
-                key={item.id}
-                style={({ pressed }) => [re.itemRow, pressed && { opacity: 0.78 }]}
-                onPress={() => router.push(`/lugar/rio/${item.id}`)}
-              >
-                <Image source={item.image} style={re.thumb} resizeMode="cover" />
-                <View style={re.itemInfo}>
-                  <Text style={re.itemName} numberOfLines={1}>{item.titulo}</Text>
-                  <View style={re.itemMeta}>
-                    <View style={re.catBadge}>
-                      <Text style={re.catBadgeText}>{CATEGORY_LABEL[item.categoria]}</Text>
+
+            {/* Items */}
+            {periodo.items.map((item, idx) => {
+              const timeStr = getItemTime(periodo.periodo, idx);
+              const travelMin = 10 + ((dia.numero * 7 + idx * 5) % 22);
+              const travelKm  = (1.8 + (dia.numero + idx) * 1.3).toFixed(1);
+
+              return (
+                <React.Fragment key={item.id}>
+                  <Pressable
+                    style={({ pressed }) => [re.itemRow, pressed && { opacity: 0.80 }]}
+                    onPress={() => router.push(`/lugar/rio/${item.id}`)}
+                  >
+                    {/* Left: time */}
+                    <View style={re.timeCol}>
+                      <Text style={re.timeLabel}>{timeStr}</Text>
                     </View>
-                    {item.localizacao ? (
-                      <Text style={re.itemLoc} numberOfLines={1}>{item.localizacao}</Text>
-                    ) : null}
-                  </View>
-                </View>
-                <Feather name="chevron-right" size={14} color={C.border} />
-              </Pressable>
-            ))}
+
+                    {/* Thumbnail */}
+                    <View style={re.thumb}>
+                      <Image
+                        source={item.image}
+                        style={StyleSheet.absoluteFill}
+                        resizeMode="cover"
+                      />
+                      <LinearGradient
+                        colors={["transparent", "rgba(8,4,1,0.45)"]}
+                        style={StyleSheet.absoluteFill}
+                      />
+                    </View>
+
+                    {/* Info */}
+                    <View style={re.itemInfo}>
+                      <Text style={re.itemName} numberOfLines={1}>{item.titulo}</Text>
+                      <View style={re.itemLocRow}>
+                        <Feather name="map-pin" size={9} color={`${GOLD}80`} />
+                        <Text style={re.itemLoc} numberOfLines={1}>
+                          {item.localizacao ?? dia.bairro}
+                        </Text>
+                      </View>
+                      <View style={re.catBadge}>
+                        <Text style={re.catBadgeText}>{CATEGORY_LABEL[item.categoria]}</Text>
+                      </View>
+                    </View>
+
+                    <Feather name="chevron-right" size={14} color="rgba(245,240,232,0.25)" />
+                  </Pressable>
+
+                  {/* Travel connector between items */}
+                  {idx < periodo.items.length - 1 && (
+                    <View style={re.travelConnector}>
+                      <View style={re.timeColSpacer} />
+                      <View style={re.connectorPill}>
+                        <Feather name="truck" size={9} color="rgba(245,240,232,0.40)" />
+                        <Text style={re.connectorText}>
+                          Carro · {travelMin} min · {travelKm} km
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+                </React.Fragment>
+              );
+            })}
           </View>
-        );
-      })}
+        ))}
+      </View>
     </View>
   );
 }
 
 const re = StyleSheet.create({
+  // ── Hotel card ─────────────────────────────────────────────────────────────
   hotelCard: {
-    height: 160,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    backgroundColor: GLASS_BG,
     borderRadius: 18,
+    borderWidth: 1,
+    borderColor: GLASS_BORDER,
+    padding: 14,
+    marginBottom: 14,
+  },
+  hotelThumb: {
+    width: 62,
+    height: 62,
+    borderRadius: 12,
     overflow: "hidden",
-    marginBottom: 16,
-    justifyContent: "flex-end",
-    borderWidth: 1,
-    borderColor: `${GOLD}22`,
+    backgroundColor: "rgba(30,15,5,0.60)",
+    flexShrink: 0,
   },
-  hotelImg: {
-    ...StyleSheet.absoluteFillObject,
+  hotelContent: {
+    flex: 1,
+    gap: 3,
   },
-  hotelBadge: {
-    position: "absolute",
-    top: 14,
-    left: 14,
-    backgroundColor: `${GOLD}22`,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: `${GOLD}44`,
-  },
-  hotelBadgeText: {
-    fontFamily: "Inter_600SemiBold",
+  hotelLabel: {
+    fontFamily: "Inter_500Medium",
     fontSize: 9,
-    color: GOLD,
-    letterSpacing: 1.2,
-  },
-  hotelInfo: {
-    padding: 16,
-    gap: 2,
+    color: `${GOLD}90`,
+    letterSpacing: 1.0,
   },
   hotelName: {
     fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 18,
-    color: C.cream,
+    fontSize: 15,
+    color: CREAM,
+    lineHeight: 20,
+  },
+  hotelLocRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 1,
   },
   hotelLoc: {
     fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: "rgba(245,240,232,0.60)",
-  },
-
-  summary: {
-    marginBottom: 16,
-    borderRadius: 16,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: `${GOLD}22`,
-    backgroundColor: C.darkBrown,
-  },
-  summaryInner: {
-    flexDirection: "row",
-    paddingVertical: 18,
-  },
-  statBlock: {
-    flex: 1,
-    alignItems: "center",
-    gap: 2,
-  },
-  statVal: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 22,
-    color: C.cream,
-    lineHeight: 28,
-  },
-  statLbl: {
-    fontFamily: "Inter_400Regular",
     fontSize: 11,
     color: "rgba(245,240,232,0.50)",
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: `${GOLD}18`,
-    alignSelf: "stretch",
-    marginVertical: 4,
-  },
-  summaryLine: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 12,
-    color: "rgba(245,240,232,0.45)",
-    textAlign: "center",
-    paddingBottom: 14,
-    letterSpacing: 0.3,
+    flex: 1,
   },
 
+  // ── Summary card ───────────────────────────────────────────────────────────
+  summary: {
+    backgroundColor: GLASS_BG,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: GLASS_BORDER,
+    padding: 18,
+    marginBottom: 14,
+    gap: 6,
+  },
+  summaryTitle: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 18,
+    color: CREAM,
+    lineHeight: 24,
+  },
+  summarySub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: "rgba(245,240,232,0.40)",
+    lineHeight: 16,
+  },
+  dayPills: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 8,
+  },
+  dayPillsLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: "rgba(245,240,232,0.40)",
+  },
+  dayPill: {
+    backgroundColor: "rgba(201,168,76,0.12)",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(201,168,76,0.22)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  dayPillText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    color: GOLD,
+  },
+
+  // ── Action row ─────────────────────────────────────────────────────────────
   actionRow: {
     flexDirection: "row",
     gap: 10,
-    marginBottom: 20,
+    marginBottom: 14,
   },
   actionBtn: {
     flex: 1,
@@ -1322,40 +1426,34 @@ const re = StyleSheet.create({
     gap: 8,
     paddingVertical: 14,
     borderRadius: 14,
-  },
-  actionBtnPrimary: {
-    backgroundColor: C.darkBrown,
     borderWidth: 1,
-    borderColor: `${GOLD}30`,
   },
-  actionBtnSecondary: {
-    backgroundColor: C.warmBeige,
-    borderWidth: 1,
-    borderColor: C.border,
+  actionBtnWA: {
+    backgroundColor: "rgba(18,40,18,0.70)",
+    borderColor: "rgba(40,120,40,0.25)",
+  },
+  actionBtnEdit: {
+    backgroundColor: GLASS_BG,
+    borderColor: "rgba(201,168,76,0.22)",
   },
   actionBtnText: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 13,
-    color: C.cream,
-  },
-  actionBtnTextSecondary: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-    color: C.darkBrown,
+    color: CREAM,
   },
 
+  // ── Map CTA ────────────────────────────────────────────────────────────────
   mapCta: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 8,
-    marginBottom: 8,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
+    backgroundColor: GLASS_BG,
     borderRadius: 16,
-    backgroundColor: C.darkBrown,
     borderWidth: 1,
-    borderColor: `${GOLD}30`,
+    borderColor: GLASS_BORDER,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    marginBottom: 20,
   },
   mapCtaLeft: {
     flexDirection: "row",
@@ -1366,67 +1464,96 @@ const re = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: `${GOLD}14`,
+    backgroundColor: "rgba(201,168,76,0.12)",
     borderWidth: 1,
-    borderColor: `${GOLD}30`,
+    borderColor: "rgba(201,168,76,0.22)",
     alignItems: "center",
     justifyContent: "center",
   },
   mapCtaLabel: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 14,
-    color: C.cream,
+    color: CREAM,
   },
   mapCtaSub: {
     fontFamily: "Inter_400Regular",
     fontSize: 11,
-    color: "rgba(245,240,232,0.50)",
+    color: "rgba(245,240,232,0.40)",
     marginTop: 1,
   },
 
+  // ── Day card ───────────────────────────────────────────────────────────────
   dayCard: {
-    marginBottom: 20,
+    marginBottom: 16,
     borderRadius: 20,
-    backgroundColor: C.warmBeige,
+    backgroundColor: GLASS_BG,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: GLASS_BORDER,
     overflow: "hidden",
   },
   dayHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    backgroundColor: C.darkBrown,
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    backgroundColor: GLASS_HEADER,
     borderBottomWidth: 1,
-    borderBottomColor: `${GOLD}18`,
+    borderBottomColor: "rgba(201,168,76,0.10)",
   },
   dayNumBadge: {
-    backgroundColor: `${GOLD}18`,
+    backgroundColor: "rgba(201,168,76,0.16)",
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderWidth: 1,
-    borderColor: `${GOLD}30`,
+    borderColor: "rgba(201,168,76,0.28)",
+    flexShrink: 0,
   },
   dayNumText: {
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: "Inter_700Bold",
     fontSize: 9,
     color: GOLD,
-    letterSpacing: 1.4,
+    letterSpacing: 1.5,
   },
   dayBairro: {
     fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 16,
-    color: C.cream,
+    fontSize: 15,
+    color: CREAM,
     flex: 1,
   },
-  periodBlock: {
-    paddingHorizontal: 16,
-    paddingTop: 14,
+  weatherEmoji: {
+    fontSize: 16,
+    flexShrink: 0,
   },
-  periodHeader: {
+  travelChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(245,240,232,0.06)",
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: "rgba(245,240,232,0.08)",
+    flexShrink: 0,
+  },
+  travelChipText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 9,
+    color: "rgba(245,240,232,0.40)",
+  },
+
+  // ── Day body / periods ─────────────────────────────────────────────────────
+  dayBody: {
+    paddingTop: 4,
+    paddingBottom: 8,
+  },
+  periodSection: {
+    paddingHorizontal: 14,
+    paddingTop: 12,
+  },
+  periodHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
@@ -1438,54 +1565,102 @@ const re = StyleSheet.create({
     color: GOLD,
     letterSpacing: 0.8,
   },
-  periodLine: {
+  periodDivider: {
     flex: 1,
     height: 1,
-    backgroundColor: `${GOLD}20`,
+    backgroundColor: "rgba(201,168,76,0.14)",
   },
+
+  // ── Item row ───────────────────────────────────────────────────────────────
   itemRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    marginBottom: 12,
+    gap: 10,
+    marginBottom: 6,
+  },
+  timeCol: {
+    width: 42,
+    alignItems: "flex-end",
+    flexShrink: 0,
+  },
+  timeLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    color: "rgba(245,240,232,0.55)",
   },
   thumb: {
-    width: 52,
-    height: 52,
+    width: 58,
+    height: 58,
     borderRadius: 12,
-    backgroundColor: C.border,
+    overflow: "hidden",
+    backgroundColor: "rgba(30,15,5,0.60)",
+    flexShrink: 0,
   },
   itemInfo: {
     flex: 1,
-    gap: 4,
+    gap: 3,
   },
   itemName: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 13,
-    color: C.darkBrown,
+    color: CREAM,
+    lineHeight: 17,
   },
-  itemMeta: {
+  itemLocRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-  },
-  catBadge: {
-    backgroundColor: `${C.darkBrown}10`,
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  catBadgeText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 9,
-    color: C.warmGray,
-    letterSpacing: 0.3,
+    gap: 4,
   },
   itemLoc: {
     fontFamily: "Inter_400Regular",
     fontSize: 11,
-    color: C.warmGray,
+    color: "rgba(245,240,232,0.45)",
     flex: 1,
+  },
+  catBadge: {
+    backgroundColor: "rgba(201,168,76,0.10)",
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: "rgba(201,168,76,0.18)",
+    alignSelf: "flex-start",
+  },
+  catBadgeText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 9,
+    color: `${GOLD}CC`,
+    letterSpacing: 0.3,
+  },
+
+  // ── Travel connector ───────────────────────────────────────────────────────
+  travelConnector: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+    marginTop: 2,
+  },
+  timeColSpacer: {
+    width: 42,
+    flexShrink: 0,
+  },
+  connectorPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(245,240,232,0.05)",
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: "rgba(245,240,232,0.07)",
+    marginLeft: 4,
+  },
+  connectorText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: "rgba(245,240,232,0.35)",
   },
 });
 
@@ -1558,22 +1733,39 @@ export default function RoteiroScreen() {
   const phase: "journey" | "loading" | "result" =
     generating ? "loading" : result ? "result" : "journey";
 
+  // Hero image for cinematic result background — prefer hotel image
+  const heroImg = hotelItem?.image ?? require("@/assets/images/ipanema.png");
+
   return (
     <View style={sc.root}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* Atmospheric background — always rendered, blurred over in journey */}
-      <View style={[sc.heroBg, { pointerEvents: "none" }]}>
-        <LinearGradient
-          colors={[C.cream, "#EDE5D6", "#E4D9C5"]}
-          locations={[0, 0.5, 1]}
-          style={StyleSheet.absoluteFill}
-        />
-        <Text style={sc.heroWatermark}>{"RIO\nDE\nJAN."}</Text>
-        <View style={sc.heroAccent} />
-      </View>
+      {/* ── Light atmospheric background (journey + loading phases) ── */}
+      {phase !== "result" && (
+        <View style={[sc.heroBg, { pointerEvents: "none" }]}>
+          <LinearGradient
+            colors={[C.cream, "#EDE5D6", "#E4D9C5"]}
+            locations={[0, 0.5, 1]}
+            style={StyleSheet.absoluteFill}
+          />
+          <Text style={sc.heroWatermark}>{"RIO\nDE\nJAN."}</Text>
+          <View style={sc.heroAccent} />
+        </View>
+      )}
 
-      {/* Header (hidden in journey phase) */}
+      {/* ── Cinematic dark background (result phase only) ── */}
+      {phase === "result" && (
+        <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}>
+          <Image source={heroImg} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          <LinearGradient
+            colors={["rgba(12,6,2,0.62)", "rgba(8,4,1,0.82)", "rgba(5,2,0,0.93)"]}
+            locations={[0, 0.45, 1]}
+            style={StyleSheet.absoluteFill}
+          />
+        </View>
+      )}
+
+      {/* ── Header (hidden in journey phase) ── */}
       {phase !== "journey" && (
         <View style={{ paddingTop: topPad }}>
           <ScreenHeader
@@ -1583,7 +1775,7 @@ export default function RoteiroScreen() {
         </View>
       )}
 
-      {/* Phase content */}
+      {/* ── Phase content ── */}
       {phase === "journey" && (
         <JourneyOverlay savedCount={saved.length} onGenerate={handleGenerate} />
       )}
@@ -1593,6 +1785,7 @@ export default function RoteiroScreen() {
       {phase === "result" && (
         <ScrollView
           showsVerticalScrollIndicator={false}
+          style={{ backgroundColor: "transparent" }}
           contentContainerStyle={[sc.content, { paddingBottom: bottomPad + 40 }]}
         >
           <ResultPhase
