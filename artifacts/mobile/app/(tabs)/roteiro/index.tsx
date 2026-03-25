@@ -60,24 +60,16 @@ type TravelVibe  = "solo" | "casal" | "amigos" | "família";
 type BudgetStyle = "essencial" | "conforto" | "sofisticado";
 
 const COMPANIONS: { id: TravelVibe; label: string; icon: string }[] = [
-  { id: "solo",    label: "Solo",    icon: "🚶" },
-  { id: "casal",   label: "Casal",   icon: "💑" },
-  { id: "amigos",  label: "Amigos",  icon: "👥" },
-  { id: "família", label: "Família", icon: "👨‍👩‍👧" },
+  { id: "solo",    label: "Solo",    icon: "user"  },
+  { id: "casal",   label: "Casal",   icon: "heart" },
+  { id: "amigos",  label: "Amigos",  icon: "users" },
+  { id: "família", label: "Família", icon: "home"  },
 ];
 
 const BUDGETS: { id: BudgetStyle; label: string; desc: string }[] = [
   { id: "essencial",   label: "Essencial",   desc: "Custo-benefício · experiências acessíveis" },
   { id: "conforto",    label: "Conforto",    desc: "Qualidade equilibrada · bom e bem feito" },
   { id: "sofisticado", label: "Sofisticado", desc: "Melhor do Rio · exclusivo e premium" },
-];
-
-const INSPIRATIONS: { id: Inspiration; label: string; icon: string }[] = [
-  { id: "gastronomia", label: "Gastronomia", icon: "🍽️" },
-  { id: "cultura",     label: "Cultura",     icon: "🎭" },
-  { id: "praia",       label: "Praia",       icon: "🏖️" },
-  { id: "aventura",    label: "Aventura",    icon: "⚡" },
-  { id: "lucky",       label: "Lucky List",  icon: "✦" },
 ];
 
 const CATEGORY_LABEL: Record<SavedCategory, string> = {
@@ -103,13 +95,14 @@ function getItemTime(periodo: string, idx: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-const WEATHER_SEQ = ["☀️", "☀️", "🌤️", "⛅", "🌤️", "☀️", "🌥️", "☀️"];
-function getDayWeather(dayNum: number): string {
+type WeatherIcon = "sun" | "cloud" | "wind";
+const WEATHER_SEQ: WeatherIcon[] = ["sun", "sun", "cloud", "cloud", "cloud", "sun", "wind", "sun"];
+function getDayWeather(dayNum: number): WeatherIcon {
   return WEATHER_SEQ[(dayNum - 1) % WEATHER_SEQ.length];
 }
 
 const GLASS_BG     = "rgba(255,255,255,0.10)";
-const GLASS_HEADER = "rgba(18,9,2,0.90)";
+const GLASS_HEADER = "rgba(0,0,0,0.90)";
 const GLASS_BORDER = "rgba(255,255,255,0.18)";
 const CREAM        = "#FFFFFF";
 
@@ -450,7 +443,11 @@ function FlowPage2({
                 style={[fp.pill, active && fp.pillActive]}
                 onPress={() => onTravelVibeChange(c.id)}
               >
-                <Text style={fp.pillIcon}>{c.icon}</Text>
+                <Feather
+                  name={c.icon as any}
+                  size={12}
+                  color={active ? "rgba(0,0,0,0.70)" : "rgba(255,255,255,0.55)"}
+                />
                 <Text style={[fp.pillText, active && fp.pillTextActive]}>{c.label}</Text>
               </Pressable>
             );
@@ -710,7 +707,11 @@ function ContextualFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) 
                 style={[cf.companionCard, travelVibe === c.id && cf.companionCardActive]}
                 onPress={() => handleCompanion(c.id)}
               >
-                <Text style={cf.companionIcon}>{c.icon}</Text>
+                <Feather
+                  name={c.icon as any}
+                  size={26}
+                  color={travelVibe === c.id ? GOLD : "rgba(255,255,255,0.55)"}
+                />
                 <Text style={[cf.companionLabel, travelVibe === c.id && cf.companionLabelActive]}>
                   {c.label}
                 </Text>
@@ -817,8 +818,8 @@ const fp = StyleSheet.create({
     fontSize: 36,
     color: CREAM,
     lineHeight: 44,
-    marginBottom: 8,
-    marginTop: 4,
+    marginBottom: 10,
+    marginTop: 8,
   },
 
   bigSub: {
@@ -826,7 +827,7 @@ const fp = StyleSheet.create({
     fontSize: 14,
     color: "rgba(255,255,255,0.56)",
     lineHeight: 22,
-    marginBottom: 24,
+    marginBottom: 32,
   },
 
   divider: {
@@ -935,19 +936,19 @@ const fp = StyleSheet.create({
   insGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
-    marginBottom: 20,
+    gap: 12,
+    marginBottom: 28,
   },
 
   insCard: {
     width: CARD_W,
-    height: 115,
+    height: 128,
     borderRadius: 16,
     overflow: "hidden",
     borderWidth: 2,
     borderColor: "transparent",
     justifyContent: "flex-end",
-    padding: 10,
+    padding: 12,
   },
 
   insCardActive: {
@@ -979,29 +980,30 @@ const fp = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     borderColor: GLASS_BORDER,
-    padding: 16,
-    marginBottom: 12,
+    padding: 20,
+    marginBottom: 16,
   },
 
   glassSectionLabel: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 14,
     color: CREAM,
-    marginBottom: 12,
+    marginBottom: 16,
+    letterSpacing: 0.2,
   },
 
   pillRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: 10,
   },
 
   pill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
     borderRadius: 50,
     borderWidth: 1,
     borderColor: GLASS_BORDER,
@@ -1013,18 +1015,15 @@ const fp = StyleSheet.create({
     borderColor: GOLD,
   },
 
-  pillIcon: {
-    fontSize: 14,
-  },
-
   pillText: {
     fontFamily: "Inter_500Medium",
     fontSize: 13,
     color: "rgba(255,255,255,0.78)",
+    letterSpacing: 0.1,
   },
 
   pillTextActive: {
-    color: C.darkBrown,
+    color: "#000000",
     fontFamily: "Inter_600SemiBold",
   },
 
@@ -1464,7 +1463,7 @@ const rs = StyleSheet.create({
     height: 56,
     borderRadius: 10,
     overflow: "hidden",
-    backgroundColor: "rgba(30,15,5,0.60)",
+    backgroundColor: "rgba(0,0,0,0.55)",
     flexShrink: 0,
   },
   sugInfo: {
@@ -1886,7 +1885,7 @@ function ResultDayCard({
           <Text style={re.dayNumText}>DIA {dia.numero}</Text>
         </View>
         <Text style={re.dayBairro} numberOfLines={1}>{dia.bairro}</Text>
-        <Text style={re.weatherEmoji}>{weather}</Text>
+        <Feather name={weather} size={13} color="rgba(255,255,255,0.45)" />
         <View style={re.travelChip}>
           <Feather name="clock" size={10} color="rgba(255,255,255,0.45)" />
           <Text style={re.travelChipText}>{travelMinTotal} min total</Text>
@@ -2016,7 +2015,7 @@ const re = StyleSheet.create({
     height: 62,
     borderRadius: 12,
     overflow: "hidden",
-    backgroundColor: "rgba(30,15,5,0.60)",
+    backgroundColor: "rgba(0,0,0,0.55)",
     flexShrink: 0,
   },
   hotelContent: {
@@ -2177,7 +2176,7 @@ const re = StyleSheet.create({
 
   // ── Day card ───────────────────────────────────────────────────────────────
   dayCard: {
-    marginBottom: 16,
+    marginBottom: 24,
     borderRadius: 20,
     backgroundColor: GLASS_BG,
     borderWidth: 1,
@@ -2188,8 +2187,8 @@ const re = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 13,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
     backgroundColor: GLASS_HEADER,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(212,175,55,0.10)",
@@ -2215,8 +2214,7 @@ const re = StyleSheet.create({
     color: CREAM,
     flex: 1,
   },
-  weatherEmoji: {
-    fontSize: 16,
+  weatherIcon: {
     flexShrink: 0,
   },
   travelChip: {
@@ -2239,18 +2237,18 @@ const re = StyleSheet.create({
 
   // ── Day body / periods ─────────────────────────────────────────────────────
   dayBody: {
-    paddingTop: 4,
-    paddingBottom: 8,
+    paddingTop: 8,
+    paddingBottom: 16,
   },
   periodSection: {
-    paddingHorizontal: 14,
-    paddingTop: 12,
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
   periodHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    marginBottom: 10,
+    marginBottom: 14,
   },
   periodLabel: {
     fontFamily: "Inter_600SemiBold",
@@ -2268,8 +2266,8 @@ const re = StyleSheet.create({
   itemRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    marginBottom: 6,
+    gap: 12,
+    marginBottom: 10,
   },
   timeCol: {
     width: 42,
@@ -2282,16 +2280,16 @@ const re = StyleSheet.create({
     color: "rgba(255,255,255,0.55)",
   },
   thumb: {
-    width: 58,
-    height: 58,
+    width: 60,
+    height: 60,
     borderRadius: 12,
     overflow: "hidden",
-    backgroundColor: "rgba(30,15,5,0.60)",
+    backgroundColor: "rgba(0,0,0,0.55)",
     flexShrink: 0,
   },
   itemInfo: {
     flex: 1,
-    gap: 3,
+    gap: 5,
   },
   itemName: {
     fontFamily: "Inter_600SemiBold",
@@ -2449,7 +2447,7 @@ export default function RoteiroScreen() {
     const lines: string[] = [`✦ Roteiro Rio de Janeiro — The Lucky Trip\n`];
     if (shareSlug) lines.push(`Ver roteiro completo: https://theluckytrip.app/r/${shareSlug}\n`);
     for (const dia of result.days) {
-      lines.push(`📍 Dia ${dia.numero} — ${dia.bairro}`);
+      lines.push(`Dia ${dia.numero} — ${dia.bairro}`);
       for (const periodo of dia.periodos) {
         const label = PERIODO_LABEL[periodo.periodo];
         const itens = periodo.items.map((it) => `  • ${it.titulo} (${it.localizacao || dia.bairro})`).join("\n");
@@ -2808,47 +2806,45 @@ const cf = StyleSheet.create({
   companionGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
-    marginTop: 4,
+    gap: 16,
+    marginTop: 12,
   },
   companionCard: {
-    width: (SW - 44 - 12) / 2,
+    width: (SW - 44 - 16) / 2,
     backgroundColor: GLASS_BG,
-    borderRadius: 18,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: GLASS_BORDER,
-    paddingVertical: 22,
-    paddingHorizontal: 12,
+    paddingVertical: 32,
+    paddingHorizontal: 16,
     alignItems: "center",
-    gap: 10,
+    gap: 14,
   },
   companionCardActive: {
     borderColor: GOLD,
-    backgroundColor: `${GOLD}18`,
-  },
-  companionIcon: {
-    fontSize: 30,
+    backgroundColor: `${GOLD}14`,
   },
   companionLabel: {
     fontFamily: "Inter_500Medium",
     fontSize: 14,
     color: "rgba(255,255,255,0.65)",
     textAlign: "center",
+    letterSpacing: 0.2,
   },
   companionLabelActive: {
     color: CREAM,
     fontFamily: "Inter_600SemiBold",
   },
   budgetGrid: {
-    gap: 12,
-    marginTop: 4,
+    gap: 14,
+    marginTop: 12,
   },
   budgetCard: {
     backgroundColor: GLASS_BG,
-    borderRadius: 18,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: GLASS_BORDER,
-    padding: 20,
+    padding: 24,
   },
   budgetCardActive: {
     borderColor: GOLD,
