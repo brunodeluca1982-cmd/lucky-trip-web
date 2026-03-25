@@ -671,9 +671,9 @@ function ContextualFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) 
           </View>
 
           {openCal && (
-            <InlineCal
+            <InlineCalendar
               value={openCal === "arrival" ? arrivalDate : departureDate}
-              min={openCal === "departure" && arrivalDate ? arrivalDate : new Date()}
+              minDate={openCal === "departure" && arrivalDate ? arrivalDate : new Date()}
               onSelect={openCal === "arrival" ? handleArrival : handleDeparture}
             />
           )}
