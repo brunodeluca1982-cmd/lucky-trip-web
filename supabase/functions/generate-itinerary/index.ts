@@ -261,12 +261,15 @@ async function attachNeighborhoodMeta(
 }
 
 // ── STEP 3: Classify best período using metadata hard signals ─────────────────
-// Rules applied in order of priority:
-//   1. categoria === "restaurante"  → almoco (will be overridden to noite if 2nd+ per day)
-//   2. momento_ideal from DB        → primary signal
-//   3. tags_ia contains "beach"     → tarde
-//   4. energia === "high"           → manha (high-energy = morning activity)
-//   5. default                      → manha
+//
+// Priority order (hard signals first, soft last):
+//   1. categoria === "restaurante"         → almoco  (day builder overflows 2nd+ to noite)
+//   2. momento_ideal from DB               → direct mapping (most trustworthy signal)
+//   3. tags_ia contains beach/praia        → tarde   (beaches are afternoon places)
+//   4. tags_ia contains bar/nightlife      → noite
+//   5. energia === "high"                  → manha   (high-intensity = early)
+//   6. duracao_media starts with "3h+"     → tarde   (long experiences fit afternoon)
+//   7. default                             → manha
 
 const MOMENTO_TO_PERIODO: Record<string, PeriodoDia> = {
   morning:   "manha",
@@ -277,23 +280,38 @@ const MOMENTO_TO_PERIODO: Record<string, PeriodoDia> = {
   night:     "noite",
 };
 
+// Whether a place's DB data allows it to move to a different period than classified.
+// Used by the morning load-balancer to avoid locking everything into manha.
+function isFlexible(p: EnrichedPlace): boolean {
+  // Restaurants are locked to their period — do not move them
+  if (p.categoria === "restaurante") return false;
+  // If DB explicitly says "morning only" (no afternoon/evening in list) and high energy → locked
+  const hasAfternoon = p.momento_ideal.some(
+    (m) => m === "afternoon" || m === "sunset" || m === "evening",
+  );
+  if (!hasAfternoon && p.energia === "high") return false;
+  return true;
+}
+
 function classifyPeriodo(p: EnrichedPlace): PeriodoDia {
-  // Rule 1 — restaurants anchor to almoco (day-level logic later handles overflow to noite)
   if (p.categoria === "restaurante") return "almoco";
 
-  // Rule 2 — DB momento_ideal (most reliable signal)
+  // DB momento_ideal — use the most prominent signal (first non-lunch entry)
   for (const m of p.momento_ideal) {
     const mapped = MOMENTO_TO_PERIODO[m.toLowerCase()];
-    if (mapped) return mapped;
+    if (mapped && mapped !== "almoco") return mapped;
   }
 
-  // Rule 3 — beach tag → tarde (beaches are best in the afternoon)
-  if (p.tags.some((t) => t.includes("beach") || t.includes("praia"))) return "tarde";
+  // Tag-based rules
+  if (p.tags.some((t) => t.includes("beach") || t.includes("praia")))   return "tarde";
+  if (p.tags.some((t) => t.includes("bar")   || t.includes("nightlife"))) return "noite";
 
-  // Rule 4 — high energy activities → morning (parks, viewpoints, hikes)
+  // Energia rule
   if (p.energia === "high") return "manha";
 
-  // Rule 5 — default
+  // Long-duration experiences fit better in the afternoon
+  if (p.duracao.startsWith("3") || p.duracao.startsWith("4") || p.duracao.startsWith("5")) return "tarde";
+
   return "manha";
 }
 
@@ -301,45 +319,150 @@ function classifyAllPeriodos(places: EnrichedPlace[]): EnrichedPlace[] {
   return places.map((p) => ({ ...p, best_periodo: classifyPeriodo(p) }));
 }
 
-// ── STEP 4: Group places by geographic coherence ──────────────────────────────
-// Algorithm:
-//   1. Sort activities by zone (South → North keeps days geographically tight)
-//   2. Sequential chunking: first N activities → Day 1, next N → Day 2, etc.
-//   3. Within each day chunk, sub-sort by neighborhood to keep walkable places together
-//   4. Restaurants matched to the day whose zone center is closest
+// ── STEP 4: Macro-region clustering ───────────────────────────────────────────
+//
+// Rio's geography is NOT a 1-D north-south spectrum.
+// Three macro-regions must NEVER be mixed in the same day:
+//
+//   "sul"    zones 1-3  Ipanema → Leblon → Copacabana → Botafogo → Flamengo
+//                       (all reachable by walking or a short Uber)
+//   "centro" zone  4    Centro → Santa Teresa → Lapa → Porto Maravilha
+//                       (historic / cultural cluster — adjacent to Sul)
+//   "oeste"  zone  5    Barra da Tijuca → Recreio → Guaratiba → Prainha
+//                       ISOLATED — 40+ min from Centro, never combine with Sul or Centro
+//   "norte"  zone  6    Tijuca → Maracanã → São Cristóvão
+//                       ISOLATED — never combine with Oeste or Sul directly
+//
+// Permitted same-day combinations:  sul + centro  (they share the Glória/Flamengo corridor)
+// Forbidden combinations:           sul  + oeste
+//                                   sul  + norte
+//                                   centro + oeste
+//                                   centro + norte
+//                                   oeste  + norte
+
+type MacroRegion = "sul" | "centro" | "oeste" | "norte";
+
+const ZONE_TO_MACRO: Record<number, MacroRegion> = {
+  1: "sul",
+  2: "sul",
+  3: "sul",
+  4: "centro",
+  5: "oeste",
+  6: "norte",
+};
+
+function getMacro(zone: number): MacroRegion {
+  return ZONE_TO_MACRO[zone] ?? "sul";
+}
+
+// Days-needed estimate for a bucket of items at a given vibe density
+function daysNeeded(count: number, perDay: number): number {
+  return count > 0 ? Math.max(1, Math.ceil(count / perDay)) : 0;
+}
+
+// Chunk a sorted array into `n` groups (sequential slices)
+function chunkInto(items: EnrichedPlace[], n: number): EnrichedPlace[][] {
+  if (n <= 0 || items.length === 0) return [];
+  const size = Math.ceil(items.length / n);
+  return Array.from({ length: n }, (_, i) => items.slice(i * size, (i + 1) * size)).filter(
+    (g) => g.length > 0,
+  );
+}
+
+// Sort a bucket internally: by zone, then by neighborhood name
+function sortBucket(items: EnrichedPlace[]): EnrichedPlace[] {
+  return [...items].sort((a, b) =>
+    a.zone !== b.zone ? a.zone - b.zone : a.area.localeCompare(b.area),
+  );
+}
 
 function groupByGeography(
   places:     EnrichedPlace[],
   tripLength: number,
+  vibe:       string,
 ): { dayGroups: EnrichedPlace[][]; dayRestaurants: EnrichedPlace[][] } {
+  const perDay      = VIBE_PER_DAY[vibe] ?? 4;
   const activities  = places.filter((p) => p.categoria !== "restaurante");
   const restaurants = places.filter((p) => p.categoria === "restaurante");
 
-  // Sort activities by zone, then by area name (keeps same-neighborhood items consecutive)
-  const sortedActs = [...activities].sort((a, b) => {
-    if (a.zone !== b.zone) return a.zone - b.zone;
-    return a.area.localeCompare(b.area);
-  });
+  // ── 4a. Separate into macro-region buckets ────────────────────────────────
+  const buckets: Record<MacroRegion, EnrichedPlace[]> = {
+    sul: [], centro: [], oeste: [], norte: [],
+  };
+  for (const act of activities) {
+    buckets[getMacro(act.zone)].push(act);
+  }
 
-  // Sequential zone chunks — each day gets a contiguous slice of the sorted list
-  const chunkSize = Math.ceil(sortedActs.length / tripLength);
-  const dayGroups: EnrichedPlace[][] = Array.from({ length: tripLength }, () => []);
-  sortedActs.forEach((act, i) => {
-    dayGroups[Math.min(Math.floor(i / chunkSize), tripLength - 1)].push(act);
-  });
+  // ── 4b. Allocate days per region ──────────────────────────────────────────
+  // Sul and Centro are compatible — merge them into one "central" pool.
+  // Oeste and Norte are isolated — each gets its own day allocation.
+  const centralItems = sortBucket([...buckets.sul, ...buckets.centro]);
+  const oesteItems   = sortBucket(buckets.oeste);
+  const norteItems   = sortBucket(buckets.norte);
 
-  // Match each restaurant to the closest-zone day
-  const dayRestaurants: EnrichedPlace[][] = Array.from({ length: tripLength }, () => []);
+  const totalActs    = activities.length;
+  if (totalActs === 0) {
+    // Restaurants-only edge case
+    const dayGroups: EnrichedPlace[][] = Array.from({ length: tripLength }, () => []);
+    const dayRestaurants: EnrichedPlace[][] = Array.from({ length: tripLength }, () => []);
+    restaurants.forEach((r, i) => dayRestaurants[i % tripLength].push(r));
+    return { dayGroups, dayRestaurants };
+  }
+
+  // Ideal day counts per pool (float)
+  const centralIdeal = (centralItems.length / totalActs) * tripLength;
+  const oesteIdeal   = (oesteItems.length   / totalActs) * tripLength;
+  const norteIdeal   = (norteItems.length   / totalActs) * tripLength;
+
+  // Minimum 1 day per non-empty pool (isolated regions keep their own days)
+  let centralDays = centralItems.length > 0 ? Math.max(1, Math.round(centralIdeal)) : 0;
+  let oesteDays   = oesteItems.length   > 0 ? Math.max(1, Math.round(oesteIdeal))   : 0;
+  let norteDays   = norteItems.length   > 0 ? Math.max(1, Math.round(norteIdeal))   : 0;
+
+  // Fix total to match tripLength (adjust central since it's flexible)
+  const allocated = centralDays + oesteDays + norteDays;
+  const delta     = tripLength - allocated;
+  centralDays     = Math.max(centralItems.length > 0 ? 1 : 0, centralDays + delta);
+
+  // ── 4c. Build day groups from each pool ──────────────────────────────────
+  const dayGroups: EnrichedPlace[][] = [
+    ...chunkInto(centralItems, centralDays),
+    ...chunkInto(oesteItems,   oesteDays),
+    ...chunkInto(norteItems,   norteDays),
+  ];
+
+  // Pad to tripLength with empty arrays (should be rare)
+  while (dayGroups.length < tripLength) dayGroups.push([]);
+
+  // ── 4d. Match restaurants to closest-region day ───────────────────────────
+  // Compute representative macro-region for each day group
+  function dayMacro(acts: EnrichedPlace[]): MacroRegion {
+    if (acts.length === 0) return "sul";
+    const counts: Record<MacroRegion, number> = { sul: 0, centro: 0, oeste: 0, norte: 0 };
+    for (const a of acts) counts[getMacro(a.zone)]++;
+    return (Object.entries(counts).sort((a, b) => b[1] - a[1])[0]![0]) as MacroRegion;
+  }
+
+  const dayRestaurants: EnrichedPlace[][] = Array.from({ length: dayGroups.length }, () => []);
   for (const rest of restaurants) {
+    const restMacro = getMacro(rest.zone);
     let bestDay   = 0;
     let bestScore = Infinity;
+
     dayGroups.forEach((acts, di) => {
-      // Representative zone = median item's zone for this day
-      const rep   = acts[Math.floor(acts.length / 2)]?.zone ?? 3;
-      // Score = zone distance (primary) + load penalty (secondary, avoids piling all on one day)
-      const score = Math.abs(rest.zone - rep) * 10 + dayRestaurants[di].length * 3;
+      const dm = dayMacro(acts);
+      // Strong preference for matching macro-region (score 0 = exact match)
+      // Adjacent macros (sul+centro) get score 5 — far better than a full zone-distance score
+      let macroScore: number;
+      if (dm === restMacro)                                       macroScore = 0;
+      else if ((dm === "sul" && restMacro === "centro") ||
+               (dm === "centro" && restMacro === "sul"))          macroScore = 5;
+      else                                                        macroScore = 50; // big penalty for cross-region
+
+      const score = macroScore + dayRestaurants[di].length * 3; // load-balancing tie-breaker
       if (score < bestScore) { bestScore = score; bestDay = di; }
     });
+
     dayRestaurants[bestDay].push(rest);
   }
 
@@ -347,63 +470,104 @@ function groupByGeography(
 }
 
 // ── STEP 5: Build fully populated DiaRoteiro[] ────────────────────────────────
-// Produces a complete itinerary draft — Gemini will receive this, not an empty skeleton.
 //
-// Period assignment per day:
-//   • Each activity uses its pre-classified best_periodo
-//   • First restaurant in a day  → almoco
-//   • Second+ restaurant in a day → noite (dinner overflow)
-//   • Canonical order: manha → almoco → tarde → noite
+// For each day group produced by Step 4:
+//   • Assign periods from Step 3 classification
+//   • Apply morning load balancing (cap heavy items in manha)
+//   • 1st restaurant → almoco, 2nd+ → noite
+//   • Day label = modal neighborhood
 
 const PERIODO_ORDER: PeriodoDia[] = ["manha", "almoco", "tarde", "noite"];
+
+// Max "manha" items per day before overflowing to tarde
+const MANHA_CAP: Record<string, number> = { tranquilo: 2, moderado: 2, intenso: 3 };
 
 function buildFullDraft(
   dayGroups:      EnrichedPlace[][],
   dayRestaurants: EnrichedPlace[][],
+  vibe:           string,
 ): DiaRoteiro[] {
+  const manhaCap = MANHA_CAP[vibe] ?? 2;
   const days: DiaRoteiro[] = [];
 
   dayGroups.forEach((acts, di) => {
     const rests = dayRestaurants[di] ?? [];
     if (acts.length === 0 && rests.length === 0) return;
 
-    const periodMap = new Map<PeriodoDia, ItemRoteiro[]>();
-
-    // Place activities using their pre-classified período
+    // ── 5a. Initial period assignment from Step 3 classification ─────────────
+    const periodMap = new Map<PeriodoDia, EnrichedPlace[]>();
     for (const act of acts) {
-      const periodo = act.best_periodo ?? "manha";
-      if (!periodMap.has(periodo)) periodMap.set(periodo, []);
-      periodMap.get(periodo)!.push({
-        id: act.id, titulo: act.name, categoria: act.categoria, localizacao: act.area,
-      });
+      const p = act.best_periodo ?? "manha";
+      if (!periodMap.has(p)) periodMap.set(p, []);
+      periodMap.get(p)!.push(act);
     }
 
-    // Place restaurants: 1st → almoco, 2nd+ → noite
+    // ── 5b. Morning load balancing ────────────────────────────────────────────
+    // If too many items landed in manha, overflow flexible ones to tarde.
+    // This prevents "Praia + Cristo + Parque Lage" all stacked in the morning.
+    const manha = periodMap.get("manha") ?? [];
+    if (manha.length > manhaCap) {
+      // Sort: inflexible (locked) items stay; flexible items can move
+      const locked    = manha.filter((p) => !isFlexible(p));
+      const flexible  = manha.filter((p) =>  isFlexible(p));
+
+      // Keep up to manhaCap locked items; overflow the rest to tarde
+      const keepCount  = Math.min(manhaCap, locked.length);
+      const inManha    = locked.slice(0, keepCount);
+      const overflowed = [
+        ...locked.slice(keepCount),
+        ...flexible,
+      ];
+
+      // If we still have room for flexible items in manha (e.g., 2 slots, 1 locked)
+      const slots = manhaCap - inManha.length;
+      inManha.push(...flexible.slice(0, slots));
+      const finalOverflow = [
+        ...locked.slice(keepCount),
+        ...flexible.slice(slots),
+      ];
+
+      periodMap.set("manha", inManha);
+      if (finalOverflow.length > 0) {
+        if (!periodMap.has("tarde")) periodMap.set("tarde", []);
+        periodMap.get("tarde")!.unshift(...finalOverflow);
+      }
+    }
+
+    // ── 5c. Restaurants: 1st → almoco, 2nd+ → noite ──────────────────────────
     rests.forEach((r, i) => {
-      const periodo: PeriodoDia = i === 0 ? "almoco" : "noite";
-      if (!periodMap.has(periodo)) periodMap.set(periodo, []);
-      periodMap.get(periodo)!.push({
-        id: r.id, titulo: r.name, categoria: r.categoria, localizacao: r.area,
-      });
+      const p: PeriodoDia = i === 0 ? "almoco" : "noite";
+      if (!periodMap.has(p)) periodMap.set(p, []);
+      periodMap.get(p)!.push(r);
     });
 
-    // Build ordered periodos
+    // ── 5d. Build ordered periodos ────────────────────────────────────────────
     const periodos: DiaPeriodo[] = PERIODO_ORDER
       .filter((p) => (periodMap.get(p) ?? []).length > 0)
-      .map((p)   => ({ periodo: p, items: periodMap.get(p)! }));
+      .map((p)   => ({
+        periodo: p,
+        items:   periodMap.get(p)!.map((a) => ({
+          id:          a.id,
+          titulo:      a.name,
+          categoria:   a.categoria,
+          localizacao: a.area,
+        })),
+      }));
 
     if (periodos.length === 0) return;
 
-    // Day bairro = the neighborhood with the most items (modal bairro)
-    const allItems = [...acts, ...rests];
+    // ── 5e. Day label = modal neighborhood ────────────────────────────────────
+    const allItems    = [...acts, ...rests];
     const bairroCount = new Map<string, number>();
-    for (const item of allItems) bairroCount.set(item.area, (bairroCount.get(item.area) ?? 0) + 1);
-    const bairro = [...bairroCount.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "Rio de Janeiro";
+    for (const item of allItems) {
+      bairroCount.set(item.area, (bairroCount.get(item.area) ?? 0) + 1);
+    }
+    const bairro = [...bairroCount.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
+      ?? "Rio de Janeiro";
 
     days.push({ numero: di + 1, bairro, periodos });
   });
 
-  // Renumber (some days may have been skipped if truly empty)
   return days.map((d, i) => ({ ...d, numero: i + 1 }));
 }
 
@@ -595,11 +759,11 @@ serve(async (req) => {
     // ── Trip length is locked here — Gemini cannot change it ──────────────────
     const tripLength = computeTripLength(places.length, vibe, requestedDays);
 
-    // ── Step 4: Group places by geographic coherence ──────────────────────────
-    const { dayGroups, dayRestaurants } = groupByGeography(places, tripLength);
+    // ── Step 4: Macro-region clustering (oeste + norte isolated from centro + sul)
+    const { dayGroups, dayRestaurants } = groupByGeography(places, tripLength, vibe);
 
-    // ── Step 5: Build fully populated DiaRoteiro[] ────────────────────────────
-    let days = buildFullDraft(dayGroups, dayRestaurants);
+    // ── Step 5: Build fully populated DiaRoteiro[] with morning load balancing
+    let days = buildFullDraft(dayGroups, dayRestaurants, vibe);
 
     // ── Step 6: Gemini refinement — only reorders within existing períodos ─────
     days = await refineWithGemini(days, dest, preferences, places);
