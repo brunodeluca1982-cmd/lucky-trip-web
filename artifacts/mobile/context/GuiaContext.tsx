@@ -47,6 +47,8 @@ export interface SavedItem {
   /** bairro — e.g. "Ipanema", "Leblon", "Santa Teresa" */
   localizacao: string;
   image: ImageSourcePropType;
+  /** True when the item was added manually via external search (Google Places) */
+  isExternal?: boolean;
 }
 
 // ── Viagem entity ─────────────────────────────────────────────────────────────

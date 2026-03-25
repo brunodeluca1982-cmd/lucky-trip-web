@@ -497,6 +497,11 @@ interface TripFlowProps {
 }
 
 function TripFlow({ savedCount: _savedCount, isContextual, onGenerate }: TripFlowProps) {
+  if (isContextual) return <ContextualFlow onGenerate={onGenerate} />;
+  return <StandardFlow onGenerate={onGenerate} />;
+}
+
+function StandardFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) => void }) {
   const [page,          setPage]          = useState(0);
   const [destination,   setDestination]   = useState("Rio de Janeiro");
   const [arrivalDate,   setArrivalDate]   = useState<Date | null>(null);
@@ -526,7 +531,7 @@ function TripFlow({ savedCount: _savedCount, isContextual, onGenerate }: TripFlo
 
   return page === 0 ? (
     <FlowPage1
-      showDestination={!isContextual}
+      showDestination
       destination={destination}
       onDestinationChange={setDestination}
       arrivalDate={arrivalDate}
@@ -546,6 +551,252 @@ function TripFlow({ savedCount: _savedCount, isContextual, onGenerate }: TripFlo
       onBack={handleBack}
       onGenerate={handleGenerate}
     />
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ContextualFlow — step-based wizard for Viagem contextual entry
+// Steps: 0 = Dates  1 = Company  2 = Interests  3 = Style/Budget
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ContextualFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) => void }) {
+  const insets = useSafeAreaInsets();
+  const topPad = Platform.OS === "web" ? 72 : insets.top + 20;
+
+  const [step,          setStep]          = useState(0);
+  const [arrivalDate,   setArrivalDate]   = useState<Date | null>(null);
+  const [departureDate, setDepartureDate] = useState<Date | null>(null);
+  const [openCal,       setOpenCal]       = useState<"arrival" | "departure" | null>(null);
+  const [travelVibe,    setTravelVibe]    = useState<TravelVibe | null>(null);
+  const [inspirations,  setInspirations]  = useState<Inspiration[]>([]);
+  const [budget,        setBudget]        = useState<BudgetStyle | null>(null);
+
+  function fmtDate(d: Date | null): string | null {
+    if (!d) return null;
+    return `${d.getDate()} de ${MONTH_PT[d.getMonth()].toLowerCase()}`;
+  }
+
+  function handleArrival(d: Date) {
+    setArrivalDate(d);
+    setOpenCal("departure");
+    if (departureDate && !isBeforeDay(d, departureDate)) {
+      setDepartureDate(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1));
+    }
+  }
+
+  function handleDeparture(d: Date) {
+    setDepartureDate(d);
+    setOpenCal(null);
+    if (arrivalDate) setTimeout(() => setStep(1), 380);
+  }
+
+  function handleCompanion(v: TravelVibe) {
+    setTravelVibe(v);
+    setTimeout(() => setStep(2), 200);
+  }
+
+  function toggleInspiration(id: Inspiration) {
+    setInspirations((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
+
+  function handleBudget(b: BudgetStyle) {
+    setBudget(b);
+    const nights =
+      arrivalDate && departureDate
+        ? Math.max(1, Math.round((departureDate.getTime() - arrivalDate.getTime()) / 86400000))
+        : 3;
+    setTimeout(() => onGenerate({
+      nights,
+      travelVibe: travelVibe ?? "amigos",
+      inspirations,
+      budget: b,
+      vibe: "moderado",
+    }), 300);
+  }
+
+  const STEP_LABELS = ["Datas", "Companhia", "Interesses", "Estilo"];
+
+  return (
+    <ScrollView
+      style={{ flex: 1 }}
+      contentContainerStyle={[fp.page, { paddingTop: topPad, paddingBottom: 56 }]}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* ── Progress indicators ── */}
+      <View style={cf.stepRow}>
+        {STEP_LABELS.map((_, i) => (
+          <View
+            key={i}
+            style={[cf.stepDot, i === step && cf.stepDotActive, i < step && cf.stepDotDone]}
+          >
+            {i < step ? (
+              <Feather name="check" size={10} color={C.darkBrown} />
+            ) : (
+              <Text style={[cf.stepNum, i === step && cf.stepNumActive]}>{i + 1}</Text>
+            )}
+          </View>
+        ))}
+      </View>
+
+      {/* ══ Step 0: Dates ══ */}
+      {step === 0 && (
+        <>
+          <Text style={fp.bigTitle}>Quando você vai?</Text>
+          <Text style={fp.bigSub}>
+            Selecione suas datas para montar o roteiro perfeito
+          </Text>
+
+          <View style={cf.dateRow}>
+            <Pressable
+              style={[cf.dateBtn, openCal === "arrival" && cf.dateBtnActive]}
+              onPress={() => setOpenCal("arrival")}
+            >
+              <Feather name="calendar" size={14} color={arrivalDate ? GOLD : `${GOLD}55`} />
+              <Text style={[cf.dateBtnText, arrivalDate && cf.dateBtnTextSet]}>
+                {fmtDate(arrivalDate) ?? "Chegada"}
+              </Text>
+            </Pressable>
+            <Feather name="arrow-right" size={14} color={`${GOLD}40`} />
+            <Pressable
+              style={[cf.dateBtn, openCal === "departure" && cf.dateBtnActive]}
+              onPress={() => setOpenCal("departure")}
+            >
+              <Feather name="calendar" size={14} color={departureDate ? GOLD : `${GOLD}55`} />
+              <Text style={[cf.dateBtnText, departureDate && cf.dateBtnTextSet]}>
+                {fmtDate(departureDate) ?? "Saída"}
+              </Text>
+            </Pressable>
+          </View>
+
+          {openCal && (
+            <InlineCal
+              value={openCal === "arrival" ? arrivalDate : departureDate}
+              min={openCal === "departure" && arrivalDate ? arrivalDate : new Date()}
+              onSelect={openCal === "arrival" ? handleArrival : handleDeparture}
+            />
+          )}
+
+          {arrivalDate && departureDate && (
+            <Pressable
+              style={[fp.cta, { marginTop: 16 }]}
+              onPress={() => setStep(1)}
+            >
+              <Text style={fp.ctaText}>Próximo</Text>
+              <Feather name="chevron-right" size={17} color={C.darkBrown} />
+            </Pressable>
+          )}
+
+          <Pressable style={cf.skipBtn} onPress={() => setStep(1)} hitSlop={12}>
+            <Text style={cf.skipText}>Pular — usar datas flexíveis</Text>
+          </Pressable>
+        </>
+      )}
+
+      {/* ══ Step 1: Company ══ */}
+      {step === 1 && (
+        <>
+          <Text style={fp.bigTitle}>Com quem você vai?</Text>
+          <Text style={fp.bigSub}>
+            Personalizamos o roteiro de acordo com a sua companhia
+          </Text>
+
+          <View style={cf.companionGrid}>
+            {COMPANIONS.map((c) => (
+              <Pressable
+                key={c.id}
+                style={[cf.companionCard, travelVibe === c.id && cf.companionCardActive]}
+                onPress={() => handleCompanion(c.id)}
+              >
+                <Text style={cf.companionIcon}>{c.icon}</Text>
+                <Text style={[cf.companionLabel, travelVibe === c.id && cf.companionLabelActive]}>
+                  {c.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
+      )}
+
+      {/* ══ Step 2: Interests ══ */}
+      {step === 2 && (
+        <>
+          <Text style={fp.bigTitle}>O que te inspira?</Text>
+          <Text style={fp.bigSub}>
+            Selecione o que você ama para personalizarmos seu roteiro
+          </Text>
+
+          <View style={fp.insGrid}>
+            {INSPIRATIONS_DATA.map((ins) => {
+              const active = inspirations.includes(ins.id);
+              return (
+                <Pressable
+                  key={ins.id}
+                  style={[fp.insCard, active && fp.insCardActive]}
+                  onPress={() => toggleInspiration(ins.id)}
+                >
+                  <Image source={ins.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                  <LinearGradient
+                    colors={["transparent", "rgba(8,4,1,0.80)"]}
+                    locations={[0.25, 1]}
+                    style={StyleSheet.absoluteFill}
+                  />
+                  {active && (
+                    <View style={fp.insCheck}>
+                      <Feather name="check" size={11} color={GOLD} />
+                    </View>
+                  )}
+                  <Text style={fp.insLabel}>{ins.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Pressable style={fp.cta} onPress={() => setStep(3)}>
+            <Text style={fp.ctaText}>Próximo</Text>
+            <Feather name="chevron-right" size={17} color={C.darkBrown} />
+          </Pressable>
+        </>
+      )}
+
+      {/* ══ Step 3: Budget/Style ══ */}
+      {step === 3 && (
+        <>
+          <Text style={fp.bigTitle}>Qual o estilo?</Text>
+          <Text style={fp.bigSub}>
+            Escolha o nível de conforto para a sua experiência no Rio
+          </Text>
+
+          <View style={cf.budgetGrid}>
+            {BUDGETS.map((b) => (
+              <Pressable
+                key={b.id}
+                style={[cf.budgetCard, budget === b.id && cf.budgetCardActive]}
+                onPress={() => handleBudget(b.id)}
+              >
+                <Text style={[cf.budgetLabel, budget === b.id && cf.budgetLabelActive]}>
+                  {b.label}
+                </Text>
+                <Text style={cf.budgetDesc}>{b.desc}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
+      )}
+
+      {/* ── Back nav (steps 1+) ── */}
+      {step > 0 && (
+        <Pressable
+          style={[fp.backRow, { marginTop: 20 }]}
+          onPress={() => setStep(step - 1)}
+          hitSlop={12}
+        >
+          <Feather name="chevron-left" size={20} color={CREAM} />
+          <Text style={fp.backText}>Voltar</Text>
+        </Pressable>
+      )}
+    </ScrollView>
   );
 }
 
@@ -1000,6 +1251,7 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
       localizacao: sug.localizacao,
       image:       sug.image,
       categoria:   sug.categoria,
+      ...(sug.isExternal ? { isExternal: true } : {}),
     };
     onReplace(diaNum, item.id, newItem);
     onClose();
@@ -1551,6 +1803,7 @@ function ResultPhase({
 }
 
 function navigateToItem(item: SavedItem) {
+  if (item.isExternal) return;
   switch (item.categoria) {
     case "restaurante":
       router.push({ pathname: "/comerBem/[id]", params: { id: item.id } });
@@ -1654,9 +1907,18 @@ function ResultDayCard({
                           {item.localizacao ?? dia.bairro}
                         </Text>
                       </View>
-                      <View style={re.catBadge}>
-                        <Text style={re.catBadgeText}>{CATEGORY_LABEL[item.categoria]}</Text>
-                      </View>
+                      {item.isExternal ? (
+                        <View style={[re.catBadge, re.catBadgeExternal]}>
+                          <Feather name="plus-circle" size={9} color={GOLD} />
+                          <Text style={[re.catBadgeText, re.catBadgeTextExternal]}>
+                            Adicionado por você
+                          </Text>
+                        </View>
+                      ) : (
+                        <View style={re.catBadge}>
+                          <Text style={re.catBadgeText}>{CATEGORY_LABEL[item.categoria]}</Text>
+                        </View>
+                      )}
                     </View>
 
                     {editMode ? (
@@ -2008,6 +2270,16 @@ const re = StyleSheet.create({
     color: `${GOLD}CC`,
     letterSpacing: 0.3,
   },
+  catBadgeExternal: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: `${GOLD}1A`,
+    borderColor: `${GOLD}55`,
+  },
+  catBadgeTextExternal: {
+    color: GOLD,
+  },
 
   // ── Travel connector ───────────────────────────────────────────────────────
   travelConnector: {
@@ -2341,6 +2613,147 @@ const sc = StyleSheet.create({
     height: 7,
     borderRadius: 3.5,
     backgroundColor: GOLD,
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ContextualFlow styles
+// ─────────────────────────────────────────────────────────────────────────────
+
+const cf = StyleSheet.create({
+  stepRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 28,
+    alignItems: "center",
+  },
+  stepDot: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderWidth: 1,
+    borderColor: GLASS_BORDER,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepDotActive: {
+    backgroundColor: GOLD,
+    borderColor: GOLD,
+  },
+  stepDotDone: {
+    backgroundColor: `${GOLD}40`,
+    borderColor: `${GOLD}60`,
+  },
+  stepNum: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    color: "rgba(245,240,232,0.45)",
+  },
+  stepNumActive: {
+    color: C.darkBrown,
+  },
+  dateRow: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
+    marginBottom: 14,
+  },
+  dateBtn: {
+    flex: 1,
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+    backgroundColor: GLASS_BG,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: GLASS_BORDER,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+  dateBtnActive: {
+    borderColor: GOLD,
+  },
+  dateBtnText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: "rgba(245,240,232,0.40)",
+  },
+  dateBtnTextSet: {
+    color: CREAM,
+  },
+  skipBtn: {
+    alignItems: "center",
+    marginTop: 18,
+    paddingVertical: 12,
+  },
+  skipText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: "rgba(245,240,232,0.38)",
+  },
+  companionGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    marginTop: 4,
+  },
+  companionCard: {
+    width: (SW - 44 - 12) / 2,
+    backgroundColor: GLASS_BG,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: GLASS_BORDER,
+    paddingVertical: 22,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    gap: 10,
+  },
+  companionCardActive: {
+    borderColor: GOLD,
+    backgroundColor: `${GOLD}18`,
+  },
+  companionIcon: {
+    fontSize: 30,
+  },
+  companionLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    color: "rgba(245,240,232,0.65)",
+    textAlign: "center",
+  },
+  companionLabelActive: {
+    color: CREAM,
+    fontFamily: "Inter_600SemiBold",
+  },
+  budgetGrid: {
+    gap: 12,
+    marginTop: 4,
+  },
+  budgetCard: {
+    backgroundColor: GLASS_BG,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: GLASS_BORDER,
+    padding: 20,
+  },
+  budgetCardActive: {
+    borderColor: GOLD,
+    backgroundColor: `${GOLD}18`,
+  },
+  budgetLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 16,
+    color: "rgba(245,240,232,0.65)",
+    marginBottom: 4,
+  },
+  budgetLabelActive: {
+    color: CREAM,
+  },
+  budgetDesc: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: "rgba(245,240,232,0.38)",
   },
 });
 
