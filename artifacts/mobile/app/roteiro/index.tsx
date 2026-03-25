@@ -835,7 +835,7 @@ export default function RoteiroScreen() {
       const perDay          = VIBE_PER_DAY[vibe ?? "moderado"] ?? 4;
       const requestedDays   = Math.max(1, Math.ceil(actionableCount / perDay));
 
-      const { data, error } = await supabase.functions.invoke("lucky-trip-ai", {
+      const { data, error } = await supabase.functions.invoke("generate-itinerary", {
         body: {
           savedItems:   serializableItems,
           destination:  "Rio de Janeiro",
