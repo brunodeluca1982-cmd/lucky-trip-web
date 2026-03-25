@@ -140,6 +140,8 @@ function ClassicTabLayout() {
             ),
         }}
       />
+      {/* Destination detail screen — inside tabs so the tab bar stays visible */}
+      <Tabs.Screen name="cidade/[id]" options={{ href: null }} />
     </Tabs>
   );
 }

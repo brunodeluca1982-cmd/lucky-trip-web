@@ -29,10 +29,6 @@ function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen
-        name="cidade/[id]"
-        options={{ headerShown: false, presentation: "card" }}
-      />
     </Stack>
   );
 }
