@@ -154,9 +154,9 @@ export default function LugarDetailScreen() {
       <LinearGradient
         colors={[
           "rgba(0,0,0,0.06)",
-          "rgba(10,5,2,0.55)",
-          "#0A0502",
-          "#0A0502",
+          "rgba(0,0,0,0.55)",
+          "#000000",
+          "#000000",
         ]}
         locations={[0.12, 0.44, 0.64, 1]}
         style={s.gradient}
@@ -287,7 +287,7 @@ export default function LugarDetailScreen() {
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#0A0502",
+    backgroundColor: "#000000",
   },
 
   // ── Hero carousel ──
@@ -391,7 +391,7 @@ const s = StyleSheet.create({
 
   // ── Content card ──
   contentCard: {
-    backgroundColor: "#0A0502",
+    backgroundColor: "#000000",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 28,

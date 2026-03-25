@@ -99,7 +99,7 @@ function RoteiroCard({ roteiro }: { roteiro: Roteiro }) {
     >
       <Image source={roteiro.image} style={s.roteiroImage} resizeMode="cover" />
       <LinearGradient
-        colors={["rgba(0,0,0,0.02)", "rgba(10,5,2,0.84)"]}
+        colors={["rgba(0,0,0,0.02)", "rgba(0,0,0,0.84)"]}
         locations={[0.2, 1]}
         style={StyleSheet.absoluteFill}
       />
@@ -130,7 +130,7 @@ function InfluencerCard({ influencer }: { influencer: Influencer }) {
     >
       <Image source={influencer.image} style={s.influencerImage} resizeMode="cover" />
       <LinearGradient
-        colors={["rgba(0,0,0,0.04)", "rgba(10,5,2,0.78)"]}
+        colors={["rgba(0,0,0,0.04)", "rgba(0,0,0,0.78)"]}
         locations={[0.35, 1]}
         style={StyleSheet.absoluteFill}
       />
@@ -220,7 +220,7 @@ export default function HomeScreen() {
       <Image source={BG_IMAGE} style={s.bgImage} resizeMode="cover" />
       {/* Editorial overlay — permeable enough that the photo reads as a surface, not black */}
       <LinearGradient
-        colors={["rgba(10,5,2,0.38)", "rgba(10,5,2,0.50)", "rgba(10,5,2,0.58)"]}
+        colors={["rgba(0,0,0,0.38)", "rgba(0,0,0,0.50)", "rgba(0,0,0,0.58)"]}
         locations={[0, 0.40, 1]}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
@@ -426,7 +426,7 @@ export default function HomeScreen() {
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#0A0502",
+    backgroundColor: "#000000",
   },
 
   // ── Background ──
@@ -473,7 +473,7 @@ const s = StyleSheet.create({
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(201,168,76,0.18)",
-    backgroundColor: "rgba(10,5,2,0.60)",
+    backgroundColor: "rgba(0,0,0,0.60)",
     padding: 24,
   },
   luckyHeader: {

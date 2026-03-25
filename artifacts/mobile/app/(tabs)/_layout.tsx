@@ -73,7 +73,7 @@ function ClassicTabLayout() {
             <BlurView
               intensity={90}
               tint="light"
-              style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(245,240,232,0.85)" }]}
+              style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(255,255,255,0.88)" }]}
             />
           ) : isWeb ? (
             <View style={[StyleSheet.absoluteFill, { backgroundColor: C.white, borderTopWidth: 1, borderTopColor: C.border }]} />

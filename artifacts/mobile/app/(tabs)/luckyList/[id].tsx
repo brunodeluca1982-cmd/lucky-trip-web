@@ -28,7 +28,7 @@ import RioMapView from "@/components/RioMapView";
 import { useGuia } from "@/context/GuiaContext";
 
 const C    = Colors.light;
-const GOLD = "#C9A84C";
+const GOLD = "#D4AF37";
 const GOLD_DIM    = "rgba(201,168,76,0.18)";
 const GOLD_BORDER = "rgba(201,168,76,0.28)";
 
@@ -226,7 +226,7 @@ export default function LuckyListScreen() {
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#0A0502" },
+  root: { flex: 1, backgroundColor: "#000000" },
 
   mapSection: {
     width: "100%",
@@ -248,7 +248,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "rgba(10,5,2,0.46)",
+    backgroundColor: "rgba(0,0,0,0.46)",
     borderRadius: 22,
     paddingHorizontal: 15,
     paddingVertical: 9,
@@ -287,10 +287,10 @@ const s = StyleSheet.create({
     letterSpacing: 0.4,
   },
 
-  listScroll: { flex: 1, backgroundColor: "#0A0502" },
+  listScroll: { flex: 1, backgroundColor: "#000000" },
 
   heroBlock: {
-    backgroundColor: "#0A0502",
+    backgroundColor: "#000000",
     paddingHorizontal: 24,
     paddingTop: 30,
     paddingBottom: 32,
@@ -509,11 +509,11 @@ const s = StyleSheet.create({
     borderColor: GOLD,
   },
   saveBtnTextSaved: {
-    color: "#0A0502",
+    color: "#000000",
   },
 
   footer: {
-    backgroundColor: "#0A0502",
+    backgroundColor: "#000000",
     paddingVertical: 36,
     paddingHorizontal: 24,
     borderTopWidth: 1,

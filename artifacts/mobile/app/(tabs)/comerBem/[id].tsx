@@ -29,7 +29,7 @@ import { getImageForEntity } from "@/utils/getImageForEntity";
 import { useGuia } from "@/context/GuiaContext";
 
 const C = Colors.light;
-const GOLD = "#C9A84C";
+const GOLD = "#D4AF37";
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const MAP_H = Math.round(SCREEN_HEIGHT * 0.50);
 const CARD_IMAGE_H = 210;
@@ -113,7 +113,7 @@ export default function ComerBemScreen() {
             resizeMode="cover"
           />
           <LinearGradient
-            colors={["rgba(10,5,2,0.28)", "rgba(10,5,2,0.92)"]}
+            colors={["rgba(0,0,0,0.28)", "rgba(0,0,0,0.92)"]}
             locations={[0.05, 1]}
             style={StyleSheet.absoluteFill}
             pointerEvents="none"
@@ -250,7 +250,7 @@ export default function ComerBemScreen() {
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#0A0502" },
+  root: { flex: 1, backgroundColor: "#000000" },
 
   mapSection: {
     width: "100%",
@@ -272,7 +272,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "rgba(10,5,2,0.46)",
+    backgroundColor: "rgba(0,0,0,0.46)",
     borderRadius: 22,
     paddingHorizontal: 15,
     paddingVertical: 9,
@@ -307,7 +307,7 @@ const s = StyleSheet.create({
     letterSpacing: 0.4,
   },
 
-  listScroll: { flex: 1, backgroundColor: "#0A0502" },
+  listScroll: { flex: 1, backgroundColor: "#000000" },
 
   introHeroWrap: {
     width: "100%",
@@ -356,7 +356,7 @@ const s = StyleSheet.create({
   },
 
   listSection: {
-    backgroundColor: "#0A0502",
+    backgroundColor: "#000000",
     paddingTop: 20,
     paddingHorizontal: 20,
     paddingBottom: 8,
@@ -506,7 +506,7 @@ const s = StyleSheet.create({
   },
 
   footer: {
-    backgroundColor: "#0A0502",
+    backgroundColor: "#000000",
     marginTop: 4,
     paddingVertical: 32,
     paddingHorizontal: 24,

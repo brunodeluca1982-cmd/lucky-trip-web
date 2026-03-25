@@ -71,7 +71,7 @@ const DestCard = memo(function DestCard({
       {/* Selected checkmark badge */}
       {selected && (
         <View style={s.checkBadge}>
-          <Feather name="check" size={10} color="#1C0E08" />
+          <Feather name="check" size={10} color="#000000" />
         </View>
       )}
 
@@ -119,7 +119,7 @@ export default function DestinosScreen() {
           resizeMode="cover"
         />
         <LinearGradient
-          colors={["rgba(8,4,2,0.84)", "rgba(8,4,2,0.76)", "rgba(8,4,2,0.90)"]}
+          colors={["rgba(0,0,0,0.84)", "rgba(0,0,0,0.76)", "rgba(0,0,0,0.90)"]}
           locations={[0, 0.5, 1]}
           style={StyleSheet.absoluteFill}
         />
@@ -201,7 +201,7 @@ export default function DestinosScreen() {
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#080402",
+    backgroundColor: "#000000",
   },
   bgImage: {
     width: "100%",
@@ -285,7 +285,7 @@ const s = StyleSheet.create({
     height: CARD_H,
     borderRadius: 16,
     overflow: "hidden",
-    backgroundColor: "#1A120A",
+    backgroundColor: "#000000",
   },
   cardSelected: {
     borderWidth: 2,

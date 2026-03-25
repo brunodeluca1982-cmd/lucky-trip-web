@@ -48,8 +48,8 @@ import { PERIODO_LABEL, PERIODO_ICON } from "@/utils/buildRoteiro";
 import type { DiaRoteiro } from "@/utils/buildRoteiro";
 
 const C          = Colors.light;
-const GOLD       = "#C9A84C";
-const DARK_BROWN = "#2C1810";
+const GOLD       = "#D4AF37";
+const DARK_BROWN = "#FFFFFF";
 const { width: SW } = Dimensions.get("window");
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -108,10 +108,10 @@ function getDayWeather(dayNum: number): string {
   return WEATHER_SEQ[(dayNum - 1) % WEATHER_SEQ.length];
 }
 
-const GLASS_BG     = "rgba(15,8,3,0.62)";
+const GLASS_BG     = "rgba(255,255,255,0.10)";
 const GLASS_HEADER = "rgba(18,9,2,0.90)";
-const GLASS_BORDER = "rgba(201,168,76,0.14)";
-const CREAM        = "#F5F0E8";
+const GLASS_BORDER = "rgba(255,255,255,0.18)";
+const CREAM        = "#FFFFFF";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Calendar utilities
@@ -300,11 +300,11 @@ function FlowPage1({
         <View style={fp.section}>
           <Text style={fp.sectionLabel}>Vai pra onde?</Text>
           <View style={fp.searchRow}>
-            <Feather name="search" size={16} color="rgba(245,240,232,0.50)" />
+            <Feather name="search" size={16} color="rgba(255,255,255,0.50)" />
             <TextInput
               style={fp.searchInput}
               placeholder="Rio de Janeiro"
-              placeholderTextColor="rgba(245,240,232,0.38)"
+              placeholderTextColor="rgba(255,255,255,0.38)"
               value={destination}
               onChangeText={onDestinationChange}
               autoCorrect={false}
@@ -321,14 +321,14 @@ function FlowPage1({
           style={[fp.dateField, openCal === "arrival" && fp.dateFieldActive]}
           onPress={() => setOpenCal(openCal === "arrival" ? null : "arrival")}
         >
-          <Feather name="calendar" size={15} color="rgba(245,240,232,0.50)" />
+          <Feather name="calendar" size={15} color="rgba(255,255,255,0.50)" />
           <Text style={[fp.dateFieldText, !arrivalDate && fp.dateFieldPlaceholder]}>
             {fmtDate(arrivalDate) ?? "Data de chegada"}
           </Text>
           <Feather
             name={openCal === "arrival" ? "chevron-up" : "chevron-down"}
             size={13}
-            color="rgba(245,240,232,0.35)"
+            color="rgba(255,255,255,0.35)"
           />
         </Pressable>
         {openCal === "arrival" && (
@@ -339,14 +339,14 @@ function FlowPage1({
           style={[fp.dateField, openCal === "departure" && fp.dateFieldActive]}
           onPress={() => setOpenCal(openCal === "departure" ? null : "departure")}
         >
-          <Feather name="calendar" size={15} color="rgba(245,240,232,0.50)" />
+          <Feather name="calendar" size={15} color="rgba(255,255,255,0.50)" />
           <Text style={[fp.dateFieldText, !departureDate && fp.dateFieldPlaceholder]}>
             {fmtDate(departureDate) ?? "Data de partida"}
           </Text>
           <Feather
             name={openCal === "departure" ? "chevron-up" : "chevron-down"}
             size={13}
-            color="rgba(245,240,232,0.35)"
+            color="rgba(255,255,255,0.35)"
           />
         </Pressable>
         {openCal === "departure" && (
@@ -424,7 +424,7 @@ function FlowPage2({
             >
               <Image source={ins.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
               <LinearGradient
-                colors={["transparent", "rgba(8,4,1,0.80)"]}
+                colors={["transparent", "rgba(0,0,0,0.80)"]}
                 locations={[0.25, 1]}
                 style={StyleSheet.absoluteFill}
               />
@@ -739,7 +739,7 @@ function ContextualFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) 
                 >
                   <Image source={ins.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
                   <LinearGradient
-                    colors={["transparent", "rgba(8,4,1,0.80)"]}
+                    colors={["transparent", "rgba(0,0,0,0.80)"]}
                     locations={[0.25, 1]}
                     style={StyleSheet.absoluteFill}
                   />
@@ -824,7 +824,7 @@ const fp = StyleSheet.create({
   bigSub: {
     fontFamily: "Inter_400Regular",
     fontSize: 14,
-    color: "rgba(245,240,232,0.56)",
+    color: "rgba(255,255,255,0.56)",
     lineHeight: 22,
     marginBottom: 24,
   },
@@ -849,7 +849,7 @@ const fp = StyleSheet.create({
   sectionSub: {
     fontFamily: "Inter_400Regular",
     fontSize: 12,
-    color: "rgba(245,240,232,0.42)",
+    color: "rgba(255,255,255,0.42)",
     marginBottom: 12,
     lineHeight: 18,
   },
@@ -898,7 +898,7 @@ const fp = StyleSheet.create({
   },
 
   dateFieldPlaceholder: {
-    color: "rgba(245,240,232,0.38)",
+    color: "rgba(255,255,255,0.38)",
   },
 
   cta: {
@@ -967,7 +967,7 @@ const fp = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: "rgba(8,4,1,0.70)",
+    backgroundColor: "rgba(0,0,0,0.70)",
     borderWidth: 1,
     borderColor: GOLD,
     alignItems: "center",
@@ -1020,7 +1020,7 @@ const fp = StyleSheet.create({
   pillText: {
     fontFamily: "Inter_500Medium",
     fontSize: 13,
-    color: "rgba(245,240,232,0.78)",
+    color: "rgba(255,255,255,0.78)",
   },
 
   pillTextActive: {
@@ -1030,7 +1030,7 @@ const fp = StyleSheet.create({
 
   // ── Inline Calendar ──────────────────────────────────────────────────────────
   cal: {
-    backgroundColor: "rgba(10,5,2,0.92)",
+    backgroundColor: "rgba(0,0,0,0.92)",
     borderRadius: 16,
     borderWidth: 1,
     borderColor: GLASS_BORDER,
@@ -1061,7 +1061,7 @@ const fp = StyleSheet.create({
     textAlign: "center",
     fontFamily: "Inter_500Medium",
     fontSize: 11,
-    color: "rgba(245,240,232,0.40)",
+    color: "rgba(255,255,255,0.40)",
   },
 
   calGrid: {
@@ -1097,7 +1097,7 @@ const fp = StyleSheet.create({
   },
 
   calDayTextPast: {
-    color: "rgba(245,240,232,0.30)",
+    color: "rgba(255,255,255,0.30)",
   },
 });
 
@@ -1278,7 +1278,7 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
         <TextInput
           style={rs.searchInput}
           placeholder="Buscar outro lugar…"
-          placeholderTextColor="rgba(245,240,232,0.30)"
+          placeholderTextColor="rgba(255,255,255,0.30)"
           value={searchQuery}
           onChangeText={setSearchQuery}
           returnKeyType="search"
@@ -1318,7 +1318,7 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
             >
               <View style={rs.sugThumb}>
                 <Image source={sug.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                <LinearGradient colors={["transparent", "rgba(8,4,1,0.50)"]} style={StyleSheet.absoluteFill} />
+                <LinearGradient colors={["transparent", "rgba(0,0,0,0.50)"]} style={StyleSheet.absoluteFill} />
               </View>
               <View style={rs.sugInfo}>
                 <Text style={rs.sugName} numberOfLines={1}>{sug.titulo}</Text>
@@ -1354,7 +1354,7 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
 const rs = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(8,4,1,0.97)",
+    backgroundColor: "rgba(0,0,0,0.97)",
     zIndex: 100,
   },
   header: {
@@ -1371,7 +1371,7 @@ const rs = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "rgba(201,168,76,0.10)",
+    backgroundColor: "rgba(212,175,55,0.10)",
     borderWidth: 1,
     borderColor: GLASS_BORDER,
     alignItems: "center",
@@ -1389,7 +1389,7 @@ const rs = StyleSheet.create({
   headerSub: {
     fontFamily: "Inter_400Regular",
     fontSize: 11,
-    color: "rgba(245,240,232,0.45)",
+    color: "rgba(255,255,255,0.45)",
     marginTop: 2,
   },
   searchRow: {
@@ -1397,7 +1397,7 @@ const rs = StyleSheet.create({
     alignItems: "center",
     marginHorizontal: 20,
     marginTop: 16,
-    backgroundColor: "rgba(245,240,232,0.07)",
+    backgroundColor: "rgba(255,255,255,0.07)",
     borderRadius: 14,
     borderWidth: 1,
     borderColor: GLASS_BORDER,
@@ -1430,7 +1430,7 @@ const rs = StyleSheet.create({
   sectionLabelSub: {
     fontFamily: "Inter_400Regular",
     fontSize: 11,
-    color: "rgba(245,240,232,0.40)",
+    color: "rgba(255,255,255,0.40)",
   },
   loadingRow: {
     flexDirection: "row",
@@ -1442,7 +1442,7 @@ const rs = StyleSheet.create({
   loadingText: {
     fontFamily: "Inter_400Regular",
     fontSize: 13,
-    color: "rgba(245,240,232,0.45)",
+    color: "rgba(255,255,255,0.45)",
   },
   listContent: {
     paddingHorizontal: 20,
@@ -1485,16 +1485,16 @@ const rs = StyleSheet.create({
   sugLoc: {
     fontFamily: "Inter_400Regular",
     fontSize: 11,
-    color: "rgba(245,240,232,0.45)",
+    color: "rgba(255,255,255,0.45)",
     flex: 1,
   },
   sugBadge: {
-    backgroundColor: "rgba(201,168,76,0.10)",
+    backgroundColor: "rgba(212,175,55,0.10)",
     borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderWidth: 1,
-    borderColor: "rgba(201,168,76,0.18)",
+    borderColor: "rgba(212,175,55,0.18)",
     alignSelf: "flex-start",
   },
   sugBadgeText: {
@@ -1503,10 +1503,10 @@ const rs = StyleSheet.create({
     color: `${GOLD}CC`,
   },
   useBtn: {
-    backgroundColor: "rgba(201,168,76,0.16)",
+    backgroundColor: "rgba(212,175,55,0.16)",
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "rgba(201,168,76,0.28)",
+    borderColor: "rgba(212,175,55,0.28)",
     paddingHorizontal: 12,
     paddingVertical: 8,
     flexShrink: 0,
@@ -1525,12 +1525,12 @@ const rs = StyleSheet.create({
   emptyText: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 15,
-    color: "rgba(245,240,232,0.50)",
+    color: "rgba(255,255,255,0.50)",
   },
   emptySub: {
     fontFamily: "Inter_400Regular",
     fontSize: 12,
-    color: "rgba(245,240,232,0.30)",
+    color: "rgba(255,255,255,0.30)",
   },
 });
 
@@ -1619,7 +1619,7 @@ const hd = StyleSheet.create({
     marginTop: 1,
   },
   subLight: {
-    color: "rgba(245,240,232,0.45)",
+    color: "rgba(255,255,255,0.45)",
   },
 });
 
@@ -1735,7 +1735,7 @@ function ResultPhase({
           <View style={re.hotelThumb}>
             <Image source={hotelItem.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
             <LinearGradient
-              colors={["transparent", "rgba(8,4,1,0.55)"]}
+              colors={["transparent", "rgba(0,0,0,0.55)"]}
               style={StyleSheet.absoluteFill}
             />
           </View>
@@ -1888,7 +1888,7 @@ function ResultDayCard({
         <Text style={re.dayBairro} numberOfLines={1}>{dia.bairro}</Text>
         <Text style={re.weatherEmoji}>{weather}</Text>
         <View style={re.travelChip}>
-          <Feather name="clock" size={10} color="rgba(245,240,232,0.45)" />
+          <Feather name="clock" size={10} color="rgba(255,255,255,0.45)" />
           <Text style={re.travelChipText}>{travelMinTotal} min total</Text>
         </View>
       </View>
@@ -1939,7 +1939,7 @@ function ResultDayCard({
                         resizeMode="cover"
                       />
                       <LinearGradient
-                        colors={["transparent", "rgba(8,4,1,0.45)"]}
+                        colors={["transparent", "rgba(0,0,0,0.45)"]}
                         style={StyleSheet.absoluteFill}
                       />
                     </View>
@@ -1972,7 +1972,7 @@ function ResultDayCard({
                         <Feather name="refresh-cw" size={13} color={GOLD} />
                       </View>
                     ) : (
-                      <Feather name="chevron-right" size={14} color="rgba(245,240,232,0.25)" />
+                      <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.25)" />
                     )}
                   </Pressable>
 
@@ -1981,7 +1981,7 @@ function ResultDayCard({
                     <View style={re.travelConnector}>
                       <View style={re.timeColSpacer} />
                       <View style={re.connectorPill}>
-                        <Feather name="truck" size={9} color="rgba(245,240,232,0.40)" />
+                        <Feather name="truck" size={9} color="rgba(255,255,255,0.40)" />
                         <Text style={re.connectorText}>
                           Carro · {travelMin} min · {travelKm} km
                         </Text>
@@ -2044,7 +2044,7 @@ const re = StyleSheet.create({
   hotelLoc: {
     fontFamily: "Inter_400Regular",
     fontSize: 11,
-    color: "rgba(245,240,232,0.50)",
+    color: "rgba(255,255,255,0.50)",
     flex: 1,
   },
 
@@ -2067,7 +2067,7 @@ const re = StyleSheet.create({
   summarySub: {
     fontFamily: "Inter_400Regular",
     fontSize: 11,
-    color: "rgba(245,240,232,0.40)",
+    color: "rgba(255,255,255,0.40)",
     lineHeight: 16,
   },
   dayPillsScroll: {
@@ -2082,13 +2082,13 @@ const re = StyleSheet.create({
   dayPillsLabel: {
     fontFamily: "Inter_400Regular",
     fontSize: 11,
-    color: "rgba(245,240,232,0.40)",
+    color: "rgba(255,255,255,0.40)",
   },
   dayPill: {
-    backgroundColor: "rgba(201,168,76,0.12)",
+    backgroundColor: "rgba(212,175,55,0.12)",
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "rgba(201,168,76,0.22)",
+    borderColor: "rgba(212,175,55,0.22)",
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
@@ -2127,7 +2127,7 @@ const re = StyleSheet.create({
   },
   actionBtnEdit: {
     backgroundColor: GLASS_BG,
-    borderColor: "rgba(201,168,76,0.22)",
+    borderColor: "rgba(212,175,55,0.22)",
   },
   actionBtnText: {
     fontFamily: "Inter_600SemiBold",
@@ -2157,9 +2157,9 @@ const re = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "rgba(201,168,76,0.12)",
+    backgroundColor: "rgba(212,175,55,0.12)",
     borderWidth: 1,
-    borderColor: "rgba(201,168,76,0.22)",
+    borderColor: "rgba(212,175,55,0.22)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -2171,7 +2171,7 @@ const re = StyleSheet.create({
   mapCtaSub: {
     fontFamily: "Inter_400Regular",
     fontSize: 11,
-    color: "rgba(245,240,232,0.40)",
+    color: "rgba(255,255,255,0.40)",
     marginTop: 1,
   },
 
@@ -2192,15 +2192,15 @@ const re = StyleSheet.create({
     paddingVertical: 13,
     backgroundColor: GLASS_HEADER,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(201,168,76,0.10)",
+    borderBottomColor: "rgba(212,175,55,0.10)",
   },
   dayNumBadge: {
-    backgroundColor: "rgba(201,168,76,0.16)",
+    backgroundColor: "rgba(212,175,55,0.16)",
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderWidth: 1,
-    borderColor: "rgba(201,168,76,0.28)",
+    borderColor: "rgba(212,175,55,0.28)",
     flexShrink: 0,
   },
   dayNumText: {
@@ -2223,18 +2223,18 @@ const re = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "rgba(245,240,232,0.06)",
+    backgroundColor: "rgba(255,255,255,0.06)",
     borderRadius: 20,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: "rgba(245,240,232,0.08)",
+    borderColor: "rgba(255,255,255,0.08)",
     flexShrink: 0,
   },
   travelChipText: {
     fontFamily: "Inter_500Medium",
     fontSize: 9,
-    color: "rgba(245,240,232,0.40)",
+    color: "rgba(255,255,255,0.40)",
   },
 
   // ── Day body / periods ─────────────────────────────────────────────────────
@@ -2261,7 +2261,7 @@ const re = StyleSheet.create({
   periodDivider: {
     flex: 1,
     height: 1,
-    backgroundColor: "rgba(201,168,76,0.14)",
+    backgroundColor: "rgba(212,175,55,0.14)",
   },
 
   // ── Item row ───────────────────────────────────────────────────────────────
@@ -2279,7 +2279,7 @@ const re = StyleSheet.create({
   timeLabel: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 11,
-    color: "rgba(245,240,232,0.55)",
+    color: "rgba(255,255,255,0.55)",
   },
   thumb: {
     width: 58,
@@ -2307,16 +2307,16 @@ const re = StyleSheet.create({
   itemLoc: {
     fontFamily: "Inter_400Regular",
     fontSize: 11,
-    color: "rgba(245,240,232,0.45)",
+    color: "rgba(255,255,255,0.45)",
     flex: 1,
   },
   catBadge: {
-    backgroundColor: "rgba(201,168,76,0.10)",
+    backgroundColor: "rgba(212,175,55,0.10)",
     borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderWidth: 1,
-    borderColor: "rgba(201,168,76,0.18)",
+    borderColor: "rgba(212,175,55,0.18)",
     alignSelf: "flex-start",
   },
   catBadgeText: {
@@ -2352,27 +2352,27 @@ const re = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    backgroundColor: "rgba(245,240,232,0.05)",
+    backgroundColor: "rgba(255,255,255,0.05)",
     borderRadius: 20,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: "rgba(245,240,232,0.07)",
+    borderColor: "rgba(255,255,255,0.07)",
     marginLeft: 4,
   },
   connectorText: {
     fontFamily: "Inter_400Regular",
     fontSize: 10,
-    color: "rgba(245,240,232,0.35)",
+    color: "rgba(255,255,255,0.35)",
   },
   editBanner: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "rgba(201,168,76,0.10)",
+    backgroundColor: "rgba(212,175,55,0.10)",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "rgba(201,168,76,0.22)",
+    borderColor: "rgba(212,175,55,0.22)",
     marginHorizontal: 20,
     marginBottom: 14,
     paddingHorizontal: 14,
@@ -2382,7 +2382,7 @@ const re = StyleSheet.create({
     flex: 1,
     fontFamily: "Inter_400Regular",
     fontSize: 12,
-    color: "rgba(245,240,232,0.70)",
+    color: "rgba(255,255,255,0.70)",
   },
   editBannerDone: {
     fontFamily: "Inter_600SemiBold",
@@ -2393,9 +2393,9 @@ const re = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: "rgba(201,168,76,0.12)",
+    backgroundColor: "rgba(212,175,55,0.12)",
     borderWidth: 1,
-    borderColor: "rgba(201,168,76,0.25)",
+    borderColor: "rgba(212,175,55,0.25)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -2587,7 +2587,7 @@ export default function RoteiroScreen() {
       <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}>
         <Image source={heroImg} style={StyleSheet.absoluteFill} resizeMode="cover" />
         <LinearGradient
-          colors={["rgba(12,6,2,0.78)", "rgba(8,4,1,0.90)", "rgba(5,2,0,0.97)"]}
+          colors={["rgba(0,0,0,0.78)", "rgba(0,0,0,0.90)", "rgba(5,2,0,0.97)"]}
           locations={[0, 0.45, 1]}
           style={StyleSheet.absoluteFill}
         />
@@ -2712,7 +2712,7 @@ const sc = StyleSheet.create({
   loadingSubText: {
     fontFamily: "Inter_400Regular",
     fontSize: 13,
-    color: "rgba(245,240,232,0.55)",
+    color: "rgba(255,255,255,0.55)",
     textAlign: "center",
     lineHeight: 20,
   },
@@ -2761,7 +2761,7 @@ const cf = StyleSheet.create({
   stepNum: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 11,
-    color: "rgba(245,240,232,0.45)",
+    color: "rgba(255,255,255,0.45)",
   },
   stepNumActive: {
     color: C.darkBrown,
@@ -2790,7 +2790,7 @@ const cf = StyleSheet.create({
   dateBtnText: {
     fontFamily: "Inter_500Medium",
     fontSize: 13,
-    color: "rgba(245,240,232,0.40)",
+    color: "rgba(255,255,255,0.40)",
   },
   dateBtnTextSet: {
     color: CREAM,
@@ -2803,7 +2803,7 @@ const cf = StyleSheet.create({
   skipText: {
     fontFamily: "Inter_400Regular",
     fontSize: 13,
-    color: "rgba(245,240,232,0.38)",
+    color: "rgba(255,255,255,0.38)",
   },
   companionGrid: {
     flexDirection: "row",
@@ -2832,7 +2832,7 @@ const cf = StyleSheet.create({
   companionLabel: {
     fontFamily: "Inter_500Medium",
     fontSize: 14,
-    color: "rgba(245,240,232,0.65)",
+    color: "rgba(255,255,255,0.65)",
     textAlign: "center",
   },
   companionLabelActive: {
@@ -2857,7 +2857,7 @@ const cf = StyleSheet.create({
   budgetLabel: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 16,
-    color: "rgba(245,240,232,0.65)",
+    color: "rgba(255,255,255,0.65)",
     marginBottom: 4,
   },
   budgetLabelActive: {
@@ -2866,7 +2866,7 @@ const cf = StyleSheet.create({
   budgetDesc: {
     fontFamily: "Inter_400Regular",
     fontSize: 13,
-    color: "rgba(245,240,232,0.38)",
+    color: "rgba(255,255,255,0.38)",
   },
 });
 

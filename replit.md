@@ -109,12 +109,18 @@ Utility scripts package. Each script is a `.ts` file in `src/` with a correspond
 
 Expo React Native app (SDK 54) with dark glassmorphism aesthetic for Rio de Janeiro travel content.
 
-### Design System
-- Colors: Cream `#F5F0E8`, Terracotta `#C4704A`, Gold `#C9A84C`, Dark Brown `#2C1810`
+### Design System — Image-Driven (updated)
+- **Zero brown** — all brown/cream colors fully removed from the entire codebase
+- TEXT: white `#FFFFFF` (primary), `rgba(255,255,255,0.80)` (secondary), `rgba(255,255,255,0.45)` (muted)
+- ACCENT: gold `#D4AF37` — sparingly (badges, icons, tab active state, key CTAs)
+- OVERLAYS: pure black `rgba(0,0,0,x)` — never colored overlays
+- GLASS CARDS: `rgba(255,255,255,0.08–0.14)` background + `rgba(255,255,255,0.15)` border
+- BACKGROUNDS: real destination/hero images with dark black overlay; `constants/colors.ts` `background = "transparent"`
+- Tab bar: light blur (iOS) / white (web/Android); active tint `#D4AF37`; inactive `rgba(255,255,255,0.45)`
 - Typography: Playfair Display (400/600/700) + Inter (400/500/600/700)
-- Background: always `#0A0502` / `#100A06` fullscreen
 - `boxShadow` everywhere (not `shadow*`); `pointerEvents` in style not as prop
 - Web insets: 67px top, 34px bottom; native uses `useSafeAreaInsets()`
+- Screens with ImageBackground: `perfil.tsx` (`rio-aerial-clean.png`), `lucky.tsx` (`lapa.png`)
 
 ### IMAGE RULE — Unified Entity Image Resolution
 Two resolvers form the complete image system. Every entity MUST use one of them — no bare `require()` for entities.

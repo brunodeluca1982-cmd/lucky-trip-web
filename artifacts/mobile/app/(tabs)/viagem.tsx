@@ -9,7 +9,7 @@
  *   Saved  → rotating fade through saved item images + cinematic gradient
  *
  * Style: dark editorial cinematic — matches luckyBlock / Home dark sections.
- *   rgba(10,5,2,x) panels · gold accent · cream text · no solid terracotta blocks.
+ *   rgba(0,0,0,x) panels · gold accent · cream text · no solid terracotta blocks.
  */
 
 import React, { useEffect, useRef, useState } from "react";
@@ -36,7 +36,7 @@ import { buildRoteiro, PERIODO_LABEL, PERIODO_ICON } from "@/utils/buildRoteiro"
 import type { DiaRoteiro, DiaPeriodo } from "@/utils/buildRoteiro";
 
 const C    = Colors.light;
-const GOLD = "#C9A84C";
+const GOLD = "#D4AF37";
 const { width: SCREEN_W } = Dimensions.get("window");
 
 const FALLBACK_BG = require("@/assets/images/ipanema.png");
@@ -94,10 +94,10 @@ function SceneBackground({ images }: { images: ImageSourcePropType[] }) {
       {/* Cinematic dark vignette — image visible at top, dark at bottom */}
       <LinearGradient
         colors={[
-          "rgba(10,5,2,0.08)",
-          "rgba(10,5,2,0.38)",
-          "rgba(10,5,2,0.68)",
-          "rgba(10,5,2,0.88)",
+          "rgba(0,0,0,0.08)",
+          "rgba(0,0,0,0.38)",
+          "rgba(0,0,0,0.68)",
+          "rgba(0,0,0,0.88)",
         ]}
         locations={[0, 0.30, 0.62, 1]}
         style={StyleSheet.absoluteFill}
@@ -128,7 +128,7 @@ function SocialChip({
       ]}
       onPress={onPress}
     >
-      <Feather name={icon} size={13} color="rgba(245,240,232,0.75)" />
+      <Feather name={icon} size={13} color="rgba(255,255,255,0.75)" />
       <Text style={act.socialLabel} numberOfLines={1}>{label}</Text>
     </Pressable>
   );
@@ -190,14 +190,14 @@ const act = StyleSheet.create({
     gap: 6,
     paddingVertical: 11,
     borderRadius: 12,
-    backgroundColor: "rgba(245,240,232,0.07)",
+    backgroundColor: "rgba(255,255,255,0.07)",
     borderWidth: 1,
-    borderColor: "rgba(245,240,232,0.15)",
+    borderColor: "rgba(255,255,255,0.15)",
   },
   socialLabel: {
     fontFamily: "Inter_500Medium",
     fontSize: 12,
-    color: "rgba(245,240,232,0.75)",
+    color: "rgba(255,255,255,0.75)",
   },
 
   // AI CTA — dark glass, gold accent (matches home's luckyBlock aesthetic)
@@ -208,7 +208,7 @@ const act = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 20,
     borderRadius: 16,
-    backgroundColor: "rgba(10,5,2,0.62)",
+    backgroundColor: "rgba(0,0,0,0.62)",
     borderWidth: 1,
     borderColor: `${GOLD}28`,
     boxShadow: `0px 4px 20px rgba(201,168,76,0.12)`,
@@ -238,7 +238,7 @@ const act = StyleSheet.create({
   aiSub: {
     fontFamily: "Inter_400Regular",
     fontSize: 11,
-    color: "rgba(245,240,232,0.48)",
+    color: "rgba(255,255,255,0.48)",
     marginTop: 1,
   },
 });
@@ -268,7 +268,7 @@ function SavedCard({
     >
       <Image source={item.image} style={StyleSheet.absoluteFillObject as any} resizeMode="cover" />
       <LinearGradient
-        colors={["transparent", "rgba(10,5,2,0.88)"]}
+        colors={["transparent", "rgba(0,0,0,0.88)"]}
         locations={[0.28, 1]}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
@@ -278,7 +278,7 @@ function SavedCard({
         onPress={(e) => { e.stopPropagation?.(); onRemove(item.id); }}
         hitSlop={8}
       >
-        <Feather name="x" size={9} color="rgba(245,240,232,0.80)" />
+        <Feather name="x" size={9} color="rgba(255,255,255,0.80)" />
       </Pressable>
       <View style={sc.footer}>
         <Text style={sc.catLabel} numberOfLines={1}>
@@ -294,7 +294,7 @@ const sc = StyleSheet.create({
   card: {
     borderRadius: 16,
     overflow: "hidden",
-    backgroundColor: "#0F0A07",
+    backgroundColor: "#000000",
     marginRight: 10,
     justifyContent: "flex-end",
   },
@@ -305,11 +305,11 @@ const sc = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: "rgba(10,5,2,0.55)",
+    backgroundColor: "rgba(0,0,0,0.55)",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "rgba(245,240,232,0.12)",
+    borderColor: "rgba(255,255,255,0.12)",
   },
   footer: {
     padding: 10,
@@ -372,7 +372,7 @@ const ss = StyleSheet.create({
   label: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 11,
-    color: "rgba(245,240,232,0.55)",
+    color: "rgba(255,255,255,0.55)",
     letterSpacing: 1.4,
     textTransform: "uppercase",
   },
@@ -380,12 +380,12 @@ const ss = StyleSheet.create({
     width: 3,
     height: 3,
     borderRadius: 1.5,
-    backgroundColor: "rgba(245,240,232,0.30)",
+    backgroundColor: "rgba(255,255,255,0.30)",
   },
   sublabel: {
     fontFamily: "Inter_400Regular",
     fontSize: 11,
-    color: "rgba(245,240,232,0.35)",
+    color: "rgba(255,255,255,0.35)",
   },
   scroll: {
     paddingRight: 8,
@@ -422,9 +422,9 @@ const eh = StyleSheet.create({
     paddingVertical: 20,
     paddingHorizontal: 18,
     borderRadius: 16,
-    backgroundColor: "rgba(10,5,2,0.55)",
+    backgroundColor: "rgba(0,0,0,0.55)",
     borderWidth: 1,
-    borderColor: "rgba(245,240,232,0.08)",
+    borderColor: "rgba(255,255,255,0.08)",
   },
   iconRing: {
     width: 42,
@@ -450,7 +450,7 @@ const eh = StyleSheet.create({
   desc: {
     fontFamily: "Inter_400Regular",
     fontSize: 13,
-    color: "rgba(245,240,232,0.50)",
+    color: "rgba(255,255,255,0.50)",
     lineHeight: 20,
   },
   bold: {
@@ -527,7 +527,7 @@ const rot = StyleSheet.create({
   sectionLabel: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 11,
-    color: "rgba(245,240,232,0.55)",
+    color: "rgba(255,255,255,0.55)",
     letterSpacing: 1.4,
     textTransform: "uppercase",
   },
@@ -546,12 +546,12 @@ const rot = StyleSheet.create({
   },
   diaCard: {
     borderRadius: 16,
-    backgroundColor: "rgba(10,5,2,0.60)",
+    backgroundColor: "rgba(0,0,0,0.60)",
     borderWidth: 1,
     borderColor: `${GOLD}18`,
     paddingHorizontal: 18,
     paddingVertical: 16,
-    boxShadow: `0px 2px 12px rgba(10,5,2,0.20)`,
+    boxShadow: `0px 2px 12px rgba(0,0,0,0.20)`,
   },
   diaHeader: {
     marginBottom: 10,
@@ -601,13 +601,13 @@ const rot = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "rgba(245,240,232,0.25)",
+    backgroundColor: "rgba(255,255,255,0.25)",
     flexShrink: 0,
   },
   itemNome: {
     fontFamily: "Inter_400Regular",
     fontSize: 13,
-    color: "rgba(245,240,232,0.75)",
+    color: "rgba(255,255,255,0.75)",
     flex: 1,
   },
 });
@@ -688,7 +688,7 @@ export default function MinhaViagemScreen() {
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#0A0502",
+    backgroundColor: "#000000",
   },
   content: {
     paddingHorizontal: 24,
@@ -736,14 +736,14 @@ const s = StyleSheet.create({
   subtitle: {
     fontFamily: "Inter_400Regular",
     fontSize: 13.5,
-    color: "rgba(245,240,232,0.50)",
+    color: "rgba(255,255,255,0.50)",
     lineHeight: 20,
   },
 
   // Rule
   rule: {
     height: 1,
-    backgroundColor: "rgba(245,240,232,0.08)",
+    backgroundColor: "rgba(255,255,255,0.08)",
     marginBottom: 22,
   },
 });

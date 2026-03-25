@@ -36,7 +36,7 @@ import { getImageForEntity } from "@/utils/getImageForEntity";
 import { useGuia } from "@/context/GuiaContext";
 
 const C = Colors.light;
-const GOLD = "#C9A84C";
+const GOLD = "#D4AF37";
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const HERO_H = Math.round(SCREEN_HEIGHT * 0.46);
 const CARD_IMAGE_H = 200;
@@ -90,7 +90,7 @@ export default function ComerBemBairroScreen() {
         resizeMode="cover"
       />
       <LinearGradient
-        colors={["rgba(10,5,2,0.05)", "rgba(10,5,2,0.38)", "rgba(10,5,2,0.82)", "rgba(10,5,2,0.95)"]}
+        colors={["rgba(0,0,0,0.05)", "rgba(0,0,0,0.38)", "rgba(0,0,0,0.82)", "rgba(0,0,0,0.95)"]}
         locations={[0, 0.30, 0.54, 1.0]}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
@@ -345,7 +345,7 @@ function StatPill({ label, value }: { label: string; value: string }) {
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#0A0502" },
+  root: { flex: 1, backgroundColor: "#000000" },
 
   hero: {
     width: "100%",
@@ -359,7 +359,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 7,
-    backgroundColor: "rgba(10,5,2,0.42)",
+    backgroundColor: "rgba(0,0,0,0.42)",
     borderRadius: 22,
     paddingHorizontal: 14,
     paddingVertical: 9,

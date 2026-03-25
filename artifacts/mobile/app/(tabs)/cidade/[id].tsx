@@ -185,11 +185,11 @@ export default function CidadeScreen() {
             48–100%  → deepens to near-black (buttons float on dark canvas) */}
       <LinearGradient
         colors={[
-          "rgba(8,4,2,0.62)",
-          "rgba(8,4,2,0.14)",
-          "rgba(8,4,2,0.08)",
-          "rgba(8,4,2,0.72)",
-          "rgba(8,4,2,0.96)",
+          "rgba(0,0,0,0.62)",
+          "rgba(0,0,0,0.14)",
+          "rgba(0,0,0,0.08)",
+          "rgba(0,0,0,0.72)",
+          "rgba(0,0,0,0.96)",
         ]}
         locations={[0, 0.20, 0.42, 0.62, 1]}
         style={StyleSheet.absoluteFill}
@@ -453,7 +453,7 @@ export default function CidadeScreen() {
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#080402",
+    backgroundColor: "#000000",
   },
 
   // Fullscreen background — sits behind everything
@@ -591,7 +591,7 @@ const s = StyleSheet.create({
   },
   expIcon: {
     fontSize: 14,
-    color: "#C9A84C",
+    color: "#D4AF37",
   },
   expTexts: {
     gap: 2,
@@ -647,7 +647,7 @@ const s = StyleSheet.create({
   // Editorial content — cream block, scrolls in naturally
   editorial: {
     marginTop: 32,
-    backgroundColor: C.cream,
+    backgroundColor: "rgba(255,255,255,0.12)",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
   },

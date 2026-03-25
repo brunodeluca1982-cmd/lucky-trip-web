@@ -20,7 +20,7 @@ import { getImageForEntity } from "@/utils/getImageForEntity";
 import { useGuia } from "@/context/GuiaContext";
 
 const C = Colors.light;
-const GOLD = "#C9A84C";
+const GOLD = "#D4AF37";
 
 const CATEGORY_LABEL: Record<string, string> = {
   luxo:     "LUXO",
@@ -102,7 +102,7 @@ export default function HotelDetailScreen() {
               resizeMode="cover"
             />
             <LinearGradient
-              colors={["rgba(0,0,0,0.06)", "rgba(10,5,2,0.60)", "#0A0502"]}
+              colors={["rgba(0,0,0,0.06)", "rgba(0,0,0,0.60)", "#000000"]}
               locations={[0.10, 0.52, 0.90]}
               style={StyleSheet.absoluteFill}
               pointerEvents="none"
@@ -197,7 +197,7 @@ export default function HotelDetailScreen() {
                 style={s.reservarBtn}
                 onPress={() => Linking.openURL(hotel.reserve_url)}
               >
-                <Feather name="external-link" size={15} color="#0A0502" />
+                <Feather name="external-link" size={15} color="#000000" />
                 <Text style={s.reservarText}>Reservar agora</Text>
               </Pressable>
             ) : null}
@@ -266,7 +266,7 @@ function DetailPill({ label, value }: { label: string; value: string }) {
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#0A0502",
+    backgroundColor: "#000000",
   },
 
   topBar: {
@@ -275,7 +275,7 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingBottom: 14,
-    backgroundColor: "#0A0502",
+    backgroundColor: "#000000",
     zIndex: 10,
   },
   backBtn: {

@@ -108,7 +108,7 @@ function ClassicoCard({ item }: { item: ClassicoItem }) {
     >
       <Image source={item.image} style={s.classicoImage} resizeMode="cover" />
       <LinearGradient
-        colors={["rgba(0,0,0,0.02)", "rgba(10,5,2,0.82)"]}
+        colors={["rgba(0,0,0,0.02)", "rgba(0,0,0,0.82)"]}
         locations={[0.25, 1]}
         style={StyleSheet.absoluteFill}
       />
@@ -145,7 +145,7 @@ function LuckyCard({
       <View style={s.luckyImageWrap}>
         <Image source={item.image} style={s.luckyImage} resizeMode="cover" />
         <LinearGradient
-          colors={["rgba(0,0,0,0.06)", "rgba(10,5,2,0.55)"]}
+          colors={["rgba(0,0,0,0.06)", "rgba(0,0,0,0.55)"]}
           locations={[0.2, 1]}
           style={StyleSheet.absoluteFill}
         />
@@ -221,14 +221,14 @@ export default function EssencialScreen() {
           <Image source={destino.image} style={s.heroImage} resizeMode="cover" />
           {/* Top dark band for back button legibility */}
           <LinearGradient
-            colors={["rgba(10,5,2,0.52)", "transparent"]}
+            colors={["rgba(0,0,0,0.52)", "transparent"]}
             locations={[0, 0.38]}
             style={StyleSheet.absoluteFill}
             pointerEvents="none"
           />
           {/* Bottom dark band — blends into content section */}
           <LinearGradient
-            colors={["transparent", "rgba(10,5,2,0.75)", "#0A0502"]}
+            colors={["transparent", "rgba(0,0,0,0.75)", "#000000"]}
             locations={[0.45, 0.75, 1]}
             style={StyleSheet.absoluteFill}
             pointerEvents="none"
@@ -303,7 +303,7 @@ export default function EssencialScreen() {
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#0A0502",
+    backgroundColor: "#000000",
   },
 
   // ── Fixed back button ──
@@ -361,7 +361,7 @@ const s = StyleSheet.create({
 
   // ── Content area below hero ──
   contentArea: {
-    backgroundColor: "#0A0502",
+    backgroundColor: "#000000",
     paddingTop: 28,
   },
 
