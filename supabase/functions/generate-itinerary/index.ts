@@ -152,72 +152,101 @@ function computeTripLength(count: number, vibe: string, requestedDays?: number):
 }
 
 // ── STEP 1 + 2: Normalize + Enrich from Supabase ─────────────────────────────
-// Queries o_que_fazer_rio and restaurantes, then merges into one EnrichedPlace array.
+//
+// Sources queried for SAVED items:
+//   • o_que_fazer_rio  — oQueFazer categoria (UUID id)
+//   • lucky_list_rio   — lucky categoria (separate table, different columns)
+//   • restaurantes     — restaurante categoria (integer id)
+//
+// Then fetchComplementaryContent() pads out the pool to support multi-day trips.
 
 async function enrichPlaces(
   saved: SavedItemInput[],
   supa:  ReturnType<typeof createClient>,
 ): Promise<EnrichedPlace[]> {
-  const oqIds   = saved.filter((s) => s.categoria === "oQueFazer" || s.categoria === "lucky").map((s) => s.id);
-  const restIds = saved.filter((s) => s.categoria === "restaurante").map((s) => Number(s.id));
+  const oqIds    = saved.filter((s) => s.categoria === "oQueFazer").map((s) => s.id);
+  const luckyIds = saved.filter((s) => s.categoria === "lucky").map((s) => s.id);
+  const restIds  = saved.filter((s) => s.categoria === "restaurante").map((s) => Number(s.id));
 
-  // Parallel fetch
-  const [oqResult, restResult] = await Promise.all([
+  // Parallel fetch from all three sources
+  const [oqResult, luckyResult, restResult] = await Promise.all([
     oqIds.length > 0
       ? supa.from("o_que_fazer_rio")
-          .select("id,bairro,tags_ia,momento_ideal,vibe,energia,duracao_media")
+          .select("id,nome,bairro,tags_ia,momento_ideal,vibe,energia,duracao_media,categoria_experiencia,perfil_ideal")
           .in("id", oqIds)
+      : Promise.resolve({ data: [] }),
+    luckyIds.length > 0
+      ? supa.from("lucky_list_rio")
+          .select("id,nome,bairro,tipo,tags_ia,ai_tags,momento_ideal,melhor_horario,vibe,energia,photo_url")
+          .in("id", luckyIds)
       : Promise.resolve({ data: [] }),
     restIds.length > 0
       ? supa.from("restaurantes")
-          .select("id,bairro,categoria,especialidade,perfil_publico")
+          .select("id,nome,bairro,categoria,especialidade,perfil_publico")
           .in("id", restIds)
       : Promise.resolve({ data: [] }),
   ]);
 
-  const oqMap   = new Map((oqResult.data   ?? []).map((r: Record<string, unknown>) => [String(r.id),  r]));
-  const restMap = new Map((restResult.data ?? []).map((r: Record<string, unknown>) => [Number(r.id), r]));
+  const oqMap    = new Map((oqResult.data    ?? []).map((r: Record<string, unknown>) => [String(r.id),  r]));
+  const luckyMap = new Map((luckyResult.data ?? []).map((r: Record<string, unknown>) => [String(r.id),  r]));
+  const restMap  = new Map((restResult.data  ?? []).map((r: Record<string, unknown>) => [Number(r.id), r]));
 
   const places: EnrichedPlace[] = [];
 
   for (const s of saved) {
     if (s.categoria === "hotel") continue;
 
-    let area        = s.localizacao ?? "";
-    let tags:        string[]     = [];
-    let momento:     string[]     = [];
-    let vibe_tags:   string[]     = [];
-    let energia                   = "medium";
-    let duracao                   = "1-2h";
+    let area:        string   = s.localizacao ?? "";
+    let name:        string   = s.titulo;
+    let tags:        string[] = [];
+    let momento:     string[] = [];
+    let vibe_tags:   string[] = [];
+    let energia                = "medium";
+    let duracao                = "1-2h";
     let especialidade: string | undefined;
     let perfil:        string | undefined;
 
-    if (s.categoria === "oQueFazer" || s.categoria === "lucky") {
+    if (s.categoria === "oQueFazer") {
       const row = oqMap.get(s.id);
       if (row) {
         area      = (row.bairro        as string) || area;
+        name      = (row.nome          as string) || name;
         tags      = (row.tags_ia       as string[]) ?? [];
         momento   = (row.momento_ideal as string[]) ?? [];
         vibe_tags = (row.vibe          as string[]) ?? [];
         energia   = (row.energia       as string)  ?? "medium";
         duracao   = (row.duracao_media as string)  ?? "1-2h";
       }
+    } else if (s.categoria === "lucky") {
+      // Look up in lucky_list_rio — it has different column names from o_que_fazer_rio
+      const row = luckyMap.get(s.id);
+      if (row) {
+        area      = (row.bairro        as string) || area;
+        name      = (row.nome          as string) || name;
+        // lucky_list_rio may use tags_ia OR ai_tags
+        tags      = (row.tags_ia as string[]) ?? (row.ai_tags as string[]) ?? [];
+        // lucky_list_rio may use momento_ideal OR melhor_horario
+        momento   = (row.momento_ideal as string[]) ?? (row.melhor_horario as string[]) ?? [];
+        vibe_tags = (row.vibe          as string[]) ?? [];
+        energia   = (row.energia       as string)  ?? "medium";
+      }
     } else if (s.categoria === "restaurante") {
       const row = restMap.get(Number(s.id));
       if (row) {
         area          = (row.bairro        as string) || area;
+        name          = (row.nome          as string) || name;
         especialidade = row.especialidade  as string | undefined;
         perfil        = row.perfil_publico as string | undefined;
       }
-      momento = ["lunch"]; // restaurants always prefer lunch slot by default
+      momento = ["lunch"];
     }
 
     places.push({
-      id:          s.id,
-      name:        s.titulo,
-      categoria:   s.categoria,
-      area:        area || "Rio de Janeiro",
-      zone:        getZone(area),
+      id:            s.id,
+      name,
+      categoria:     s.categoria,
+      area:          area || "Rio de Janeiro",
+      zone:          getZone(area),
       momento_ideal: momento,
       energia,
       tags,
@@ -229,6 +258,139 @@ async function enrichPlaces(
   }
 
   return places;
+}
+
+// ── Complementary content: pad the place pool for multi-day trips ─────────────
+//
+// Priority: lucky_list_rio (editorial) → o_que_fazer_rio (core) → restaurantes
+// Only called when saved items are insufficient for the requested trip length.
+
+async function fetchComplementaryContent(
+  existingPlaces: EnrichedPlace[],
+  requestedDays:  number,
+  vibe:           string,
+  supa:           ReturnType<typeof createClient>,
+): Promise<EnrichedPlace[]> {
+  const existingIds = new Set(existingPlaces.map((p) => p.id));
+
+  const perDay       = VIBE_PER_DAY[vibe] ?? 4;
+  // Target: (perDay-1) activities + 1 restaurant per day = comfortable density
+  const targetActs   = requestedDays * (perDay - 1);
+  const targetRests  = requestedDays;
+
+  const currentActs  = existingPlaces.filter((p) => p.categoria !== "restaurante").length;
+  const currentRests = existingPlaces.filter((p) => p.categoria === "restaurante").length;
+
+  const needActs  = Math.max(0, targetActs  - currentActs);
+  const needRests = Math.max(0, targetRests - currentRests);
+
+  if (needActs === 0 && needRests === 0) return [];
+
+  const complement: EnrichedPlace[] = [];
+
+  // ── 1. Lucky List Rio — highest editorial priority ────────────────────────
+  if (needActs > 0) {
+    const { data: luckyRows } = await supa
+      .from("lucky_list_rio")
+      .select("id,nome,bairro,tipo,tags_ia,ai_tags,momento_ideal,melhor_horario,vibe,energia")
+      .limit(Math.min(20, needActs + 5));
+
+    for (const row of (luckyRows ?? []) as Record<string, unknown>[]) {
+      const id = String(row.id ?? "");
+      if (!id || existingIds.has(id)) continue;
+
+      const tipo = (row.tipo as string ?? "").toLowerCase();
+      // Skip lucky items that are restaurants (handled separately)
+      if (tipo.includes("restaurante") || tipo.includes("bar") || tipo.includes("café")) continue;
+
+      const area = (row.bairro as string) || "Rio de Janeiro";
+      const tags = (row.tags_ia as string[]) ?? (row.ai_tags as string[]) ?? [];
+      const momento = (row.momento_ideal as string[]) ?? (row.melhor_horario as string[]) ?? [];
+
+      complement.push({
+        id,
+        name:          (row.nome as string) || area,
+        categoria:     "lucky",
+        area,
+        zone:          getZone(area),
+        momento_ideal: Array.isArray(momento) ? momento : [],
+        energia:       (row.energia as string) ?? "medium",
+        tags:          Array.isArray(tags) ? tags : [],
+        vibe_tags:     (row.vibe as string[]) ?? [],
+        duracao:       "1-2h",
+      });
+      existingIds.add(id);
+
+      if (complement.filter((p) => p.categoria !== "restaurante").length >= needActs) break;
+    }
+  }
+
+  // ── 2. O que fazer Rio — core anchors & broader activities ───────────────
+  const stillNeedActs = Math.max(
+    0, needActs - complement.filter((p) => p.categoria !== "restaurante").length,
+  );
+  if (stillNeedActs > 0) {
+    const { data: oqRows } = await supa
+      .from("o_que_fazer_rio")
+      .select("id,nome,bairro,tags_ia,momento_ideal,vibe,energia,duracao_media")
+      .limit(Math.min(25, stillNeedActs + 8));
+
+    for (const row of (oqRows ?? []) as Record<string, unknown>[]) {
+      const id = String(row.id ?? "");
+      if (!id || existingIds.has(id)) continue;
+
+      const area = (row.bairro as string) || "Rio de Janeiro";
+      complement.push({
+        id,
+        name:          (row.nome as string) || area,
+        categoria:     "oQueFazer",
+        area,
+        zone:          getZone(area),
+        momento_ideal: (row.momento_ideal as string[]) ?? [],
+        energia:       (row.energia       as string)   ?? "medium",
+        tags:          (row.tags_ia       as string[]) ?? [],
+        vibe_tags:     (row.vibe          as string[]) ?? [],
+        duracao:       (row.duracao_media as string)   ?? "1-2h",
+      });
+      existingIds.add(id);
+    }
+  }
+
+  // ── 3. Restaurantes — 1 per day (for lunch/dinner anchors) ───────────────
+  if (needRests > 0) {
+    const { data: restRows } = await supa
+      .from("restaurantes")
+      .select("id,nome,bairro,especialidade,perfil_publico")
+      .eq("ativo", true)
+      .order("ordem_bairro")
+      .limit(Math.min(12, needRests + 3));
+
+    for (const row of (restRows ?? []) as Record<string, unknown>[]) {
+      const id = String(row.id ?? "");
+      if (!id || existingIds.has(id)) continue;
+
+      const area = (row.bairro as string) || "Rio de Janeiro";
+      complement.push({
+        id,
+        name:          (row.nome as string) || area,
+        categoria:     "restaurante",
+        area,
+        zone:          getZone(area),
+        momento_ideal: ["lunch"],
+        energia:       "low",
+        tags:          [],
+        vibe_tags:     [],
+        duracao:       "1-2h",
+        especialidade: row.especialidade  as string | undefined,
+        perfil_publico: row.perfil_publico as string | undefined,
+      });
+      existingIds.add(id);
+
+      if (complement.filter((p) => p.categoria === "restaurante").length >= needRests) break;
+    }
+  }
+
+  return complement;
 }
 
 // ── STEP 2: Attach neighborhood metadata ──────────────────────────────────────
@@ -865,22 +1027,35 @@ serve(async (req) => {
       if (diff >= 1) resolvedDays = diff;
     }
 
-    // ── Step 1+2: Normalize + Enrich from Supabase ────────────────────────────
-    let places = await enrichPlaces(savedItems, supa);
-    places     = await attachNeighborhoodMeta(places, supa);
+    // ── Step 1+2: Normalize saved items from all sources ────────────────────────
+    let savedPlaces = await enrichPlaces(savedItems, supa);
 
-    if (places.length === 0) {
+    // ── Trip length is locked early — determines how much complement we need ──
+    const tripLength = computeTripLength(savedPlaces.length, vibe, resolvedDays);
+
+    // Only block if there's nothing to work with AND no trip dates were given
+    if (savedPlaces.length === 0 && tripLength === 0) {
       return new Response(
-        JSON.stringify({ error: "No actionable saved places" }),
+        JSON.stringify({ error: "No actionable saved places and no trip dates provided" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 },
       );
     }
 
+    // ── Fetch complementary content from lucky_list_rio, o_que_fazer_rio, restaurantes
+    // Priority: saved items first, then lucky list, then o_que_fazer, then restaurants.
+    // This pads out weak itineraries caused by too few saved items for the trip length.
+    const complementaryPlaces = await fetchComplementaryContent(
+      savedPlaces, tripLength, vibe, supa,
+    );
+
+    // Merge: saved items always come first (preserved position in clustering)
+    let places = [...savedPlaces, ...complementaryPlaces];
+
+    // Attach neighborhood metadata to the full pool (saved + complementary)
+    places = await attachNeighborhoodMeta(places, supa);
+
     // ── Step 3: Classify each place by best time-of-day ───────────────────────
     places = classifyAllPeriodos(places, vibe);
-
-    // ── Trip length is locked here — Gemini cannot change it ──────────────────
-    const tripLength = computeTripLength(places.length, vibe, resolvedDays);
 
     // ── Step 4: Macro-region clustering (oeste + norte isolated from centro + sul)
     const { dayGroups, dayRestaurants } = groupByGeography(places, tripLength, vibe);
