@@ -122,8 +122,11 @@ export function getImageForEntity(
   localizacao?: string,
   supabaseImageUrl?: string | null,
 ): NeighborhoodImageSource {
-  // ── Tier 1: Supabase image (always wins, not cached — may change between syncs) ──
-  if (supabaseImageUrl && supabaseImageUrl.trim().length > 0) {
+  // ── Tier 1: Supabase image — native only.
+  // On web, external URIs can fail silently (CORS / redirect chains) and the
+  // Image component renders blank with no recoverable error. Local assets are
+  // used on web instead (tiers 2-4 below).
+  if (supabaseImageUrl && supabaseImageUrl.trim().length > 0 && Platform.OS !== "web") {
     return { uri: supabaseImageUrl };
   }
 

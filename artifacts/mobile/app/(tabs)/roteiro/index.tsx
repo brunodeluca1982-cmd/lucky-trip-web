@@ -38,6 +38,7 @@ import { useGuia } from "@/context/GuiaContext";
 import type { SavedCategory, SavedItem } from "@/context/GuiaContext";
 import { supabase } from "@/lib/supabase";
 import { getNeighborhoodImage } from "@/data/neighborhoodImages";
+import { getImageForEntity } from "@/utils/getImageForEntity";
 import {
   buildItinerary,
   type Inspiration,
@@ -1205,7 +1206,7 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
     const timer = setTimeout(async () => {
       try {
         const [r1, r2, r3, r4] = await Promise.all([
-          supabase.from("restaurantes").select("id,nome,bairro,especialidade").ilike("nome", `%${q}%`).limit(6),
+          supabase.from("restaurantes").select("id,nome,bairro,especialidade,photo_url").ilike("nome", `%${q}%`).limit(6),
           supabase.from("o_que_fazer_rio").select("id,nome,bairro,categoria").ilike("nome", `%${q}%`).limit(6),
           supabase.from("lucky_list_rio").select("id,nome,bairro,tipo").ilike("nome", `%${q}%`).limit(4),
           supabase.from("stay_hotels").select("id,nome,bairro,categoria").ilike("nome", `%${q}%`).limit(4),
@@ -1213,7 +1214,8 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
         const rows: Suggestion[] = [
           ...(r1.data ?? []).map((r: Record<string, unknown>) => ({
             id: `r-${r.id}`, titulo: (r.nome as string) || "", localizacao: (r.bairro as string) || "",
-            image: getNeighborhoodImage((r.bairro as string) || ""), categoria: "restaurante" as SavedCategory,
+            image: getImageForEntity("restaurant", (r.nome as string) || "", (r.bairro as string) || "", (r.photo_url as string | null) ?? null),
+            categoria: "restaurante" as SavedCategory,
             subtitle: (r.especialidade as string) ?? "Restaurante",
           })),
           ...(r2.data ?? []).map((r: Record<string, unknown>) => ({
@@ -1261,14 +1263,14 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
       if (item.categoria === "restaurante") {
         const { data } = await supabase
           .from("restaurantes")
-          .select("id, nome, bairro, especialidade, categoria")
+          .select("id, nome, bairro, especialidade, categoria, photo_url")
           .eq("ativo", true)
           .limit(14);
         rows = (data ?? []).map((r: Record<string, unknown>) => ({
           id:          String(r.id),
           titulo:      (r.nome as string) || "Restaurante",
           localizacao: (r.bairro as string) || "",
-          image:       getNeighborhoodImage((r.bairro as string) || ""),
+          image:       getImageForEntity("restaurant", (r.nome as string) || "", (r.bairro as string) || "", (r.photo_url as string | null) ?? null),
           categoria:   "restaurante" as SavedCategory,
           subtitle:    (r.especialidade as string) ?? (r.categoria as string) ?? undefined,
         }));
@@ -2123,6 +2125,30 @@ function getItemFallbackImage(categoria: SavedCategory): ReturnType<typeof requi
   }
 }
 
+// ItemThumb — renders item thumbnail with onError fallback.
+// Prevents blank images when URIs fail (network, CORS, expired URL).
+function ItemThumb({ image, categoria }: { image: unknown; categoria: SavedCategory }) {
+  const [errored, setErrored] = React.useState(false);
+  const fallback = getItemFallbackImage(categoria);
+  const src = (!errored && image != null && image !== undefined && image !== 0)
+    ? (image as ReturnType<typeof require>)
+    : fallback;
+  return (
+    <>
+      <Image
+        source={src}
+        style={StyleSheet.absoluteFill}
+        resizeMode="cover"
+        onError={() => setErrored(true)}
+      />
+      <LinearGradient
+        colors={["transparent", "rgba(0,0,0,0.32)"]}
+        style={StyleSheet.absoluteFill}
+      />
+    </>
+  );
+}
+
 function ResultDayCard({
   dia,
   editMode,
@@ -2221,15 +2247,7 @@ function ResultDayCard({
 
                       {/* Thumbnail */}
                       <View style={re.thumb}>
-                        <Image
-                          source={(item.image as ReturnType<typeof require> | undefined) ?? getItemFallbackImage(item.categoria)}
-                          style={StyleSheet.absoluteFill}
-                          resizeMode="cover"
-                        />
-                        <LinearGradient
-                          colors={["transparent", "rgba(0,0,0,0.32)"]}
-                          style={StyleSheet.absoluteFill}
-                        />
+                        <ItemThumb image={item.image} categoria={item.categoria} />
                       </View>
 
                       {/* Info */}
@@ -2996,7 +3014,14 @@ export default function RoteiroScreen() {
         ...day,
         periodos: day.periodos.map((p) => ({
           ...p,
-          items: p.items.map((item) => savedMap.get(item.id) ?? item).filter(Boolean),
+          items: p.items.map((item) => {
+            const found = savedMap.get(item.id);
+            if (found) return found;
+            // AI introduced an item not in saved list — resolve a fallback image
+            // so the thumbnail never renders blank
+            const cat = (item.categoria as SavedCategory | undefined) ?? "oQueFazer";
+            return { ...item, image: getItemFallbackImage(cat) };
+          }).filter(Boolean),
         })),
       }));
 
