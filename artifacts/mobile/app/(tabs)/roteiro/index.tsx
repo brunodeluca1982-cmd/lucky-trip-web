@@ -103,9 +103,9 @@ function getDayWeather(dayNum: number): WeatherIcon {
   return WEATHER_SEQ[(dayNum - 1) % WEATHER_SEQ.length];
 }
 
-const GLASS_BG     = "rgba(255,255,255,0.10)";
-const GLASS_HEADER = "rgba(0,0,0,0.90)";
-const GLASS_BORDER = "rgba(255,255,255,0.18)";
+const GLASS_BG     = "rgba(255,255,255,0.15)";
+const GLASS_HEADER = "rgba(0,0,0,0.65)";
+const GLASS_BORDER = "rgba(255,255,255,0.22)";
 const CREAM        = "#FFFFFF";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -417,7 +417,7 @@ function FlowPage2({
             >
               <Image source={ins.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
               <LinearGradient
-                colors={["transparent", "rgba(0,0,0,0.80)"]}
+                colors={["transparent", "rgba(0,0,0,0.58)"]}
                 locations={[0.25, 1]}
                 style={StyleSheet.absoluteFill}
               />
@@ -732,7 +732,7 @@ function ContextualFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) 
                 >
                   <Image source={ins.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
                   <LinearGradient
-                    colors={["transparent", "rgba(0,0,0,0.80)"]}
+                    colors={["transparent", "rgba(0,0,0,0.58)"]}
                     locations={[0.25, 1]}
                     style={StyleSheet.absoluteFill}
                   />
@@ -960,7 +960,7 @@ const fp = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: "rgba(0,0,0,0.70)",
+    backgroundColor: "rgba(0,0,0,0.48)",
     borderWidth: 1,
     borderColor: GOLD,
     alignItems: "center",
@@ -999,7 +999,7 @@ const fp = StyleSheet.create({
     borderRadius: 50,
     borderWidth: 1,
     borderColor: GLASS_BORDER,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: "rgba(255,255,255,0.12)",
   },
 
   pillActive: {
@@ -1021,7 +1021,7 @@ const fp = StyleSheet.create({
 
   // ── Inline Calendar ──────────────────────────────────────────────────────────
   cal: {
-    backgroundColor: "rgba(0,0,0,0.92)",
+    backgroundColor: "rgba(0,0,0,0.72)",
     borderRadius: 16,
     borderWidth: 1,
     borderColor: GLASS_BORDER,
@@ -1394,7 +1394,7 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
         <View style={rs.sugThumb}>
           <Image source={sug.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
           <LinearGradient
-            colors={["transparent", "rgba(0,0,0,0.50)"]}
+            colors={["transparent", "rgba(0,0,0,0.35)"]}
             style={StyleSheet.absoluteFill}
           />
           {sug.isExternal && (
@@ -1541,7 +1541,7 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
 const rs = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.97)",
+    backgroundColor: "rgba(0,0,0,0.85)",
     zIndex: 100,
   },
   header: {
@@ -1651,7 +1651,7 @@ const rs = StyleSheet.create({
     height: 56,
     borderRadius: 10,
     overflow: "hidden",
-    backgroundColor: "rgba(0,0,0,0.55)",
+    backgroundColor: "rgba(0,0,0,0.35)",
     flexShrink: 0,
   },
   sugInfo: {
@@ -1724,7 +1724,7 @@ const rs = StyleSheet.create({
     position: "absolute",
     bottom: 4,
     right: 4,
-    backgroundColor: "rgba(0,0,0,0.70)",
+    backgroundColor: "rgba(0,0,0,0.48)",
     borderRadius: 5,
     padding: 2,
   },
@@ -1787,7 +1787,7 @@ function ScreenHeader({
 
       <View style={hd.center}>
         <Text style={[hd.title, isResult && hd.titleLight]}>
-          {isResult ? "Roteiro automático" : "Criando roteiro…"}
+          {isResult ? "Roteiro inteligente" : "Criando roteiro…"}
         </Text>
         <Text style={[hd.sub, isResult && hd.subLight]}>Rio de Janeiro</Text>
       </View>
@@ -2019,7 +2019,7 @@ function ResultPhase({
           <View style={re.hotelThumb}>
             <Image source={hotelItem.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
             <LinearGradient
-              colors={["transparent", "rgba(0,0,0,0.55)"]}
+              colors={["transparent", "rgba(0,0,0,0.38)"]}
               style={StyleSheet.absoluteFill}
             />
           </View>
@@ -2237,7 +2237,7 @@ function ResultDayCard({
                           resizeMode="cover"
                         />
                         <LinearGradient
-                          colors={["transparent", "rgba(0,0,0,0.45)"]}
+                          colors={["transparent", "rgba(0,0,0,0.32)"]}
                           style={StyleSheet.absoluteFill}
                         />
                       </View>
@@ -2325,7 +2325,7 @@ const re = StyleSheet.create({
     height: 62,
     borderRadius: 12,
     overflow: "hidden",
-    backgroundColor: "rgba(0,0,0,0.55)",
+    backgroundColor: "rgba(0,0,0,0.35)",
     flexShrink: 0,
   },
   hotelContent: {
@@ -2598,7 +2598,7 @@ const re = StyleSheet.create({
     height: 60,
     borderRadius: 12,
     overflow: "hidden",
-    backgroundColor: "rgba(0,0,0,0.55)",
+    backgroundColor: "rgba(0,0,0,0.35)",
     flexShrink: 0,
   },
   itemInfo: {
@@ -3038,7 +3038,7 @@ export default function RoteiroScreen() {
       <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}>
         <Image source={heroImg} style={StyleSheet.absoluteFill} resizeMode="cover" />
         <LinearGradient
-          colors={["rgba(0,0,0,0.18)", "rgba(0,0,0,0.55)", "rgba(0,0,0,0.90)"]}
+          colors={["rgba(0,0,0,0.05)", "rgba(0,0,0,0.28)", "rgba(0,0,0,0.60)"]}
           locations={[0, 0.35, 1]}
           style={StyleSheet.absoluteFill}
         />
@@ -3105,7 +3105,7 @@ export default function RoteiroScreen() {
 const sc = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#080401",
+    backgroundColor: "#100D09",
   },
   heroBg: {
     ...StyleSheet.absoluteFillObject,

@@ -161,7 +161,7 @@ function ActionArea({ hasSaved }: { hasSaved: boolean }) {
             <Feather name="zap" size={15} color={GOLD} />
           </View>
           <View>
-            <Text style={act.aiLabel}>Criar roteiro com IA</Text>
+            <Text style={act.aiLabel}>Criar roteiro inteligente</Text>
             <Text style={act.aiSub}>Baseado nos seus lugares salvos</Text>
           </View>
         </View>
@@ -208,7 +208,7 @@ const act = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 20,
     borderRadius: 16,
-    backgroundColor: "rgba(0,0,0,0.62)",
+    backgroundColor: "rgba(0,0,0,0.42)",
     borderWidth: 1,
     borderColor: `${GOLD}28`,
     boxShadow: `0px 4px 20px rgba(201,168,76,0.12)`,
@@ -294,7 +294,7 @@ const sc = StyleSheet.create({
   card: {
     borderRadius: 16,
     overflow: "hidden",
-    backgroundColor: "#000000",
+    backgroundColor: "#100D09",
     marginRight: 10,
     justifyContent: "flex-end",
   },
@@ -305,7 +305,7 @@ const sc = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: "rgba(0,0,0,0.55)",
+    backgroundColor: "rgba(0,0,0,0.35)",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
@@ -422,7 +422,7 @@ const eh = StyleSheet.create({
     paddingVertical: 20,
     paddingHorizontal: 18,
     borderRadius: 16,
-    backgroundColor: "rgba(0,0,0,0.55)",
+    backgroundColor: "rgba(0,0,0,0.35)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
@@ -546,7 +546,7 @@ const rot = StyleSheet.create({
   },
   diaCard: {
     borderRadius: 16,
-    backgroundColor: "rgba(0,0,0,0.60)",
+    backgroundColor: "rgba(0,0,0,0.38)",
     borderWidth: 1,
     borderColor: `${GOLD}18`,
     paddingHorizontal: 18,
@@ -688,7 +688,7 @@ export default function MinhaViagemScreen() {
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#000000",
+    backgroundColor: "#100D09",
   },
   content: {
     paddingHorizontal: 24,
