@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   Animated,
   Dimensions,
@@ -37,7 +37,33 @@ import {
   roteiros,
 } from "@/data/mockData";
 import { LUGARES_LUCKY } from "@/data/lugares";
+import { useGuia } from "@/context/GuiaContext";
 import { useTimeOfDay } from "@/hooks/useTimeOfDay";
+
+// ── Context-aware "O que fazer agora" title ───────────────────────────────────
+// Prepositions for known destinations (Portuguese grammar)
+const DESTINO_PREP: Record<string, string> = {
+  "Rio de Janeiro":   "no Rio de Janeiro",
+  "São Paulo":        "em São Paulo",
+  "Belo Horizonte":   "em Belo Horizonte",
+  "Florianópolis":    "em Florianópolis",
+  "Santorini":        "em Santorini",
+  "Kyoto":            "em Kyoto",
+  "Paris":            "em Paris",
+  "Lisboa":           "em Lisboa",
+};
+
+// Priority: user location (future) → active trip → fallback
+function getAgoraTitle(tripDestino?: string): string {
+  // 1. User location: not available in this build (expo-location not installed)
+  // 2. Active trip
+  if (tripDestino) {
+    const prep = DESTINO_PREP[tripDestino] ?? `em ${tripDestino}`;
+    return `O que fazer agora ${prep}`;
+  }
+  // 3. Fallback
+  return "O que fazer agora";
+}
 
 const C = Colors.light;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -204,8 +230,9 @@ export default function HomeScreen() {
   const { periodo, setPeriodo, fadeAnim } = useTimeOfDay();
   const currentItems = oQueFazerPorMomento[periodo];
   const currentMeta = periodoMeta[periodo];
-  const [heroIndex, setHeroIndex] = useState(0);
-  const currentHero = heroDestinos[heroIndex] ?? heroDestinos[0];
+  // Context priority: location (future) → active trip → fallback
+  const { viagem } = useGuia();
+  const agoraTitle = getAgoraTitle(viagem.destino || undefined);
 
   return (
     <View style={s.root}>
@@ -228,12 +255,12 @@ export default function HomeScreen() {
       >
 
         {/* ── 1. HERO CAROUSEL ── */}
-        <HeroCarousel items={heroDestinos} onIndexChange={setHeroIndex} />
+        <HeroCarousel items={heroDestinos} />
 
         {/* ── 2. O QUE FAZER AGORA ── */}
         <View style={s.section}>
           <SectionHeader
-            title={`O que fazer agora ${currentHero.lugar}`}
+            title={agoraTitle}
             uppercase
             subtitle={currentMeta.subtitle}
             dark

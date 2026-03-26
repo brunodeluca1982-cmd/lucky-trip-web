@@ -101,10 +101,25 @@ export const heroDestinos = [
     id: "1",
     cidade: "Rio de Janeiro",
     pais: "Brasil",
-    badge: "Confira as novidades",
+    badge: "Destino em destaque",
     image: require("../assets/images/hero-rio.png"),
     cityId: "rio",
-    lugar: "no Rio de Janeiro",
+  },
+  {
+    id: "e1",
+    cidade: "Restaurantes imperdíveis",
+    pais: "Rio de Janeiro",
+    badge: "Onde comer",
+    image: require("../assets/images/restaurante1.png"),
+    cityId: "rio",
+  },
+  {
+    id: "e2",
+    cidade: "O que fazer hoje",
+    pais: "Experiências no Rio",
+    badge: "Experiências",
+    image: require("../assets/images/pao-acucar.png"),
+    cityId: "rio",
   },
   {
     id: "2",
@@ -113,7 +128,6 @@ export const heroDestinos = [
     badge: "Destaque da semana",
     image: require("../assets/images/hero-santorini.png"),
     cityId: "santorini",
-    lugar: "em Santorini",
   },
   {
     id: "3",
@@ -122,7 +136,6 @@ export const heroDestinos = [
     badge: "Experiência única",
     image: require("../assets/images/hero-kyoto.png"),
     cityId: "kyoto",
-    lugar: "em Kyoto",
   },
 ];
 
