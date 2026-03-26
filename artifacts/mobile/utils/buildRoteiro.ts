@@ -7,24 +7,29 @@
  * Rules (no AI):
  *   1. Group items by bairro → each bairro becomes one DiaRoteiro.
  *   2. Within each bairro:
- *        restaurante → almoço (1st) then noite (2nd+)
- *        oQueFazer / lucky → manhã (1st half) then tarde (2nd half)
+ *        restaurante → almoco (1st only) then jantar (2nd only) — max 1 each slot
+ *        oQueFazer / lucky → manha (first 2) then tarde (next 2) — max 2 each slot
  *        hotel → excluded from periodo display (it's the lodging, not an activity)
  *   3. Empty periodos are not included.
  *   4. Bairros that yield no periodos (hotels only) are skipped.
  *   5. Day numbers are sequential in insertion order of first saved bairro item.
+ *
+ * Anti-repetition rules:
+ *   - Max 2 activities per time slot (prevents 3+ same-type items in a row)
+ *   - Max 1 restaurant per meal slot (prevents multiple dinners)
  */
 
 import type { SavedItem, SavedCategory } from "@/context/GuiaContext";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-export type PeriodoDia = "manha" | "almoco" | "tarde" | "noite";
+export type PeriodoDia = "manha" | "almoco" | "tarde" | "jantar" | "noite";
 
 export const PERIODO_LABEL: Record<PeriodoDia, string> = {
   manha:  "Manhã",
   almoco: "Almoço",
   tarde:  "Tarde",
+  jantar: "Jantar",
   noite:  "Noite",
 };
 
@@ -32,7 +37,8 @@ export const PERIODO_ICON: Record<PeriodoDia, string> = {
   manha:  "sun",
   almoco: "coffee",
   tarde:  "cloud",
-  noite:  "moon",
+  jantar: "moon",
+  noite:  "star",
 };
 
 export interface DiaPeriodo {
@@ -76,21 +82,20 @@ export function buildRoteiro(items: SavedItem[]): DiaRoteiro[] {
     const restaurantes = bairroItems.filter(i => tipoFromCategoria(i.categoria) === "restaurante");
     // hotels are deliberately excluded from the timetable
 
-    // 3. Distribute atividades between manhã and tarde
-    const meioAtiv = Math.ceil(atividades.length / 2);
-    const manha    = atividades.slice(0, meioAtiv);
-    const tarde    = atividades.slice(meioAtiv);
+    // 3. Distribute atividades — max 2 per slot to prevent repetitive sequences
+    const manha = atividades.slice(0, 2);
+    const tarde = atividades.slice(2, 4);
 
-    // 4. Distribute restaurantes between almoço and noite
-    const almoco = restaurantes.slice(0, 1);
-    const noite  = restaurantes.slice(1);
+    // 4. Distribute restaurantes — strictly 1 per slot (prevents multiple dinners)
+    const almoco = restaurantes.slice(0, 1); // first restaurant → lunch
+    const jantar = restaurantes.slice(1, 2); // second restaurant → dinner (max 1)
 
     // 5. Build ordered periodo list, skipping empty ones
     const periodos: DiaPeriodo[] = [];
     if (manha.length  > 0) periodos.push({ periodo: "manha",  items: manha  });
     if (almoco.length > 0) periodos.push({ periodo: "almoco", items: almoco });
     if (tarde.length  > 0) periodos.push({ periodo: "tarde",  items: tarde  });
-    if (noite.length  > 0) periodos.push({ periodo: "noite",  items: noite  });
+    if (jantar.length > 0) periodos.push({ periodo: "jantar", items: jantar });
 
     // 6. Skip bairros that yield no actionable periodos (hotel-only bairros)
     if (periodos.length === 0) continue;

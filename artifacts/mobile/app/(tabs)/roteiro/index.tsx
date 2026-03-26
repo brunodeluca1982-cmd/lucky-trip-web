@@ -15,6 +15,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import {
+  Alert,
   Animated,
   Dimensions,
   Image,
@@ -29,7 +30,7 @@ import {
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, Stack, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
@@ -84,7 +85,8 @@ const PERIODO_TIME: Record<string, number> = {
   manha:  9 * 60,
   almoco: 12 * 60 + 30,
   tarde:  14 * 60,
-  noite:  19 * 60,
+  jantar: 19 * 60 + 30,
+  noite:  21 * 60,
 };
 
 function getItemTime(periodo: string, idx: number): string {
@@ -1205,18 +1207,63 @@ interface ReplaceSheetProps {
 
 function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
   const [suggestions,     setSuggestions]     = useState<Suggestion[]>([]);
+  const [crossResults,    setCrossResults]    = useState<Suggestion[]>([]);
   const [externalResults, setExternalResults] = useState<Suggestion[]>([]);
   const [loading,         setLoading]         = useState(true);
+  const [crossLoading,    setCrossLoading]    = useState(false);
   const [extLoading,      setExtLoading]      = useState(false);
   const [isConfirming,    setIsConfirming]    = useState(false);
   const [searchQuery,     setSearchQuery]     = useState("");
 
   useEffect(() => { fetchSuggestions(); }, [item.id]);
 
+  // Cross-category internal DB search — fires at 2+ chars, finds ANY place in the DB
+  useEffect(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (q.length < 2) { setCrossResults([]); setCrossLoading(false); return; }
+    setCrossLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const [r1, r2, r3, r4] = await Promise.all([
+          supabase.from("restaurantes").select("id,nome,bairro,especialidade").ilike("nome", `%${q}%`).limit(6),
+          supabase.from("o_que_fazer_rio").select("id,nome,bairro,categoria").ilike("nome", `%${q}%`).limit(6),
+          supabase.from("lucky_list_rio").select("id,nome,bairro,tipo").ilike("nome", `%${q}%`).limit(4),
+          supabase.from("stay_hotels").select("id,nome,bairro,categoria").ilike("nome", `%${q}%`).limit(4),
+        ]);
+        const rows: Suggestion[] = [
+          ...(r1.data ?? []).map((r: Record<string, unknown>) => ({
+            id: `r-${r.id}`, titulo: (r.nome as string) || "", localizacao: (r.bairro as string) || "",
+            image: getNeighborhoodImage((r.bairro as string) || ""), categoria: "restaurante" as SavedCategory,
+            subtitle: (r.especialidade as string) ?? "Restaurante",
+          })),
+          ...(r2.data ?? []).map((r: Record<string, unknown>) => ({
+            id: `q-${r.id}`, titulo: (r.nome as string) || "", localizacao: (r.bairro as string) || "",
+            image: getNeighborhoodImage((r.bairro as string) || ""), categoria: "oQueFazer" as SavedCategory,
+            subtitle: (r.categoria as string) ?? "O que fazer",
+          })),
+          ...(r3.data ?? []).map((r: Record<string, unknown>) => ({
+            id: `l-${r.id}`, titulo: (r.nome as string) || "", localizacao: (r.bairro as string) || "",
+            image: getNeighborhoodImage((r.bairro as string) || ""), categoria: "lucky" as SavedCategory,
+            subtitle: (r.tipo as string) ?? "Lucky",
+          })),
+          ...(r4.data ?? []).map((r: Record<string, unknown>) => ({
+            id: `h-${r.id}`, titulo: (r.nome as string) || "", localizacao: (r.bairro as string) || "",
+            image: getNeighborhoodImage((r.bairro as string) || ""), categoria: "hotel" as SavedCategory,
+            subtitle: (r.categoria as string) ?? "Hotel",
+          })),
+        ];
+        setCrossResults(rows);
+      } catch { setCrossResults([]); }
+      setCrossLoading(false);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   // Debounce Google Places search — starts at 2 chars, 500ms delay
   useEffect(() => {
     const q = searchQuery.trim();
     if (q.length < 2) { setExternalResults([]); setExtLoading(false); return; }
+    if (!GOOGLE_PLACES_KEY) { setExternalResults([]); setExtLoading(false); return; }
     setExtLoading(true);
     const timer = setTimeout(async () => {
       const results = await fetchGooglePlaces(q, item.categoria);
@@ -1295,9 +1342,14 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
       )
     : suggestions;
 
-  // External results — deduplicate against internal list
+  // Cross-category DB results — deduplicate against localFiltered
+  const crossDeduped = crossResults.filter(
+    (c) => !localFiltered.some((l) => l.titulo === c.titulo),
+  );
+
+  // External results — deduplicate against internal DB results
   const externalDeduped = externalResults.filter(
-    (e) => !localFiltered.some((l) => l.id === e.id),
+    (e) => !localFiltered.some((l) => l.id === e.id) && !crossDeduped.some((c) => c.titulo === e.titulo),
   );
 
   /**
@@ -1445,8 +1497,19 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
             </>
           )}
 
+          {/* ── Cross-category DB results ─── */}
+          {q.length >= 2 && crossDeduped.length > 0 && (
+            <>
+              <View style={rs.sectionLabelRow}>
+                <Text style={rs.sectionLabel}>✦ Outros lugares no Rio</Text>
+                {crossLoading && <Text style={rs.sectionLabelSub}>buscando…</Text>}
+              </View>
+              {crossDeduped.map(renderSugCard)}
+            </>
+          )}
+
           {/* ── Google Places results ─── */}
-          {q.length >= 2 && (
+          {q.length >= 2 && GOOGLE_PLACES_KEY.length > 0 && (
             <>
               <View style={rs.sectionLabelRow}>
                 <Text style={rs.sectionLabel}>✦ Google Places</Text>
@@ -1472,11 +1535,11 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
           )}
 
           {/* ── True empty state — only shown when no results anywhere and not loading ── */}
-          {localFiltered.length === 0 && externalDeduped.length === 0 && !extLoading && q.length < 2 && (
+          {localFiltered.length === 0 && crossDeduped.length === 0 && externalDeduped.length === 0 && !extLoading && !crossLoading && q.length < 2 && (
             <View style={rs.emptyState}>
               <Feather name="search" size={24} color={`${GOLD}50`} />
               <Text style={rs.emptyText}>Nenhum lugar encontrado</Text>
-              <Text style={rs.emptySub}>Digite para buscar no Google Places</Text>
+              <Text style={rs.emptySub}>Digite o nome de qualquer lugar no Rio</Text>
             </View>
           )}
         </ScrollView>
@@ -1873,8 +1936,28 @@ function ResultPhase({
 
   function handleOpenMap() {
     const allItems = result.days.flatMap((d) => d.periodos.flatMap((p) => p.items));
-    const query    = allItems.slice(0, 3).map((i) => i.titulo).join(" + ") + " Rio de Janeiro";
-    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`);
+    if (allItems.length === 0) return;
+
+    if (allItems.length === 1) {
+      const q = `${allItems[0].titulo} Rio de Janeiro`;
+      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`);
+      return;
+    }
+
+    // Build Google Maps directions URL with origin + destination + up to 8 waypoints (Maps limit)
+    const ordered = allItems.slice(0, 10);
+    const origin      = encodeURIComponent(`${ordered[0].titulo} Rio de Janeiro`);
+    const destination = encodeURIComponent(`${ordered[ordered.length - 1].titulo} Rio de Janeiro`);
+    const waypoints   = ordered
+      .slice(1, -1)
+      .map((i) => encodeURIComponent(`${i.titulo} Rio de Janeiro`))
+      .join("|");
+
+    const url = waypoints.length > 0
+      ? `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&waypoints=${waypoints}&travelmode=walking`
+      : `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=walking`;
+
+    Linking.openURL(url);
   }
 
   function handleDayChipPress(diaNum: number) {
@@ -2021,10 +2104,21 @@ function ResultPhase({
 }
 
 function navigateToItem(item: SavedItem) {
-  if (item.isExternal) return;
+  // External (Google Places) items — open in Google Maps
+  if (item.isExternal) {
+    if (item.placeId) {
+      Linking.openURL(`https://www.google.com/maps/place/?q=place_id:${item.placeId}`);
+    } else if (item.lat && item.lng) {
+      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${item.lat},${item.lng}`);
+    } else {
+      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.titulo + " Rio de Janeiro")}`);
+    }
+    return;
+  }
+
   switch (item.categoria) {
     case "restaurante":
-      router.push({ pathname: "/comerBem/[id]", params: { id: item.id } });
+      router.push({ pathname: "/(tabs)/comerBem/[id]", params: { id: item.id } });
       break;
     case "hotel":
       router.push({ pathname: "/ondeFicar/hotel/[hotelId]", params: { hotelId: item.id } });
@@ -2831,13 +2925,29 @@ export default function RoteiroScreen() {
       shareSlug = undefined;
     }
 
-    try {
-      await Share.share({
-        message: buildShareLines(shareSlug),
-        title:   "Roteiro Rio de Janeiro",
-      });
-    } catch {
-      // dismissed
+    const shareText = buildShareLines(shareSlug);
+    const persistentUrl = shareSlug ? `https://theluckytrip.app/r/${shareSlug}` : null;
+
+    if (persistentUrl) {
+      Alert.alert(
+        "Roteiro salvo ✦",
+        `Link permanente para o seu roteiro:\n\n${persistentUrl}\n\nCompartilhe com quem vai viajar com você.`,
+        [
+          {
+            text: "Compartilhar",
+            onPress: async () => {
+              try {
+                await Share.share({ message: shareText, title: "Roteiro Rio de Janeiro" });
+              } catch { /* dismissed */ }
+            },
+          },
+          { text: "Fechar", style: "cancel" },
+        ]
+      );
+    } else {
+      try {
+        await Share.share({ message: shareText, title: "Roteiro Rio de Janeiro" });
+      } catch { /* dismissed */ }
     }
   }
 
@@ -2901,14 +3011,13 @@ export default function RoteiroScreen() {
 
   return (
     <View style={sc.root}>
-      <Stack.Screen options={{ headerShown: false }} />
 
-      {/* ── Cinematic dark background — all phases ── */}
+      {/* ── Cinematic background — image visible at top, dark toward content ── */}
       <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}>
         <Image source={heroImg} style={StyleSheet.absoluteFill} resizeMode="cover" />
         <LinearGradient
-          colors={["rgba(0,0,0,0.72)", "rgba(0,0,0,0.88)", "rgba(0,0,0,0.97)"]}
-          locations={[0, 0.40, 1]}
+          colors={["rgba(0,0,0,0.18)", "rgba(0,0,0,0.55)", "rgba(0,0,0,0.90)"]}
+          locations={[0, 0.35, 1]}
           style={StyleSheet.absoluteFill}
         />
       </View>
