@@ -29,11 +29,15 @@ interface HeroItem {
 
 interface HeroCarouselProps {
   items: HeroItem[];
+  onIndexChange?: (index: number) => void;
 }
 
 function HeroSlide({ item }: { item: HeroItem }) {
   return (
-    <View style={styles.slide}>
+    <Pressable
+      style={({ pressed }) => [styles.slide, pressed && { opacity: 0.94 }]}
+      onPress={() => item.cityId && router.push({ pathname: "/cidade/[id]", params: { id: item.cityId } })}
+    >
       <Image source={item.image} style={styles.image} resizeMode="cover" />
       <LinearGradient
         colors={["transparent", "rgba(0,0,0,0.25)", "rgba(0,0,0,0.72)"]}
@@ -46,18 +50,12 @@ function HeroSlide({ item }: { item: HeroItem }) {
         </View>
         <Text style={styles.cidade}>{item.cidade}</Text>
         <Text style={styles.pais}>{item.pais}</Text>
-        <Pressable
-          onPress={() => item.cityId && router.push({ pathname: "/cidade/[id]", params: { id: item.cityId } })}
-          style={({ pressed }) => [styles.cta, pressed && { opacity: 0.88, transform: [{ scale: 0.97 }] }]}
-        >
-          <Text style={styles.ctaText}>Conferir agora</Text>
-        </Pressable>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
-export function HeroCarousel({ items }: HeroCarouselProps) {
+export function HeroCarousel({ items, onIndexChange }: HeroCarouselProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const autoplayRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -65,7 +63,9 @@ export function HeroCarousel({ items }: HeroCarouselProps) {
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       if (viewableItems.length > 0 && viewableItems[0].index !== null) {
-        setActiveIndex(viewableItems[0].index);
+        const idx = viewableItems[0].index;
+        setActiveIndex(idx);
+        onIndexChange?.(idx);
       }
     }
   ).current;
@@ -77,6 +77,7 @@ export function HeroCarousel({ items }: HeroCarouselProps) {
       setActiveIndex((prev) => {
         const next = (prev + 1) % items.length;
         flatListRef.current?.scrollToIndex({ index: next, animated: true });
+        onIndexChange?.(next);
         return next;
       });
     }, 4000);
@@ -176,23 +177,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     letterSpacing: 2,
     textTransform: "uppercase",
-  },
-  cta: {
-    backgroundColor: C.white,
-    borderRadius: 50,
-    paddingHorizontal: 36,
-    paddingVertical: 14,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  ctaText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
-    color: C.darkBrown,
-    letterSpacing: 0.3,
   },
   dots: {
     position: "absolute",

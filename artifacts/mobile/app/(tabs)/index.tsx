@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Animated,
   Dimensions,
@@ -26,7 +26,6 @@ import { SectionHeader } from "@/components/SectionHeader";
 import Colors from "@/constants/colors";
 import {
   curadoPara,
-  destaques,
   heroDestinos,
   hoteis,
   influencers,
@@ -170,14 +169,6 @@ function RoteiroCTA() {
 // Maps every Home card ID to the correct /lugar/rio/[placeId] detail route.
 // Using the unified LugarDetail template (matches the Ciclovia reference).
 
-// Destaques use sequential IDs "1"-"4" that don't all match LUGARES numeric IDs.
-const DESTAQUE_MAP: Record<string, string> = {
-  "1": "1",         // Praia de Ipanema ✅
-  "2": "colombo",   // Confeitaria Colombo → LUGARES_COMER
-  "3": "h1",        // Copacabana Palace → LUGARES_FICAR
-  "4": "l5",        // Escadaria Selarón → LUGARES_LUCKY
-};
-
 // oQueFazerPorMomento period items → closest lugar by content / location
 const O_QUE_FAZER_MAP: Record<string, string> = {
   m1: "1",         // Praia de Ipanema
@@ -213,6 +204,8 @@ export default function HomeScreen() {
   const { periodo, setPeriodo, fadeAnim } = useTimeOfDay();
   const currentItems = oQueFazerPorMomento[periodo];
   const currentMeta = periodoMeta[periodo];
+  const [heroIndex, setHeroIndex] = useState(0);
+  const currentHero = heroDestinos[heroIndex] ?? heroDestinos[0];
 
   return (
     <View style={s.root}>
@@ -235,38 +228,12 @@ export default function HomeScreen() {
       >
 
         {/* ── 1. HERO CAROUSEL ── */}
-        <HeroCarousel items={heroDestinos} />
+        <HeroCarousel items={heroDestinos} onIndexChange={setHeroIndex} />
 
-        {/* ── 2. DESTAQUES ── */}
+        {/* ── 2. O QUE FAZER AGORA ── */}
         <View style={s.section}>
           <SectionHeader
-            title="Destaques"
-            uppercase
-            subtitle="Uma seleção editorial dos melhores do Rio."
-            dark
-          />
-          <HorizontalScroll>
-            {destaques.map((d) => (
-              <PlaceCard
-                key={d.id}
-                id={d.id}
-                saveCategoria="oQueFazer"
-                titulo={d.titulo}
-                localizacao={d.localizacao}
-                image={d.image}
-                size="large"
-                onPress={() => router.push(`/lugar/rio/${DESTAQUE_MAP[d.id] ?? d.id}`)}
-              />
-            ))}
-          </HorizontalScroll>
-        </View>
-
-        <Divider />
-
-        {/* ── 3. O QUE FAZER AGORA ── */}
-        <View style={s.section}>
-          <SectionHeader
-            title="O que fazer agora"
+            title={`O que fazer agora ${currentHero.lugar}`}
             uppercase
             subtitle={currentMeta.subtitle}
             dark
