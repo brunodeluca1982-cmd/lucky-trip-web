@@ -2094,31 +2094,35 @@ function ResultPhase({
 }
 
 function navigateToItem(item: SavedItem) {
-  // External (Google Places) items — open in Google Maps
-  if (item.isExternal) {
-    if (item.placeId) {
-      Linking.openURL(`https://www.google.com/maps/place/?q=place_id:${item.placeId}`);
-    } else if (item.lat && item.lng) {
-      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${item.lat},${item.lng}`);
-    } else {
-      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.titulo + " Rio de Janeiro")}`);
-    }
+  // ── Priority 1: Google Place ID → Google Maps (place_id URL)
+  if (item.placeId) {
+    Linking.openURL(`https://www.google.com/maps/place/?q=place_id:${item.placeId}`);
     return;
   }
 
+  // ── Priority 2: Coordinates → Google Maps (coordinates URL)
+  if (item.lat && item.lng) {
+    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${item.lat},${item.lng}`);
+    return;
+  }
+
+  // ── Priority 3: Internal DB item — route to correct detail screen
   switch (item.categoria) {
     case "restaurante":
       router.push({ pathname: "/(tabs)/comerBem/[id]", params: { id: item.id } });
-      break;
+      return;
     case "hotel":
       router.push({ pathname: "/ondeFicar/hotel/[hotelId]", params: { hotelId: item.id } });
-      break;
+      return;
     case "oQueFazer":
-    case "lucky":
-    default:
       router.push({ pathname: "/lugar/[cityId]/[placeId]", params: { cityId: "rio", placeId: item.id } });
-      break;
+      return;
   }
+
+  // ── Priority 4: Absolute fallback — guaranteed no dead click
+  // Used for: lucky items (different table), unknown categories, edge cases
+  const query = `${item.titulo}${item.localizacao ? ` ${item.localizacao}` : ""} Rio de Janeiro`;
+  Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`);
 }
 
 function getItemFallbackImage(categoria: SavedCategory): ReturnType<typeof require> {
@@ -2863,81 +2867,109 @@ export default function RoteiroScreen() {
     if (!result) return;
     let shareSlug: string | undefined;
 
+    // 1. Try to persist the itinerary and get a shareable slug
     try {
-      // 1. Generate a unique slug
       shareSlug = Array.from({ length: 8 }, () => Math.random().toString(36)[2]).join("");
 
-      // 2. Persist to user_itineraries
       const { data: itinerary, error: itinErr } = await supabase
         .from("user_itineraries")
         .insert({
-          destination_id:        "rio-de-janeiro",
-          destination_name:      result.destination ?? "Rio de Janeiro",
-          status:                "generated",
-          is_public:             true,
-          share_slug:            shareSlug,
-          days_count:            result.summary.totalDays,
-          items_count:           result.summary.totalItems,
-          inspiration_tags:      (result.preferences?.inspirations ?? []) as string[],
-          travel_company:        null,
-          budget_style:          result.preferences?.vibe ?? null,
-          generated_at:          new Date().toISOString(),
+          destination_id:   "rio-de-janeiro",
+          destination_name: result.destination ?? "Rio de Janeiro",
+          status:           "generated",
+          is_public:        true,
+          share_slug:       shareSlug,
+          days_count:       result.summary.totalDays,
+          items_count:      result.summary.totalItems,
+          inspiration_tags: (result.preferences?.inspirations ?? []) as string[],
+          travel_company:   null,
+          budget_style:     result.preferences?.vibe ?? null,
+          generated_at:     new Date().toISOString(),
         })
         .select("id")
         .single();
 
-      if (itinErr || !itinerary) throw itinErr ?? new Error("no itinerary returned");
-
-      // 3. Persist items to roteiro_itens
-      const roteiroItens = result.days.flatMap((dia) =>
-        dia.periodos.flatMap((periodo, _pi) =>
-          periodo.items.map((item, idx) => ({
-            roteiro_id:    itinerary.id,
-            name:          item.titulo,
-            day_index:     dia.numero - 1,
-            order_in_day:  idx,
-            time_slot:     periodo.periodo,
-            source:        item.isExternal ? "external" : "saved",
-            ref_table:     item.isExternal ? "external" : null,
-            place_id:      item.isExternal ? (item.placeId ?? null) : null,
-            neighborhood:  item.localizacao ?? dia.bairro,
-            address:       item.isExternal ? (item.address ?? null) : null,
-            city:          "Rio de Janeiro",
-            lat:           item.isExternal ? (item.lat ?? null) : null,
-            lng:           item.isExternal ? (item.lng ?? null) : null,
-          }))
-        )
-      );
-
-      await supabase.from("roteiro_itens").insert(roteiroItens);
+      if (itinErr || !itinerary) {
+        shareSlug = undefined;
+      } else {
+        const roteiroItens = result.days.flatMap((dia) =>
+          dia.periodos.flatMap((periodo, _pi) =>
+            periodo.items.map((item, idx) => ({
+              roteiro_id:   itinerary.id,
+              name:         item.titulo,
+              day_index:    dia.numero - 1,
+              order_in_day: idx,
+              time_slot:    periodo.periodo,
+              source:       item.isExternal ? "external" : "saved",
+              ref_table:    item.isExternal ? "external" : null,
+              place_id:     item.isExternal ? (item.placeId ?? null) : null,
+              neighborhood: item.localizacao ?? dia.bairro,
+              address:      item.isExternal ? (item.address ?? null) : null,
+              city:         "Rio de Janeiro",
+              lat:          item.isExternal ? (item.lat ?? null) : null,
+              lng:          item.isExternal ? (item.lng ?? null) : null,
+            }))
+          )
+        );
+        await supabase.from("roteiro_itens").insert(roteiroItens);
+      }
     } catch {
-      // If Supabase fails, still share without URL
       shareSlug = undefined;
     }
 
-    const shareText = buildShareLines(shareSlug);
-    const persistentUrl = shareSlug ? `https://theluckytrip.app/r/${shareSlug}` : null;
+    // 2. Build share content
+    const shareText  = buildShareLines(shareSlug);
+    const shareUrl   = shareSlug ? `https://theluckytrip.app/r/${shareSlug}` : undefined;
+    const shareTitle = "Roteiro Rio de Janeiro — The Lucky Trip";
 
-    if (persistentUrl) {
+    // 3. Platform-aware sharing — always produces visible output
+    const doNativeShare = async () => {
+      try {
+        await Share.share({
+          message: shareText,
+          url:     shareUrl,         // iOS only — adds a URL field
+          title:   shareTitle,       // Android
+        });
+      } catch { /* user dismissed */ }
+    };
+
+    if (Platform.OS === "web") {
+      // Web: try Web Share API first, then Alert fallback
+      const canWebShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+      if (canWebShare) {
+        try {
+          await navigator.share({
+            title: shareTitle,
+            text:  shareText,
+            url:   shareUrl,
+          });
+          return;
+        } catch { /* dismissed or unsupported — fall through */ }
+      }
+      // Fallback for web browsers without Share API: show link in Alert
       Alert.alert(
-        "Roteiro salvo ✦",
-        `Link permanente para o seu roteiro:\n\n${persistentUrl}\n\nCompartilhe com quem vai viajar com você.`,
+        "Compartilhar roteiro",
+        shareUrl
+          ? `Seu roteiro está disponível em:\n\n${shareUrl}\n\nCopie o link e compartilhe.`
+          : shareText.slice(0, 300),
+        [{ text: "OK" }]
+      );
+    } else if (shareUrl) {
+      // Native with URL: show Alert with URL + share button
+      Alert.alert(
+        "Roteiro salvo",
+        `Link do seu roteiro:\n\n${shareUrl}`,
         [
           {
             text: "Compartilhar",
-            onPress: async () => {
-              try {
-                await Share.share({ message: shareText, title: "Roteiro Rio de Janeiro" });
-              } catch { /* dismissed */ }
-            },
+            onPress: doNativeShare,
           },
           { text: "Fechar", style: "cancel" },
         ]
       );
     } else {
-      try {
-        await Share.share({ message: shareText, title: "Roteiro Rio de Janeiro" });
-      } catch { /* dismissed */ }
+      // Native without URL: open share sheet directly
+      await doNativeShare();
     }
   }
 

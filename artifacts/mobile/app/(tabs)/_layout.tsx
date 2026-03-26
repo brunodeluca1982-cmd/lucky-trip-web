@@ -5,19 +5,21 @@ import React from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import Colors from "@/constants/colors";
-
-const C = Colors.light;
-
-const GOLD    = "#D4AF37";
-const GRAY    = "#888888";
-const TAB_BG  = "#FFFFFF";
-const BORDER  = "rgba(0,0,0,0.08)";
+const GOLD   = "#D4AF37";
+const GRAY   = "#888888";
+const TAB_BG = "#FFFFFF";
+const BORDER = "rgba(0,0,0,0.08)";
 
 export default function TabLayout() {
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
   const insets = useSafeAreaInsets();
+
+  // On iOS respect the home-indicator safe area; never let it collapse to 0
+  // on devices that report a non-zero inset (iPhone X and later = 34 pt).
+  // On older iPhones with a home button insets.bottom is correctly 0.
+  const bottomInset = isIOS ? insets.bottom : 0;
+  const TAB_HEIGHT  = 49 + bottomInset;          // 49 = standard iOS tab bar content height
 
   return (
     <Tabs
@@ -28,7 +30,7 @@ export default function TabLayout() {
         tabBarLabelStyle: {
           fontFamily: "Inter_500Medium",
           fontSize: 11,
-          marginBottom: isIOS ? 0 : 2,
+          marginBottom: 0,
         },
         tabBarStyle: {
           position: "absolute",
@@ -40,9 +42,9 @@ export default function TabLayout() {
           shadowOffset: { width: 0, height: -1 },
           shadowOpacity: 0.08,
           shadowRadius: 6,
-          paddingBottom: isWeb ? 6 : insets.bottom,
+          paddingBottom: isWeb ? 4 : bottomInset,
           paddingTop: 6,
-          height: isWeb ? 60 : 56 + insets.bottom,
+          height: isWeb ? 60 : TAB_HEIGHT,
           zIndex: 100,
         },
         tabBarBackground: () => (
