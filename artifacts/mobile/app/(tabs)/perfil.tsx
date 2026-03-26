@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  Image,
   ImageBackground,
   Platform,
   Pressable,
@@ -14,6 +15,9 @@ import Colors from "@/constants/colors";
 
 const C = Colors.light;
 const GOLD = "#D4AF37";
+
+// Official brand mark — same file used in AppHeader across the entire app.
+const LOGO_MARK = require("@/assets/images/logo-symbol.png");
 
 const menuItems = [
   { icon: "heart"      as const, label: "Favoritos",      count: "12" },
@@ -48,6 +52,11 @@ export default function PerfilScreen() {
             { paddingTop: topPad + 8, paddingBottom: bottomPad + 80 },
           ]}
         >
+          {/* Brand mark — same logo file as AppHeader, displayed at low opacity */}
+          <View style={styles.logoRow}>
+            <Image source={LOGO_MARK} style={styles.logoMark} resizeMode="contain" />
+          </View>
+
           {/* Profile */}
           <View style={styles.profileSection}>
             <View style={styles.avatar}>
@@ -134,25 +143,35 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.32)",
   },
   content: {
-    paddingHorizontal: 24,
-    gap: 0,
+    paddingHorizontal: 20,
+  },
+
+  // Brand mark row — mirrors the AppHeader logo placement
+  logoRow: {
+    alignItems:    "flex-start",
+    marginBottom:  20,
+  },
+  logoMark: {
+    height:  24,
+    width:   84,
+    opacity: 0.50,
   },
 
   profileSection: {
-    alignItems: "center",
-    marginBottom: 24,
-    gap: 6,
+    alignItems:   "center",
+    marginBottom: 28,
+    gap:          6,
   },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width:           80,
+    height:          80,
+    borderRadius:    40,
     backgroundColor: `${GOLD}28`,
-    borderWidth: 2,
-    borderColor: `${GOLD}60`,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 4,
+    borderWidth:     2,
+    borderColor:     `${GOLD}60`,
+    alignItems:      "center",
+    justifyContent:  "center",
+    marginBottom:    4,
   },
   name: {
     fontFamily: "PlayfairDisplay_700Bold",
@@ -191,7 +210,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.10)",
     borderRadius:    18,
     padding:         20,
-    marginBottom:    24,
+    marginBottom:    28,
     borderWidth:     1,
     borderColor:     "rgba(255,255,255,0.14)",
   },
@@ -224,12 +243,12 @@ const styles = StyleSheet.create({
     marginBottom:  10,
   },
   menuRow: {
-    flexDirection: "row",
-    alignItems:    "center",
-    gap:           14,
-    paddingVertical:     14,
-    borderBottomWidth:   1,
-    borderBottomColor:   "rgba(255,255,255,0.10)",
+    flexDirection:     "row",
+    alignItems:        "center",
+    gap:               14,
+    paddingVertical:   14,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.10)",
   },
   menuIconContainer: {
     width:           36,
@@ -259,16 +278,16 @@ const styles = StyleSheet.create({
   },
 
   logoutBtn: {
-    flexDirection:     "row",
-    alignItems:        "center",
-    justifyContent:    "center",
-    gap:               8,
-    paddingVertical:   16,
-    borderRadius:      14,
-    borderWidth:       1,
-    borderColor:       "rgba(255,255,255,0.14)",
-    marginTop:         8,
-    backgroundColor:   "rgba(255,255,255,0.06)",
+    flexDirection:   "row",
+    alignItems:      "center",
+    justifyContent:  "center",
+    gap:             8,
+    paddingVertical: 16,
+    borderRadius:    14,
+    borderWidth:     1,
+    borderColor:     "rgba(255,255,255,0.14)",
+    marginTop:       8,
+    backgroundColor: "rgba(255,255,255,0.06)",
   },
   logoutText: {
     fontFamily: "Inter_500Medium",

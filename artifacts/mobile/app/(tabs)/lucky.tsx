@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   ImageBackground,
   Keyboard,
   KeyboardAvoidingView,
@@ -22,6 +23,10 @@ import { getDeviceId } from "@/utils/deviceId";
 
 const C    = Colors.light;
 const GOLD = "#D4AF37";
+
+// Official brand mark — same file used in AppHeader across the entire app.
+// White strokes on transparent bg; renders correctly on any dark surface.
+const LOGO_MARK = require("@/assets/images/logo-symbol.png");
 
 const FREE_LIMIT         = 2;
 const RESPONSES_USED_KEY = "@luckytrip/lucky_responses_v1";
@@ -186,9 +191,12 @@ export default function LuckyScreen() {
                   <Text style={styles.eyebrow}>Concierge</Text>
                   <Text style={styles.title}>Lucky</Text>
                 </View>
-                <View style={styles.logoMark}>
-                  <Text style={styles.logoMarkText}>L.</Text>
-                </View>
+                {/* Official logo mark — same asset as AppHeader */}
+                <Image
+                  source={LOGO_MARK}
+                  style={styles.logoMark}
+                  resizeMode="contain"
+                />
               </View>
               {!hasMessages && (
                 <Text style={styles.subtitle}>
@@ -247,8 +255,8 @@ export default function LuckyScreen() {
                 ) : (
                   <View style={styles.luckyCard}>
                     <View style={styles.luckyCardHeader}>
-                      <View style={styles.luckyAvatarSmall}>
-                        <Text style={styles.luckyAvatarSmallText}>L.</Text>
+                      <View style={styles.luckyAvatar}>
+                        <Image source={LOGO_MARK} style={styles.luckyAvatarLogo} resizeMode="contain" />
                       </View>
                       <Text style={styles.luckyCardLabel}>Lucky</Text>
                     </View>
@@ -262,8 +270,8 @@ export default function LuckyScreen() {
             {loading && (
               <View style={styles.loadingCard}>
                 <View style={styles.luckyCardHeader}>
-                  <View style={styles.luckyAvatarSmall}>
-                    <Text style={styles.luckyAvatarSmallText}>L.</Text>
+                  <View style={styles.luckyAvatar}>
+                    <Image source={LOGO_MARK} style={styles.luckyAvatarLogo} resizeMode="contain" />
                   </View>
                   <Text style={styles.luckyCardLabel}>Lucky</Text>
                 </View>
@@ -278,7 +286,12 @@ export default function LuckyScreen() {
             {isAtLimit && !loading && (
               <View style={styles.paywallCard}>
                 <View style={styles.paywallTop}>
-                  <Text style={styles.paywallLogo}>L.</Text>
+                  {/* Official logo mark — same as AppHeader, sized for the card */}
+                  <Image
+                    source={LOGO_MARK}
+                    style={styles.paywallLogo}
+                    resizeMode="contain"
+                  />
                   <View style={styles.paywallBadge}>
                     <Feather name="lock" size={11} color={GOLD} />
                     <Text style={styles.paywallBadgeText}>Lucky Premium</Text>
@@ -361,8 +374,8 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
-    marginBottom: 28,
-    gap:          10,
+    marginBottom: 32,
+    gap:          12,
   },
   headerTop: {
     flexDirection:  "row",
@@ -383,27 +396,19 @@ const styles = StyleSheet.create({
     color:      "#FFFFFF",
     lineHeight: 44,
   },
+  // Official logo mark — horizontal image, matches AppHeader proportions.
+  // Floats top-right of the header; low opacity for a watermark feel.
   logoMark: {
-    width:           52,
-    height:          52,
-    borderRadius:    26,
-    backgroundColor: `${GOLD}20`,
-    borderWidth:     1,
-    borderColor:     `${GOLD}40`,
-    alignItems:      "center",
-    justifyContent:  "center",
-    marginTop:       4,
-  },
-  logoMarkText: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize:   22,
-    color:      GOLD,
+    height:  28,
+    width:   96,
+    opacity: 0.70,
+    marginTop: 10,
   },
   subtitle: {
     fontFamily: "Inter_400Regular",
     fontSize:   15,
     color:      "rgba(255,255,255,0.60)",
-    lineHeight: 22,
+    lineHeight: 23,
   },
   counterBadge: {
     flexDirection:     "row",
@@ -442,7 +447,7 @@ const styles = StyleSheet.create({
 
   // Prompts
   promptsSection: {
-    marginBottom: 8,
+    marginBottom: 10,
   },
   promptsLabel: {
     fontFamily:    "Inter_500Medium",
@@ -486,14 +491,14 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   userBubble: {
-    backgroundColor:     "rgba(255,255,255,0.14)",
-    borderRadius:        16,
+    backgroundColor:         "rgba(255,255,255,0.14)",
+    borderRadius:            16,
     borderBottomRightRadius: 4,
-    paddingHorizontal:   14,
-    paddingVertical:     10,
-    maxWidth:            "80%",
-    borderWidth:         1,
-    borderColor:         "rgba(255,255,255,0.20)",
+    paddingHorizontal:       14,
+    paddingVertical:         10,
+    maxWidth:                "80%",
+    borderWidth:             1,
+    borderColor:             "rgba(255,255,255,0.20)",
   },
   userBubbleText: {
     fontFamily: "Inter_400Regular",
@@ -514,22 +519,24 @@ const styles = StyleSheet.create({
   luckyCardHeader: {
     flexDirection: "row",
     alignItems:    "center",
-    gap:           8,
+    gap:           10,
   },
-  luckyAvatarSmall: {
-    width:           28,
-    height:          28,
-    borderRadius:    14,
-    backgroundColor: `${GOLD}22`,
+  // Avatar container — small gold-tinted pill that holds the logo mark
+  luckyAvatar: {
+    width:           52,
+    height:          26,
+    borderRadius:    8,
+    backgroundColor: `${GOLD}18`,
     borderWidth:     1,
-    borderColor:     `${GOLD}40`,
+    borderColor:     `${GOLD}38`,
     alignItems:      "center",
     justifyContent:  "center",
+    paddingHorizontal: 4,
   },
-  luckyAvatarSmallText: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize:   13,
-    color:      GOLD,
+  luckyAvatarLogo: {
+    width:   44,
+    height:  14,
+    opacity: 0.85,
   },
   luckyCardLabel: {
     fontFamily: "Inter_600SemiBold",
@@ -566,10 +573,10 @@ const styles = StyleSheet.create({
 
   // Paywall
   paywallCard: {
-    backgroundColor: "rgba(0,0,0,0.42)",
+    backgroundColor: "rgba(0,0,0,0.46)",
     borderRadius:    20,
     padding:         24,
-    gap:             12,
+    gap:             14,
     marginTop:       8,
     borderWidth:     1,
     borderColor:     "rgba(212,175,55,0.30)",
@@ -578,12 +585,13 @@ const styles = StyleSheet.create({
     flexDirection:  "row",
     alignItems:     "center",
     justifyContent: "space-between",
-    marginBottom:   4,
+    marginBottom:   2,
   },
+  // Official logo mark inside paywall card — same file, scaled for card context
   paywallLogo: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize:   26,
-    color:      GOLD,
+    height:  22,
+    width:   78,
+    opacity: 0.85,
   },
   paywallBadge: {
     flexDirection:     "row",
@@ -611,7 +619,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize:   14,
     color:      "rgba(255,255,255,0.72)",
-    lineHeight: 21,
+    lineHeight: 22,
   },
   paywallCTA: {
     backgroundColor: GOLD,
@@ -639,7 +647,7 @@ const styles = StyleSheet.create({
     gap:               10,
     paddingHorizontal: 16,
     paddingTop:        12,
-    backgroundColor:   "rgba(0,0,0,0.40)",
+    backgroundColor:   "rgba(0,0,0,0.44)",
     borderTopWidth:    1,
     borderTopColor:    "rgba(255,255,255,0.10)",
   },
