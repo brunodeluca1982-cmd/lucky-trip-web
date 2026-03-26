@@ -376,7 +376,6 @@ interface FlowPage2Props {
   budget: BudgetStyle;
   onBudgetChange: (b: BudgetStyle) => void;
   onBack: () => void;
-  onGenerate: () => void;
 }
 
 function FlowPage2({
@@ -387,7 +386,6 @@ function FlowPage2({
   budget,
   onBudgetChange,
   onBack,
-  onGenerate,
 }: FlowPage2Props) {
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === "web" ? 72 : insets.top + 20;
@@ -458,7 +456,7 @@ function FlowPage2({
       </View>
 
       <View style={fp.glassSection}>
-        <Text style={fp.glassSectionLabel}>Estilo da viagem (opcional)</Text>
+        <Text style={fp.glassSectionLabel}>Estilo da viagem — toque para criar o roteiro</Text>
         <View style={fp.pillRow}>
           {BUDGETS.map((b) => {
             const active = budget === b.id;
@@ -474,14 +472,6 @@ function FlowPage2({
           })}
         </View>
       </View>
-
-      <Pressable
-        style={({ pressed }) => [fp.cta, pressed && { opacity: 0.85 }]}
-        onPress={onGenerate}
-      >
-        <Text style={fp.ctaText}>Criar meu roteiro</Text>
-        <Feather name="chevron-right" size={17} color={C.darkBrown} />
-      </Pressable>
     </ScrollView>
   );
 }
@@ -513,14 +503,15 @@ function StandardFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) =>
   function handleNext() { setPage(1); }
   function handleBack() { setPage(0); }
 
-  function handleGenerate() {
+  function handleBudgetAndGenerate(b: BudgetStyle) {
+    setBudget(b);
     const n =
       arrivalDate && departureDate
         ? Math.max(1, Math.round(
             (departureDate.getTime() - arrivalDate.getTime()) / 86400000,
           ))
         : 3;
-    onGenerate({ nights: n, travelVibe, inspirations, budget, vibe: "moderado" });
+    setTimeout(() => onGenerate({ nights: n, travelVibe, inspirations, budget: b, vibe: "moderado" }), 300);
   }
 
   function toggleInspiration(id: Inspiration) {
@@ -547,9 +538,8 @@ function StandardFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) =>
       travelVibe={travelVibe}
       onTravelVibeChange={setTravelVibe}
       budget={budget}
-      onBudgetChange={setBudget}
+      onBudgetChange={handleBudgetAndGenerate}
       onBack={handleBack}
-      onGenerate={handleGenerate}
     />
   );
 }
@@ -757,10 +747,12 @@ function ContextualFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) 
             })}
           </View>
 
-          <Pressable style={fp.cta} onPress={() => setStep(3)}>
-            <Text style={fp.ctaText}>Próximo</Text>
-            <Feather name="chevron-right" size={17} color={C.darkBrown} />
-          </Pressable>
+          {inspirations.length > 0 && (
+            <Pressable style={fp.cta} onPress={() => setStep(3)}>
+              <Text style={fp.ctaText}>Continuar</Text>
+              <Feather name="chevron-right" size={17} color={C.darkBrown} />
+            </Pressable>
+          )}
         </>
       )}
 
@@ -807,8 +799,6 @@ function ContextualFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) 
 // ─────────────────────────────────────────────────────────────────────────────
 // Flow page styles
 // ─────────────────────────────────────────────────────────────────────────────
-
-const CARD_W = (SW - 44 - 10) / 2;
 
 const fp = StyleSheet.create({
   page: {
@@ -943,7 +933,7 @@ const fp = StyleSheet.create({
   },
 
   insCard: {
-    width: CARD_W,
+    width: "47%",
     height: 128,
     borderRadius: 16,
     overflow: "hidden",
@@ -3241,7 +3231,7 @@ const cf = StyleSheet.create({
     marginTop: 12,
   },
   companionCard: {
-    width: (SW - 44 - 16) / 2,
+    width: "46%",
     backgroundColor: GLASS_BG,
     borderRadius: 20,
     borderWidth: 1,

@@ -1,7 +1,4 @@
-import { BlurView } from "expo-blur";
-import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
-import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import React from "react";
@@ -12,34 +9,12 @@ import Colors from "@/constants/colors";
 
 const C = Colors.light;
 
-function NativeTabLayout() {
-  return (
-    <NativeTabs>
-      <NativeTabs.Trigger name="index">
-        <Icon sf={{ default: "house", selected: "house.fill" }} />
-        <Label>Home</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="destinos">
-        <Icon sf={{ default: "map", selected: "map.fill" }} />
-        <Label>Destinos</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="viagem">
-        <Icon sf={{ default: "airplane", selected: "airplane" }} />
-        <Label>Viagem</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="lucky">
-        <Icon sf={{ default: "star", selected: "star.fill" }} />
-        <Label>Lucky</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="perfil">
-        <Icon sf={{ default: "person", selected: "person.fill" }} />
-        <Label>Perfil</Label>
-      </NativeTabs.Trigger>
-    </NativeTabs>
-  );
-}
+const GOLD    = "#D4AF37";
+const GRAY    = "#888888";
+const TAB_BG  = "#FFFFFF";
+const BORDER  = "rgba(0,0,0,0.08)";
 
-function ClassicTabLayout() {
+export default function TabLayout() {
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
   const insets = useSafeAreaInsets();
@@ -48,36 +23,40 @@ function ClassicTabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: C.tint,
-        tabBarInactiveTintColor: C.warmGray,
+        tabBarActiveTintColor: GOLD,
+        tabBarInactiveTintColor: GRAY,
         tabBarLabelStyle: {
           fontFamily: "Inter_500Medium",
           fontSize: 11,
-          marginBottom: 2,
+          marginBottom: isIOS ? 0 : 2,
         },
         tabBarStyle: {
           position: "absolute",
-          backgroundColor: isIOS ? "transparent" : C.white,
-          borderTopWidth: 0,
-          borderTopColor: C.border,
-          elevation: 0,
+          backgroundColor: TAB_BG,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: BORDER,
+          elevation: 12,
           shadowColor: "#000",
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.06,
-          shadowRadius: 8,
-          paddingBottom: isWeb ? 0 : insets.bottom,
-          ...(isWeb ? { height: 84 } : {}),
+          shadowOffset: { width: 0, height: -1 },
+          shadowOpacity: 0.08,
+          shadowRadius: 6,
+          paddingBottom: isWeb ? 6 : insets.bottom,
+          paddingTop: 6,
+          height: isWeb ? 60 : 56 + insets.bottom,
+          zIndex: 100,
         },
-        tabBarBackground: () =>
-          isIOS ? (
-            <BlurView
-              intensity={90}
-              tint="light"
-              style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(255,255,255,0.88)" }]}
-            />
-          ) : isWeb ? (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: C.white, borderTopWidth: 1, borderTopColor: C.border }]} />
-          ) : null,
+        tabBarBackground: () => (
+          <View
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                backgroundColor: TAB_BG,
+                borderTopWidth: StyleSheet.hairlineWidth,
+                borderTopColor: BORDER,
+              },
+            ]}
+          />
+        ),
       }}
     >
       <Tabs.Screen
@@ -140,24 +119,15 @@ function ClassicTabLayout() {
             ),
         }}
       />
-      {/* Destination detail — inside tabs so tab bar stays visible */}
-      <Tabs.Screen name="cidade/[id]"    options={{ href: null }} />
-      {/* Section list pages from destination — inside tabs so tab bar stays visible */}
-      <Tabs.Screen name="comerBem/[id]"  options={{ href: null }} />
-      <Tabs.Screen name="ondeFicar/[id]" options={{ href: null }} />
-      <Tabs.Screen name="oQueFazer/[id]" options={{ href: null }} />
-      <Tabs.Screen name="essencial/[id]" options={{ href: null }} />
-      <Tabs.Screen name="agoraNoRio/[id]" options={{ href: null }} />
-      <Tabs.Screen name="luckyList/[id]" options={{ href: null }} />
-      {/* Itinerary creation + result — inside tabs so tab bar stays visible */}
-      <Tabs.Screen name="roteiro/index"  options={{ href: null }} />
+      {/* Hidden tab screens — keep tab bar visible on all these pages */}
+      <Tabs.Screen name="cidade/[id]"      options={{ href: null }} />
+      <Tabs.Screen name="comerBem/[id]"    options={{ href: null }} />
+      <Tabs.Screen name="ondeFicar/[id]"   options={{ href: null }} />
+      <Tabs.Screen name="oQueFazer/[id]"   options={{ href: null }} />
+      <Tabs.Screen name="essencial/[id]"   options={{ href: null }} />
+      <Tabs.Screen name="agoraNoRio/[id]"  options={{ href: null }} />
+      <Tabs.Screen name="luckyList/[id]"   options={{ href: null }} />
+      <Tabs.Screen name="roteiro/index"    options={{ href: null }} />
     </Tabs>
   );
-}
-
-export default function TabLayout() {
-  if (isLiquidGlassAvailable()) {
-    return <NativeTabLayout />;
-  }
-  return <ClassicTabLayout />;
 }
