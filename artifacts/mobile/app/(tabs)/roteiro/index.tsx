@@ -2098,21 +2098,36 @@ function navigateToItem(item: SavedItem) {
     return;
   }
 
-  // ── Priority 3: Internal DB item — route to correct detail screen
+  // ── Priority 3: Internal Supabase item — route to the exact entity detail page.
+  // Every row from restaurantes / o_que_fazer_rio / lucky_list_rio / stay_hotels
+  // has its own detail page. `categoria` is passed so the detail screen knows
+  // which Supabase table to query when the static getLugar lookup misses.
   switch (item.categoria) {
     case "restaurante":
-      router.push({ pathname: "/(tabs)/comerBem/[id]", params: { id: item.id } });
+      router.push({
+        pathname: "/lugar/[cityId]/[placeId]",
+        params: { cityId: "rio", placeId: item.id, categoria: "restaurante" },
+      });
       return;
     case "hotel":
+      // Hotels have a dedicated Supabase-backed detail route — keep it.
       router.push({ pathname: "/ondeFicar/hotel/[hotelId]", params: { hotelId: item.id } });
       return;
     case "oQueFazer":
-      router.push({ pathname: "/lugar/[cityId]/[placeId]", params: { cityId: "rio", placeId: item.id } });
+      router.push({
+        pathname: "/lugar/[cityId]/[placeId]",
+        params: { cityId: "rio", placeId: item.id, categoria: "oQueFazer" },
+      });
+      return;
+    case "lucky":
+      router.push({
+        pathname: "/lugar/[cityId]/[placeId]",
+        params: { cityId: "rio", placeId: item.id, categoria: "lucky" },
+      });
       return;
   }
 
-  // ── Priority 4: Absolute fallback — guaranteed no dead click
-  // Used for: lucky items (different table), unknown categories, edge cases
+  // ── Priority 4: Absolute fallback — guaranteed no dead click for unknown categories
   const query = `${item.titulo}${item.localizacao ? ` ${item.localizacao}` : ""} Rio de Janeiro`;
   Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`);
 }

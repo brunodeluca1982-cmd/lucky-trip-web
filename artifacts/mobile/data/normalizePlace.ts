@@ -171,8 +171,8 @@ function detectTipoFromString(raw: string | null | undefined): TipoItem {
 }
 
 /** Convenience: derive TipoItem from a placeId string prefix (local IDs). */
-export function tipoFromPlaceId(placeId: string): TipoItem {
-  if (placeId.startsWith("h")) return "hotel";
-  if (placeId.startsWith("c")) return "restaurante";
+export function tipoFromPlaceId(placeId: string, categoria?: string): TipoItem {
+  if (categoria === "hotel" || placeId.startsWith("h"))      return "hotel";
+  if (categoria === "restaurante" || placeId.startsWith("c")) return "restaurante";
   return "experiencia";
 }

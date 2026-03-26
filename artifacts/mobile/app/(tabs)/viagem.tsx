@@ -264,7 +264,16 @@ function SavedCard({
         { width: CARD_W, height: CARD_H },
         pressed && { opacity: 0.88, transform: [{ scale: 0.97 }] },
       ]}
-      onPress={() => router.push(`/lugar/rio/${item.id}`)}
+      onPress={() => {
+        if (item.categoria === "hotel") {
+          router.push({ pathname: "/ondeFicar/hotel/[hotelId]", params: { hotelId: item.id } });
+        } else {
+          router.push({
+            pathname: "/lugar/[cityId]/[placeId]",
+            params: { cityId: "rio", placeId: item.id, categoria: item.categoria },
+          });
+        }
+      }}
     >
       <Image source={item.image} style={StyleSheet.absoluteFillObject as any} resizeMode="cover" />
       <LinearGradient

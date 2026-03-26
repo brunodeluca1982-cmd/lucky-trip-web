@@ -16,8 +16,9 @@
  * Content is fully dynamic — identical layout for all categories.
  */
 
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Dimensions,
   Image,
   ImageSourcePropType,
@@ -35,23 +36,126 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { getLugar, LugarPlace } from "@/data/lugares";
+import { getLugar, LugarPlace, resolvePin } from "@/data/lugares";
 import { useGuia } from "@/context/GuiaContext";
 import type { SavedCategory } from "@/context/GuiaContext";
 import { AppTabBar, TAB_BAR_HEIGHT } from "@/components/AppTabBar";
 import { ActionBlock } from "@/components/ActionBlock";
 import { normalizeLugarPlace, tipoFromPlaceId } from "@/data/normalizePlace";
+import { getImageForEntity } from "@/utils/getImageForEntity";
+import { supabase } from "@/lib/supabase";
 
-// Derive the SavedCategory from the placeId prefix:
+// Derive the SavedCategory from the placeId prefix (static) or from an
+// explicit categoria query param passed when navigating from Supabase items.
 //   "1"–"8"   → oQueFazer
 //   "c1"–"c5" → restaurante
 //   "h1"–"h5" → hotel
 //   "l1"–"l9" → lucky
-function resolveSaveCategory(placeId: string): SavedCategory {
-  if (placeId.startsWith("c")) return "restaurante";
-  if (placeId.startsWith("h")) return "hotel";
-  if (placeId.startsWith("l")) return "lucky";
+function resolveSaveCategory(placeId: string, categoria?: string): SavedCategory {
+  if (categoria === "restaurante") return "restaurante";
+  if (categoria === "hotel")       return "hotel";
+  if (categoria === "lucky")       return "lucky";
+  if (categoria === "oQueFazer")   return "oQueFazer";
+  if (placeId.startsWith("c"))     return "restaurante";
+  if (placeId.startsWith("h"))     return "hotel";
+  if (placeId.startsWith("l"))     return "lucky";
   return "oQueFazer";
+}
+
+// ── Supabase lookup ─────────────────────────────────────────────────────────
+// When a Supabase item is navigated to (real row ID instead of a static prefix
+// like "c1"), this hook fetches the actual row and builds a LugarPlace from it.
+// Returns null while loading, undefined when not found / not applicable.
+function useSupabaseLugar(
+  placeId: string,
+  categoria: string | undefined,
+  skip: boolean,
+): { place: LugarPlace | null; loading: boolean } {
+  const [place, setPlace] = useState<LugarPlace | null>(null);
+  const [loading, setLoading] = useState(!skip);
+
+  useEffect(() => {
+    if (skip) { setLoading(false); return; }
+    setLoading(true);
+
+    (async () => {
+      try {
+        let resolved: LugarPlace | null = null;
+
+        if (categoria === "restaurante") {
+          const { data } = await supabase
+            .from("restaurantes")
+            .select("id, nome, bairro, especialidade, categoria")
+            .eq("id", Number(placeId))
+            .maybeSingle();
+          if (data) {
+            const pin = resolvePin("rio", data.bairro ?? "", 0);
+            resolved = {
+              id:         String(data.id),
+              titulo:     data.nome ?? "Restaurante",
+              localizacao: data.bairro ?? "Rio de Janeiro",
+              categoria:  "RESTAURANTE",
+              descricao:  data.especialidade
+                ? `Especialidade: ${data.especialidade}`
+                : "Um dos restaurantes curados da nossa seleção no Rio de Janeiro.",
+              image: getImageForEntity("restaurant", data.nome ?? "", data.bairro ?? "", null),
+              xPct: pin.xPct,
+              yPct: pin.yPct,
+              tipo_item: "restaurante",
+            };
+          }
+        } else if (categoria === "oQueFazer") {
+          const { data } = await supabase
+            .from("o_que_fazer_rio")
+            .select("id, nome, bairro, categoria, descricao")
+            .eq("id", placeId)
+            .maybeSingle();
+          if (data) {
+            const pin = resolvePin("rio", data.bairro ?? "", 0);
+            resolved = {
+              id:          String(data.id),
+              titulo:      data.nome ?? "Experiência",
+              localizacao: data.bairro ?? "Rio de Janeiro",
+              categoria:   (data.categoria as string | null)?.toUpperCase() ?? "EXPERIÊNCIA",
+              descricao:   (data.descricao as string | null)
+                ?? "Uma das experiências selecionadas para o seu roteiro no Rio.",
+              image: getImageForEntity("activity", data.nome ?? "", data.bairro ?? "", null),
+              xPct: pin.xPct,
+              yPct: pin.yPct,
+              tipo_item: "experiencia",
+            };
+          }
+        } else if (categoria === "lucky") {
+          const { data } = await supabase
+            .from("lucky_list_rio")
+            .select("id, nome, bairro, tipo, descricao")
+            .eq("id", placeId)
+            .maybeSingle();
+          if (data) {
+            const pin = resolvePin("rio", data.bairro ?? "", 0);
+            resolved = {
+              id:          String(data.id),
+              titulo:      data.nome ?? "Lucky Pick",
+              localizacao: data.bairro ?? "Rio de Janeiro",
+              categoria:   "LUCKY LIST",
+              descricao:   (data.descricao as string | null)
+                ?? "Um dos achados especiais da Lucky List — lugares que só quem sabe, sabe.",
+              image: getImageForEntity("activity", data.nome ?? "", data.bairro ?? "", null),
+              xPct: pin.xPct,
+              yPct: pin.yPct,
+              tipo_item: "experiencia",
+            };
+          }
+        }
+
+        setPlace(resolved);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [placeId, categoria, skip]);
+
+  return { place, loading };
 }
 
 
@@ -77,13 +181,22 @@ const FALLBACK: LugarPlace = {
 // ── Screen ─────────────────────────────────────────────────────────────────────
 
 export default function LugarDetailScreen() {
-  const { cityId, placeId } =
-    useLocalSearchParams<{ cityId: string; placeId: string }>();
+  const { cityId, placeId, categoria } =
+    useLocalSearchParams<{ cityId: string; placeId: string; categoria?: string }>();
 
   const insets = useSafeAreaInsets();
   const topInset = Platform.OS === "web" ? 67 : insets.top;
 
-  const place = getLugar(cityId, placeId) ?? FALLBACK;
+  // ── Step 1: try static lookup (handles all legacy prefix-based routes) ──
+  const staticPlace = getLugar(cityId, placeId);
+
+  // ── Step 2: if static lookup failed, query Supabase using `categoria` ──
+  const needsSupabase = !staticPlace;
+  const { place: supabasePlace, loading: supabaseLoading } =
+    useSupabaseLugar(placeId ?? "", categoria, !needsSupabase);
+
+  // ── Resolved place — static wins, then Supabase, then FALLBACK ──
+  const place: LugarPlace = staticPlace ?? supabasePlace ?? FALLBACK;
   const images: ImageSourcePropType[] = place.images ?? [place.image];
 
   // Carousel state
@@ -91,13 +204,15 @@ export default function LugarDetailScreen() {
   const carouselRef = useRef<ScrollView>(null);
 
   // Normalized place object — single source of truth for all UI actions.
-  // When Supabase is connected, replace this with normalizeHotel / normalizeRestaurante / etc.
-  const normalized = normalizeLugarPlace(place, tipoFromPlaceId(placeId ?? ""));
+  const normalized = normalizeLugarPlace(
+    place,
+    tipoFromPlaceId(placeId ?? "", categoria),
+  );
 
   // Save to Trip — backed by GuiaContext (persists across navigation)
   const { isSaved, save, unsave } = useGuia();
   const saved = isSaved(place.id);
-  const saveCategory = resolveSaveCategory(placeId ?? "");
+  const saveCategory = resolveSaveCategory(placeId ?? "", categoria);
 
   function toggleSave() {
     if (saved) {
@@ -117,6 +232,16 @@ export default function LugarDetailScreen() {
   function handleCarouselScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
     const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
     setImgIndex(idx);
+  }
+
+  // ── Loading state while Supabase fetch is in progress ──
+  if (supabaseLoading) {
+    return (
+      <View style={[s.root, { alignItems: "center", justifyContent: "center" }]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <ActivityIndicator size="large" color="rgba(212,175,55,0.9)" />
+      </View>
+    );
   }
 
   return (
