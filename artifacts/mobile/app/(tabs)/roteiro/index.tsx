@@ -104,7 +104,7 @@ function getDayWeather(dayNum: number): WeatherIcon {
 }
 
 const GLASS_BG     = "rgba(255,255,255,0.15)";
-const GLASS_HEADER = "rgba(0,0,0,0.65)";
+const GLASS_HEADER = "rgba(0,0,0,0.42)";
 const GLASS_BORDER = "rgba(255,255,255,0.22)";
 const CREAM        = "#FFFFFF";
 
@@ -417,7 +417,7 @@ function FlowPage2({
             >
               <Image source={ins.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
               <LinearGradient
-                colors={["transparent", "rgba(0,0,0,0.58)"]}
+                colors={["transparent", "rgba(0,0,0,0.35)"]}
                 locations={[0.25, 1]}
                 style={StyleSheet.absoluteFill}
               />
@@ -732,7 +732,7 @@ function ContextualFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) 
                 >
                   <Image source={ins.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
                   <LinearGradient
-                    colors={["transparent", "rgba(0,0,0,0.58)"]}
+                    colors={["transparent", "rgba(0,0,0,0.35)"]}
                     locations={[0.25, 1]}
                     style={StyleSheet.absoluteFill}
                   />
@@ -960,7 +960,7 @@ const fp = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: "rgba(0,0,0,0.48)",
+    backgroundColor: "rgba(0,0,0,0.28)",
     borderWidth: 1,
     borderColor: GOLD,
     alignItems: "center",
@@ -1021,7 +1021,7 @@ const fp = StyleSheet.create({
 
   // ── Inline Calendar ──────────────────────────────────────────────────────────
   cal: {
-    backgroundColor: "rgba(0,0,0,0.72)",
+    backgroundColor: "rgba(0,0,0,0.42)",
     borderRadius: 16,
     borderWidth: 1,
     borderColor: GLASS_BORDER,

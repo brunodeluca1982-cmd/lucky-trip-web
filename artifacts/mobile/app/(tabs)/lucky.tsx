@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.62)",
+    backgroundColor: "rgba(0,0,0,0.36)",
   },
   content: {
     paddingHorizontal: 20,
@@ -566,7 +566,7 @@ const styles = StyleSheet.create({
 
   // Paywall
   paywallCard: {
-    backgroundColor: "rgba(0,0,0,0.70)",
+    backgroundColor: "rgba(0,0,0,0.42)",
     borderRadius:    20,
     padding:         24,
     gap:             12,
@@ -639,7 +639,7 @@ const styles = StyleSheet.create({
     gap:               10,
     paddingHorizontal: 16,
     paddingTop:        12,
-    backgroundColor:   "rgba(0,0,0,0.72)",
+    backgroundColor:   "rgba(0,0,0,0.40)",
     borderTopWidth:    1,
     borderTopColor:    "rgba(255,255,255,0.10)",
   },

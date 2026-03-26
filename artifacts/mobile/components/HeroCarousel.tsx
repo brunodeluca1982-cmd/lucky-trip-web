@@ -40,7 +40,7 @@ function HeroSlide({ item }: { item: HeroItem }) {
     >
       <Image source={item.image} style={styles.image} resizeMode="cover" />
       <LinearGradient
-        colors={["transparent", "rgba(0,0,0,0.25)", "rgba(0,0,0,0.72)"]}
+        colors={["transparent", "rgba(0,0,0,0.10)", "rgba(0,0,0,0.48)"]}
         style={styles.gradient}
         locations={[0.3, 0.6, 1]}
       />

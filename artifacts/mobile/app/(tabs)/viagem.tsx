@@ -94,10 +94,10 @@ function SceneBackground({ images }: { images: ImageSourcePropType[] }) {
       {/* Cinematic dark vignette — image visible at top, dark at bottom */}
       <LinearGradient
         colors={[
-          "rgba(0,0,0,0.08)",
-          "rgba(0,0,0,0.38)",
-          "rgba(0,0,0,0.68)",
-          "rgba(0,0,0,0.88)",
+          "rgba(0,0,0,0.05)",
+          "rgba(0,0,0,0.25)",
+          "rgba(0,0,0,0.52)",
+          "rgba(0,0,0,0.72)",
         ]}
         locations={[0, 0.30, 0.62, 1]}
         style={StyleSheet.absoluteFill}
@@ -208,7 +208,7 @@ const act = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 20,
     borderRadius: 16,
-    backgroundColor: "rgba(0,0,0,0.42)",
+    backgroundColor: "rgba(0,0,0,0.26)",
     borderWidth: 1,
     borderColor: `${GOLD}28`,
     boxShadow: `0px 4px 20px rgba(201,168,76,0.12)`,
@@ -268,7 +268,7 @@ function SavedCard({
     >
       <Image source={item.image} style={StyleSheet.absoluteFillObject as any} resizeMode="cover" />
       <LinearGradient
-        colors={["transparent", "rgba(0,0,0,0.88)"]}
+        colors={["transparent", "rgba(0,0,0,0.62)"]}
         locations={[0.28, 1]}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
@@ -305,7 +305,7 @@ const sc = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: "rgba(0,0,0,0.35)",
+    backgroundColor: "rgba(0,0,0,0.20)",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
@@ -422,7 +422,7 @@ const eh = StyleSheet.create({
     paddingVertical: 20,
     paddingHorizontal: 18,
     borderRadius: 16,
-    backgroundColor: "rgba(0,0,0,0.35)",
+    backgroundColor: "rgba(0,0,0,0.20)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
@@ -546,7 +546,7 @@ const rot = StyleSheet.create({
   },
   diaCard: {
     borderRadius: 16,
-    backgroundColor: "rgba(0,0,0,0.38)",
+    backgroundColor: "rgba(0,0,0,0.22)",
     borderWidth: 1,
     borderColor: `${GOLD}18`,
     paddingHorizontal: 18,
