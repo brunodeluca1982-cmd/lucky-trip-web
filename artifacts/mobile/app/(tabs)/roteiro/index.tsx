@@ -668,16 +668,6 @@ function ContextualFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) 
             />
           )}
 
-          {arrivalDate && departureDate && (
-            <Pressable
-              style={[fp.cta, { marginTop: 16 }]}
-              onPress={() => setStep(1)}
-            >
-              <Text style={fp.ctaText}>Próximo</Text>
-              <Feather name="chevron-right" size={17} color={C.darkBrown} />
-            </Pressable>
-          )}
-
           <Pressable style={cf.skipBtn} onPress={() => setStep(1)} hitSlop={12}>
             <Text style={cf.skipText}>Pular — usar datas flexíveis</Text>
           </Pressable>
