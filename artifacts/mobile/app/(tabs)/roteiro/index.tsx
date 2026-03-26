@@ -1490,11 +1490,11 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
             </>
           )}
 
-          {/* ── Google Places results ─── */}
+          {/* ── Google Places results (when API key is configured) ─── */}
           {q.length >= 2 && GOOGLE_PLACES_KEY.length > 0 && (
             <>
               <View style={rs.sectionLabelRow}>
-                <Text style={rs.sectionLabel}>✦ Google Places</Text>
+                <Text style={rs.sectionLabel}>✦ Lugares externos</Text>
                 {extLoading && (
                   <Text style={rs.sectionLabelSub}>buscando…</Text>
                 )}
@@ -1509,10 +1509,42 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
               ) : (
                 !extLoading && (
                   <View style={rs.googleEmptyRow}>
-                    <Text style={rs.googleEmptyText}>Nenhum resultado do Google Places</Text>
+                    <Text style={rs.googleEmptyText}>Nenhum resultado externo encontrado</Text>
                   </View>
                 )
               )}
+            </>
+          )}
+
+          {/* ── Manual external place — shown when no Google key or no results ─── */}
+          {q.length >= 2 && (GOOGLE_PLACES_KEY.length === 0 || (!extLoading && externalDeduped.length === 0)) && (
+            <>
+              <View style={rs.sectionLabelRow}>
+                <Text style={rs.sectionLabel}>✦ Adicionar lugar externo</Text>
+              </View>
+              <Pressable
+                style={({ pressed }) => [rs.sugCard, rs.manualCard, (pressed || isConfirming) && { opacity: 0.75 }]}
+                onPress={() => confirmReplace({
+                  id:          `ext-${Date.now()}`,
+                  titulo:      q,
+                  localizacao: "Rio de Janeiro",
+                  address:     q,
+                  image:       getNeighborhoodImage(""),
+                  categoria:   item.categoria,
+                  subtitle:    "Lugar adicionado manualmente",
+                  isExternal:  true,
+                })}
+                disabled={isConfirming}
+              >
+                <View style={rs.manualIconBox}>
+                  <Feather name="plus" size={18} color={GOLD} />
+                </View>
+                <View style={rs.manualTextBox}>
+                  <Text style={rs.manualTitle} numberOfLines={1}>{q}</Text>
+                  <Text style={rs.manualSub}>Adicionar como lugar externo</Text>
+                </View>
+                <Feather name="chevron-right" size={16} color={`${GOLD}60`} />
+              </Pressable>
             </>
           )}
 
@@ -1748,6 +1780,41 @@ const rs = StyleSheet.create({
     fontSize: 12,
     color: "rgba(255,255,255,0.30)",
   },
+  manualCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: "rgba(212,175,55,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(212,175,55,0.22)",
+  },
+  manualIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: "rgba(212,175,55,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(212,175,55,0.25)",
+  },
+  manualTextBox: {
+    flex: 1,
+  },
+  manualTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: CREAM,
+  },
+  manualSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: `${GOLD}90`,
+    marginTop: 2,
+  },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1892,6 +1959,7 @@ interface ResultPhaseProps {
   onToggleEdit:   () => void;
   onReplaceItem:  (diaNum: number, itemId: string, newItem: SavedItem) => void;
   onShareResult:  () => void;
+  onExport:       () => void;
   scrollRef:      React.RefObject<ScrollView>;
 }
 
@@ -1903,6 +1971,7 @@ function ResultPhase({
   onToggleEdit,
   onReplaceItem,
   onShareResult,
+  onExport,
   scrollRef,
 }: ResultPhaseProps) {
   const { totalDays, totalItems } = result.summary;
@@ -2050,9 +2119,9 @@ function ResultPhase({
         </Pressable>
         <Pressable
           style={({ pressed }) => [re.actionBtn, re.actionBtnExport, pressed && { opacity: 0.82 }]}
-          onPress={onShareResult}
+          onPress={onExport}
         >
-          <Feather name="share-2" size={14} color={CREAM} />
+          <Feather name="link" size={14} color={CREAM} />
           <Text style={re.actionBtnText}>Exportar</Text>
         </Pressable>
       </View>
@@ -2996,6 +3065,90 @@ export default function RoteiroScreen() {
     }
   }
 
+  /**
+   * Export — generates a shareable URL and shows it with a copy/share action.
+   * Distinct from handleShare: does NOT open the native share sheet as primary action.
+   * Primary action is to surface the URL so the user can copy or access it in a browser.
+   */
+  async function handleExport() {
+    if (!result) return;
+    let exportUrl: string | undefined;
+
+    // 1. Generate slug + persist itinerary to Supabase
+    try {
+      const slug = Array.from({ length: 8 }, () => Math.random().toString(36)[2]).join("");
+      const { data: itinerary, error: itinErr } = await supabase
+        .from("user_itineraries")
+        .insert({
+          destination_id:   "rio-de-janeiro",
+          destination_name: result.destination ?? "Rio de Janeiro",
+          status:           "generated",
+          is_public:        true,
+          share_slug:       slug,
+          days_count:       result.summary.totalDays,
+          items_count:      result.summary.totalItems,
+          inspiration_tags: (result.preferences?.inspirations ?? []) as string[],
+          travel_company:   null,
+          budget_style:     result.preferences?.vibe ?? null,
+          generated_at:     new Date().toISOString(),
+        })
+        .select("id")
+        .single();
+
+      if (!itinErr && itinerary) {
+        const roteiroItens = result.days.flatMap((dia) =>
+          dia.periodos.flatMap((periodo) =>
+            periodo.items.map((item, idx) => ({
+              roteiro_id:   itinerary.id,
+              name:         item.titulo,
+              day_index:    dia.numero - 1,
+              order_in_day: idx,
+              time_slot:    periodo.periodo,
+              source:       item.isExternal ? "external" : "saved",
+              ref_table:    item.isExternal ? "external" : null,
+              place_id:     item.isExternal ? (item.placeId ?? null) : null,
+              neighborhood: item.localizacao ?? dia.bairro,
+              address:      item.isExternal ? (item.address ?? null) : null,
+              city:         "Rio de Janeiro",
+              lat:          item.isExternal ? (item.lat ?? null) : null,
+              lng:          item.isExternal ? (item.lng ?? null) : null,
+            }))
+          )
+        );
+        await supabase.from("roteiro_itens").insert(roteiroItens);
+        exportUrl = `https://theluckytrip.app/r/${slug}`;
+      }
+    } catch { /* Supabase unavailable — proceed without URL */ }
+
+    const urlToShow = exportUrl ?? "Roteiro ainda não salvo. Tente novamente.";
+
+    // 2. Surface the URL — copy on web, share prompt on native
+    if (Platform.OS === "web") {
+      try {
+        if (exportUrl) await navigator.clipboard.writeText(exportUrl);
+      } catch { /* clipboard not available */ }
+      Alert.alert(
+        exportUrl ? "Link copiado!" : "Exportar roteiro",
+        `${urlToShow}\n\nCompartilhe este link para acessar o roteiro no navegador.`,
+        [{ text: "OK" }]
+      );
+    } else {
+      Alert.alert(
+        "Link do roteiro",
+        urlToShow,
+        exportUrl
+          ? [
+              {
+                text: "Compartilhar link",
+                onPress: () => Share.share({ message: exportUrl, url: exportUrl, title: "Roteiro Rio de Janeiro — The Lucky Trip" }),
+              },
+              { text: "Fechar", style: "cancel" },
+            ]
+          : [{ text: "OK" }]
+      );
+    }
+  }
+
   const hotelItem   = saved.find((s) => s.categoria === "hotel") ?? null;
   const totalPlaces = saved.filter((s) => s.categoria !== "hotel").length;
 
@@ -3111,6 +3264,7 @@ export default function RoteiroScreen() {
             onToggleEdit={() => setEditMode((v) => !v)}
             onReplaceItem={openReplaceSheet}
             onShareResult={handleShare}
+            onExport={handleExport}
             scrollRef={scrollRef}
           />
         </ScrollView>

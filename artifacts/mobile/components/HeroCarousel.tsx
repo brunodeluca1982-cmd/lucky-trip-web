@@ -39,10 +39,11 @@ function HeroSlide({ item }: { item: HeroItem }) {
       onPress={() => item.cityId && router.push({ pathname: "/cidade/[id]", params: { id: item.cityId } })}
     >
       <Image source={item.image} style={styles.image} resizeMode="cover" />
+      <View style={styles.dimOverlay} />
       <LinearGradient
-        colors={["transparent", "rgba(0,0,0,0.10)", "rgba(0,0,0,0.48)"]}
+        colors={["transparent", "rgba(0,0,0,0.45)", "rgba(0,0,0,0.78)"]}
         style={styles.gradient}
-        locations={[0.3, 0.6, 1]}
+        locations={[0.25, 0.60, 1]}
       />
       <View style={styles.content}>
         <View style={styles.badgeContainer}>
@@ -131,12 +132,16 @@ const styles = StyleSheet.create({
     height: HERO_HEIGHT,
     resizeMode: "cover",
   },
+  dimOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.22)",
+  },
   gradient: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    height: HERO_HEIGHT * 0.7,
+    height: HERO_HEIGHT * 0.75,
   },
   content: {
     position: "absolute",
@@ -168,15 +173,21 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 50,
     letterSpacing: -0.5,
+    textShadowColor: "rgba(0,0,0,0.85)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 10,
   },
   pais: {
     fontFamily: "Inter_400Regular",
     fontSize: 16,
-    color: "rgba(255,255,255,0.82)",
+    color: "rgba(255,255,255,0.90)",
     marginTop: 4,
     marginBottom: 24,
     letterSpacing: 2,
     textTransform: "uppercase",
+    textShadowColor: "rgba(0,0,0,0.75)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
   },
   dots: {
     position: "absolute",

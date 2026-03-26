@@ -244,6 +244,34 @@ export default function LugarDetailScreen() {
     );
   }
 
+  // ── "Em breve" — entity does not exist in static data or Supabase ──
+  if (!staticPlace && !supabasePlace) {
+    return (
+      <View style={[s.root, { alignItems: "center", justifyContent: "center", paddingHorizontal: 36 }]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <Image
+          source={require("../../../assets/images/hero-rio.png")}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+        />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.72)" }]} />
+        <Pressable
+          style={{ position: "absolute", top: Platform.OS === "web" ? 20 : 54, left: 20, padding: 8 }}
+          onPress={() => router.back()}
+          hitSlop={12}
+        >
+          <Text style={{ color: "rgba(255,255,255,0.80)", fontSize: 15 }}>← Voltar</Text>
+        </Pressable>
+        <Text style={{ fontFamily: "PlayfairDisplay_700Bold", fontSize: 28, color: "#fff", textAlign: "center", marginBottom: 14 }}>
+          Em breve disponível
+        </Text>
+        <Text style={{ fontFamily: "Inter_400Regular", fontSize: 15, color: "rgba(255,255,255,0.65)", textAlign: "center", lineHeight: 22 }}>
+          Este lugar ainda não tem página de detalhes.{"\n"}Em breve estará disponível no app.
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <View style={s.root}>
       <Stack.Screen options={{ headerShown: false }} />
