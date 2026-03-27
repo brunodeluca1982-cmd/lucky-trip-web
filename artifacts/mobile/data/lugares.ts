@@ -217,7 +217,7 @@ export const LUGARES_O_QUE_FAZER: Record<string, LugarPlace[]> = {
   ],
 };
 
-// ── Comer bem — food places ───────────────────────────────────────────────────
+// ── Onde comer — food places ──────────────────────────────────────────────────
 
 export const LUGARES_COMER: Record<string, LugarPlace[]> = {
   rio: [

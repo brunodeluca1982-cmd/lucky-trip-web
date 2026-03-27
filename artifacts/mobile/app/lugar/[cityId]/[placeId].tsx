@@ -2,7 +2,7 @@
  * Place Detail Screen — unified reusable template for the entire app.
  *
  * Route:  /lugar/[cityId]/[placeId]
- * Used by: O que fazer / Comer bem / Ficar bem / Lucky List / Agora no Rio / O essencial
+ * Used by: O que fazer / Onde comer / Onde ficar / Lucky List / Agora no Rio / O essencial
  *
  * Layout (all layers stacked on one root View):
  *   1. Horizontal paging carousel — full-width images/videos
