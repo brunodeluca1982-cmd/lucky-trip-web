@@ -30,7 +30,7 @@ import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { useGuia } from "@/context/GuiaContext";
+import { useGuia, sourceTableFromCategoria } from "@/context/GuiaContext";
 import type { SavedCategory, SavedItem } from "@/context/GuiaContext";
 import { buildRoteiro, PERIODO_LABEL, PERIODO_ICON } from "@/utils/buildRoteiro";
 import type { DiaRoteiro, DiaPeriodo } from "@/utils/buildRoteiro";
@@ -265,12 +265,14 @@ function SavedCard({
         pressed && { opacity: 0.88, transform: [{ scale: 0.97 }] },
       ]}
       onPress={() => {
-        if (item.categoria === "hotel") {
+        const table = item.source_table ?? sourceTableFromCategoria(item.categoria);
+        console.log("[viagem tap]", { id: item.id, source_table: table, titulo: item.titulo });
+        if (table === "stay_hotels") {
           router.push({ pathname: "/ondeFicar/hotel/[hotelId]", params: { hotelId: item.id } });
         } else {
           router.push({
             pathname: "/lugar/[cityId]/[placeId]",
-            params: { cityId: "rio", placeId: item.id, categoria: item.categoria },
+            params: { cityId: "rio", placeId: item.id, source_table: table },
           });
         }
       }}

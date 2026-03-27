@@ -37,25 +37,34 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { getLugar, LugarPlace, resolvePin } from "@/data/lugares";
-import { useGuia } from "@/context/GuiaContext";
-import type { SavedCategory } from "@/context/GuiaContext";
+import { useGuia, sourceTableFromCategoria } from "@/context/GuiaContext";
+import type { SavedCategory, SourceTable } from "@/context/GuiaContext";
 import { AppTabBar, TAB_BAR_HEIGHT } from "@/components/AppTabBar";
 import { ActionBlock } from "@/components/ActionBlock";
 import { normalizeLugarPlace, tipoFromPlaceId } from "@/data/normalizePlace";
 import { getImageForEntity } from "@/utils/getImageForEntity";
 import { supabase } from "@/lib/supabase";
 
-// Derive the SavedCategory from the placeId prefix (static) or from an
-// explicit categoria query param passed when navigating from Supabase items.
-//   "1"–"8"   → oQueFazer
-//   "c1"–"c5" → restaurante
-//   "h1"–"h5" → hotel
-//   "l1"–"l9" → lucky
-function resolveSaveCategory(placeId: string, categoria?: string): SavedCategory {
+/**
+ * Resolve the SavedCategory for the Save button.
+ * Priority: explicit source_table > explicit categoria > placeId prefix (legacy static routes).
+ */
+function resolveSaveCategory(
+  placeId: string,
+  source_table?: string,
+  categoria?: string,
+): SavedCategory {
+  // Preferred: derive from source_table (authoritative)
+  if (source_table === "restaurantes")    return "restaurante";
+  if (source_table === "stay_hotels")     return "hotel";
+  if (source_table === "o_que_fazer_rio") return "oQueFazer";
+  if (source_table === "lucky_list_rio")  return "lucky";
+  // Legacy: categoria param from older navigation paths
   if (categoria === "restaurante") return "restaurante";
   if (categoria === "hotel")       return "hotel";
   if (categoria === "lucky")       return "lucky";
   if (categoria === "oQueFazer")   return "oQueFazer";
+  // Fallback: static placeId prefixes
   if (placeId.startsWith("c"))     return "restaurante";
   if (placeId.startsWith("h"))     return "hotel";
   if (placeId.startsWith("l"))     return "lucky";
@@ -66,23 +75,45 @@ function resolveSaveCategory(placeId: string, categoria?: string): SavedCategory
 // When a Supabase item is navigated to (real row ID instead of a static prefix
 // like "c1"), this hook fetches the actual row and builds a LugarPlace from it.
 // Returns null while loading, undefined when not found / not applicable.
+/**
+ * Fetches a single entity from Supabase by (placeId, source_table).
+ * source_table is the authoritative routing key — always set for Supabase items.
+ * categoria is accepted as a legacy fallback for items saved before source_table existed.
+ *
+ * Table-specific ID casting:
+ *   restaurantes → bigint → cast to Number()
+ *   all others  → UUID  → pass as string
+ */
 function useSupabaseLugar(
   placeId: string,
+  source_table: string | undefined,
   categoria: string | undefined,
   skip: boolean,
 ): { place: LugarPlace | null; loading: boolean } {
   const [place, setPlace] = useState<LugarPlace | null>(null);
   const [loading, setLoading] = useState(!skip);
 
+  // Effective table: source_table wins; fall back to categoria→table mapping
+  const effectiveTable: string | undefined =
+    source_table ??
+    (categoria === "restaurante" ? "restaurantes"
+      : categoria === "hotel"    ? "stay_hotels"
+      : categoria === "oQueFazer" ? "o_que_fazer_rio"
+      : categoria === "lucky"    ? "lucky_list_rio"
+      : undefined);
+
   useEffect(() => {
     if (skip) { setLoading(false); return; }
+    if (!effectiveTable) { setLoading(false); return; }
     setLoading(true);
+
+    console.log("[useSupabaseLugar] fetching", { placeId, effectiveTable });
 
     (async () => {
       try {
         let resolved: LugarPlace | null = null;
 
-        if (categoria === "restaurante") {
+        if (effectiveTable === "restaurantes") {
           const { data } = await supabase
             .from("restaurantes")
             .select("id, nome, bairro, especialidade, categoria")
@@ -91,20 +122,20 @@ function useSupabaseLugar(
           if (data) {
             const pin = resolvePin("rio", data.bairro ?? "", 0);
             resolved = {
-              id:         String(data.id),
-              titulo:     data.nome ?? "Restaurante",
+              id:          String(data.id),
+              titulo:      data.nome ?? "Restaurante",
               localizacao: data.bairro ?? "Rio de Janeiro",
-              categoria:  "RESTAURANTE",
-              descricao:  data.especialidade
+              categoria:   "RESTAURANTE",
+              descricao:   data.especialidade
                 ? `Especialidade: ${data.especialidade}`
                 : "Um dos restaurantes curados da nossa seleção no Rio de Janeiro.",
-              image: getImageForEntity("restaurant", data.nome ?? "", data.bairro ?? "", null),
-              xPct: pin.xPct,
-              yPct: pin.yPct,
+              image:    getImageForEntity("restaurant", data.nome ?? "", data.bairro ?? "", null),
+              xPct:     pin.xPct,
+              yPct:     pin.yPct,
               tipo_item: "restaurante",
             };
           }
-        } else if (categoria === "oQueFazer") {
+        } else if (effectiveTable === "o_que_fazer_rio") {
           const { data } = await supabase
             .from("o_que_fazer_rio")
             .select("id, nome, bairro, categoria, descricao")
@@ -119,13 +150,13 @@ function useSupabaseLugar(
               categoria:   (data.categoria as string | null)?.toUpperCase() ?? "EXPERIÊNCIA",
               descricao:   (data.descricao as string | null)
                 ?? "Uma das experiências selecionadas para o seu roteiro no Rio.",
-              image: getImageForEntity("activity", data.nome ?? "", data.bairro ?? "", null),
-              xPct: pin.xPct,
-              yPct: pin.yPct,
+              image:    getImageForEntity("activity", data.nome ?? "", data.bairro ?? "", null),
+              xPct:     pin.xPct,
+              yPct:     pin.yPct,
               tipo_item: "experiencia",
             };
           }
-        } else if (categoria === "lucky") {
+        } else if (effectiveTable === "lucky_list_rio") {
           const { data } = await supabase
             .from("lucky_list_rio")
             .select("id, nome, bairro, tipo, descricao")
@@ -140,20 +171,21 @@ function useSupabaseLugar(
               categoria:   "LUCKY LIST",
               descricao:   (data.descricao as string | null)
                 ?? "Um dos achados especiais da Lucky List — lugares que só quem sabe, sabe.",
-              image: getImageForEntity("activity", data.nome ?? "", data.bairro ?? "", null),
-              xPct: pin.xPct,
-              yPct: pin.yPct,
+              image:    getImageForEntity("activity", data.nome ?? "", data.bairro ?? "", null),
+              xPct:     pin.xPct,
+              yPct:     pin.yPct,
               tipo_item: "experiencia",
             };
           }
         }
 
+        console.log("[useSupabaseLugar] resolved", resolved ? resolved.id : "null");
         setPlace(resolved);
       } finally {
         setLoading(false);
       }
     })();
-  }, [placeId, categoria, skip]);
+  }, [placeId, effectiveTable, skip]);
 
   return { place, loading };
 }
@@ -181,8 +213,8 @@ const FALLBACK: LugarPlace = {
 // ── Screen ─────────────────────────────────────────────────────────────────────
 
 export default function LugarDetailScreen() {
-  const { cityId, placeId, categoria } =
-    useLocalSearchParams<{ cityId: string; placeId: string; categoria?: string }>();
+  const { cityId, placeId, source_table, categoria } =
+    useLocalSearchParams<{ cityId: string; placeId: string; source_table?: string; categoria?: string }>();
 
   const insets = useSafeAreaInsets();
   const topInset = Platform.OS === "web" ? 67 : insets.top;
@@ -190,10 +222,10 @@ export default function LugarDetailScreen() {
   // ── Step 1: try static lookup (handles all legacy prefix-based routes) ──
   const staticPlace = getLugar(cityId, placeId);
 
-  // ── Step 2: if static lookup failed, query Supabase using `categoria` ──
+  // ── Step 2: if static lookup failed, query Supabase using source_table (primary) or categoria ──
   const needsSupabase = !staticPlace;
   const { place: supabasePlace, loading: supabaseLoading } =
-    useSupabaseLugar(placeId ?? "", categoria, !needsSupabase);
+    useSupabaseLugar(placeId ?? "", source_table, categoria, !needsSupabase);
 
   // ── Resolved place — static wins, then Supabase, then FALLBACK ──
   const place: LugarPlace = staticPlace ?? supabasePlace ?? FALLBACK;
@@ -212,18 +244,22 @@ export default function LugarDetailScreen() {
   // Save to Trip — backed by GuiaContext (persists across navigation)
   const { isSaved, save, unsave } = useGuia();
   const saved = isSaved(place.id);
-  const saveCategory = resolveSaveCategory(placeId ?? "", categoria);
+  const saveCategory = resolveSaveCategory(placeId ?? "", source_table, categoria);
+  // Derive the authoritative source_table for the SavedItem (use param > resolve from saveCategory)
+  const resolvedSourceTable: SourceTable =
+    (source_table as SourceTable | undefined) ?? sourceTableFromCategoria(saveCategory);
 
   function toggleSave() {
     if (saved) {
       unsave(place.id);
     } else {
       save({
-        id: place.id,
-        categoria: saveCategory,
-        titulo: place.titulo,
-        localizacao: place.localizacao,
-        image: place.image,
+        id:           place.id,
+        categoria:    saveCategory,
+        source_table: resolvedSourceTable,
+        titulo:       place.titulo,
+        localizacao:  place.localizacao,
+        image:        place.image,
       });
     }
   }

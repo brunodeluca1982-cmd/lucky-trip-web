@@ -34,8 +34,8 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { useGuia } from "@/context/GuiaContext";
-import type { SavedCategory, SavedItem } from "@/context/GuiaContext";
+import { useGuia, sourceTableFromCategoria } from "@/context/GuiaContext";
+import type { SavedCategory, SavedItem, SourceTable } from "@/context/GuiaContext";
 import { supabase } from "@/lib/supabase";
 import { getNeighborhoodImage } from "@/data/neighborhoodImages";
 import { getImageForEntity } from "@/utils/getImageForEntity";
@@ -1094,6 +1094,8 @@ interface Suggestion {
   localizacao: string;
   image: ReturnType<typeof getNeighborhoodImage>;
   categoria: SavedCategory;
+  /** Explicit Supabase table — always set for internal DB items. */
+  source_table?: SourceTable;
   subtitle?: string;
   isExternal?: boolean;
   // External places (Google Places)
@@ -1213,24 +1215,28 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
         ]);
         const rows: Suggestion[] = [
           ...(r1.data ?? []).map((r: Record<string, unknown>) => ({
-            id: `r-${r.id}`, titulo: (r.nome as string) || "", localizacao: (r.bairro as string) || "",
+            id: String(r.id), titulo: (r.nome as string) || "", localizacao: (r.bairro as string) || "",
             image: getImageForEntity("restaurant", (r.nome as string) || "", (r.bairro as string) || "", (r.photo_url as string | null) ?? null),
             categoria: "restaurante" as SavedCategory,
+            source_table: "restaurantes" as SourceTable,
             subtitle: (r.especialidade as string) ?? "Restaurante",
           })),
           ...(r2.data ?? []).map((r: Record<string, unknown>) => ({
-            id: `q-${r.id}`, titulo: (r.nome as string) || "", localizacao: (r.bairro as string) || "",
+            id: String(r.id), titulo: (r.nome as string) || "", localizacao: (r.bairro as string) || "",
             image: getNeighborhoodImage((r.bairro as string) || ""), categoria: "oQueFazer" as SavedCategory,
+            source_table: "o_que_fazer_rio" as SourceTable,
             subtitle: (r.categoria as string) ?? "O que fazer",
           })),
           ...(r3.data ?? []).map((r: Record<string, unknown>) => ({
-            id: `l-${r.id}`, titulo: (r.nome as string) || "", localizacao: (r.bairro as string) || "",
+            id: String(r.id), titulo: (r.nome as string) || "", localizacao: (r.bairro as string) || "",
             image: getNeighborhoodImage((r.bairro as string) || ""), categoria: "lucky" as SavedCategory,
+            source_table: "lucky_list_rio" as SourceTable,
             subtitle: (r.tipo as string) ?? "Lucky",
           })),
           ...(r4.data ?? []).map((r: Record<string, unknown>) => ({
-            id: `h-${r.id}`, titulo: (r.nome as string) || "", localizacao: (r.bairro as string) || "",
+            id: String(r.id), titulo: (r.nome as string) || "", localizacao: (r.bairro as string) || "",
             image: getNeighborhoodImage((r.bairro as string) || ""), categoria: "hotel" as SavedCategory,
+            source_table: "stay_hotels" as SourceTable,
             subtitle: (r.categoria as string) ?? "Hotel",
           })),
         ];
@@ -1267,12 +1273,13 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
           .eq("ativo", true)
           .limit(14);
         rows = (data ?? []).map((r: Record<string, unknown>) => ({
-          id:          String(r.id),
-          titulo:      (r.nome as string) || "Restaurante",
-          localizacao: (r.bairro as string) || "",
-          image:       getImageForEntity("restaurant", (r.nome as string) || "", (r.bairro as string) || "", (r.photo_url as string | null) ?? null),
-          categoria:   "restaurante" as SavedCategory,
-          subtitle:    (r.especialidade as string) ?? (r.categoria as string) ?? undefined,
+          id:           String(r.id),
+          titulo:       (r.nome as string) || "Restaurante",
+          localizacao:  (r.bairro as string) || "",
+          image:        getImageForEntity("restaurant", (r.nome as string) || "", (r.bairro as string) || "", (r.photo_url as string | null) ?? null),
+          categoria:    "restaurante" as SavedCategory,
+          source_table: "restaurantes" as SourceTable,
+          subtitle:     (r.especialidade as string) ?? (r.categoria as string) ?? undefined,
         }));
       } else if (item.categoria === "lucky") {
         const { data } = await supabase
@@ -1280,12 +1287,13 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
           .select("id, nome, bairro, tipo")
           .limit(14);
         rows = (data ?? []).map((r: Record<string, unknown>) => ({
-          id:          String(r.id),
-          titulo:      (r.nome as string) || "Lucky pick",
-          localizacao: (r.bairro as string) || "",
-          image:       getNeighborhoodImage((r.bairro as string) || ""),
-          categoria:   "lucky" as SavedCategory,
-          subtitle:    (r.tipo as string) ?? undefined,
+          id:           String(r.id),
+          titulo:       (r.nome as string) || "Lucky pick",
+          localizacao:  (r.bairro as string) || "",
+          image:        getNeighborhoodImage((r.bairro as string) || ""),
+          categoria:    "lucky" as SavedCategory,
+          source_table: "lucky_list_rio" as SourceTable,
+          subtitle:     (r.tipo as string) ?? undefined,
         }));
       } else {
         const { data } = await supabase
@@ -1293,12 +1301,13 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
           .select("id, nome, bairro, categoria")
           .limit(14);
         rows = (data ?? []).map((r: Record<string, unknown>) => ({
-          id:          String(r.id),
-          titulo:      (r.nome as string) || "Experiência",
-          localizacao: (r.bairro as string) || "",
-          image:       getNeighborhoodImage((r.bairro as string) || ""),
-          categoria:   "oQueFazer" as SavedCategory,
-          subtitle:    (r.categoria as string) ?? undefined,
+          id:           String(r.id),
+          titulo:       (r.nome as string) || "Experiência",
+          localizacao:  (r.bairro as string) || "",
+          image:        getNeighborhoodImage((r.bairro as string) || ""),
+          categoria:    "oQueFazer" as SavedCategory,
+          source_table: "o_que_fazer_rio" as SourceTable,
+          subtitle:     (r.categoria as string) ?? undefined,
         }));
       }
 
@@ -1352,11 +1361,12 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
       }
 
       const newItem: SavedItem = {
-        id:          sug.id,
-        titulo:      sug.titulo,
-        localizacao: sug.localizacao,
-        image:       sug.image,
-        categoria:   sug.categoria,
+        id:           sug.id,
+        titulo:       sug.titulo,
+        localizacao:  sug.localizacao,
+        image:        sug.image,
+        categoria:    sug.categoria,
+        // Carry source_table for internal items so routing never infers from categoria
         ...(sug.isExternal
           ? {
               isExternal: true,
@@ -1365,7 +1375,7 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
               lat,
               lng,
             }
-          : {}),
+          : { source_table: sug.source_table ?? sourceTableFromCategoria(sug.categoria) }),
       };
       onReplace(diaNum, item.id, newItem);
       onClose();
@@ -2155,50 +2165,56 @@ function ResultPhase({
 }
 
 function navigateToItem(item: SavedItem) {
-  // ── Priority 1: Google Place ID → Google Maps (place_id URL)
-  if (item.placeId) {
-    Linking.openURL(`https://www.google.com/maps/place/?q=place_id:${item.placeId}`);
+  // ── Debug log — always fires to help diagnose routing issues ──
+  console.log("[navigateToItem]", {
+    id:           item.id,
+    source_table: item.source_table,
+    categoria:    item.categoria,
+    isExternal:   item.isExternal ?? false,
+    titulo:       item.titulo,
+  });
+
+  // ── External items: route by coordinates or Google Place ID, never by name ──
+  if (item.isExternal) {
+    if (item.placeId) {
+      console.log("[navigateToItem] → Google Maps (place_id)", item.placeId);
+      Linking.openURL(`https://www.google.com/maps/place/?q=place_id:${item.placeId}`);
+      return;
+    }
+    if (item.lat && item.lng) {
+      console.log("[navigateToItem] → Google Maps (coords)", item.lat, item.lng);
+      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${item.lat},${item.lng}`);
+      return;
+    }
+    // External item with no coordinates — cannot navigate
+    console.warn("[navigateToItem] External item has no placeId or coords — showing fallback");
+    Alert.alert("Em breve disponível", "Este lugar ainda não tem página de detalhes.");
     return;
   }
 
-  // ── Priority 2: Coordinates → Google Maps (coordinates URL)
-  if (item.lat && item.lng) {
-    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${item.lat},${item.lng}`);
+  // ── Internal items: must have a valid id ──
+  if (!item.id) {
+    console.warn("[navigateToItem] Item has no id — showing fallback");
+    Alert.alert("Em breve disponível", "Este lugar ainda não tem página de detalhes.");
     return;
   }
 
-  // ── Priority 3: Internal Supabase item — route to the exact entity detail page.
-  // Every row from restaurantes / o_que_fazer_rio / lucky_list_rio / stay_hotels
-  // has its own detail page. `categoria` is passed so the detail screen knows
-  // which Supabase table to query when the static getLugar lookup misses.
-  switch (item.categoria) {
-    case "restaurante":
-      router.push({
-        pathname: "/lugar/[cityId]/[placeId]",
-        params: { cityId: "rio", placeId: item.id, categoria: "restaurante" },
-      });
-      return;
-    case "hotel":
-      // Hotels have a dedicated Supabase-backed detail route — keep it.
-      router.push({ pathname: "/ondeFicar/hotel/[hotelId]", params: { hotelId: item.id } });
-      return;
-    case "oQueFazer":
-      router.push({
-        pathname: "/lugar/[cityId]/[placeId]",
-        params: { cityId: "rio", placeId: item.id, categoria: "oQueFazer" },
-      });
-      return;
-    case "lucky":
-      router.push({
-        pathname: "/lugar/[cityId]/[placeId]",
-        params: { cityId: "rio", placeId: item.id, categoria: "lucky" },
-      });
-      return;
+  // Derive source_table: prefer explicit field, fall back to categoria mapping
+  const table: SourceTable = item.source_table ?? sourceTableFromCategoria(item.categoria);
+
+  console.log("[navigateToItem] → detail page", { table, id: item.id });
+
+  // Hotels have their own dedicated detail route
+  if (table === "stay_hotels") {
+    router.push({ pathname: "/ondeFicar/hotel/[hotelId]", params: { hotelId: item.id } });
+    return;
   }
 
-  // ── Priority 4: Absolute fallback — guaranteed no dead click for unknown categories
-  const query = `${item.titulo}${item.localizacao ? ` ${item.localizacao}` : ""} Rio de Janeiro`;
-  Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`);
+  // All other tables → unified lugar detail route with explicit source_table
+  router.push({
+    pathname: "/lugar/[cityId]/[placeId]",
+    params: { cityId: "rio", placeId: item.id, source_table: table },
+  });
 }
 
 function getItemFallbackImage(categoria: SavedCategory): ReturnType<typeof require> {
@@ -3184,11 +3200,17 @@ export default function RoteiroScreen() {
           ...p,
           items: p.items.map((item) => {
             const found = savedMap.get(item.id);
+            // Always prefer the saved copy — it has source_table and image already set
             if (found) return found;
-            // AI introduced an item not in saved list — resolve a fallback image
-            // so the thumbnail never renders blank
+            // AI introduced an item not in saved list:
+            // Use the AI-provided categoria if valid, fall back to "oQueFazer"
             const cat = (item.categoria as SavedCategory | undefined) ?? "oQueFazer";
-            return { ...item, image: getItemFallbackImage(cat) };
+            return {
+              ...item,
+              image:        getItemFallbackImage(cat),
+              // Derive source_table from categoria so routing is never guessing
+              source_table: sourceTableFromCategoria(cat),
+            };
           }).filter(Boolean),
         })),
       }));

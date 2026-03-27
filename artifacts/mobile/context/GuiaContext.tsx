@@ -40,9 +40,45 @@ const STORAGE_KEY = "@luckytrip/saved_v1";
 
 export type SavedCategory = "oQueFazer" | "restaurante" | "hotel" | "lucky";
 
+/**
+ * Valid Supabase table names for internal entities.
+ * Used as the authoritative routing key — must match the actual DB table.
+ */
+export type SourceTable =
+  | "restaurantes"
+  | "stay_hotels"
+  | "o_que_fazer_rio"
+  | "lucky_list_rio";
+
+/** Maps UI category to the Supabase source table. */
+export function sourceTableFromCategoria(categoria: SavedCategory): SourceTable {
+  switch (categoria) {
+    case "restaurante": return "restaurantes";
+    case "hotel":       return "stay_hotels";
+    case "oQueFazer":   return "o_que_fazer_rio";
+    case "lucky":       return "lucky_list_rio";
+  }
+}
+
+/** Maps Supabase source table back to UI category. */
+export function categoriaFromSourceTable(table: SourceTable): SavedCategory {
+  switch (table) {
+    case "restaurantes":    return "restaurante";
+    case "stay_hotels":     return "hotel";
+    case "o_que_fazer_rio": return "oQueFazer";
+    case "lucky_list_rio":  return "lucky";
+  }
+}
+
 export interface SavedItem {
   id: string;
   categoria: SavedCategory;
+  /**
+   * Explicit Supabase table this item belongs to.
+   * Always set for items created from DB rows — used as the primary routing key.
+   * Optional for backward compatibility with items persisted before this field existed.
+   */
+  source_table?: SourceTable;
   titulo: string;
   /** bairro — e.g. "Ipanema", "Leblon", "Santa Teresa" */
   localizacao: string;

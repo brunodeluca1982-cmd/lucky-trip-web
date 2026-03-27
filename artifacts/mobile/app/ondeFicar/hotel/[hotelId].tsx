@@ -209,11 +209,12 @@ export default function HotelDetailScreen() {
                   unsave(hotel.id);
                 } else {
                   save({
-                    id: hotel.id,
-                    categoria: "hotel",
-                    titulo: hotel.hotel_name,
-                    localizacao: hotel.neighborhood.neighborhood_name,
-                    image: heroImage,
+                    id:           hotel.id,
+                    categoria:    "hotel",
+                    source_table: "stay_hotels",
+                    titulo:       hotel.hotel_name,
+                    localizacao:  hotel.neighborhood.neighborhood_name,
+                    image:        heroImage,
                   });
                 }
               }}
