@@ -1,7 +1,7 @@
 /**
  * useOQueFazer.ts — Fetches activities from Supabase `o_que_fazer_rio` table.
  * Returns LugarPlace-compatible objects for use in O que fazer screens.
- * Only selects confirmed columns (validated from edge function schema).
+ * Photos: Supabase photo_url first, then Wikipedia image search (background, non-blocking).
  */
 
 import { useEffect, useState } from "react";
@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase";
 import type { LugarPlace } from "@/data/lugares";
 import { resolvePin } from "@/data/lugares";
 import { getImageForEntity } from "@/utils/getImageForEntity";
+import { fetchWikipediaImage } from "@/utils/fetchWikipediaImage";
 
 type State = {
   lugares: LugarPlace[];
@@ -42,26 +43,44 @@ export function useOQueFazer(): State {
         return;
       }
 
-      const mapped: LugarPlace[] = (data ?? []).map((row, idx) => {
-        const bairro   = (row.bairro as string | null) ?? "";
-        const pin      = resolvePin("rio", bairro, idx % 6);
-        const photoUri = null; // photo_url not confirmed in o_que_fazer_rio schema
-        const descricao = "Uma das experiências selecionadas para o Rio de Janeiro.";
+      const rows = data ?? [];
+
+      // ── Phase 1: Render immediately with Supabase / neighborhood fallbacks ──
+      const initial: LugarPlace[] = rows.map((row, idx) => {
+        const bairro    = (row.bairro as string | null) ?? "";
+        const pin       = resolvePin("rio", bairro, idx % 6);
+        const supaPhoto = (row as any).photo_url as string | null ?? null;
         return {
           id:          String(row.id),
-          titulo:      (row.nome as string | null)            ?? "Experiência",
-          localizacao: bairro                                 || "Rio de Janeiro",
+          titulo:      (row.nome as string | null)                    ?? "Experiência",
+          localizacao: bairro                                         || "Rio de Janeiro",
           categoria:   ((row.categoria as string | null)?.toUpperCase()) ?? "EXPERIÊNCIA",
-          descricao,
-          image:       getImageForEntity("activity", row.nome ?? "", bairro, photoUri) as ImageSourcePropType,
+          descricao:   "Uma das experiências selecionadas para o Rio de Janeiro.",
+          image:       getImageForEntity("activity", row.nome ?? "", bairro, supaPhoto) as ImageSourcePropType,
           xPct:        pin.xPct,
           yPct:        pin.yPct,
           tipo_item:   "experiencia",
         };
       });
 
-      setLugares(mapped);
+      setLugares(initial);
       setLoading(false);
+
+      // ── Phase 2: Enrich photos from Wikipedia in background ─────────────
+      const needsWiki = rows.filter((r) => !(r as any).photo_url);
+      for (const row of needsWiki) {
+        if (cancelled) break;
+        const wikiUrl = await fetchWikipediaImage(row.nome ?? "", "Rio de Janeiro");
+        if (!wikiUrl || cancelled) continue;
+
+        setLugares((prev) =>
+          prev.map((p) =>
+            p.id === String(row.id)
+              ? { ...p, image: { uri: wikiUrl } as ImageSourcePropType }
+              : p,
+          ),
+        );
+      }
     }
 
     load();

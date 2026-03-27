@@ -487,9 +487,8 @@ interface TripFlowProps {
   onGenerate:   (p: JourneyGenerateProps) => void;
 }
 
-function TripFlow({ savedCount: _savedCount, isContextual, onGenerate }: TripFlowProps) {
-  if (isContextual) return <ContextualFlow onGenerate={onGenerate} />;
-  return <StandardFlow onGenerate={onGenerate} />;
+function TripFlow({ savedCount: _savedCount, isContextual: _isContextual, onGenerate }: TripFlowProps) {
+  return <ContextualFlow onGenerate={onGenerate} />;
 }
 
 function StandardFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) => void }) {

@@ -136,11 +136,10 @@ export function getImageForEntity(
   localizacao?: string,
   supabaseImageUrl?: string | null,
 ): NeighborhoodImageSource {
-  // ── Tier 1: Supabase image — native only.
-  // On web, external URIs can fail silently (CORS / redirect chains) and the
-  // Image component renders blank with no recoverable error. Local assets are
-  // used on web instead (tiers 2-4 below).
-  if (supabaseImageUrl && supabaseImageUrl.trim().length > 0 && Platform.OS !== "web") {
+  // ── Tier 1: Supabase/Wikipedia image — all platforms.
+  // Supabase Storage URLs are direct HTTPS (upload.wikimedia.org too) — no
+  // redirect chains, CORS-enabled. Safe to use on web and native alike.
+  if (supabaseImageUrl && supabaseImageUrl.trim().length > 0) {
     return { uri: supabaseImageUrl };
   }
 

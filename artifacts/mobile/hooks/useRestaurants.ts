@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase, type Restaurante } from "@/lib/supabase";
+import { fetchWikipediaImage } from "@/utils/fetchWikipediaImage";
 
 type State = {
   restaurantes: Restaurante[];
@@ -72,17 +73,32 @@ export function useRestaurants(cidadeId?: string): State {
 
       if (cancelled) return;
 
-      // ── 3. Merge resolved photo URI ───────────────────────────────────────
+      // ── 3. Render immediately with Supabase / place_photos ────────────────
       const merged: Restaurante[] = rawRows.map((r) => ({
         ...r,
-        resolvedPhotoUri:
-          r.photo_url ??
-          photoMap[String(r.id)] ??
-          null,
+        resolvedPhotoUri: r.photo_url ?? photoMap[String(r.id)] ?? null,
       }));
 
       setRestaurantes(merged);
       setLoading(false);
+
+      // ── 4. Wikipedia fallback in background for restaurants without photos ─
+      const stillMissing = rawRows.filter(
+        (r) => !r.photo_url && !photoMap[String(r.id)],
+      );
+      for (const r of stillMissing) {
+        if (cancelled) break;
+        const wikiUrl = await fetchWikipediaImage(r.nome, "restaurante Rio de Janeiro");
+        if (!wikiUrl || cancelled) continue;
+
+        setRestaurantes((prev) =>
+          prev.map((p) =>
+            p.id === r.id
+              ? { ...p, resolvedPhotoUri: wikiUrl }
+              : p,
+          ),
+        );
+      }
     }
 
     load();
