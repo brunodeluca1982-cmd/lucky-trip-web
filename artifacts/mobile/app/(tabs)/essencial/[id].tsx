@@ -104,7 +104,10 @@ function ClassicoCard({ item }: { item: ClassicoItem }) {
         s.classicoCard,
         pressed && { opacity: 0.88, transform: [{ scale: 0.97 }] },
       ]}
-      onPress={() => router.push(`/lugar/rio/${item.id}`)}
+      onPress={() => router.push({
+        pathname: "/lugar/[cityId]/[placeId]",
+        params: { cityId: "rio", placeId: item.id, source_table: "o_que_fazer_rio" },
+      })}
     >
       <Image source={item.image} style={s.classicoImage} resizeMode="cover" />
       <LinearGradient
@@ -139,7 +142,10 @@ function LuckyCard({
         s.luckyCard,
         pressed && { opacity: 0.90 },
       ]}
-      onPress={() => router.push(`/lugar/${cityId}/${item.id}`)}
+      onPress={() => router.push({
+        pathname: "/lugar/[cityId]/[placeId]",
+        params: { cityId, placeId: item.id, source_table: "lucky_list_rio" },
+      })}
     >
       {/* Image */}
       <View style={s.luckyImageWrap}>

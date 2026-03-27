@@ -12,6 +12,7 @@
 
 import { ImageSourcePropType } from "react-native";
 import { getNeighborhoodImage } from "./neighborhoodImages";
+import { getImageForEntity } from "../utils/getImageForEntity";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -324,7 +325,7 @@ export const LUGARES_FICAR: Record<string, LugarPlace[]> = {
       categoria: "ÍCONE",
       descricao:
         "Um século de elegância à beira-mar. O hotel mais celebrado do Rio recebe o mundo com serviço impecável e vista para o Atlântico.",
-      image: ni("Copacabana"),
+      image: getImageForEntity("hotel", "Copacabana Palace", "Copacabana"),
       ...resolvePin("rio", "Copacabana", 0),
       tipo_item: "hotel",
       google_maps_url: "https://maps.app.goo.gl/Copacabana-Palace",
@@ -338,7 +339,7 @@ export const LUGARES_FICAR: Record<string, LugarPlace[]> = {
       categoria: "BOUTIQUE",
       descricao:
         "Antiga mansão colonial transformada em refúgio de design. Piscina com vista para a Baía de Guanabara e atmosfera de artista.",
-      image: ni("Santa Teresa"),
+      image: getImageForEntity("hotel", "Santa Teresa Hotel MGallery", "Santa Teresa"),
       ...resolvePin("rio", "Santa Teresa", 0),
     },
     {
@@ -348,7 +349,7 @@ export const LUGARES_FICAR: Record<string, LugarPlace[]> = {
       categoria: "LUXO",
       descricao:
         "Rooftop com piscina suspensa sobre Ipanema, design Philippe Starck e o melhor endereço da Zona Sul para quem não abre mão do requinte.",
-      image: ni("Ipanema"),
+      image: getImageForEntity("hotel", "Fasano Rio de Janeiro", "Ipanema"),
       ...resolvePin("rio", "Ipanema", 0),
     },
     {
@@ -358,7 +359,7 @@ export const LUGARES_FICAR: Record<string, LugarPlace[]> = {
       categoria: "CHARME",
       descricao:
         "Apenas sete quartos numa villa francesa de 1920. Café da manhã em varanda, arte por toda a parte e a sensação de ser hóspede especial.",
-      image: ni("Santa Teresa"),
+      image: getImageForEntity("hotel", "Mama Ruisa", "Santa Teresa"),
       ...resolvePin("rio", "Santa Teresa", 1),
     },
     {
@@ -368,7 +369,7 @@ export const LUGARES_FICAR: Record<string, LugarPlace[]> = {
       categoria: "DESIGN",
       descricao:
         "Conceito lifestyle no coração de Botafogo, com rooftop aberto à cidade, piscina e uma vizinhança que pulsa gastronomia e cultura.",
-      image: ni("Botafogo"),
+      image: getImageForEntity("hotel", "Yoo2 Rio de Janeiro", "Botafogo"),
       ...resolvePin("rio", "Botafogo", 0),
     },
   ],

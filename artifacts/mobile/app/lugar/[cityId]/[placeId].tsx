@@ -179,6 +179,29 @@ function useSupabaseLugar(
               tipo_item: "experiencia",
             };
           }
+        } else if (effectiveTable === "stay_hotels") {
+          const { data } = await supabase
+            .from("stay_hotels")
+            .select("id, hotel_name, hotel_category, neighborhoods(neighborhood_name)")
+            .eq("id", placeId)
+            .maybeSingle();
+          if (data) {
+            const neighborhoodName =
+              ((data as any).neighborhoods as { neighborhood_name: string } | null)
+                ?.neighborhood_name ?? "Rio de Janeiro";
+            const pin = resolvePin("rio", neighborhoodName, 0);
+            resolved = {
+              id:          String(data.id),
+              titulo:      (data.hotel_name as string | null) ?? "Hotel",
+              localizacao: neighborhoodName,
+              categoria:   ((data.hotel_category as string | null)?.toUpperCase()) ?? "HOTEL",
+              descricao:   "Uma das hospedagens selecionadas para a sua estadia no Rio de Janeiro.",
+              image:       getImageForEntity("hotel", data.hotel_name ?? "", neighborhoodName, null),
+              xPct:        pin.xPct,
+              yPct:        pin.yPct,
+              tipo_item:   "hotel",
+            };
+          }
         }
 
         console.log("[useSupabaseLugar] resolved", resolved ? resolved.id : "null");

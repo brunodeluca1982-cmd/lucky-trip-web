@@ -94,7 +94,10 @@ function LuckyHighlight() {
           <Pressable
             key={place.id}
             style={s.luckyPickRow}
-            onPress={() => router.push(`/lugar/rio/${place.id}`)}
+            onPress={() => router.push({
+              pathname: "/lugar/[cityId]/[placeId]",
+              params: { cityId: "rio", placeId: place.id, source_table: "lucky_list_rio" },
+            })}
           >
             <Text style={s.luckyPickStar}>✦</Text>
             <View style={s.luckyPickText}>
@@ -277,7 +280,10 @@ export default function HomeScreen() {
                   localizacao={item.localizacao}
                   image={item.image}
                   size="medium"
-                  onPress={() => router.push(`/lugar/rio/${O_QUE_FAZER_MAP[item.id] ?? "1"}`)}
+                  onPress={() => router.push({
+                    pathname: "/lugar/[cityId]/[placeId]",
+                    params: { cityId: "rio", placeId: O_QUE_FAZER_MAP[item.id] ?? "1", source_table: "o_que_fazer_rio" },
+                  })}
                 />
               ))}
             </HorizontalScroll>
@@ -295,7 +301,14 @@ export default function HomeScreen() {
             dark
           />
           <HorizontalScroll>
-            {curadoPara.map((item) => (
+            {curadoPara.map((item) => {
+              const curadoId = CURADO_MAP[item.id] ?? "1";
+              // cp4 (l2) is lucky; cp2/cp3 are restaurants; cp1 is an activity
+              const curadoTable =
+                item.id === "cp4" ? "lucky_list_rio"
+                : (item.id === "cp2" || item.id === "cp3") ? "restaurantes"
+                : "o_que_fazer_rio";
+              return (
               <PlaceCard
                 key={item.id}
                 id={item.id}
@@ -304,9 +317,13 @@ export default function HomeScreen() {
                 localizacao={item.localizacao}
                 image={item.image}
                 size="medium"
-                onPress={() => router.push(`/lugar/rio/${CURADO_MAP[item.id] ?? "1"}`)}
+                onPress={() => router.push({
+                  pathname: "/lugar/[cityId]/[placeId]",
+                  params: { cityId: "rio", placeId: curadoId, source_table: curadoTable },
+                })}
               />
-            ))}
+              );
+            })}
           </HorizontalScroll>
         </View>
 
@@ -329,7 +346,10 @@ export default function HomeScreen() {
                 bairro={r.bairro}
                 categoria={r.categoria}
                 image={r.image}
-                onPress={() => router.push(`/lugar/rio/${RESTAURANTE_MAP[r.id] ?? "c1"}`)}
+                onPress={() => router.push({
+                  pathname: "/lugar/[cityId]/[placeId]",
+                  params: { cityId: "rio", placeId: RESTAURANTE_MAP[r.id] ?? "c1", source_table: "restaurantes" },
+                })}
               />
             ))}
           </HorizontalScroll>
@@ -354,7 +374,10 @@ export default function HomeScreen() {
                 localizacao={h.localizacao}
                 tipo={h.tipo}
                 image={h.image}
-                onPress={() => router.push(`/lugar/rio/h${h.id}`)}
+                onPress={() => router.push({
+                  pathname: "/lugar/[cityId]/[placeId]",
+                  params: { cityId: "rio", placeId: `h${h.id}`, source_table: "stay_hotels" },
+                })}
               />
             ))}
           </HorizontalScroll>

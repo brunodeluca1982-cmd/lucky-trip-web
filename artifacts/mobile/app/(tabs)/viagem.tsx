@@ -267,7 +267,9 @@ function SavedCard({
       onPress={() => {
         const table = item.source_table ?? sourceTableFromCategoria(item.categoria);
         console.log("[viagem tap]", { id: item.id, source_table: table, titulo: item.titulo });
-        if (table === "stay_hotels") {
+        // UUID regex — real Supabase IDs are 36-char UUIDs; static hotel IDs are h1/h2 etc.
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.id);
+        if (table === "stay_hotels" && isUUID) {
           router.push({ pathname: "/ondeFicar/hotel/[hotelId]", params: { hotelId: item.id } });
         } else {
           router.push({
