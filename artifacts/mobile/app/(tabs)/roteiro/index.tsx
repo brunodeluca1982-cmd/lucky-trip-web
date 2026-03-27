@@ -2213,7 +2213,13 @@ function navigateToItem(item: SavedItem) {
   // All other tables → unified lugar detail route with explicit source_table
   router.push({
     pathname: "/lugar/[cityId]/[placeId]",
-    params: { cityId: "rio", placeId: item.id, source_table: table },
+    params: {
+      cityId:      "rio",
+      placeId:     item.id,
+      source_table: table,
+      titulo:      item.titulo ?? "",
+      localizacao: item.localizacao ?? "",
+    },
   });
 }
 
@@ -3205,11 +3211,12 @@ export default function RoteiroScreen() {
             // AI introduced an item not in saved list:
             // Use the AI-provided categoria if valid, fall back to "oQueFazer"
             const cat = (item.categoria as SavedCategory | undefined) ?? "oQueFazer";
+            // Prefer source_table from edge function; fall back to derived value
+            const edgeSourceTable = (item as any).source_table as string | undefined;
             return {
               ...item,
               image:        getItemFallbackImage(cat),
-              // Derive source_table from categoria so routing is never guessing
-              source_table: sourceTableFromCategoria(cat),
+              source_table: (edgeSourceTable as SourceTable | undefined) ?? sourceTableFromCategoria(cat),
             };
           }).filter(Boolean),
         })),

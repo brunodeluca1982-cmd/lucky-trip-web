@@ -174,6 +174,11 @@ Neighborhood map (defined in `data/neighborhoodImages.ts`):
 ### Supabase Tables Used
 - `stay_neighborhoods` — neighborhood details (name, slug, identity_phrase, my_view, how_to_live, best_for_*, nightlife, gastronomy, scenery, walkable, safety_solo_woman, etc.)
 - `v_stay_neighborhoods_with_hotels` — view joining neighborhoods + their hotels array; 26 hotels across 11 neighborhoods for Rio de Janeiro
+- `restaurantes` — integer PK (`id`). Confirmed columns: `id, nome, bairro, especialidade, categoria, photo_url, meu_olhar, google_maps_url, instagram, perfil_publico, ativo, ordem_bairro`. NOT in table: `tipo_de_cozinha, preco_nivel`. Legacy string IDs (e.g., "colombo") must be guarded with `isNaN(Number(id))` before querying.
+- `o_que_fazer_rio` — UUID PK. Confirmed columns: `id, nome, bairro, categoria, tags_ia, momento_ideal, vibe, energia, duracao_media`. Use `select("*")` for safety.
+- `lucky_list_rio` — UUID PK. 22 items. Confirmed working columns (use `select("*")`): `id, nome, bairro, tipo, photo_url, tags_ia, momento_ideal`. NOT in table: `ai_tags, melhor_horario, energia, vibe`.
+
+**CRITICAL**: Always use `select("*")` in mobile client for these tables — any explicit column that doesn't exist causes a 400 error that silently returns null (no data rendered). The edge function confirmed which columns exist.
 
 ### Route Structure
 - `(tabs)/` — 5-tab navigator

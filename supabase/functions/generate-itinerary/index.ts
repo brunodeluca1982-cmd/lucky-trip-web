@@ -85,11 +85,12 @@ interface EnrichedPlace {
 
 /** Output types — must stay compatible with the existing DiaRoteiro UI shape */
 interface ItemRoteiro {
-  id:          string;
-  titulo:      string;
-  categoria:   SavedCategory;
-  localizacao: string;
-  image?:      unknown;
+  id:           string;
+  titulo:       string;
+  categoria:    SavedCategory;
+  localizacao:  string;
+  source_table: string;
+  image?:       unknown;
 }
 
 interface DiaPeriodo {
@@ -177,7 +178,7 @@ async function enrichPlaces(
       : Promise.resolve({ data: [] }),
     luckyIds.length > 0
       ? supa.from("lucky_list_rio")
-          .select("id,nome,bairro,tipo,tags_ia,ai_tags,momento_ideal,melhor_horario,vibe,energia,photo_url")
+          .select("id,nome,bairro,tipo,tags_ia,momento_ideal,photo_url")
           .in("id", luckyIds)
       : Promise.resolve({ data: [] }),
     restIds.length > 0
@@ -218,17 +219,15 @@ async function enrichPlaces(
         duracao   = (row.duracao_media as string)  ?? "1-2h";
       }
     } else if (s.categoria === "lucky") {
-      // Look up in lucky_list_rio — it has different column names from o_que_fazer_rio
+      // Look up in lucky_list_rio — confirmed columns: id,nome,bairro,tipo,tags_ia,momento_ideal,photo_url
       const row = luckyMap.get(s.id);
       if (row) {
-        area      = (row.bairro        as string) || area;
-        name      = (row.nome          as string) || name;
-        // lucky_list_rio may use tags_ia OR ai_tags
-        tags      = (row.tags_ia as string[]) ?? (row.ai_tags as string[]) ?? [];
-        // lucky_list_rio may use momento_ideal OR melhor_horario
-        momento   = (row.momento_ideal as string[]) ?? (row.melhor_horario as string[]) ?? [];
-        vibe_tags = (row.vibe          as string[]) ?? [];
-        energia   = (row.energia       as string)  ?? "medium";
+        area      = (row.bairro        as string)   || area;
+        name      = (row.nome          as string)   || name;
+        tags      = (row.tags_ia       as string[]) ?? [];
+        momento   = (row.momento_ideal as string[]) ?? [];
+        vibe_tags = [];
+        energia   = "medium";
       }
     } else if (s.categoria === "restaurante") {
       const row = restMap.get(Number(s.id));
@@ -292,7 +291,7 @@ async function fetchComplementaryContent(
   if (needActs > 0) {
     const { data: luckyRows } = await supa
       .from("lucky_list_rio")
-      .select("id,nome,bairro,tipo,tags_ia,ai_tags,momento_ideal,melhor_horario,vibe,energia")
+      .select("id,nome,bairro,tipo,tags_ia,momento_ideal")
       .limit(Math.min(20, needActs + 5));
 
     for (const row of (luckyRows ?? []) as Record<string, unknown>[]) {
@@ -304,8 +303,8 @@ async function fetchComplementaryContent(
       if (tipo.includes("restaurante") || tipo.includes("bar") || tipo.includes("café")) continue;
 
       const area = (row.bairro as string) || "Rio de Janeiro";
-      const tags = (row.tags_ia as string[]) ?? (row.ai_tags as string[]) ?? [];
-      const momento = (row.momento_ideal as string[]) ?? (row.melhor_horario as string[]) ?? [];
+      const tags = (row.tags_ia as string[]) ?? [];
+      const momento = (row.momento_ideal as string[]) ?? [];
 
       complement.push({
         id,
@@ -314,9 +313,9 @@ async function fetchComplementaryContent(
         area,
         zone:          getZone(area),
         momento_ideal: Array.isArray(momento) ? momento : [],
-        energia:       (row.energia as string) ?? "medium",
+        energia:       "medium",
         tags:          Array.isArray(tags) ? tags : [],
-        vibe_tags:     (row.vibe as string[]) ?? [],
+        vibe_tags:     [],
         duracao:       "1-2h",
       });
       existingIds.add(id);
@@ -757,6 +756,15 @@ const PERIODO_ORDER: PeriodoDia[] = ["manha", "almoco", "tarde", "noite"];
 
 const MANHA_CAP: Record<string, number> = { tranquilo: 2, moderado: 2, intenso: 3 };
 
+function categoriaToTable(cat: SavedCategory): string {
+  switch (cat) {
+    case "restaurante": return "restaurantes";
+    case "hotel":       return "stay_hotels";
+    case "oQueFazer":   return "o_que_fazer_rio";
+    case "lucky":       return "lucky_list_rio";
+  }
+}
+
 function buildFullDraft(
   dayGroups:      EnrichedPlace[][],
   dayRestaurants: EnrichedPlace[][],
@@ -820,10 +828,11 @@ function buildFullDraft(
       .map((p) => ({
         periodo: p,
         items:   periodMap.get(p)!.map((a) => ({
-          id:          a.id,
-          titulo:      a.name,
-          categoria:   a.categoria,
-          localizacao: a.area,
+          id:           a.id,
+          titulo:       a.name,
+          categoria:    a.categoria,
+          localizacao:  a.area,
+          source_table: categoriaToTable(a.categoria),
         })),
       }));
 

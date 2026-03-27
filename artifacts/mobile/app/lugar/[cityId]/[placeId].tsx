@@ -114,89 +114,110 @@ function useSupabaseLugar(
         let resolved: LugarPlace | null = null;
 
         if (effectiveTable === "restaurantes") {
-          const { data } = await supabase
+          // restaurantes uses integer PK — skip query if ID is not a valid number
+          const numId = Number(placeId);
+          if (isNaN(numId)) {
+            // Legacy string ID (e.g. "colombo") — static data handles this; no Supabase query needed
+          } else {
+          // Confirmed columns from edge function + previous working code
+          const { data, error: err } = await supabase
             .from("restaurantes")
-            .select("id, nome, bairro, especialidade, categoria, photo_url, meu_olhar")
-            .eq("id", Number(placeId))
+            .select("*")
+            .eq("id", numId)
             .maybeSingle();
-          if (data) {
-            const pin = resolvePin("rio", data.bairro ?? "", 0);
+          if (err) {
+            console.warn("[useSupabaseLugar] restaurantes error:", err.message);
+          } else if (data) {
+            const pin = resolvePin("rio", (data as any).bairro ?? "", 0);
             const photoUri = (data as any).photo_url as string | null ?? null;
-            const descricao = (data as any).meu_olhar as string | null
-              ?? (data.especialidade ? `Especialidade: ${data.especialidade}` : null)
+            const meuOlhar = (data as any).meu_olhar as string | null;
+            const especialidade = (data as any).especialidade as string | null;
+            const descricao = meuOlhar
+              ?? (especialidade ? `Especialidade: ${especialidade}` : null)
               ?? "Um dos restaurantes curados da nossa seleção no Rio de Janeiro.";
             resolved = {
-              id:          String(data.id),
-              titulo:      data.nome ?? "Restaurante",
-              localizacao: data.bairro ?? "Rio de Janeiro",
-              categoria:   (data.categoria as string | null)?.toUpperCase() ?? "RESTAURANTE",
+              id:               String((data as any).id),
+              titulo:           (data as any).nome ?? "Restaurante",
+              localizacao:      (data as any).bairro ?? "Rio de Janeiro",
+              categoria:        ((data as any).categoria as string | null)?.toUpperCase() ?? "RESTAURANTE",
               descricao,
-              image:    getImageForEntity("restaurant", data.nome ?? "", data.bairro ?? "", photoUri),
-              xPct:     pin.xPct,
-              yPct:     pin.yPct,
-              tipo_item: "restaurante",
+              image:            getImageForEntity("restaurant", (data as any).nome ?? "", (data as any).bairro ?? "", photoUri),
+              xPct:             pin.xPct,
+              yPct:             pin.yPct,
+              tipo_item:        "restaurante",
+              google_maps_url:  (data as any).google_maps_url ?? null,
+              instagram_handle: (data as any).instagram as string | null ?? null,
+              preco:            (data as any).perfil_publico ?? null,
             };
           }
+          } // closes the `else { // numId valid }` block
         } else if (effectiveTable === "o_que_fazer_rio") {
-          const { data } = await supabase
+          // Confirmed columns from edge function enrichment
+          const { data, error: err } = await supabase
             .from("o_que_fazer_rio")
-            .select("id, nome, bairro, categoria, descricao")
+            .select("*")
             .eq("id", placeId)
             .maybeSingle();
+          if (err) console.warn("[useSupabaseLugar] o_que_fazer_rio error:", err.message);
           if (data) {
-            const pin = resolvePin("rio", data.bairro ?? "", 0);
+            const pin = resolvePin("rio", (data as any).bairro ?? "", 0);
+            const photoUri = null; // photo_url not confirmed in o_que_fazer_rio
+            const descricao = "Uma das experiências selecionadas para o seu roteiro no Rio.";
             resolved = {
-              id:          String(data.id),
-              titulo:      data.nome ?? "Experiência",
-              localizacao: data.bairro ?? "Rio de Janeiro",
-              categoria:   (data.categoria as string | null)?.toUpperCase() ?? "EXPERIÊNCIA",
-              descricao:   (data.descricao as string | null)
-                ?? "Uma das experiências selecionadas para o seu roteiro no Rio.",
-              image:    getImageForEntity("activity", data.nome ?? "", data.bairro ?? "", null),
-              xPct:     pin.xPct,
-              yPct:     pin.yPct,
-              tipo_item: "experiencia",
+              id:          String((data as any).id),
+              titulo:      (data as any).nome ?? "Experiência",
+              localizacao: (data as any).bairro ?? "Rio de Janeiro",
+              categoria:   ((data as any).categoria as string | null)?.toUpperCase() ?? "EXPERIÊNCIA",
+              descricao,
+              image:       getImageForEntity("activity", (data as any).nome ?? "", (data as any).bairro ?? "", photoUri),
+              xPct:        pin.xPct,
+              yPct:        pin.yPct,
+              tipo_item:   "experiencia",
             };
           }
         } else if (effectiveTable === "lucky_list_rio") {
-          const { data } = await supabase
+          // Confirmed columns from edge function enrichment
+          const { data, error: err } = await supabase
             .from("lucky_list_rio")
-            .select("id, nome, bairro, tipo, descricao")
+            .select("*")
             .eq("id", placeId)
             .maybeSingle();
+          if (err) console.warn("[useSupabaseLugar] lucky_list_rio error:", err.message);
           if (data) {
-            const pin = resolvePin("rio", data.bairro ?? "", 0);
+            const pin = resolvePin("rio", (data as any).bairro ?? "", 0);
+            const photoUri = (data as any).photo_url as string | null ?? null;
+            const descricao = "Um dos achados especiais da Lucky List — lugares que só quem sabe, sabe.";
             resolved = {
-              id:          String(data.id),
-              titulo:      data.nome ?? "Lucky Pick",
-              localizacao: data.bairro ?? "Rio de Janeiro",
+              id:          String((data as any).id),
+              titulo:      (data as any).nome ?? "Lucky Pick",
+              localizacao: (data as any).bairro ?? "Rio de Janeiro",
               categoria:   "LUCKY LIST",
-              descricao:   (data.descricao as string | null)
-                ?? "Um dos achados especiais da Lucky List — lugares que só quem sabe, sabe.",
-              image:    getImageForEntity("activity", data.nome ?? "", data.bairro ?? "", null),
-              xPct:     pin.xPct,
-              yPct:     pin.yPct,
-              tipo_item: "experiencia",
+              descricao,
+              image:       getImageForEntity("activity", (data as any).nome ?? "", (data as any).bairro ?? "", photoUri),
+              xPct:        pin.xPct,
+              yPct:        pin.yPct,
+              tipo_item:   "experiencia",
             };
           }
         } else if (effectiveTable === "stay_hotels") {
-          const { data } = await supabase
+          const { data, error: err } = await supabase
             .from("stay_hotels")
             .select("id, hotel_name, hotel_category, neighborhoods(neighborhood_name)")
             .eq("id", placeId)
             .maybeSingle();
+          if (err) console.warn("[useSupabaseLugar] stay_hotels error:", err.message);
           if (data) {
             const neighborhoodName =
               ((data as any).neighborhoods as { neighborhood_name: string } | null)
                 ?.neighborhood_name ?? "Rio de Janeiro";
             const pin = resolvePin("rio", neighborhoodName, 0);
             resolved = {
-              id:          String(data.id),
-              titulo:      (data.hotel_name as string | null) ?? "Hotel",
+              id:          String((data as any).id),
+              titulo:      (data as any).hotel_name as string | null ?? "Hotel",
               localizacao: neighborhoodName,
-              categoria:   ((data.hotel_category as string | null)?.toUpperCase()) ?? "HOTEL",
+              categoria:   ((data as any).hotel_category as string | null)?.toUpperCase() ?? "HOTEL",
               descricao:   "Uma das hospedagens selecionadas para a sua estadia no Rio de Janeiro.",
-              image:       getImageForEntity("hotel", data.hotel_name ?? "", neighborhoodName, null),
+              image:       getImageForEntity("hotel", (data as any).hotel_name ?? "", neighborhoodName, null),
               xPct:        pin.xPct,
               yPct:        pin.yPct,
               tipo_item:   "hotel",
@@ -238,8 +259,8 @@ const FALLBACK: LugarPlace = {
 // ── Screen ─────────────────────────────────────────────────────────────────────
 
 export default function LugarDetailScreen() {
-  const { cityId, placeId, source_table, categoria } =
-    useLocalSearchParams<{ cityId: string; placeId: string; source_table?: string; categoria?: string }>();
+  const { cityId, placeId, source_table, categoria, titulo: tituloPar, localizacao: localizacaoPar } =
+    useLocalSearchParams<{ cityId: string; placeId: string; source_table?: string; categoria?: string; titulo?: string; localizacao?: string }>();
 
   const insets = useSafeAreaInsets();
   const topInset = Platform.OS === "web" ? 67 : insets.top;
@@ -316,6 +337,8 @@ export default function LugarDetailScreen() {
 
   // ── "Em breve" — entity does not exist in static data or Supabase ──
   if (!staticPlace && !supabasePlace) {
+    const fallbackTitulo = Array.isArray(tituloPar) ? tituloPar[0] : (tituloPar ?? "");
+    const fallbackLoc    = Array.isArray(localizacaoPar) ? localizacaoPar[0] : (localizacaoPar ?? "Rio de Janeiro");
     return (
       <View style={[s.root, { alignItems: "center", justifyContent: "center", paddingHorizontal: 36 }]}>
         <Stack.Screen options={{ headerShown: false }} />
@@ -332,12 +355,28 @@ export default function LugarDetailScreen() {
         >
           <Text style={{ color: "rgba(255,255,255,0.80)", fontSize: 15 }}>← Voltar</Text>
         </Pressable>
-        <Text style={{ fontFamily: "PlayfairDisplay_700Bold", fontSize: 28, color: "#fff", textAlign: "center", marginBottom: 14 }}>
-          Em breve disponível
-        </Text>
-        <Text style={{ fontFamily: "Inter_400Regular", fontSize: 15, color: "rgba(255,255,255,0.65)", textAlign: "center", lineHeight: 22 }}>
-          Este lugar ainda não tem página de detalhes.{"\n"}Em breve estará disponível no app.
-        </Text>
+        {fallbackTitulo ? (
+          <>
+            <Text style={{ fontFamily: "Inter_500Medium", fontSize: 11, color: "rgba(255,255,255,0.45)", letterSpacing: 2, textTransform: "uppercase", marginBottom: 10 }}>
+              {fallbackLoc}
+            </Text>
+            <Text style={{ fontFamily: "PlayfairDisplay_700Bold", fontSize: 28, color: "#fff", textAlign: "center", marginBottom: 14 }}>
+              {fallbackTitulo}
+            </Text>
+            <Text style={{ fontFamily: "Inter_400Regular", fontSize: 15, color: "rgba(255,255,255,0.55)", textAlign: "center", lineHeight: 22 }}>
+              Página de detalhes em breve.
+            </Text>
+          </>
+        ) : (
+          <>
+            <Text style={{ fontFamily: "PlayfairDisplay_700Bold", fontSize: 28, color: "#fff", textAlign: "center", marginBottom: 14 }}>
+              Em breve disponível
+            </Text>
+            <Text style={{ fontFamily: "Inter_400Regular", fontSize: 15, color: "rgba(255,255,255,0.65)", textAlign: "center", lineHeight: 22 }}>
+              Este lugar ainda não tem página de detalhes.{"\n"}Em breve estará disponível no app.
+            </Text>
+          </>
+        )}
       </View>
     );
   }
