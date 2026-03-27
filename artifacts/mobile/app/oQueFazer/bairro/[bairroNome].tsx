@@ -239,11 +239,12 @@ export default function OQueFazerBairroScreen() {
                       unsave(place.id);
                     } else {
                       save({
-                        id: place.id,
-                        categoria: "oQueFazer",
-                        titulo: place.titulo,
-                        localizacao: place.localizacao,
-                        image: place.image,
+                        id:           place.id,
+                        categoria:    "oQueFazer",
+                        source_table: "o_que_fazer_rio",
+                        titulo:       place.titulo,
+                        localizacao:  place.localizacao,
+                        image:        place.image,
                       });
                     }
                   }}

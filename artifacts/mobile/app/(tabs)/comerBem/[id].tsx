@@ -164,7 +164,7 @@ export default function ComerBemScreen() {
                 onPress={() =>
                   router.push({
                     pathname: "/lugar/[cityId]/[placeId]",
-                    params: { cityId: destino.id, placeId: String(r.id) },
+                    params: { cityId: destino.id, placeId: String(r.id), source_table: "restaurantes" },
                   })
                 }
               >
@@ -184,11 +184,12 @@ export default function ComerBemScreen() {
                         unsave(String(r.id));
                       } else {
                         save({
-                          id: String(r.id),
-                          categoria: "restaurante",
-                          titulo: r.nome,
-                          localizacao: r.bairro,
-                          image: imageSource,
+                          id:           String(r.id),
+                          categoria:    "restaurante",
+                          source_table: "restaurantes",
+                          titulo:       r.nome,
+                          localizacao:  r.bairro,
+                          image:        imageSource,
                         });
                       }
                     }}
@@ -225,7 +226,7 @@ export default function ComerBemScreen() {
                       e.stopPropagation?.();
                       router.push({
                         pathname: "/lugar/[cityId]/[placeId]",
-                        params: { cityId: destino.id, placeId: String(r.id), showMap: "true" },
+                        params: { cityId: destino.id, placeId: String(r.id), source_table: "restaurantes", showMap: "true" },
                       });
                     }}
                   >

@@ -189,11 +189,12 @@ export default function LuckyListScreen() {
                         unsave(place.id);
                       } else {
                         save({
-                          id: place.id,
-                          categoria: "lucky",
-                          titulo: place.titulo,
-                          localizacao: place.localizacao,
-                          image: place.image,
+                          id:           place.id,
+                          categoria:    "lucky",
+                          source_table: "lucky_list_rio",
+                          titulo:       place.titulo,
+                          localizacao:  place.localizacao,
+                          image:        place.image,
                         });
                       }
                     }}
