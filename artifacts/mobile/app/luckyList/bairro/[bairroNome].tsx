@@ -30,8 +30,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { destinos } from "@/data/mockData";
-import { LUGARES_LUCKY } from "@/data/lugares";
 import { useNeighborhoods } from "@/hooks/useNeighborhoods";
+import { useLuckyList } from "@/hooks/useLuckyList";
 import { getNeighborhoodHero } from "@/utils/neighborhoodHero";
 import { useGuia } from "@/context/GuiaContext";
 
@@ -58,7 +58,7 @@ export default function LuckyListBairroScreen() {
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
   const destino    = destinos.find((d) => d.id === (cityId ?? "rio")) ?? destinos[0];
-  const allLugares = LUGARES_LUCKY[destino.id] ?? [];
+  const { lugares: allLugares, loading: lugaresLoading } = useLuckyList();
   const filtered   = allLugares.filter((p) => p.localizacao === bairroNome);
 
   const { save, unsave, isSaved } = useGuia();
@@ -224,7 +224,12 @@ export default function LuckyListBairroScreen() {
             <View style={s.listLine} />
           </View>
 
-          {itemCount === 0 && (
+          {lugaresLoading && itemCount === 0 && (
+            <View style={s.centerWrap}>
+              <Text style={s.emptyText}>Carregando…</Text>
+            </View>
+          )}
+          {!lugaresLoading && itemCount === 0 && (
             <View style={s.centerWrap}>
               <Text style={s.emptyGold}>✦</Text>
               <Text style={s.emptyTitle}>Nenhum pick em {bairroNome}</Text>
@@ -236,7 +241,12 @@ export default function LuckyListBairroScreen() {
             <Pressable
               key={place.id}
               style={s.card}
-              onPress={() => router.push(`/lugar/${destino.id}/${place.id}`)}
+              onPress={() =>
+                router.push({
+                  pathname: "/lugar/[cityId]/[placeId]",
+                  params: { cityId: destino.id, placeId: place.id, source_table: "lucky_list_rio" },
+                })
+              }
             >
               <View style={s.cardImageWrap}>
                 <Image source={place.image} style={s.cardImage} resizeMode="cover" />
@@ -271,7 +281,7 @@ export default function LuckyListBairroScreen() {
                       e.stopPropagation?.();
                       router.push({
                         pathname: "/lugar/[cityId]/[placeId]",
-                        params: { cityId: destino.id, placeId: place.id, showMap: "true" },
+                        params: { cityId: destino.id, placeId: place.id, source_table: "lucky_list_rio", showMap: "true" },
                       });
                     }}
                   >

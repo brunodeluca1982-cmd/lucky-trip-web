@@ -116,20 +116,22 @@ function useSupabaseLugar(
         if (effectiveTable === "restaurantes") {
           const { data } = await supabase
             .from("restaurantes")
-            .select("id, nome, bairro, especialidade, categoria")
+            .select("id, nome, bairro, especialidade, categoria, photo_url, meu_olhar")
             .eq("id", Number(placeId))
             .maybeSingle();
           if (data) {
             const pin = resolvePin("rio", data.bairro ?? "", 0);
+            const photoUri = (data as any).photo_url as string | null ?? null;
+            const descricao = (data as any).meu_olhar as string | null
+              ?? (data.especialidade ? `Especialidade: ${data.especialidade}` : null)
+              ?? "Um dos restaurantes curados da nossa seleção no Rio de Janeiro.";
             resolved = {
               id:          String(data.id),
               titulo:      data.nome ?? "Restaurante",
               localizacao: data.bairro ?? "Rio de Janeiro",
-              categoria:   "RESTAURANTE",
-              descricao:   data.especialidade
-                ? `Especialidade: ${data.especialidade}`
-                : "Um dos restaurantes curados da nossa seleção no Rio de Janeiro.",
-              image:    getImageForEntity("restaurant", data.nome ?? "", data.bairro ?? "", null),
+              categoria:   (data.categoria as string | null)?.toUpperCase() ?? "RESTAURANTE",
+              descricao,
+              image:    getImageForEntity("restaurant", data.nome ?? "", data.bairro ?? "", photoUri),
               xPct:     pin.xPct,
               yPct:     pin.yPct,
               tipo_item: "restaurante",
@@ -222,13 +224,22 @@ export default function LugarDetailScreen() {
   // ── Step 1: try static lookup (handles all legacy prefix-based routes) ──
   const staticPlace = getLugar(cityId, placeId);
 
-  // ── Step 2: if static lookup failed, query Supabase using source_table (primary) or categoria ──
-  const needsSupabase = !staticPlace;
+  // ── Step 2: Supabase-first when source_table is explicitly set.
+  //    When navigating from a Supabase-driven screen, source_table is always present.
+  //    In that case we always query Supabase, even if a static entry exists for the same
+  //    ID, because the Supabase row has richer content (meu_olhar, photo_url, etc.).
+  const hasExplicitSourceTable = !!source_table;
+  const needsSupabase = !staticPlace || hasExplicitSourceTable;
   const { place: supabasePlace, loading: supabaseLoading } =
     useSupabaseLugar(placeId ?? "", source_table, categoria, !needsSupabase);
 
-  // ── Resolved place — static wins, then Supabase, then FALLBACK ──
-  const place: LugarPlace = staticPlace ?? supabasePlace ?? FALLBACK;
+  // ── Resolved place:
+  //    When source_table is set: prefer Supabase (richer data), fall back to static.
+  //    Otherwise: prefer static (instant, no network), fall back to Supabase.
+  const place: LugarPlace =
+    (hasExplicitSourceTable && supabasePlace)
+      ? supabasePlace
+      : (staticPlace ?? supabasePlace ?? FALLBACK);
   const images: ImageSourcePropType[] = place.images ?? [place.image];
 
   // Carousel state

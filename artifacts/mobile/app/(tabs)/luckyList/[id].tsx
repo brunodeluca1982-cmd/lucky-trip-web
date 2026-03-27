@@ -23,9 +23,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { destinos } from "@/data/mockData";
-import { LUGARES_LUCKY } from "@/data/lugares";
 import RioMapView from "@/components/RioMapView";
 import { useGuia } from "@/context/GuiaContext";
+import { useLuckyList } from "@/hooks/useLuckyList";
 
 const C    = Colors.light;
 const GOLD = "#D4AF37";
@@ -62,7 +62,7 @@ export default function LuckyListScreen() {
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
   const destino    = destinos.find((d) => d.id === id) ?? destinos[0];
-  const allLugares = LUGARES_LUCKY[destino.id] ?? [];
+  const { lugares: allLugares, loading: lugaresLoading } = useLuckyList();
   const editorial  = EDITORIAIS[destino.id] ?? DEFAULT_EDITORIAL;
 
   const { save, unsave, isSaved } = useGuia();
@@ -94,7 +94,9 @@ export default function LuckyListScreen() {
             <Text style={s.pillText}>← Voltar</Text>
           </Pressable>
           <View style={[s.pill, s.pillGold]}>
-            <Text style={s.pillGoldText}>✦ {allLugares.length} picks</Text>
+            <Text style={s.pillGoldText}>
+              {lugaresLoading ? "✦ carregando…" : `✦ ${allLugares.length} picks`}
+            </Text>
           </View>
         </View>
 
@@ -139,7 +141,12 @@ export default function LuckyListScreen() {
             <Pressable
               key={place.id}
               style={s.card}
-              onPress={() => router.push(`/lugar/${destino.id}/${place.id}`)}
+              onPress={() =>
+                router.push({
+                  pathname: "/lugar/[cityId]/[placeId]",
+                  params: { cityId: destino.id, placeId: place.id, source_table: "lucky_list_rio" },
+                })
+              }
             >
               <View style={s.cardImageWrap}>
                 <Image source={place.image} style={s.cardImage} resizeMode="cover" />
@@ -174,7 +181,7 @@ export default function LuckyListScreen() {
                       e.stopPropagation?.();
                       router.push({
                         pathname: "/lugar/[cityId]/[placeId]",
-                        params: { cityId: destino.id, placeId: place.id, showMap: "true" },
+                        params: { cityId: destino.id, placeId: place.id, source_table: "lucky_list_rio", showMap: "true" },
                       });
                     }}
                   >

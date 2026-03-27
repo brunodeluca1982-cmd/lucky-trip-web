@@ -23,9 +23,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { destinos } from "@/data/mockData";
-import { LUGARES_O_QUE_FAZER } from "@/data/lugares";
 import RioMapView from "@/components/RioMapView";
 import { useGuia } from "@/context/GuiaContext";
+import { useOQueFazer } from "@/hooks/useOQueFazer";
 
 const C = Colors.light;
 const GOLD = "#D4AF37";
@@ -53,7 +53,7 @@ export default function OQueFazerScreen() {
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
   const destino    = destinos.find((d) => d.id === id) ?? destinos[0];
-  const allLugares = LUGARES_O_QUE_FAZER[destino.id] ?? [];
+  const { lugares: allLugares, loading: lugaresLoading } = useOQueFazer();
   const descricao  = DESCRICOES[destino.id] ?? DEFAULT_DESCRICAO;
   const { save, unsave, isSaved } = useGuia();
 
@@ -85,7 +85,9 @@ export default function OQueFazerScreen() {
           </Pressable>
           <View style={s.pill}>
             <View style={s.badgeDot} />
-            <Text style={s.pillText}>{allLugares.length} locais</Text>
+            <Text style={s.pillText}>
+              {lugaresLoading ? "carregando…" : `${allLugares.length} locais`}
+            </Text>
           </View>
         </View>
 
@@ -136,7 +138,12 @@ export default function OQueFazerScreen() {
             <Pressable
               key={place.id}
               style={s.card}
-              onPress={() => router.push(`/lugar/${destino.id}/${place.id}`)}
+              onPress={() =>
+                router.push({
+                  pathname: "/lugar/[cityId]/[placeId]",
+                  params: { cityId: destino.id, placeId: place.id, source_table: "o_que_fazer_rio" },
+                })
+              }
             >
               <View style={s.cardImageWrap}>
                 <Image source={place.image} style={s.cardImage} resizeMode="cover" />
@@ -196,7 +203,7 @@ export default function OQueFazerScreen() {
                     e.stopPropagation?.();
                     router.push({
                       pathname: "/lugar/[cityId]/[placeId]",
-                      params: { cityId: destino.id, placeId: place.id, showMap: "true" },
+                      params: { cityId: destino.id, placeId: place.id, source_table: "o_que_fazer_rio", showMap: "true" },
                     });
                   }}
                 >

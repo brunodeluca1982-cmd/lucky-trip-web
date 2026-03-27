@@ -66,6 +66,20 @@ const HOTEL_WEB_IMAGES: Record<string, string> = {
     "https://commons.wikimedia.org/wiki/Special:FilePath/Santa_Teresa_Rio_de_Janeiro_Brasil.jpg",
   "hotel santa teresa":
     "https://commons.wikimedia.org/wiki/Special:FilePath/Santa_Teresa_Rio_de_Janeiro_Brasil.jpg",
+  "santa teresa hotel mgallery":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Santa_Teresa_Rio_de_Janeiro_Brasil.jpg",
+  "fasano rio de janeiro":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Ipanema_from_Arpoador.jpg",
+  "hotel fasano rio de janeiro":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Ipanema_from_Arpoador.jpg",
+  "fasano":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Ipanema_from_Arpoador.jpg",
+  "mama ruisa":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Santa_Teresa_Rio_de_Janeiro_Brasil.jpg",
+  "yoo2 rio de janeiro":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Botafogo_Cove_from_Morro_do_Pasmado.jpg",
+  "yoo2":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Botafogo_Cove_from_Morro_do_Pasmado.jpg",
 };
 
 const CITY_WEB_IMAGES: Record<string, string> = {
