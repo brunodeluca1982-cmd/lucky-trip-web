@@ -381,6 +381,7 @@ export default function HomeScreen() {
             style={s.footerLogo}
             resizeMode="contain"
           />
+          <Text style={s.footerTagline}>inteligência humana em viagens</Text>
           <Text style={s.footerText}>
             Curadoria editorial para viajantes que entendem de beleza.
           </Text>
@@ -727,10 +728,18 @@ const s = StyleSheet.create({
     height: 32,
     opacity: 0.55,
   },
+  footerTagline: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: "rgba(255,255,255,0.45)",
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+    textAlign: "center",
+  },
   footerText: {
     fontFamily: "Inter_400Regular",
     fontSize: 13,
-    color: "rgba(255,255,255,0.38)",
+    color: "rgba(255,255,255,0.28)",
     textAlign: "center",
     lineHeight: 20,
     maxWidth: 240,
