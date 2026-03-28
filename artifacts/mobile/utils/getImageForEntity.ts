@@ -82,6 +82,61 @@ const HOTEL_WEB_IMAGES: Record<string, string> = {
     "https://commons.wikimedia.org/wiki/Special:FilePath/Botafogo_Cove_from_Morro_do_Pasmado.jpg",
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Curated activity images (NATIVE ONLY — tier 2)
+// Priority over neighborhood fallback — geographically precise.
+// ─────────────────────────────────────────────────────────────────────────────
+const ACTIVITY_WEB_IMAGES: Record<string, string> = {
+  "academia dos flintstones":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Arpoador_Rocks.jpg",
+  "pedra do arpoador":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Arpoador_Rocks.jpg",
+  "arpoador":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Arpoador_Rocks.jpg",
+  "praia de arpoador":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Arpoador_Rocks.jpg",
+  "forte de copacabana":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Forte_de_Copacabana.jpg",
+  "pão de açúcar":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/P%C3%A3o_de_A%C3%A7%C3%BAcar_(2009).jpg",
+  "pao de acucar":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/P%C3%A3o_de_A%C3%A7%C3%BAcar_(2009).jpg",
+  "morro da urca":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/P%C3%A3o_de_A%C3%A7%C3%BAcar_(2009).jpg",
+  "cristo redentor":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Cristo_Redentor_-_Rio_de_Janeiro%2C_Brazil.jpg",
+  "corcovado":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Cristo_Redentor_-_Rio_de_Janeiro%2C_Brazil.jpg",
+  "escadaria selarón":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Escadaria_Seler%C3%B3n_1.jpg",
+  "escadaria selaron":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Escadaria_Seler%C3%B3n_1.jpg",
+  "jardim botânico":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Jardim_Bot%C3%A2nico_do_Rio_de_Janeiro_07_2009.jpg",
+  "jardim botanico":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Jardim_Bot%C3%A2nico_do_Rio_de_Janeiro_07_2009.jpg",
+  "lagoa rodrigo de freitas":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Lagoa_Rodrigo_de_Freitas_-_Rio_de_Janeiro%2C_Brazil.jpg",
+  "lagoa":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Lagoa_Rodrigo_de_Freitas_-_Rio_de_Janeiro%2C_Brazil.jpg",
+  "praia de ipanema":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Ipanema_from_Arpoador.jpg",
+  "praia de copacabana":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Copacabana_beach_Aerial_2010.jpg",
+  "museu do amanhã":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Museu_do_Amanh%C3%A3.jpg",
+  "museu do amanha":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Museu_do_Amanh%C3%A3.jpg",
+  "floresta da tijuca":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Floresta_da_Tijuca.jpg",
+  "parque lage":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Parque_Lage_-_Rio_de_Janeiro.jpg",
+  "mirante dona marta":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Botafogo_from_Dona_Marta.jpg",
+  "pedra bonita":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Pedra_Bonita_Rio_de_Janeiro.jpg",
+};
+
 const CITY_WEB_IMAGES: Record<string, string> = {
   "rio de janeiro":  "https://commons.wikimedia.org/wiki/Special:FilePath/Ipanema_from_Arpoador.jpg",
   "santorini":       "https://commons.wikimedia.org/wiki/Special:FilePath/Oia_Santorini.jpg",
@@ -197,8 +252,12 @@ function _resolve(
       );
     }
 
-    case "activity":
-    default:
+    case "activity": {
+      if (isNative) {
+        const uri = ACTIVITY_WEB_IMAGES[nameLower];
+        if (uri) return { uri };
+      }
       return getNeighborhoodImage(loc || name);
+    }
   }
 }

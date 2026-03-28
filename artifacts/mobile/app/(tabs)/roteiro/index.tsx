@@ -83,11 +83,11 @@ const CATEGORY_LABEL: Record<SavedCategory, string> = {
 
 // Result phase helpers — time labels, weather, travel connectors
 const PERIODO_TIME: Record<string, number> = {
-  manha:  9 * 60,
-  almoco: 12 * 60 + 30,
-  tarde:  14 * 60,
-  jantar: 19 * 60 + 30,
-  noite:  21 * 60,
+  manha:      9 * 60,
+  almoco:     12 * 60 + 30,
+  tarde:      14 * 60,
+  jantar:     19 * 60 + 30,
+  late_night: 21 * 60,
 };
 
 function getItemTime(periodo: string, idx: number): string {
@@ -150,11 +150,11 @@ function calDays(month: Date): (Date | null)[] {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const INSPIRATIONS_DATA: { id: Inspiration; label: string; image: ReturnType<typeof require> }[] = [
-  { id: "natureza",   label: "Natureza",    image: require("@/assets/images/rio-aerial-clean.png") },
-  { id: "gastronomy", label: "Gastronomia", image: require("@/assets/images/restaurante1.png") },
+  { id: "natureza",   label: "Natureza",    image: require("@/assets/images/secret1.png") },
+  { id: "gastronomy", label: "Gastronomia", image: require("@/assets/images/restaurante2.png") },
   { id: "culture",    label: "Cultura",     image: require("@/assets/images/cristo.png") },
   { id: "adventure",  label: "Aventura",    image: require("@/assets/images/pao-acucar.png") },
-  { id: "beach",      label: "Relaxamento", image: require("@/assets/images/ipanema.png") },
+  { id: "beach",      label: "Relaxamento", image: require("@/assets/images/hotel1.png") },
   { id: "festa",      label: "Festa",       image: require("@/assets/images/lapa.png") },
 ];
 
@@ -179,13 +179,15 @@ function InlineCalendar({
   value,
   minDate,
   onSelect,
+  initialMonth,
 }: {
   value: Date | null;
   minDate?: Date | null;
   onSelect: (d: Date) => void;
+  initialMonth?: Date;
 }) {
   const today = new Date();
-  const [viewMonth, setViewMonth] = useState(value ?? today);
+  const [viewMonth, setViewMonth] = useState(initialMonth ?? value ?? today);
   const days = calDays(viewMonth);
   const min  = minDate ?? today;
 
@@ -262,6 +264,7 @@ function FlowPage1({
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === "web" ? 72 : insets.top + 20;
   const [openCal, setOpenCal] = useState<"arrival" | "departure" | null>(null);
+  const [deptInitMonth, setDeptInitMonth] = useState<Date | undefined>(undefined);
 
   function fmtDate(d: Date | null): string | null {
     if (!d) return null;
@@ -270,6 +273,8 @@ function FlowPage1({
 
   function handleArrival(d: Date) {
     onArrivalChange(d);
+    // Next Best Step: auto-advance departure calendar to the following month
+    setDeptInitMonth(new Date(d.getFullYear(), d.getMonth() + 1, 1));
     setOpenCal("departure");
     if (departureDate && !isBeforeDay(d, departureDate)) {
       onDepartureChange(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1));
@@ -350,6 +355,7 @@ function FlowPage1({
             value={departureDate}
             minDate={arrivalDate}
             onSelect={handleDeparture}
+            initialMonth={deptInitMonth}
           />
         )}
       </View>
@@ -418,8 +424,8 @@ function FlowPage2({
             >
               <Image source={ins.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
               <LinearGradient
-                colors={["transparent", "rgba(0,0,0,0.35)"]}
-                locations={[0.25, 1]}
+                colors={["rgba(0,0,0,0.06)", "rgba(0,0,0,0.68)"]}
+                locations={[0, 1]}
                 style={StyleSheet.absoluteFill}
               />
               {active && (
@@ -938,9 +944,12 @@ const fp = StyleSheet.create({
   },
 
   insLabel: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-    color: CREAM,
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+    color: "#FFFFFF",
+    textShadowColor: "rgba(0,0,0,0.55)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
   },
 
   insCheck: {
@@ -1969,6 +1978,7 @@ interface ResultPhaseProps {
   onReplaceItem:  (diaNum: number, itemId: string, newItem: SavedItem) => void;
   onShareResult:  () => void;
   onExport:       () => void;
+  isExporting:    boolean;
   scrollRef:      React.RefObject<ScrollView>;
 }
 
@@ -1981,6 +1991,7 @@ function ResultPhase({
   onReplaceItem,
   onShareResult,
   onExport,
+  isExporting,
   scrollRef,
 }: ResultPhaseProps) {
   const { totalDays, totalItems } = result.summary;
@@ -2127,11 +2138,12 @@ function ResultPhase({
           <Text style={re.actionBtnText}>WhatsApp</Text>
         </Pressable>
         <Pressable
-          style={({ pressed }) => [re.actionBtn, re.actionBtnExport, pressed && { opacity: 0.82 }]}
+          style={({ pressed }) => [re.actionBtn, re.actionBtnExport, (pressed || isExporting) && { opacity: 0.70 }]}
           onPress={onExport}
+          disabled={isExporting}
         >
           <Feather name="link" size={14} color={CREAM} />
-          <Text style={re.actionBtnText}>Exportar</Text>
+          <Text style={re.actionBtnText}>{isExporting ? "Gerando..." : "Exportar"}</Text>
         </Pressable>
       </View>
 
@@ -2934,6 +2946,7 @@ export default function RoteiroScreen() {
   const [result,        setResult]        = useState<ItineraryResult | null>(null);
   const [generating,    setGenerating]    = useState(false);
   const [editMode,      setEditMode]      = useState(false);
+  const [isExporting,   setIsExporting]   = useState(false);
   const [replacingItem, setReplacingItem] = useState<{ item: SavedItem; diaNum: number } | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
@@ -3092,7 +3105,8 @@ export default function RoteiroScreen() {
    * Primary action is to surface the URL so the user can copy or access it in a browser.
    */
   async function handleExport() {
-    if (!result) return;
+    if (!result || isExporting) return;
+    setIsExporting(true);
     let exportUrl: string | undefined;
 
     // 1. Generate slug + persist itinerary to Supabase
@@ -3168,6 +3182,7 @@ export default function RoteiroScreen() {
           : [{ text: "OK" }]
       );
     }
+    setIsExporting(false);
   }
 
   const hotelItem   = saved.find((s) => s.categoria === "hotel") ?? null;
@@ -3293,6 +3308,7 @@ export default function RoteiroScreen() {
             onReplaceItem={openReplaceSheet}
             onShareResult={handleShare}
             onExport={handleExport}
+            isExporting={isExporting}
             scrollRef={scrollRef}
           />
         </ScrollView>
@@ -3517,17 +3533,20 @@ const cf = StyleSheet.create({
   },
   budgetLabel: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 16,
-    color: "rgba(255,255,255,0.65)",
-    marginBottom: 4,
+    fontSize: 18,
+    color: "rgba(255,255,255,0.92)",
+    marginBottom: 6,
+    letterSpacing: 0.2,
   },
   budgetLabelActive: {
     color: CREAM,
+    fontFamily: "Inter_700Bold",
   },
   budgetDesc: {
     fontFamily: "Inter_400Regular",
     fontSize: 13,
-    color: "rgba(255,255,255,0.38)",
+    color: "rgba(255,255,255,0.62)",
+    lineHeight: 19,
   },
 });
 
