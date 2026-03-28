@@ -4,41 +4,49 @@
  * Pure deterministic function that converts a flat list of SavedItems
  * into a structured day-by-day itinerary (roteiro base).
  *
- * Rules (no AI):
- *   1. Group items by bairro → each bairro becomes one DiaRoteiro.
- *   2. Within each bairro:
- *        restaurante → almoco (1st only) then jantar (2nd only) — max 1 each slot
- *        oQueFazer / lucky → manha (first 2) then tarde (next 2) — max 2 each slot
- *        hotel → excluded from periodo display (it's the lodging, not an activity)
- *   3. Empty periodos are not included.
- *   4. Bairros that yield no periodos (hotels only) are skipped.
- *   5. Day numbers are sequential in insertion order of first saved bairro item.
+ * Slot rules (enforced strictly):
+ *   morning    — 1 activity only
+ *   lunch      — 1 restaurant only
+ *   afternoon  — 1 activity only
+ *   dinner     — 1 restaurant only
+ *   late_night — 1 nightlife/bar item (optional)
  *
- * Anti-repetition rules:
- *   - Max 2 activities per time slot (prevents 3+ same-type items in a row)
- *   - Max 1 restaurant per meal slot (prevents multiple dinners)
+ * Never allows:
+ *   - 2 restaurants in dinner/night
+ *   - 2 restaurants in lunch
+ *   - 2 activities in the same slot
+ *   - Cross-slot bleed (restaurants taking activity slots or vice versa)
+ *
+ * Nightlife detection:
+ *   Items are flagged as nightlife if their title contains common bar/nightlife
+ *   keywords. Nightlife items are routed to late_night, never to lunch/dinner.
  */
 
 import type { SavedItem, SavedCategory } from "@/context/GuiaContext";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-export type PeriodoDia = "manha" | "almoco" | "tarde" | "jantar" | "noite";
+export type PeriodoDia =
+  | "manha"
+  | "almoco"
+  | "tarde"
+  | "jantar"
+  | "late_night";
 
 export const PERIODO_LABEL: Record<PeriodoDia, string> = {
-  manha:  "Manhã",
-  almoco: "Almoço",
-  tarde:  "Tarde",
-  jantar: "Jantar",
-  noite:  "Noite",
+  manha:      "Manhã",
+  almoco:     "Almoço",
+  tarde:      "Tarde",
+  jantar:     "Jantar",
+  late_night: "Noite",
 };
 
 export const PERIODO_ICON: Record<PeriodoDia, string> = {
-  manha:  "sun",
-  almoco: "coffee",
-  tarde:  "cloud",
-  jantar: "moon",
-  noite:  "star",
+  manha:      "sun",
+  almoco:     "coffee",
+  tarde:      "cloud",
+  jantar:     "moon",
+  late_night: "star",
 };
 
 export interface DiaPeriodo {
@@ -52,14 +60,32 @@ export interface DiaRoteiro {
   periodos: DiaPeriodo[];
 }
 
-// ── Internal helper ────────────────────────────────────────────────────────────
+// ── Internal helpers ───────────────────────────────────────────────────────────
 
-type TipoInterno = "atividade" | "restaurante" | "hotel";
+type TipoInterno = "atividade" | "restaurante" | "nightlife" | "hotel";
 
-function tipoFromCategoria(categoria: SavedCategory): TipoInterno {
-  if (categoria === "restaurante") return "restaurante";
-  if (categoria === "hotel")       return "hotel";
-  return "atividade"; // oQueFazer + lucky → atividade
+/**
+ * Detect nightlife/bar items by title keywords.
+ * Nightlife goes to late_night slot — never lunch or dinner.
+ */
+const NIGHTLIFE_KEYWORDS = [
+  "bar", "pub", "club", "clube", "lounge", "noite", "night",
+  "drinks", "cocktail", "caipirinha", "boteco", "balada", "dj",
+  "cervejaria", "taproom", "speakeasy",
+];
+
+function isNightlife(titulo: string): boolean {
+  const lower = titulo.toLowerCase();
+  return NIGHTLIFE_KEYWORDS.some((kw) => lower.includes(kw));
+}
+
+function tipoFromItem(item: SavedItem): TipoInterno {
+  if (item.categoria === "hotel") return "hotel";
+  if (item.categoria === "restaurante") {
+    return isNightlife(item.titulo) ? "nightlife" : "restaurante";
+  }
+  // oQueFazer + lucky → atividade
+  return "atividade";
 }
 
 // ── Main export ────────────────────────────────────────────────────────────────
@@ -77,27 +103,35 @@ export function buildRoteiro(items: SavedItem[]): DiaRoteiro[] {
   let diaNum = 1;
 
   for (const [bairro, bairroItems] of byBairro) {
-    // 2. Split by tipo
-    const atividades   = bairroItems.filter(i => tipoFromCategoria(i.categoria) === "atividade");
-    const restaurantes = bairroItems.filter(i => tipoFromCategoria(i.categoria) === "restaurante");
-    // hotels are deliberately excluded from the timetable
+    // 2. Classify each item into its tipo bucket
+    const atividades  = bairroItems.filter(i => tipoFromItem(i) === "atividade");
+    const restaurantes = bairroItems.filter(i => tipoFromItem(i) === "restaurante");
+    const nightlife   = bairroItems.filter(i => tipoFromItem(i) === "nightlife");
+    // hotels excluded from timetable
 
-    // 3. Distribute atividades — max 2 per slot to prevent repetitive sequences
-    const manha = atividades.slice(0, 2);
-    const tarde = atividades.slice(2, 4);
+    // 3. Compose slots — strictly 1 item per slot, no exceptions
+    //
+    //   morning   : 1 activity
+    //   lunch     : 1 restaurant
+    //   afternoon : 1 activity (next available, not the morning one)
+    //   dinner    : 1 restaurant (next available, not the lunch one)
+    //   late_night: 1 nightlife item (optional)
 
-    // 4. Distribute restaurantes — strictly 1 per slot (prevents multiple dinners)
-    const almoco = restaurantes.slice(0, 1); // first restaurant → lunch
-    const jantar = restaurantes.slice(1, 2); // second restaurant → dinner (max 1)
+    const manha      = atividades.slice(0, 1);   // exactly 1 activity → morning
+    const tarde      = atividades.slice(1, 2);   // exactly 1 activity → afternoon
+    const almoco     = restaurantes.slice(0, 1); // exactly 1 restaurant → lunch
+    const jantar     = restaurantes.slice(1, 2); // exactly 1 restaurant → dinner
+    const lateNight  = nightlife.slice(0, 1);    // exactly 1 nightlife → late_night
 
-    // 5. Build ordered periodo list, skipping empty ones
+    // 4. Build ordered periodo list (slot order reflects real day flow)
     const periodos: DiaPeriodo[] = [];
-    if (manha.length  > 0) periodos.push({ periodo: "manha",  items: manha  });
-    if (almoco.length > 0) periodos.push({ periodo: "almoco", items: almoco });
-    if (tarde.length  > 0) periodos.push({ periodo: "tarde",  items: tarde  });
-    if (jantar.length > 0) periodos.push({ periodo: "jantar", items: jantar });
+    if (manha.length     > 0) periodos.push({ periodo: "manha",      items: manha      });
+    if (almoco.length    > 0) periodos.push({ periodo: "almoco",     items: almoco     });
+    if (tarde.length     > 0) periodos.push({ periodo: "tarde",      items: tarde      });
+    if (jantar.length    > 0) periodos.push({ periodo: "jantar",     items: jantar     });
+    if (lateNight.length > 0) periodos.push({ periodo: "late_night", items: lateNight  });
 
-    // 6. Skip bairros that yield no actionable periodos (hotel-only bairros)
+    // 5. Skip bairros with no actionable periodos (hotel-only bairros)
     if (periodos.length === 0) continue;
 
     dias.push({ numero: diaNum++, bairro, periodos });
