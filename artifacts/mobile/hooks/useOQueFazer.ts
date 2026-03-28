@@ -51,15 +51,16 @@ export function useOQueFazer(): State {
         const pin       = resolvePin("rio", bairro, idx % 6);
         const supaPhoto = (row as any).photo_url as string | null ?? null;
         return {
-          id:          String(row.id),
-          titulo:      (row.nome as string | null)                    ?? "Experiência",
-          localizacao: bairro                                         || "Rio de Janeiro",
-          categoria:   ((row.categoria as string | null)?.toUpperCase()) ?? "EXPERIÊNCIA",
-          descricao:   "Uma das experiências selecionadas para o Rio de Janeiro.",
-          image:       getImageForEntity("activity", row.nome ?? "", bairro, supaPhoto) as ImageSourcePropType,
-          xPct:        pin.xPct,
-          yPct:        pin.yPct,
-          tipo_item:   "experiencia",
+          id:            String(row.id),
+          titulo:        (row.nome as string | null)                    ?? "Experiência",
+          localizacao:   bairro                                         || "Rio de Janeiro",
+          categoria:     ((row.categoria as string | null)?.toUpperCase()) ?? "EXPERIÊNCIA",
+          descricao:     "Uma das experiências selecionadas para o Rio de Janeiro.",
+          image:         getImageForEntity("activity", row.nome ?? "", bairro, supaPhoto) as ImageSourcePropType,
+          xPct:          pin.xPct,
+          yPct:          pin.yPct,
+          tipo_item:     "experiencia",
+          momento_ideal: (row.momento_ideal as string | null) ?? null,
         };
       });
 

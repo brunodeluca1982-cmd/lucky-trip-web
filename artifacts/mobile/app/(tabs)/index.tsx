@@ -196,6 +196,14 @@ function RoteiroCTA() {
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
+type MomentoTab = "manha" | "tarde" | "noite";
+
+const MOMENTO_TABS: { key: MomentoTab; label: string; emoji: string }[] = [
+  { key: "manha", label: "Manhã",  emoji: "🌅" },
+  { key: "tarde", label: "Tarde",  emoji: "☀️" },
+  { key: "noite", label: "Noite",  emoji: "🌙" },
+];
+
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
@@ -203,6 +211,16 @@ export default function HomeScreen() {
   const agoraTitle = getAgoraTitle(viagem.destino || undefined);
   const { lugares: atividades, loading: loadingAtividades } = useOQueFazer();
   const { restaurantes: restos, loading: loadingRestos } = useRestaurants();
+  const [momentoTab, setMomentoTab] = React.useState<MomentoTab>("manha");
+
+  const filteredAtividades = React.useMemo(() => {
+    if (!atividades.length) return [];
+    const filtered = atividades.filter((a) => {
+      const m = a.momento_ideal;
+      return typeof m === "string" && m.toLowerCase() === momentoTab;
+    });
+    return filtered.length > 0 ? filtered : atividades.slice(0, 10);
+  }, [atividades, momentoTab]);
 
   return (
     <View style={s.root}>
@@ -235,11 +253,33 @@ export default function HomeScreen() {
             subtitle="Experiências selecionadas para o Rio de Janeiro."
             dark
           />
+
+          {/* ── Manhã / Tarde / Noite tabs ── */}
+          <View style={s.momentoTabs}>
+            {MOMENTO_TABS.map((tab) => (
+              <Pressable
+                key={tab.key}
+                onPress={() => setMomentoTab(tab.key)}
+                style={[
+                  s.momentoTab,
+                  momentoTab === tab.key && s.momentoTabActive,
+                ]}
+              >
+                <Text style={[
+                  s.momentoTabText,
+                  momentoTab === tab.key && s.momentoTabTextActive,
+                ]}>
+                  {tab.emoji} {tab.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
           {loadingAtividades ? (
             <ActivityIndicator color="rgba(255,255,255,0.4)" style={{ marginTop: 20, marginBottom: 8 }} />
           ) : (
             <HorizontalScroll>
-              {atividades.slice(0, 10).map((item) => (
+              {filteredAtividades.slice(0, 10).map((item) => (
                 <PlaceCard
                   key={item.id}
                   id={item.id}
@@ -381,6 +421,37 @@ const s = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.06)",
     marginHorizontal: 24,
     marginTop: 20,
+  },
+
+  // ── Momento tabs (manhã / tarde / noite) ──
+  momentoTabs: {
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 24,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  momentoTab: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  momentoTabActive: {
+    backgroundColor: "#C9A84C",
+    borderColor: "#C9A84C",
+  },
+  momentoTabText: {
+    fontFamily: "Inter",
+    fontSize: 12,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.65)",
+    letterSpacing: 0.4,
+  },
+  momentoTabTextActive: {
+    color: "#1a1a1a",
   },
 
   // ── 2-column grid ──
