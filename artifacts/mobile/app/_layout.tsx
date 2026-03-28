@@ -26,19 +26,27 @@ SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
+// All screens use a dark photographic aesthetic — root background must match
+// so there is no flash of white/transparent between navigations or on mount.
 const AppTheme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
-    background: "transparent",
+    background: "#000000",
   },
 };
 
 function RootLayoutNav() {
   return (
     <ThemeProvider value={AppTheme}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: "#000000" },
+          animation: "none",
+        }}
+      >
+        <Stack.Screen name="(tabs)" options={{ headerShown: false, contentStyle: { backgroundColor: "#000000" } }} />
       </Stack>
     </ThemeProvider>
   );
@@ -64,11 +72,11 @@ export default function RootLayout() {
   if (!fontsLoaded && !fontError) return null;
 
   return (
-    <SafeAreaProvider>
+    <SafeAreaProvider style={{ backgroundColor: "#000000" }}>
       <ErrorBoundary>
         <GuiaProvider>
           <QueryClientProvider client={queryClient}>
-            <GestureHandlerRootView>
+            <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#000000" }}>
               <KeyboardProvider>
                 <RootLayoutNav />
               </KeyboardProvider>
