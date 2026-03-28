@@ -13,7 +13,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 
 import { AppHeader } from "@/components/AppHeader";
 import { HeroCarousel } from "@/components/HeroCarousel";
@@ -198,10 +198,11 @@ function RoteiroCTA() {
 
 type MomentoTab = "manha" | "tarde" | "noite";
 
-const MOMENTO_TABS: { key: MomentoTab; label: string; emoji: string }[] = [
-  { key: "manha", label: "Manhã",  emoji: "🌅" },
-  { key: "tarde", label: "Tarde",  emoji: "☀️" },
-  { key: "noite", label: "Noite",  emoji: "🌙" },
+type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
+const MOMENTO_TABS: { key: MomentoTab; label: string; icon: IoniconName }[] = [
+  { key: "manha", label: "Manhã", icon: "partly-sunny-outline" },
+  { key: "tarde", label: "Tarde", icon: "sunny-outline"         },
+  { key: "noite", label: "Noite", icon: "moon-outline"          },
 ];
 
 export default function HomeScreen() {
@@ -256,23 +257,26 @@ export default function HomeScreen() {
 
           {/* ── Manhã / Tarde / Noite tabs ── */}
           <View style={s.momentoTabs}>
-            {MOMENTO_TABS.map((tab) => (
-              <Pressable
-                key={tab.key}
-                onPress={() => setMomentoTab(tab.key)}
-                style={[
-                  s.momentoTab,
-                  momentoTab === tab.key && s.momentoTabActive,
-                ]}
-              >
-                <Text style={[
-                  s.momentoTabText,
-                  momentoTab === tab.key && s.momentoTabTextActive,
-                ]}>
-                  {tab.emoji} {tab.label}
-                </Text>
-              </Pressable>
-            ))}
+            {MOMENTO_TABS.map((tab) => {
+              const active = momentoTab === tab.key;
+              return (
+                <Pressable
+                  key={tab.key}
+                  onPress={() => setMomentoTab(tab.key)}
+                  style={[s.momentoTab, active && s.momentoTabActive]}
+                >
+                  <Ionicons
+                    name={tab.icon}
+                    size={14}
+                    color={active ? "#1a1a1a" : "rgba(255,255,255,0.60)"}
+                    style={{ marginRight: 5 }}
+                  />
+                  <Text style={[s.momentoTabText, active && s.momentoTabTextActive]}>
+                    {tab.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
 
           {loadingAtividades ? (
@@ -437,6 +441,8 @@ const s = StyleSheet.create({
     marginBottom: 4,
   },
   momentoTab: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 20,
