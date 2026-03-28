@@ -1,6 +1,6 @@
 import React from "react";
 import {
-  Animated,
+  ActivityIndicator,
   Dimensions,
   Image,
   Platform,
@@ -18,27 +18,21 @@ import { Feather } from "@expo/vector-icons";
 import { AppHeader } from "@/components/AppHeader";
 import { HeroCarousel } from "@/components/HeroCarousel";
 import { HorizontalScroll } from "@/components/HorizontalScroll";
-import { HotelCard } from "@/components/HotelCard";
-import { PeriodoSwitcher } from "@/components/PeriodoSwitcher";
 import { PlaceCard } from "@/components/PlaceCard";
 import { RestauranteCard } from "@/components/RestauranteCard";
 import { SectionHeader } from "@/components/SectionHeader";
 import Colors from "@/constants/colors";
 import {
-  curadoPara,
   heroDestinos,
-  hoteis,
   influencers,
   Influencer,
-  oQueFazerPorMomento,
-  periodoMeta,
-  restaurantes,
   Roteiro,
   roteiros,
 } from "@/data/mockData";
-import { LUGARES_LUCKY } from "@/data/lugares";
 import { useGuia } from "@/context/GuiaContext";
-import { useTimeOfDay } from "@/hooks/useTimeOfDay";
+import { useLuckyList } from "@/hooks/useLuckyList";
+import { useOQueFazer } from "@/hooks/useOQueFazer";
+import { useRestaurants } from "@/hooks/useRestaurants";
 
 // ── Context-aware "O que fazer agora" title ───────────────────────────────────
 // Prepositions for known destinations (Portuguese grammar)
@@ -76,9 +70,10 @@ function Divider() {
   return <View style={s.divider} />;
 }
 
-// ── Lucky List dark editorial block ──────────────────────────────────────────
+// ── Lucky List dark editorial block — powered by Supabase ────────────────────
 function LuckyHighlight() {
-  const picks = (LUGARES_LUCKY["rio"] ?? []).slice(0, 3);
+  const { lugares, loading } = useLuckyList();
+  const picks = lugares.slice(0, 3);
   return (
     <View style={s.luckyBlock}>
       <View style={s.luckyHeader}>
@@ -89,25 +84,29 @@ function LuckyHighlight() {
       <Text style={s.luckySubtitle}>
         Os segredos que poucos conhecem. Curadoria feita à mão, atualizada quando vale a pena.
       </Text>
-      <View style={s.luckyPicks}>
-        {picks.map((place) => (
-          <Pressable
-            key={place.id}
-            style={s.luckyPickRow}
-            onPress={() => router.push({
-              pathname: "/lugar/[cityId]/[placeId]",
-              params: { cityId: "rio", placeId: place.id, source_table: "lucky_list_rio" },
-            })}
-          >
-            <Text style={s.luckyPickStar}>✦</Text>
-            <View style={s.luckyPickText}>
-              <Text style={s.luckyPickTitle}>{place.titulo}</Text>
-              <Text style={s.luckyPickLoc}>{place.localizacao}</Text>
-            </View>
-            <Feather name="arrow-right" size={13} color="rgba(201,168,76,0.50)" />
-          </Pressable>
-        ))}
-      </View>
+      {loading ? (
+        <ActivityIndicator color="rgba(201,168,76,0.7)" style={{ marginVertical: 16 }} />
+      ) : (
+        <View style={s.luckyPicks}>
+          {picks.map((place) => (
+            <Pressable
+              key={place.id}
+              style={s.luckyPickRow}
+              onPress={() => router.push({
+                pathname: "/lugar/[cityId]/[placeId]",
+                params: { cityId: "rio", placeId: place.id, source_table: "lucky_list_rio" },
+              })}
+            >
+              <Text style={s.luckyPickStar}>✦</Text>
+              <View style={s.luckyPickText}>
+                <Text style={s.luckyPickTitle}>{place.titulo}</Text>
+                <Text style={s.luckyPickLoc}>{place.localizacao}</Text>
+              </View>
+              <Feather name="arrow-right" size={13} color="rgba(201,168,76,0.50)" />
+            </Pressable>
+          ))}
+        </View>
+      )}
       <Pressable
         style={s.luckyBtn}
         onPress={() => router.push({ pathname: "/luckyList/[id]", params: { id: "rio" } })}
@@ -194,48 +193,16 @@ function RoteiroCTA() {
   );
 }
 
-// ── Home card → lugar ID mappings ────────────────────────────────────────────
-// Maps every Home card ID to the correct /lugar/rio/[placeId] detail route.
-// Using the unified LugarDetail template (matches the Ciclovia reference).
-
-// oQueFazerPorMomento period items → closest lugar by content / location
-const O_QUE_FAZER_MAP: Record<string, string> = {
-  m1: "1",         // Praia de Ipanema
-  m2: "2",         // Cristo Redentor / caminhada
-  m3: "colombo",   // Café na Colombo
-  t1: "3",         // Pão de Açúcar
-  t2: "5",         // Escadaria Selarón
-  t3: "7",         // Santa Teresa
-  n1: "4",         // Beco das Sardinhas
-  n2: "c3",        // Oro Restaurant
-  n3: "arcos",     // Arcos da Lapa
-};
-
-// Curados para você
-const CURADO_MAP: Record<string, string> = {
-  cp1: "6",        // Arpoador (pedra do pôr do sol)
-  cp2: "cobri",    // COBRI · Bar do Mercado
-  cp3: "banzeiro", // Banzeiro
-  cp4: "l2",       // Parque Lage → LUGARES_LUCKY
-};
-
-// Restaurantes (mock IDs "1"/"2") → LUGARES_COMER IDs
-const RESTAURANTE_MAP: Record<string, string> = {
-  "1": "colombo",  // Confeitaria Colombo
-  "2": "c3",       // Oro Restaurant
-};
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
-  const { periodo, setPeriodo, fadeAnim } = useTimeOfDay();
-  const currentItems = oQueFazerPorMomento[periodo];
-  const currentMeta = periodoMeta[periodo];
-  // Context priority: location (future) → active trip → fallback
   const { viagem } = useGuia();
   const agoraTitle = getAgoraTitle(viagem.destino || undefined);
+  const { lugares: atividades, loading: loadingAtividades } = useOQueFazer();
+  const { restaurantes: restos, loading: loadingRestos } = useRestaurants();
 
   return (
     <View style={s.root}>
@@ -260,18 +227,19 @@ export default function HomeScreen() {
         {/* ── 1. HERO CAROUSEL ── */}
         <HeroCarousel items={heroDestinos} />
 
-        {/* ── 2. O QUE FAZER AGORA ── */}
+        {/* ── 2. O QUE FAZER NO RIO ── Supabase: o_que_fazer_rio */}
         <View style={s.section}>
           <SectionHeader
             title={agoraTitle}
             uppercase
-            subtitle={currentMeta.subtitle}
+            subtitle="Experiências selecionadas para o Rio de Janeiro."
             dark
           />
-          <PeriodoSwitcher active={periodo} onChange={setPeriodo} dark />
-          <Animated.View style={{ opacity: fadeAnim }}>
+          {loadingAtividades ? (
+            <ActivityIndicator color="rgba(255,255,255,0.4)" style={{ marginTop: 20, marginBottom: 8 }} />
+          ) : (
             <HorizontalScroll>
-              {currentItems.map((item) => (
+              {atividades.slice(0, 10).map((item) => (
                 <PlaceCard
                   key={item.id}
                   id={item.id}
@@ -282,54 +250,17 @@ export default function HomeScreen() {
                   size="medium"
                   onPress={() => router.push({
                     pathname: "/lugar/[cityId]/[placeId]",
-                    params: { cityId: "rio", placeId: O_QUE_FAZER_MAP[item.id] ?? "1", source_table: "o_que_fazer_rio" },
+                    params: { cityId: "rio", placeId: item.id, source_table: "o_que_fazer_rio" },
                   })}
                 />
               ))}
             </HorizontalScroll>
-          </Animated.View>
+          )}
         </View>
 
         <Divider />
 
-        {/* ── 4. CURADOS PARA VOCÊ ── */}
-        <View style={s.section}>
-          <SectionHeader
-            title="Curados para você"
-            uppercase
-            subtitle="Hotéis, restaurantes e experiências no Rio."
-            dark
-          />
-          <HorizontalScroll>
-            {curadoPara.map((item) => {
-              const curadoId = CURADO_MAP[item.id] ?? "1";
-              // cp4 (l2) is lucky; cp2/cp3 are restaurants; cp1 is an activity
-              const curadoTable =
-                item.id === "cp4" ? "lucky_list_rio"
-                : (item.id === "cp2" || item.id === "cp3") ? "restaurantes"
-                : "o_que_fazer_rio";
-              return (
-              <PlaceCard
-                key={item.id}
-                id={item.id}
-                saveCategoria="oQueFazer"
-                titulo={item.titulo}
-                localizacao={item.localizacao}
-                image={item.image}
-                size="medium"
-                onPress={() => router.push({
-                  pathname: "/lugar/[cityId]/[placeId]",
-                  params: { cityId: "rio", placeId: curadoId, source_table: curadoTable },
-                })}
-              />
-              );
-            })}
-          </HorizontalScroll>
-        </View>
-
-        <Divider />
-
-        {/* ── 5. ONDE COMER ── */}
+        {/* ── 3. ONDE COMER ── Supabase: restaurantes */}
         <View style={s.section}>
           <SectionHeader
             title="Onde comer"
@@ -337,53 +268,31 @@ export default function HomeScreen() {
             subtitle="Os melhores restaurantes do Rio."
             dark
           />
-          <HorizontalScroll>
-            {restaurantes.map((r) => (
-              <RestauranteCard
-                key={r.id}
-                id={r.id}
-                nome={r.nome}
-                bairro={r.bairro}
-                categoria={r.categoria}
-                image={r.image}
-                onPress={() => router.push({
-                  pathname: "/lugar/[cityId]/[placeId]",
-                  params: { cityId: "rio", placeId: RESTAURANTE_MAP[r.id] ?? "c1", source_table: "restaurantes" },
-                })}
-              />
-            ))}
-          </HorizontalScroll>
+          {loadingRestos ? (
+            <ActivityIndicator color="rgba(255,255,255,0.4)" style={{ marginTop: 20, marginBottom: 8 }} />
+          ) : (
+            <HorizontalScroll>
+              {restos.slice(0, 10).map((r) => (
+                <RestauranteCard
+                  key={String(r.id)}
+                  id={String(r.id)}
+                  nome={r.nome}
+                  bairro={r.bairro ?? "Rio de Janeiro"}
+                  categoria={r.categoria ?? "Restaurante"}
+                  image={r.resolvedPhotoUri ? { uri: r.resolvedPhotoUri } : require("../../assets/images/hero-rio.png")}
+                  onPress={() => router.push({
+                    pathname: "/lugar/[cityId]/[placeId]",
+                    params: { cityId: "rio", placeId: String(r.id), source_table: "restaurantes" },
+                  })}
+                />
+              ))}
+            </HorizontalScroll>
+          )}
         </View>
 
         <Divider />
 
-        {/* ── 6. ONDE FICAR ── */}
-        <View style={s.section}>
-          <SectionHeader
-            title="Onde ficar"
-            uppercase
-            subtitle="Hotéis com personalidade carioca."
-            dark
-          />
-          <HorizontalScroll>
-            {hoteis.map((h) => (
-              <HotelCard
-                key={h.id}
-                id={h.id}
-                nome={h.nome}
-                localizacao={h.localizacao}
-                tipo={h.tipo}
-                image={h.image}
-                onPress={() => router.push({
-                  pathname: "/lugar/[cityId]/[placeId]",
-                  params: { cityId: "rio", placeId: `h${h.id}`, source_table: "stay_hotels" },
-                })}
-              />
-            ))}
-          </HorizontalScroll>
-        </View>
-
-        {/* ── 7. LUCKY LIST HIGHLIGHT ── */}
+        {/* ── 4. LUCKY LIST HIGHLIGHT ── Supabase: lucky_list_rio */}
         <LuckyHighlight />
 
         <Divider />

@@ -21,8 +21,11 @@ export type Hotel = {
   featured_restaurant: string | null;
   instagram: string | null;
   google_maps: string | null;
+  google_maps_url: string | null;
   ai_tags: string[];
   display_order: number;
+  photo_url: string | null;
+  neighborhood_slug: string | null;
 };
 
 export type Restaurante = {

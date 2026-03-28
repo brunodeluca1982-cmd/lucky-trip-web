@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  ActivityIndicator,
   Dimensions,
   Image,
   Platform,
@@ -19,17 +20,16 @@ import { PlaceCard } from "@/components/PlaceCard";
 import { SectionHeader } from "@/components/SectionHeader";
 import {
   destinos,
-  destaques,
-  restaurantes,
-  hoteis,
-  segredos,
   detectPeriodo,
   type Periodo,
 } from "@/data/mockData";
 import { AGORA_CONTENT, FALLBACK_CONTENT } from "@/data/agoraContent";
-import { DestaquesCard } from "@/components/DestaquesCard";
 import { RestauranteCard } from "@/components/RestauranteCard";
 import { HotelCard } from "@/components/HotelCard";
+import { useOQueFazer } from "@/hooks/useOQueFazer";
+import { useRestaurants } from "@/hooks/useRestaurants";
+import { useNeighborhoods } from "@/hooks/useNeighborhoods";
+import { getNeighborhoodImage } from "@/data/neighborhoodImages";
 
 const C = Colors.light;
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -164,6 +164,14 @@ export default function CidadeScreen() {
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
   const periodo = detectPeriodo();
+
+  // Supabase data
+  const { lugares: atividades, loading: loadingAtiv } = useOQueFazer();
+  const { restaurantes: restos, loading: loadingRestos } = useRestaurants();
+  const { neighborhoods, loading: loadingHoteis } = useNeighborhoods();
+  const allHotels = neighborhoods.flatMap((n) =>
+    (n.hotels ?? []).map((h) => ({ ...h, localizacao: n.neighborhood_name }))
+  );
   // Derive "Agora" label + pinned item from the same source as the next page
   const cityAgoraContent = AGORA_CONTENT[destino.id] ?? FALLBACK_CONTENT;
   const firstAgoraItem = cityAgoraContent[periodo]?.[0];
@@ -331,112 +339,99 @@ export default function CidadeScreen() {
 
         {/* ── Editorial content — cream section, scrolls naturally below ── */}
         <View style={s.editorial}>
-          <View style={s.section}>
-            <SectionHeader
-              title={isRio ? "Destaques do destino" : "Em destaque"}
-              subtitle={
-                isRio
-                  ? "Uma seleção editorial dos melhores momentos."
-                  : `O melhor de ${destino.cidade} em curadoria.`
-              }
-            />
-            {destaques.map((d) => (
-              <DestaquesCard
-                key={d.id}
-                id={`cidade-${destino.id}-${d.id}`}
-                titulo={d.titulo}
-                localizacao={d.localizacao}
-                descricao={d.descricao}
-                tipo={d.tipo}
-                image={d.image}
-              />
-            ))}
-          </View>
-
-          <View style={s.divider} />
-
+          {/* ── O que fazer — Supabase: o_que_fazer_rio ── */}
           <View style={s.section}>
             <SectionHeader
               title="O que fazer"
               subtitle={`Experiências imperdíveis em ${destino.cidade}.`}
             />
-            <HorizontalScroll>
-              {[...destaques, ...segredos].slice(0, 4).map((item) => (
-                <PlaceCard
-                  key={item.id}
-                  id={`cidade-of-${destino.id}-${item.id}`}
-                  saveCategoria="oQueFazer"
-                  titulo={item.titulo}
-                  localizacao={item.localizacao}
-                  image={item.image}
-                  size="medium"
-                />
-              ))}
-            </HorizontalScroll>
+            {loadingAtiv ? (
+              <ActivityIndicator color="#C9A84C" style={{ marginVertical: 16 }} />
+            ) : (
+              <HorizontalScroll>
+                {atividades.slice(0, 8).map((item) => (
+                  <PlaceCard
+                    key={item.id}
+                    id={item.id}
+                    saveCategoria="oQueFazer"
+                    titulo={item.titulo}
+                    localizacao={item.localizacao}
+                    image={item.image}
+                    size="medium"
+                    onPress={() => router.push({
+                      pathname: "/lugar/[cityId]/[placeId]",
+                      params: { cityId: "rio", placeId: item.id, source_table: "o_que_fazer_rio" },
+                    })}
+                  />
+                ))}
+              </HorizontalScroll>
+            )}
           </View>
 
           <View style={s.divider} />
 
+          {/* ── Onde comer — Supabase: restaurantes ── */}
           <View style={s.section}>
             <SectionHeader
               title="Onde comer"
               subtitle={`Restaurantes com alma em ${destino.cidade}.`}
             />
-            <HorizontalScroll>
-              {restaurantes.map((r) => (
-                <RestauranteCard
-                  key={r.id}
-                  id={`cidade-r-${destino.id}-${r.id}`}
-                  nome={r.nome}
-                  bairro={r.bairro}
-                  categoria={r.categoria}
-                  image={r.image}
-                />
-              ))}
-            </HorizontalScroll>
+            {loadingRestos ? (
+              <ActivityIndicator color="#C9A84C" style={{ marginVertical: 16 }} />
+            ) : (
+              <HorizontalScroll>
+                {restos.slice(0, 8).map((r) => (
+                  <RestauranteCard
+                    key={String(r.id)}
+                    id={String(r.id)}
+                    nome={r.nome}
+                    bairro={r.bairro}
+                    categoria={r.categoria}
+                    image={r.resolvedPhotoUri ? { uri: r.resolvedPhotoUri } : require("../../../assets/images/hero-rio.png")}
+                    onPress={() => router.push({
+                      pathname: "/lugar/[cityId]/[placeId]",
+                      params: { cityId: "rio", placeId: String(r.id), source_table: "restaurantes" },
+                    })}
+                  />
+                ))}
+              </HorizontalScroll>
+            )}
           </View>
 
           <View style={s.divider} />
 
-          <View style={s.section}>
-            <SectionHeader
-              title="Onde ficar"
-              subtitle={`Hospedagem com personalidade em ${destino.cidade}.`}
-            />
-            <HorizontalScroll>
-              {hoteis.map((h) => (
-                <HotelCard
-                  key={h.id}
-                  id={`cidade-h-${destino.id}-${h.id}`}
-                  nome={h.nome}
-                  localizacao={h.localizacao}
-                  tipo={h.tipo}
-                  image={h.image}
+          {/* ── Onde ficar — Supabase: stay_hotels via stay_neighborhoods ── */}
+          {!loadingHoteis && allHotels.length > 0 && (
+            <>
+              <View style={s.section}>
+                <SectionHeader
+                  title="Onde ficar"
+                  subtitle={`Hospedagem com personalidade em ${destino.cidade}.`}
                 />
-              ))}
-            </HorizontalScroll>
-          </View>
-
-          <View style={s.divider} />
-
-          <View style={s.section}>
-            <SectionHeader
-              title="Segredos locais"
-              subtitle={`O que poucos sabem sobre ${destino.cidade}.`}
-            />
-            {segredos.map((seg) => (
-              <PlaceCard
-                key={seg.id}
-                id={`cidade-seg-${destino.id}-${seg.id}`}
-                saveCategoria="oQueFazer"
-                titulo={seg.titulo}
-                localizacao={seg.localizacao}
-                descricao={seg.descricao}
-                image={seg.image}
-                variant="secret"
-              />
-            ))}
-          </View>
+                <HorizontalScroll>
+                  {allHotels.slice(0, 6).map((h) => (
+                    <HotelCard
+                      key={h.id}
+                      id={h.id}
+                      nome={h.hotel_name}
+                      localizacao={h.localizacao}
+                      tipo={h.hotel_category}
+                      image={
+                        h.photo_url
+                          ? { uri: h.photo_url }
+                          : getNeighborhoodImage(h.neighborhood_slug ?? h.localizacao)
+                      }
+                      onPress={() => router.push({
+                        pathname: "/lugar/[cityId]/[placeId]",
+                        params: { cityId: "rio", placeId: h.id, source_table: "stay_hotels" },
+                      })}
+                    />
+                  ))}
+                </HorizontalScroll>
+              </View>
+              <View style={s.divider} />
+            </>
+          )}
 
           <View style={s.footer}>
             <Text style={s.footerL}>L.</Text>

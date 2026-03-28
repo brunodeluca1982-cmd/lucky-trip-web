@@ -3,18 +3,17 @@
  *
  * Structure:
  *  1. Cinematic hero header (back button + title + intro)
- *  2. Section: Clássicos do Rio — 2-col image grid (reference card style)
- *  3. Section: 3 achados Lucky no Rio — editorial Lucky cards
+ *  2. Section: Clássicos do Rio — 2-col image grid from Supabase o_que_fazer_rio
+ *  3. Section: 3 achados Lucky no Rio — from Supabase lucky_list_rio
  *
- * Data: Classic items are inline mock (Supabase-ready). Lucky items are
- * pulled from LUGARES_LUCKY filtered by IDs l7, l8, l9.
+ * Data: 100% Supabase — no static/hardcoded places.
  */
 
 import React from "react";
 import {
+  ActivityIndicator,
   Dimensions,
   Image,
-  ImageSourcePropType,
   Platform,
   Pressable,
   ScrollView,
@@ -28,76 +27,17 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { destinos } from "@/data/mockData";
-import { LUGARES_LUCKY } from "@/data/lugares";
-import { getNeighborhoodImage } from "@/data/neighborhoodImages";
+import type { LugarPlace } from "@/data/lugares";
+import { useOQueFazer } from "@/hooks/useOQueFazer";
+import { useLuckyList } from "@/hooks/useLuckyList";
 
 const C = Colors.light;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
-// ── Classic Rio items (Supabase-ready mock) ───────────────────────────────────
-interface ClassicoItem {
-  id: string;
-  titulo: string;
-  localizacao: string;
-  categoria: string;
-  image: ImageSourcePropType;
-}
-
-// IDs map directly to LUGARES_O_QUE_FAZER["rio"] entries — resolved by getLugar()
-// Images come from getNeighborhoodImage() so each entry is consistent with
-// every other screen that shows the same neighborhood.
-const CLASSICOS_RIO: ClassicoItem[] = [
-  {
-    id: "2",
-    titulo: "Cristo Redentor",
-    localizacao: "Corcovado",
-    categoria: "ÍCONE",
-    image: getNeighborhoodImage("Corcovado"),
-  },
-  {
-    id: "3",
-    titulo: "Pão de Açúcar",
-    localizacao: "Urca",
-    categoria: "MIRANTE",
-    image: getNeighborhoodImage("Urca"),
-  },
-  {
-    id: "1",
-    titulo: "Praia de Ipanema",
-    localizacao: "Ipanema",
-    categoria: "PRAIA",
-    image: getNeighborhoodImage("Ipanema"),
-  },
-  {
-    id: "6",
-    titulo: "Arpoador",
-    localizacao: "Arpoador",
-    categoria: "RITUAL",
-    image: getNeighborhoodImage("Arpoador"),
-  },
-  {
-    id: "7",
-    titulo: "Santa Teresa",
-    localizacao: "Santa Teresa",
-    categoria: "BAIRRO",
-    image: getNeighborhoodImage("Santa Teresa"),
-  },
-  {
-    id: "8",
-    titulo: "Jardim Botânico",
-    localizacao: "Jardim Botânico",
-    categoria: "NATUREZA",
-    image: getNeighborhoodImage("Jardim Botânico"),
-  },
-];
-
-// Lucky items shown on this page (Supabase-ready: filter by id)
-const LUCKY_ESSENCIAL_IDS = ["l7", "l8", "l9"];
-
 // ── 2-column card (reference style) ──────────────────────────────────────────
 const CARD_W = (SCREEN_WIDTH - 48 - 12) / 2;
 
-function ClassicoCard({ item }: { item: ClassicoItem }) {
+function ClassicoCard({ item }: { item: LugarPlace }) {
   return (
     <Pressable
       style={({ pressed }) => [
@@ -132,7 +72,7 @@ function LuckyCard({
   index,
   cityId,
 }: {
-  item: (typeof LUGARES_LUCKY)["rio"][number];
+  item: LugarPlace;
   index: number;
   cityId: string;
 }) {
@@ -194,14 +134,14 @@ export default function EssencialScreen() {
 
   const destino = destinos.find((d) => d.id === id) ?? destinos[0];
 
-  // Classic items: currently from inline mock — swap for Supabase fetch here
-  const classicos = CLASSICOS_RIO;
+  // Supabase data only
+  const { lugares: todasAtividades, loading: loadingAtiv } = useOQueFazer();
+  const { lugares: todasLucky, loading: loadingLucky } = useLuckyList();
 
-  // Lucky picks: filter the 3 Supabase-ready items from the Lucky List
-  const allLucky = LUGARES_LUCKY[destino.id] ?? [];
-  const luckyPicks = LUCKY_ESSENCIAL_IDS
-    .map((lid) => allLucky.find((l) => l.id === lid))
-    .filter((l): l is NonNullable<typeof l> => Boolean(l));
+  // First 6 activities as "Clássicos do Rio"
+  const classicos = todasAtividades.slice(0, 6);
+  // First 3 lucky picks
+  const luckyPicks = todasLucky.slice(0, 3);
 
   const HERO_HEIGHT = topInset + 300;
 
@@ -253,22 +193,26 @@ export default function EssencialScreen() {
         {/* ── Dark content area ── */}
         <View style={s.contentArea}>
 
-          {/* ── Section 1: Clássicos do Rio ── */}
+          {/* ── Section 1: O que fazer no Rio — Supabase ── */}
           <View style={s.sectionHeader}>
-            <Text style={s.sectionLabel}>CLÁSSICOS DO RIO</Text>
-            <Text style={s.sectionCount}>{classicos.length} lugares</Text>
+            <Text style={s.sectionLabel}>O QUE FAZER NO RIO</Text>
+            {!loadingAtiv && <Text style={s.sectionCount}>{classicos.length} lugares</Text>}
           </View>
 
-          <View style={s.grid2}>
-            {classicos.map((item) => (
-              <ClassicoCard key={item.id} item={item} />
-            ))}
-          </View>
+          {loadingAtiv ? (
+            <ActivityIndicator color="rgba(201,168,76,0.7)" style={{ marginVertical: 24 }} />
+          ) : (
+            <View style={s.grid2}>
+              {classicos.map((item) => (
+                <ClassicoCard key={item.id} item={item} />
+              ))}
+            </View>
+          )}
 
           {/* ── Divider ── */}
           <View style={s.divider} />
 
-          {/* ── Section 2: 3 achados Lucky no Rio ── */}
+          {/* ── Section 2: 3 achados Lucky no Rio — Supabase ── */}
           <View style={s.sectionHeader}>
             <View style={s.luckyHeaderRow}>
               <Text style={s.luckyHeaderStar}>✦</Text>
@@ -279,16 +223,20 @@ export default function EssencialScreen() {
             </Text>
           </View>
 
-          <View style={s.luckyList}>
-            {luckyPicks.map((item, i) => (
-              <LuckyCard
-                key={item.id}
-                item={item}
-                index={i}
-                cityId={destino.id}
-              />
-            ))}
-          </View>
+          {loadingLucky ? (
+            <ActivityIndicator color="rgba(201,168,76,0.7)" style={{ marginVertical: 24 }} />
+          ) : (
+            <View style={s.luckyList}>
+              {luckyPicks.map((item, i) => (
+                <LuckyCard
+                  key={item.id}
+                  item={item}
+                  index={i}
+                  cityId={destino.id}
+                />
+              ))}
+            </View>
+          )}
 
           {/* ── Editorial footer ── */}
           <View style={s.footer}>
