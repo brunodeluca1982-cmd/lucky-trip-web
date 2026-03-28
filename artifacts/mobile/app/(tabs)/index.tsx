@@ -376,7 +376,11 @@ export default function HomeScreen() {
 
         {/* ── EDITORIAL FOOTER ── */}
         <View style={s.footer}>
-          <Text style={s.footerL}>L.</Text>
+          <Image
+            source={require("../../assets/images/logo-symbol.png")}
+            style={s.footerLogo}
+            resizeMode="contain"
+          />
           <Text style={s.footerText}>
             Curadoria editorial para viajantes que entendem de beleza.
           </Text>
@@ -718,10 +722,10 @@ const s = StyleSheet.create({
     gap: 8,
     paddingBottom: 8,
   },
-  footerL: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 36,
-    color: C.terracotta,
+  footerLogo: {
+    width: 110,
+    height: 32,
+    opacity: 0.55,
   },
   footerText: {
     fontFamily: "Inter_400Regular",
