@@ -152,7 +152,6 @@ function useSupabaseLugar(
           }
           } // closes the `else { // numId valid }` block
         } else if (effectiveTable === "o_que_fazer_rio") {
-          // Confirmed columns from edge function enrichment
           const { data, error: err } = await supabase
             .from("o_que_fazer_rio")
             .select("*")
@@ -161,8 +160,10 @@ function useSupabaseLugar(
           if (err) console.warn("[useSupabaseLugar] o_que_fazer_rio error:", err.message);
           if (data) {
             const pin = resolvePin("rio", (data as any).bairro ?? "", 0);
-            const photoUri = null; // photo_url not confirmed in o_que_fazer_rio
-            const descricao = "Uma das experiências selecionadas para o seu roteiro no Rio.";
+            // photo_url IS present in o_que_fazer_rio — always use it when available
+            const photoUri = (data as any).photo_url as string | null ?? null;
+            const meuOlhar = (data as any).meu_olhar as string | null;
+            const descricao = meuOlhar ?? "Uma das experiências selecionadas para o seu roteiro no Rio.";
             resolved = {
               id:          String((data as any).id),
               titulo:      (data as any).nome ?? "Experiência",
@@ -173,6 +174,7 @@ function useSupabaseLugar(
               xPct:        pin.xPct,
               yPct:        pin.yPct,
               tipo_item:   "experiencia",
+              google_maps_url: (data as any).google_maps_url ?? null,
             };
           }
         } else if (effectiveTable === "lucky_list_rio") {
@@ -185,24 +187,27 @@ function useSupabaseLugar(
           if (err) console.warn("[useSupabaseLugar] lucky_list_rio error:", err.message);
           if (data) {
             const pin = resolvePin("rio", (data as any).bairro ?? "", 0);
+            // photo_url IS present in lucky_list_rio — always use it when available
             const photoUri = (data as any).photo_url as string | null ?? null;
-            const descricao = "Um dos achados especiais da Lucky List — lugares que só quem sabe, sabe.";
+            const meuOlhar = (data as any).meu_olhar as string | null;
+            const descricao = meuOlhar ?? "Um dos achados especiais da Lucky List — lugares que só quem sabe, sabe.";
             resolved = {
               id:          String((data as any).id),
               titulo:      (data as any).nome ?? "Lucky Pick",
               localizacao: (data as any).bairro ?? "Rio de Janeiro",
-              categoria:   "LUCKY LIST",
+              categoria:   ((data as any).tipo_item as string | null)?.toUpperCase() ?? "LUCKY LIST",
               descricao,
               image:       getImageForEntity("activity", (data as any).nome ?? "", (data as any).bairro ?? "", photoUri),
               xPct:        pin.xPct,
               yPct:        pin.yPct,
               tipo_item:   "experiencia",
+              google_maps_url: (data as any).google_maps_url ?? null,
             };
           }
         } else if (effectiveTable === "stay_hotels") {
           const { data, error: err } = await supabase
             .from("stay_hotels")
-            .select("id, hotel_name, hotel_category, neighborhoods(neighborhood_name)")
+            .select("id, hotel_name, hotel_category, photo_url, reserve_url, neighborhoods(neighborhood_name)")
             .eq("id", placeId)
             .maybeSingle();
           if (err) console.warn("[useSupabaseLugar] stay_hotels error:", err.message);
@@ -211,16 +216,19 @@ function useSupabaseLugar(
               ((data as any).neighborhoods as { neighborhood_name: string } | null)
                 ?.neighborhood_name ?? "Rio de Janeiro";
             const pin = resolvePin("rio", neighborhoodName, 0);
+            // photo_url IS present in stay_hotels — always use it when available
+            const photoUri = (data as any).photo_url as string | null ?? null;
             resolved = {
               id:          String((data as any).id),
               titulo:      (data as any).hotel_name as string | null ?? "Hotel",
               localizacao: neighborhoodName,
               categoria:   ((data as any).hotel_category as string | null)?.toUpperCase() ?? "HOTEL",
               descricao:   "Uma das hospedagens selecionadas para a sua estadia no Rio de Janeiro.",
-              image:       getImageForEntity("hotel", (data as any).hotel_name ?? "", neighborhoodName, null),
+              image:       getImageForEntity("hotel", (data as any).hotel_name ?? "", neighborhoodName, photoUri),
               xPct:        pin.xPct,
               yPct:        pin.yPct,
               tipo_item:   "hotel",
+              booking_url: (data as any).reserve_url ?? null,
             };
           }
         }
