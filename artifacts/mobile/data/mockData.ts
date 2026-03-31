@@ -380,32 +380,237 @@ export const curadoPara = [
 ];
 
 // ── Roteiros ──────────────────────────────────────────────────────────────────
+
+export type RoteiroCategory =
+  | "passeio"
+  | "gastronomia"
+  | "cultura"
+  | "contemplação"
+  | "natureza"
+  | "compras"
+  | "noite";
+
+export interface RoteiroSlot {
+  name:         string;
+  category:     RoteiroCategory;
+  neighborhood: string;
+}
+
+export interface RoteiroDia {
+  dia:     number;
+  bairro:  string;
+  manha?:  RoteiroSlot;
+  almoco?: RoteiroSlot;
+  tarde?:  RoteiroSlot;
+  jantar?: RoteiroSlot;
+  noite?:  RoteiroSlot;
+}
+
 export interface Roteiro {
-  id: string;
-  titulo: string;
-  dias: string;
-  tags: string[];
+  id:         string;
+  titulo:     string;
+  dias:       string;
+  tags:       string[];
   numLugares: number;
-  image: any;
+  image:      any;
+  itinerary:  RoteiroDia[];
+}
+
+// ── Deduplication guard ────────────────────────────────────────────────────────
+// Runs at module init time. Logs a warning if any place appears more than once
+// in the same itinerary (case-insensitive match). numLugares is auto-calculated
+// from actual slot count so it always matches the real content.
+function buildRoteiro(
+  base: Omit<Roteiro, "numLugares" | "itinerary">,
+  itinerary: RoteiroDia[],
+): Roteiro {
+  const seen = new Set<string>();
+  for (const dia of itinerary) {
+    const slots = [dia.manha, dia.almoco, dia.tarde, dia.jantar, dia.noite];
+    for (const slot of slots) {
+      if (!slot) continue;
+      const key = slot.name.toLowerCase().trim();
+      if (seen.has(key) && __DEV__) {
+        console.warn(`[Roteiro "${base.titulo}"] Duplicate place detected: "${slot.name}"`);
+      }
+      seen.add(key);
+    }
+  }
+  const numLugares = itinerary.reduce(
+    (acc, d) =>
+      acc + [d.manha, d.almoco, d.tarde, d.jantar, d.noite].filter(Boolean).length,
+    0,
+  );
+  return { ...base, numLugares, itinerary };
 }
 
 export const roteiros: Roteiro[] = [
-  {
-    id: "r1",
-    titulo: "Rio com classe",
-    dias: "3 dias",
-    tags: ["Arte", "Gastronomia"],
-    numLugares: 12,
-    image: require("../assets/images/hero-rio.png"),
-  },
-  {
-    id: "r2",
-    titulo: "Rio em família",
-    dias: "5 dias",
-    tags: ["Praia", "Natureza"],
-    numLugares: 18,
-    image: require("../assets/images/pao-acucar.png"),
-  },
+
+  // ── R1: Rio com classe — 3 dias ─────────────────────────────────────────────
+  // Theme: premium / arts / gastronomy
+  // Flow: Ipanema zone → Santa Teresa → Urca/Botafogo
+  // Categories per day: passeio + gastronomia×2 + natureza / cultura×2 + gastronomia + noite /
+  //                     passeio + gastronomia + contemplação + gastronomia
+  buildRoteiro(
+    {
+      id:    "r1",
+      titulo: "Rio com classe",
+      dias:   "3 dias",
+      tags:   ["Arte", "Gastronomia"],
+      image:  require("../assets/images/hero-rio.png"),
+    },
+    [
+      {
+        dia:    1,
+        bairro: "Ipanema & Jardim Botânico",
+        manha:  { name: "Praia de Ipanema",                  category: "passeio",      neighborhood: "Ipanema" },
+        almoco: { name: "Gero",                              category: "gastronomia",  neighborhood: "Ipanema" },
+        tarde:  { name: "Jardim Botânico do Rio de Janeiro", category: "natureza",     neighborhood: "Jardim Botânico" },
+        jantar: { name: "Oro",                               category: "gastronomia",  neighborhood: "Ipanema" },
+      },
+      {
+        dia:    2,
+        bairro: "Santa Teresa & Lapa",
+        manha:  { name: "Escadaria Selarón",   category: "cultura",     neighborhood: "Santa Teresa" },
+        almoco: { name: "Aprazível",            category: "gastronomia", neighborhood: "Santa Teresa" },
+        tarde:  { name: "Museu Chácara do Céu", category: "cultura",    neighborhood: "Santa Teresa" },
+        noite:  { name: "Arcos da Lapa",        category: "noite",      neighborhood: "Lapa" },
+      },
+      {
+        dia:    3,
+        bairro: "Urca & Botafogo",
+        manha:  { name: "Pão de Açúcar",    category: "passeio",      neighborhood: "Urca" },
+        almoco: { name: "Bar Urca",         category: "gastronomia",  neighborhood: "Urca" },
+        tarde:  { name: "Praia de Botafogo", category: "contemplação", neighborhood: "Botafogo" },
+        jantar: { name: "Lasai",            category: "gastronomia",  neighborhood: "Botafogo" },
+      },
+    ],
+  ),
+
+  // ── R2: Rio em família — 5 dias ─────────────────────────────────────────────
+  // Theme: beaches / nature / family
+  // Flow: Copacabana → Urca → Lagoa/Leblon → Santa Teresa → Barra
+  // No place repeats anywhere in the 5-day sequence.
+  buildRoteiro(
+    {
+      id:    "r2",
+      titulo: "Rio em família",
+      dias:   "5 dias",
+      tags:   ["Praia", "Natureza"],
+      image:  require("../assets/images/pao-acucar.png"),
+    },
+    [
+      {
+        dia:    1,
+        bairro: "Copacabana",
+        manha:  { name: "Praia de Copacabana", category: "passeio",     neighborhood: "Copacabana" },
+        almoco: { name: "Siri Mole & Cia",      category: "gastronomia", neighborhood: "Copacabana" },
+        tarde:  { name: "Forte de Copacabana",  category: "cultura",     neighborhood: "Copacabana" },
+        jantar: { name: "Churrascaria Palace",  category: "gastronomia", neighborhood: "Copacabana" },
+      },
+      {
+        dia:    2,
+        bairro: "Urca & Botafogo",
+        manha:  { name: "Bondinho do Pão de Açúcar", category: "passeio",      neighborhood: "Urca" },
+        almoco: { name: "Bar Urca",                   category: "gastronomia",  neighborhood: "Urca" },
+        tarde:  { name: "Praia de Botafogo",          category: "contemplação", neighborhood: "Botafogo" },
+        jantar: { name: "Lasai",                      category: "gastronomia",  neighborhood: "Botafogo" },
+      },
+      {
+        dia:    3,
+        bairro: "Lagoa & Leblon",
+        manha:  { name: "Lagoa Rodrigo de Freitas", category: "contemplação", neighborhood: "Lagoa" },
+        almoco: { name: "Bar Lagoa",                category: "gastronomia",  neighborhood: "Lagoa" },
+        tarde:  { name: "Mirante do Leblon",        category: "contemplação", neighborhood: "Leblon" },
+        jantar: { name: "Zuka",                     category: "gastronomia",  neighborhood: "Leblon" },
+      },
+      {
+        dia:    4,
+        bairro: "Santa Teresa",
+        manha:  { name: "Bonde de Santa Teresa",  category: "cultura",     neighborhood: "Santa Teresa" },
+        almoco: { name: "Aprazível",               category: "gastronomia", neighborhood: "Santa Teresa" },
+        tarde:  { name: "Museu Chácara do Céu",   category: "cultura",     neighborhood: "Santa Teresa" },
+        jantar: { name: "Bar dos Descasados",      category: "noite",       neighborhood: "Santa Teresa" },
+      },
+      {
+        dia:    5,
+        bairro: "Barra da Tijuca",
+        manha:  { name: "Praia da Barra da Tijuca", category: "passeio",     neighborhood: "Barra da Tijuca" },
+        almoco: { name: "CT Boucherie",              category: "gastronomia", neighborhood: "Barra da Tijuca" },
+        tarde:  { name: "Parque Marapendi",          category: "natureza",    neighborhood: "Barra da Tijuca" },
+      },
+    ],
+  ),
+
+  // ── R3: Rio de fim de semana — 2 dias ───────────────────────────────────────
+  // Theme: experiences / nightlife / quick immersion
+  // Flow: Arpoador/Ipanema → Centro/Lapa
+  buildRoteiro(
+    {
+      id:    "r3",
+      titulo: "Rio de fim de semana",
+      dias:   "2 dias",
+      tags:   ["Experiências", "Noite"],
+      image:  require("../assets/images/lapa.png"),
+    },
+    [
+      {
+        dia:    1,
+        bairro: "Arpoador & Ipanema",
+        manha:  { name: "Pedra do Arpoador",        category: "passeio",      neighborhood: "Arpoador" },
+        almoco: { name: "Vegetariano Social Clube",  category: "gastronomia",  neighborhood: "Ipanema" },
+        tarde:  { name: "Praia do Leblon",           category: "contemplação", neighborhood: "Leblon" },
+        noite:  { name: "Bar dos Descasados",        category: "noite",        neighborhood: "Santa Teresa" },
+      },
+      {
+        dia:    2,
+        bairro: "Centro & Lapa",
+        manha:  { name: "Museu do Amanhã",     category: "cultura",     neighborhood: "Centro" },
+        almoco: { name: "Confeitaria Colombo", category: "gastronomia", neighborhood: "Centro" },
+        tarde:  { name: "Escadaria Selarón",   category: "cultura",     neighborhood: "Lapa" },
+        noite:  { name: "Arcos da Lapa",       category: "noite",       neighborhood: "Lapa" },
+      },
+    ],
+  ),
+
+  // ── R4: Rio cultural — 3 dias ────────────────────────────────────────────────
+  // Theme: history / art / architecture
+  // Flow: Centro → Santa Teresa/Lapa → Botafogo/Urca
+  buildRoteiro(
+    {
+      id:    "r4",
+      titulo: "Rio cultural",
+      dias:   "3 dias",
+      tags:   ["Cultura", "História"],
+      image:  require("../assets/images/cristo.png"),
+    },
+    [
+      {
+        dia:    1,
+        bairro: "Centro histórico",
+        manha:  { name: "Real Gabinete Português de Leitura", category: "cultura",     neighborhood: "Centro" },
+        almoco: { name: "Confeitaria Colombo",                 category: "gastronomia", neighborhood: "Centro" },
+        tarde:  { name: "Museu Nacional de Belas Artes",       category: "cultura",     neighborhood: "Centro" },
+        jantar: { name: "Cais do Oriente",                     category: "gastronomia", neighborhood: "Centro" },
+      },
+      {
+        dia:    2,
+        bairro: "Santa Teresa & Lapa",
+        manha:  { name: "Museu Chácara do Céu",  category: "cultura",     neighborhood: "Santa Teresa" },
+        almoco: { name: "Aprazível",              category: "gastronomia", neighborhood: "Santa Teresa" },
+        tarde:  { name: "Escadaria Selarón",      category: "cultura",     neighborhood: "Lapa" },
+        noite:  { name: "Arcos da Lapa",          category: "noite",       neighborhood: "Lapa" },
+      },
+      {
+        dia:    3,
+        bairro: "Botafogo & Urca",
+        manha:  { name: "Museu Casa de Rui Barbosa", category: "cultura",     neighborhood: "Botafogo" },
+        almoco: { name: "Lasai",                      category: "gastronomia", neighborhood: "Botafogo" },
+        tarde:  { name: "Museu do Índio",             category: "cultura",     neighborhood: "Botafogo" },
+        jantar: { name: "Bar Urca",                   category: "gastronomia", neighborhood: "Urca" },
+      },
+    ],
+  ),
 ];
 
 // ── Influencers (Viaje como eles) ─────────────────────────────────────────────
