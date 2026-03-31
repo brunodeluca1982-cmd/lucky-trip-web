@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
+  Alert,
   Dimensions,
   FlatList,
   Image,
@@ -36,7 +37,18 @@ function HeroSlide({ item }: { item: HeroItem }) {
   return (
     <Pressable
       style={({ pressed }) => [styles.slide, pressed && { opacity: 0.94 }]}
-      onPress={() => item.cityId && router.push({ pathname: "/cidade/[id]", params: { id: item.cityId } })}
+      onPress={() => {
+        if (!item.cityId) return;
+        if (item.cityId === "rio") {
+          router.push({ pathname: "/cidade/[id]", params: { id: item.cityId } });
+        } else {
+          Alert.alert(
+            "Em breve disponível",
+            "Estamos preparando esse destino com o cuidado do The Lucky Trip",
+            [{ text: "OK" }]
+          );
+        }
+      }}
     >
       <Image source={item.image} style={styles.image} resizeMode="cover" />
       <View style={styles.dimOverlay} />

@@ -205,6 +205,15 @@ const MOMENTO_TABS: { key: MomentoTab; label: string; icon: IoniconName }[] = [
   { key: "noite", label: "Noite", icon: "moon-outline"          },
 ];
 
+// Determine the current time period automatically.
+// Rules: 05:00–11:59 → manhã | 12:00–17:59 → tarde | 18:00–04:59 → noite
+function getCurrentMomento(): MomentoTab {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) return "manha";
+  if (hour >= 12 && hour < 18) return "tarde";
+  return "noite";
+}
+
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
@@ -212,7 +221,7 @@ export default function HomeScreen() {
   const agoraTitle = getAgoraTitle(viagem.destino || undefined);
   const { lugares: atividades, loading: loadingAtividades } = useOQueFazer();
   const { restaurantes: restos, loading: loadingRestos } = useRestaurants();
-  const [momentoTab, setMomentoTab] = React.useState<MomentoTab>("manha");
+  const momentoTab = getCurrentMomento();
 
   const filteredAtividades = React.useMemo(() => {
     if (!atividades.length) return [];
@@ -260,9 +269,8 @@ export default function HomeScreen() {
             {MOMENTO_TABS.map((tab) => {
               const active = momentoTab === tab.key;
               return (
-                <Pressable
+                <View
                   key={tab.key}
-                  onPress={() => setMomentoTab(tab.key)}
                   style={[s.momentoTab, active && s.momentoTabActive]}
                 >
                   <Ionicons
@@ -274,7 +282,7 @@ export default function HomeScreen() {
                   <Text style={[s.momentoTabText, active && s.momentoTabTextActive]}>
                     {tab.label}
                   </Text>
-                </Pressable>
+                </View>
               );
             })}
           </View>
