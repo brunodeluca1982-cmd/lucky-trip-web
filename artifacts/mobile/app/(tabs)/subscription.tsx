@@ -11,6 +11,7 @@
 import React, { useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Linking,
   Platform,
@@ -24,7 +25,7 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
-import { useGuia } from "@/context/GuiaContext";
+import { getDeviceId } from "@/utils/deviceId";
 
 const GOLD      = "#D4AF37";
 const GOLD_DIM  = "rgba(212,175,55,0.14)";
@@ -63,23 +64,28 @@ export default function SubscriptionScreen() {
   const botPad  = Platform.OS === "web" ? 34 : insets.bottom;
   const params  = useLocalSearchParams<{ plan?: string }>();
 
-  const { deviceId } = useGuia();
-
   const defaultPlan: Plan = params.plan === "weekly" ? "weekly" : "annual";
   const [selected,   setSelected]   = useState<Plan>(defaultPlan);
   const [loading,    setLoading]    = useState(false);
 
   async function handleStart() {
-    if (loading || !deviceId) return;
+    if (loading) return;
+    console.log("CHECKOUT CLICKED");
+    console.log("Selected plan:", selected);
     setLoading(true);
     try {
+      // Always resolve deviceId directly — GuiaContext may not have loaded it yet
+      const id = await getDeviceId();
+      console.log("Calling checkout...");
       const { data, error } = await supabase.functions.invoke("create-checkout", {
-        body: { deviceId, plan: selected },
+        body: { deviceId: id, plan: selected },
       });
+      console.log("Checkout response:", data, error);
       if (error || !data?.url) throw error ?? new Error("No checkout URL");
       await Linking.openURL(data.url);
-    } catch {
-      await Linking.openURL("mailto:ola@theluckytrip.com?subject=Assinar%20Lucky%20Pro");
+    } catch (err) {
+      console.error("Checkout error:", err);
+      Alert.alert("Erro ao iniciar pagamento", "Tente novamente ou entre em contato.");
     } finally {
       setLoading(false);
     }
