@@ -27,6 +27,8 @@ import RioMapView from "@/components/RioMapView";
 import { useGuia } from "@/context/GuiaContext";
 import { useLuckyList } from "@/hooks/useLuckyList";
 
+const FREE_ITEMS = 3;
+
 const C    = Colors.light;
 const GOLD = "#D4AF37";
 const GOLD_DIM    = "rgba(201,168,76,0.18)";
@@ -65,7 +67,7 @@ export default function LuckyListScreen() {
   const { lugares: allLugares, loading: lugaresLoading } = useLuckyList();
   const editorial  = EDITORIAIS[destino.id] ?? DEFAULT_EDITORIAL;
 
-  const { save, unsave, isSaved } = useGuia();
+  const { save, unsave, isSaved, isPremium, showPaywall } = useGuia();
 
   const listRef = useRef<ScrollView>(null);
 
@@ -137,88 +139,130 @@ export default function LuckyListScreen() {
             <View style={s.sectionLabelLine} />
           </View>
 
-          {allLugares.map((place, index) => (
-            <Pressable
-              key={place.id}
-              style={s.card}
-              onPress={() =>
-                router.push({
-                  pathname: "/lugar/[cityId]/[placeId]",
-                  params: { cityId: destino.id, placeId: place.id, source_table: "lucky_list_rio" },
-                })
-              }
-            >
-              <View style={s.cardImageWrap}>
-                <Image source={place.image} style={s.cardImage} resizeMode="cover" />
-                <LinearGradient
-                  colors={["rgba(0,0,0,0.22)", "rgba(0,0,0,0.05)", "rgba(0,0,0,0.55)"]}
-                  locations={[0, 0.45, 1]}
-                  style={StyleSheet.absoluteFill}
-                />
-                <View style={s.bookmarkBtn}>
-                  <Feather name="bookmark" size={15} color={C.white} />
-                </View>
-                <View style={s.luckyNumber}>
-                  <Text style={s.luckyNumberText}>✦</Text>
-                  <Text style={s.luckyIndexText}>{String(index + 1).padStart(2, "0")}</Text>
-                </View>
-                <View style={s.categoriaBadge}>
-                  <Text style={s.categoriaText}>{place.categoria}</Text>
-                </View>
-              </View>
+          {allLugares.map((place, index) => {
+            const isLocked = !isPremium && index >= FREE_ITEMS;
+            return (
+              <Pressable
+                key={place.id}
+                style={s.card}
+                onPress={() => {
+                  if (isLocked) {
+                    showPaywall("discovery");
+                    return;
+                  }
+                  router.push({
+                    pathname: "/lugar/[cityId]/[placeId]",
+                    params: { cityId: destino.id, placeId: place.id, source_table: "lucky_list_rio" },
+                  });
+                }}
+              >
+                <View style={s.cardImageWrap}>
+                  <Image
+                    source={place.image}
+                    style={[s.cardImage, isLocked && s.cardImageLocked]}
+                    resizeMode="cover"
+                  />
+                  <LinearGradient
+                    colors={["rgba(0,0,0,0.22)", "rgba(0,0,0,0.05)", "rgba(0,0,0,0.55)"]}
+                    locations={[0, 0.45, 1]}
+                    style={StyleSheet.absoluteFill}
+                  />
 
-              <View style={s.cardBody}>
-                <View style={s.cardLocRow}>
-                  <Feather name="map-pin" size={10} color={GOLD} />
-                  <Text style={s.cardLocText}>{place.localizacao}</Text>
+                  {/* Lock overlay (premium only) */}
+                  {isLocked && (
+                    <View style={s.lockOverlay}>
+                      <View style={s.lockBadge}>
+                        <Feather name="lock" size={14} color={GOLD} />
+                        <Text style={s.lockBadgeText}>Lucky Premium</Text>
+                      </View>
+                      <Text style={s.lockHint}>Toque para desbloquear</Text>
+                    </View>
+                  )}
+
+                  {!isLocked && (
+                    <View style={s.bookmarkBtn}>
+                      <Feather name="bookmark" size={15} color={C.white} />
+                    </View>
+                  )}
+                  <View style={s.luckyNumber}>
+                    <Text style={s.luckyNumberText}>✦</Text>
+                    <Text style={s.luckyIndexText}>{String(index + 1).padStart(2, "0")}</Text>
+                  </View>
+                  <View style={s.categoriaBadge}>
+                    <Text style={s.categoriaText}>{place.categoria}</Text>
+                  </View>
                 </View>
-                <Text style={s.cardTitulo}>{place.titulo}</Text>
-                <Text style={s.cardDesc}>{place.descricao}</Text>
-                <View style={s.actionsRow}>
-                  <Pressable
-                    style={s.verNoMapaBtn}
-                    onPress={(e) => {
-                      e.stopPropagation?.();
-                      router.push({
-                        pathname: "/lugar/[cityId]/[placeId]",
-                        params: { cityId: destino.id, placeId: place.id, source_table: "lucky_list_rio", showMap: "true" },
-                      });
-                    }}
-                  >
-                    <Feather name="map-pin" size={13} color={C.terracotta} />
-                    <Text style={s.verNoMapaText}>Ver no mapa</Text>
-                  </Pressable>
-                  <Pressable
-                    style={[s.saveBtn, isSaved(place.id) && s.saveBtnSaved]}
-                    onPress={(e) => {
-                      e.stopPropagation?.();
-                      if (isSaved(place.id)) {
-                        unsave(place.id);
-                      } else {
-                        save({
-                          id:           place.id,
-                          categoria:    "lucky",
-                          source_table: "lucky_list_rio",
-                          titulo:       place.titulo,
-                          localizacao:  place.localizacao,
-                          image:        place.image,
-                        });
-                      }
-                    }}
-                  >
-                    <Feather
-                      name="bookmark"
-                      size={13}
-                      color={isSaved(place.id) ? C.white : GOLD}
-                    />
-                    <Text style={[s.saveBtnText, isSaved(place.id) && s.saveBtnTextSaved]}>
-                      {isSaved(place.id) ? "Salvo" : "Salvar"}
-                    </Text>
-                  </Pressable>
+
+                <View style={s.cardBody}>
+                  <View style={s.cardLocRow}>
+                    <Feather name="map-pin" size={10} color={GOLD} />
+                    <Text style={s.cardLocText}>{place.localizacao}</Text>
+                  </View>
+                  <Text style={[s.cardTitulo, isLocked && s.cardTituloLocked]}>
+                    {isLocked ? "Lucky Pick exclusivo" : place.titulo}
+                  </Text>
+                  <Text style={s.cardDesc}>
+                    {isLocked
+                      ? "Este endereço faz parte da curadoria Lucky Premium. Desbloqueie para ver."
+                      : place.descricao}
+                  </Text>
+
+                  {isLocked ? (
+                    <Pressable
+                      style={s.unlockBtn}
+                      onPress={() => showPaywall("discovery")}
+                    >
+                      <Feather name="lock" size={13} color="#000000" />
+                      <Text style={s.unlockBtnText}>Desbloquear</Text>
+                    </Pressable>
+                  ) : (
+                    <View style={s.actionsRow}>
+                      <Pressable
+                        style={s.verNoMapaBtn}
+                        onPress={(e) => {
+                          e.stopPropagation?.();
+                          router.push({
+                            pathname: "/lugar/[cityId]/[placeId]",
+                            params: { cityId: destino.id, placeId: place.id, source_table: "lucky_list_rio", showMap: "true" },
+                          });
+                        }}
+                      >
+                        <Feather name="map-pin" size={13} color={C.terracotta} />
+                        <Text style={s.verNoMapaText}>Ver no mapa</Text>
+                      </Pressable>
+                      <Pressable
+                        style={[s.saveBtn, isSaved(place.id) && s.saveBtnSaved]}
+                        onPress={(e) => {
+                          e.stopPropagation?.();
+                          if (isSaved(place.id)) {
+                            unsave(place.id);
+                          } else {
+                            save({
+                              id:           place.id,
+                              categoria:    "lucky",
+                              source_table: "lucky_list_rio",
+                              titulo:       place.titulo,
+                              localizacao:  place.localizacao,
+                              image:        place.image,
+                            });
+                          }
+                        }}
+                      >
+                        <Feather
+                          name="bookmark"
+                          size={13}
+                          color={isSaved(place.id) ? C.white : GOLD}
+                        />
+                        <Text style={[s.saveBtnText, isSaved(place.id) && s.saveBtnTextSaved]}>
+                          {isSaved(place.id) ? "Salvo" : "Salvar"}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  )}
                 </View>
-              </View>
-            </Pressable>
-          ))}
+              </Pressable>
+            );
+          })}
         </View>
 
         <View style={s.footer}>
@@ -395,9 +439,42 @@ const s = StyleSheet.create({
     position: "relative",
   },
   cardImage: {
-    width: "100%",
+    width:  "100%",
     height: "100%",
     resizeMode: "cover",
+  },
+  cardImageLocked: {
+    opacity: 0.35,
+  },
+  lockOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems:     "center",
+    justifyContent: "center",
+    gap:            10,
+    backgroundColor: "rgba(0,0,0,0.30)",
+  },
+  lockBadge: {
+    flexDirection:     "row",
+    alignItems:        "center",
+    gap:               6,
+    backgroundColor:   "rgba(201,168,76,0.16)",
+    borderRadius:      20,
+    paddingHorizontal: 14,
+    paddingVertical:   6,
+    borderWidth:       1,
+    borderColor:       GOLD_BORDER,
+  },
+  lockBadgeText: {
+    fontFamily:    "Inter_500Medium",
+    fontSize:      13,
+    color:         GOLD,
+    letterSpacing: 0.3,
+  },
+  lockHint: {
+    fontFamily: "Inter_400Regular",
+    fontSize:   12,
+    color:      "rgba(255,255,255,0.50)",
+    letterSpacing: 0.2,
   },
   bookmarkBtn: {
     position: "absolute",
@@ -476,6 +553,24 @@ const s = StyleSheet.create({
     color: "rgba(255,255,255,0.62)",
     lineHeight: 21,
     marginBottom: 18,
+  },
+  cardTituloLocked: {
+    color: "rgba(255,255,255,0.35)",
+    fontStyle: "italic",
+  },
+  unlockBtn: {
+    flexDirection:   "row",
+    alignItems:      "center",
+    justifyContent:  "center",
+    gap:             7,
+    backgroundColor: GOLD,
+    borderRadius:    10,
+    paddingVertical: 11,
+  },
+  unlockBtnText: {
+    fontFamily: "Inter_500Medium",
+    fontSize:   13,
+    color:      "#000000",
   },
   actionsRow: { flexDirection: "row", gap: 10 },
   verNoMapaBtn: {

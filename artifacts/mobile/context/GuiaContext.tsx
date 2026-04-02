@@ -1,13 +1,19 @@
 /**
  * GuiaContext.tsx
  *
- * Global state for saved places and the active viagem (roteiro base).
+ * Global state for saved places, premium status, and paywall gating.
  *
  * DATA MODEL
  * ──────────
  *   SavedItem   — a place the user bookmarked (id, categoria, titulo, localizacao, image)
  *   Viagem      — the trip entity  (id, nome, destino, created_at)
  *   ViagemItem  — links a saved place to the viagem (viagem_id, item_id, tipo, bairro)
+ *
+ * PREMIUM
+ * ───────
+ *   isPremium is loaded from AsyncStorage (fast path) then Supabase (authoritative).
+ *   Access gates: save 2nd+ place, generate/edit itinerary, Lucky List locked items.
+ *   Global paywall is triggered via showPaywall(type) — rendered by PaywallModal in layout.
  *
  * PERSISTENCE
  * ───────────
@@ -31,10 +37,17 @@ import React, {
 } from "react";
 import type { ImageSourcePropType } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { supabase } from "@/lib/supabase";
+import { getDeviceId } from "@/utils/deviceId";
 
-// ── Storage key ───────────────────────────────────────────────────────────────
+// ── Storage keys ───────────────────────────────────────────────────────────────
 
-const STORAGE_KEY = "@luckytrip/saved_v1";
+const STORAGE_KEY  = "@luckytrip/saved_v1";
+const PREMIUM_KEY  = "@luckytrip/lucky_premium_v2";
+
+// ── Paywall types ─────────────────────────────────────────────────────────────
+
+export type PaywallType = "discovery" | "lucky" | "depth";
 
 // ── SavedItem ─────────────────────────────────────────────────────────────────
 
@@ -135,13 +148,28 @@ export function tipoFromCategoria(
 
 interface GuiaContextType {
   saved: SavedItem[];
-  save: (item: SavedItem) => void;
+  /**
+   * Save a place. For non-premium users, the 2nd+ save triggers the depth
+   * paywall instead of adding the item. Returns true if the item was saved.
+   */
+  save: (item: SavedItem) => boolean;
   unsave: (id: string) => void;
   isSaved: (id: string) => boolean;
   /** The active trip entity */
   viagem: Viagem;
   /** Derived: one ViagemItem per saved place */
   viagemItens: ViagemItem[];
+  /** Premium status (authoritative, persisted via AsyncStorage + Supabase) */
+  isPremium: boolean;
+  /** Device identifier for Supabase queries */
+  deviceId: string | null;
+  /** Mark user as premium (called after successful purchase verification) */
+  markPremium: () => Promise<void>;
+  /** Global paywall modal state */
+  paywallVisible: boolean;
+  paywallType: PaywallType;
+  showPaywall: (type: PaywallType) => void;
+  hidePaywall: () => void;
 }
 
 const GuiaContext = createContext<GuiaContextType | null>(null);
@@ -149,10 +177,14 @@ const GuiaContext = createContext<GuiaContextType | null>(null);
 // ── Provider ──────────────────────────────────────────────────────────────────
 
 export function GuiaProvider({ children }: { children: React.ReactNode }) {
-  const [saved, setSaved]       = useState<SavedItem[]>([]);
-  const [hydrated, setHydrated] = useState(false);
+  const [saved,          setSaved]          = useState<SavedItem[]>([]);
+  const [hydrated,       setHydrated]       = useState(false);
+  const [isPremium,      setIsPremium]      = useState(false);
+  const [deviceId,       setDeviceId]       = useState<string | null>(null);
+  const [paywallVisible, setPaywallVisible] = useState(false);
+  const [paywallType,    setPaywallType]    = useState<PaywallType>("depth");
 
-  // ── Load from AsyncStorage on mount ───────────────────────────────────────
+  // ── Load saved places from AsyncStorage on mount ───────────────────────────
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
       .then((raw) => {
@@ -168,6 +200,39 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
       .finally(() => setHydrated(true));
   }, []);
 
+  // ── Load premium status on mount ───────────────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      const [id, premiumStr] = await Promise.all([
+        getDeviceId(),
+        AsyncStorage.getItem(PREMIUM_KEY),
+      ]);
+      setDeviceId(id);
+
+      if (premiumStr === "true") {
+        setIsPremium(true);
+        return;
+      }
+
+      // Verify with Supabase (authoritative)
+      try {
+        const { data } = await supabase
+          .from("access_levels")
+          .select("plan_type, access_until")
+          .eq("user_id", id)
+          .maybeSingle();
+
+        const validPlan = data?.plan_type === "premium" || data?.plan_type === "vip";
+        if (validPlan && data?.access_until && new Date(data.access_until) > new Date()) {
+          setIsPremium(true);
+          await AsyncStorage.setItem(PREMIUM_KEY, "true");
+        }
+      } catch {
+        // Network error — rely on AsyncStorage cache
+      }
+    })();
+  }, []);
+
   // ── Persist to AsyncStorage whenever saved changes ─────────────────────────
   useEffect(() => {
     if (!hydrated) return;
@@ -176,12 +241,20 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
 
   // ── Save / unsave ──────────────────────────────────────────────────────────
 
-  const save = useCallback((item: SavedItem) => {
+  const save = useCallback((item: SavedItem): boolean => {
+    if (saved.some((s) => s.id === item.id)) return true;
+    // Non-premium: only 1 free save; 2nd+ triggers depth paywall
+    if (!isPremium && saved.length >= 1) {
+      setPaywallType("depth");
+      setPaywallVisible(true);
+      return false;
+    }
     setSaved((prev) => {
       if (prev.some((s) => s.id === item.id)) return prev;
       return [...prev, item];
     });
-  }, []);
+    return true;
+  }, [saved, isPremium]);
 
   const unsave = useCallback((id: string) => {
     setSaved((prev) => prev.filter((s) => s.id !== id));
@@ -191,6 +264,24 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
     (id: string) => saved.some((s) => s.id === id),
     [saved],
   );
+
+  // ── Mark premium ───────────────────────────────────────────────────────────
+
+  const markPremium = useCallback(async () => {
+    setIsPremium(true);
+    await AsyncStorage.setItem(PREMIUM_KEY, "true");
+  }, []);
+
+  // ── Paywall controls ───────────────────────────────────────────────────────
+
+  const showPaywall = useCallback((type: PaywallType) => {
+    setPaywallType(type);
+    setPaywallVisible(true);
+  }, []);
+
+  const hidePaywall = useCallback(() => {
+    setPaywallVisible(false);
+  }, []);
 
   // ── Derive ViagemItem list ─────────────────────────────────────────────────
   const viagemItens: ViagemItem[] = saved.map((item) => ({
@@ -209,6 +300,13 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
         isSaved,
         viagem: DEFAULT_VIAGEM,
         viagemItens,
+        isPremium,
+        deviceId,
+        markPremium,
+        paywallVisible,
+        paywallType,
+        showPaywall,
+        hidePaywall,
       }}
     >
       {children}

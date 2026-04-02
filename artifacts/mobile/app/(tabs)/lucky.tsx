@@ -5,7 +5,6 @@ import {
   ImageBackground,
   Keyboard,
   KeyboardAvoidingView,
-  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -14,6 +13,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -57,7 +57,6 @@ export default function LuckyScreen() {
   const [responsesUsed,    setResponsesUsed]    = useState(0);
   const [isPremium,        setIsPremium]        = useState(false);
   const [loading,          setLoading]          = useState(false);
-  const [checkingOut,      setCheckingOut]      = useState(false);
   const [inputText,        setInputText]        = useState("");
   const [deviceId,         setDeviceId]         = useState<string | null>(null);
   // showSecondHint: true after the 2nd free answer is delivered (editorial nudge, no button)
@@ -213,21 +212,9 @@ export default function LuckyScreen() {
     [loading, isAtLimit, deviceId, messages, responsesUsed, isPremium, scrollToBottom],
   );
 
-  const handleUpgrade = useCallback(async () => {
-    if (checkingOut || !deviceId) return;
-    setCheckingOut(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("create-checkout", {
-        body: { deviceId },
-      });
-      if (error || !data?.url) throw error ?? new Error("No checkout URL");
-      await Linking.openURL(data.url);
-    } catch {
-      await Linking.openURL("mailto:ola@theluckytrip.com?subject=Premium%20Lucky");
-    } finally {
-      setCheckingOut(false);
-    }
-  }, [deviceId, checkingOut]);
+  const handleUpgrade = useCallback(() => {
+    router.push("/subscription");
+  }, []);
 
   const hasMessages = messages.length > 0;
 
@@ -361,26 +348,27 @@ export default function LuckyScreen() {
                     <Text style={styles.paywallBadgeText}>Lucky Premium</Text>
                   </View>
                 </View>
-                <Text style={styles.paywallTitle}>Continue com o Lucky</Text>
+                <Text style={styles.paywallTitle}>Você chegou muito perto</Text>
                 <Text style={styles.paywallBody}>
-                  Desbloqueie respostas ilimitadas e mais personalização. Assine para
-                  continuar refinando a sua viagem com o nosso concierge.
+                  Continue com o Lucky para refinar sua viagem com inteligência e
+                  acessar respostas ilimitadas.
                 </Text>
                 <Pressable
                   style={({ pressed }) => [
                     styles.paywallCTA,
                     pressed && { opacity: 0.85 },
-                    checkingOut && { opacity: 0.6 },
                   ]}
                   onPress={handleUpgrade}
-                  disabled={checkingOut}
                 >
-                  {checkingOut
-                    ? <ActivityIndicator size="small" color="#000" />
-                    : <Text style={styles.paywallCTAText}>Assinar para continuar</Text>
-                  }
+                  <Text style={styles.paywallCTAText}>Desbloquear agora</Text>
                 </Pressable>
                 <Text style={styles.paywallSub}>Cancele quando quiser · Sem taxas ocultas</Text>
+                <Pressable
+                  style={({ pressed }) => [styles.paywallSecondary, pressed && { opacity: 0.6 }]}
+                  onPress={() => router.push("/subscription")}
+                >
+                  <Text style={styles.paywallSecondaryText}>Prefere ajuda humana?</Text>
+                </Pressable>
               </View>
             )}
           </ScrollView>
@@ -689,10 +677,21 @@ const styles = StyleSheet.create({
     color:      "#000000",
   },
   paywallSub: {
-    fontFamily: "Inter_400Regular",
-    fontSize:   12,
-    color:      "rgba(255,255,255,0.45)",
-    textAlign:  "center",
+    fontFamily:   "Inter_400Regular",
+    fontSize:     12,
+    color:        "rgba(255,255,255,0.45)",
+    textAlign:    "center",
+    marginBottom: 10,
+  },
+  paywallSecondary: {
+    paddingVertical: 6,
+    alignItems:      "center",
+  },
+  paywallSecondaryText: {
+    fontFamily:         "Inter_400Regular",
+    fontSize:           13,
+    color:              "rgba(255,255,255,0.35)",
+    textDecorationLine: "underline",
   },
 
   // Input bar

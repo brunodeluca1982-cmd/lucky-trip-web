@@ -212,7 +212,9 @@ Map tap → navigate directly to bairro page (no floating card). Bairro pages ha
 - `Viagem` — `{ id, nome, destino, created_at }` — one auto-created default viagem per device
 - `ViagemItem` — `{ viagem_id, item_id, tipo, bairro }` — derived in-memory from saved list
 
-**Context**: `context/GuiaContext.tsx` — exposes `{ saved, save, unsave, isSaved, viagem, viagemItens }`. Persists `saved` to AsyncStorage on every change. Loads on mount.
+**Context**: `context/GuiaContext.tsx` — exposes `{ saved, save, unsave, isSaved, viagem, viagemItens, isPremium, deviceId, markPremium, paywallVisible, paywallType, showPaywall, hidePaywall }`. Persists `saved` to AsyncStorage on every change. Loads on mount. `isPremium` loaded from `@luckytrip/lucky_premium_v2` (AsyncStorage fast path) + Supabase `access_levels` table (authoritative).
+
+**Save gating**: non-premium users get 1 free save; 2nd+ attempt fires the depth paywall modal. The `save()` function returns `boolean` (false if gated).
 
 **Grouping logic**: `utils/buildRoteiro.ts` — pure `buildRoteiro(items: SavedItem[]): DiaRoteiro[]`
 - Groups by `localizacao` (bairro) → each bairro = one day
@@ -247,3 +249,40 @@ Map tap → navigate directly to bairro page (no floating card). Bairro pages ha
 - adventure→pao-acucar.png, beach→ipanema.png, festa→lapa.png
 
 **ReplaceSheet**: Supabase curated suggestions + Google Places Autocomplete (600ms debounce, 3+ chars query, requires `EXPO_PUBLIC_GOOGLE_PLACES_KEY`).
+
+### Premium Paywall System
+
+**GuiaContext** (`context/GuiaContext.tsx`) is the authoritative premium state hub:
+- `isPremium` — loaded from AsyncStorage `@luckytrip/lucky_premium_v2` (fast path) then Supabase `access_levels` table (authoritative; `plan_type` in `["premium","vip"]` + `access_until` in future)
+- `deviceId` — persistent UUID from `utils/deviceId.ts`
+- `markPremium()` — sets `isPremium=true` + writes to AsyncStorage (called on post-purchase)
+- `showPaywall(type)` / `hidePaywall()` — controls global `PaywallModal`
+
+**PaywallModal** (`components/PaywallModal.tsx`):
+- Global modal rendered in `(tabs)/_layout.tsx` above all tab content
+- 3 types: `"discovery"` (Lucky List locked items), `"lucky"` (AI limit), `"depth"` (save 2nd+ place)
+- All CTAs navigate to `/subscription`; "Prefere ajuda humana?" (lucky type) goes to Lucky screen
+
+**Subscription screen** (`app/(tabs)/subscription.tsx`, hidden from tab bar):
+- Annual plan (highlighted, "Mais escolhido" + "Economize 40%", R$19,90/mês / R$97/ano)
+- Monthly plan (R$29,90/mês)
+- Weekly link at bottom (R$9,90)
+- CTA calls `supabase.functions.invoke("create-checkout")` with `{ deviceId, plan }`
+
+**Post-purchase screen** (`app/(tabs)/post-purchase.tsx`, hidden from tab bar):
+- Calls `markPremium()` on mount
+- "Você agora é Lucky Pro" — lists unlocked benefits
+- CTA → Lucky List; secondary → home
+
+**Lucky List locking** (`app/(tabs)/luckyList/[id].tsx`):
+- `FREE_ITEMS = 3`: first 3 picks visible to all; items 4+ are locked for non-premium
+- Locked state: dimmed image (opacity 0.35), centered lock badge + "Toque para desbloquear"
+- Locked body: generic text; gold "Desbloquear" CTA triggers `showPaywall("discovery")`
+
+**Lucky AI paywall** (`app/(tabs)/lucky.tsx`):
+- FREE_LIMIT = 2 questions; 3rd attempt shows in-chat paywall card
+- Title: "Você chegou muito perto" / CTA: "Desbloquear agora" → `/subscription`
+- Secondary: "Prefere ajuda humana?" (small link)
+
+**Save gating** (`context/GuiaContext.tsx`):
+- `save(item)` returns `boolean` — false if gated; non-premium can save 1 place free; 2nd+ triggers depth paywall automatically
