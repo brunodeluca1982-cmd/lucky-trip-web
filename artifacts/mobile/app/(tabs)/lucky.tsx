@@ -139,25 +139,43 @@ export default function LuckyScreen() {
 
       try {
         // Call lucky-concierge with Supabase-grounded context
-        const { data, error } = await supabase.functions.invoke("lucky-concierge", {
-          body: {
+        // Use raw fetch so we control status code handling ourselves.
+        // supabase.functions.invoke() throws on any non-2xx, hiding 402 limitReached.
+        const supabaseUrl  = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
+        const supabaseAnon = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
+        const rawRes = await fetch(`${supabaseUrl}/functions/v1/lucky-concierge`, {
+          method:  "POST",
+          headers: {
+            "Content-Type":  "application/json",
+            "Authorization": `Bearer ${supabaseAnon}`,
+            "apikey":        supabaseAnon,
+          },
+          body: JSON.stringify({
             query:       userMsg.content,
             history:     priorHistory.map((m) => ({ role: m.role, content: m.content })),
             deviceId,
             destination: "Rio de Janeiro",
-          },
+          }),
         });
 
-        if (error) throw error;
+        const data = await rawRes.json().catch(() => ({}));
+        console.log("[Lucky] status:", rawRes.status, "data keys:", Object.keys(data));
 
         // 402 = server-side limit reached (authoritative enforcement)
-        if (data?.limitReached) {
-          const newCount = Math.max(responsesUsed, data.questionCount ?? FREE_LIMIT);
+        if (rawRes.status === 402 || data?.limitReached) {
+          console.log("[Lucky] GATE: limit reached");
+          const newCount = Math.max(responsesUsed, data?.questionCount ?? FREE_LIMIT);
           setResponsesUsed(newCount);
           await AsyncStorage.setItem(RESPONSES_USED_KEY, String(newCount));
           setLoading(false);
           scrollToBottom();
           return;
+        }
+
+        if (!rawRes.ok || data?.error) {
+          const errMsg = data?.error ?? `HTTP ${rawRes.status}`;
+          console.error("[Lucky] server error:", errMsg);
+          throw new Error(errMsg);
         }
 
         const reply = data?.reply ?? "Desculpe, não consegui processar sua pergunta.";
@@ -173,7 +191,9 @@ export default function LuckyScreen() {
           setIsPremium(true);
           await AsyncStorage.setItem(IS_PREMIUM_KEY, "true");
         }
-      } catch {
+      } catch (err) {
+        const errMsg = (err as Error)?.message ?? "unknown";
+        console.error("[Lucky] CATCH:", errMsg);
         setMessages((prev) => [
           ...prev,
           { role: "assistant", content: "Hmm, algo deu errado. Tente novamente em instantes." },

@@ -234,38 +234,44 @@ async function fetchLuckyPicks(supa: ReturnType<typeof createClient>) {
 
 // ── Gemini call ───────────────────────────────────────────────────────────────
 
-async function callGemini(systemPrompt: string, allMessages: Message[]): Promise<string> {
-  const apiKey = Deno.env.get("GEMINI_API_KEY");
-  if (!apiKey) throw new Error("GEMINI_API_KEY not set");
+async function callAI(systemPrompt: string, allMessages: Message[]): Promise<string> {
+  const apiKey = Deno.env.get("OPENAI_API_KEY");
+  if (!apiKey) throw new Error("OPENAI_API_KEY not set");
 
-  const contents = [
-    { role: "user",  parts: [{ text: systemPrompt }] },
-    { role: "model", parts: [{ text: "Entendido. Sou o Lucky, concierge do The Lucky Trip. Respondo apenas com dados reais da nossa curadoria do Rio de Janeiro." }] },
+  const openAiMessages = [
+    { role: "system", content: systemPrompt },
     ...allMessages.map((m) => ({
-      role:  m.role === "user" ? "user" : "model",
-      parts: [{ text: m.content }],
+      role:    m.role === "user" ? "user" : "assistant",
+      content: m.content,
     })),
   ];
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-    {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents,
-        generationConfig: { temperature: 0.65, maxOutputTokens: 500 },
-      }),
+  const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+    method:  "POST",
+    headers: {
+      "Content-Type":  "application/json",
+      "Authorization": `Bearer ${apiKey}`,
     },
-  );
+    body: JSON.stringify({
+      model:       "gpt-4o-mini",
+      messages:    openAiMessages,
+      temperature: 0.65,
+      max_tokens:  600,
+    }),
+  });
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Gemini error: ${err}`);
+  if (!aiRes.ok) {
+    const errText = await aiRes.text();
+    console.error("[lucky-concierge] OpenAI API error:", aiRes.status, errText);
+    throw new Error(`OpenAI error (${aiRes.status}): ${errText}`);
   }
 
-  const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  const data = await aiRes.json();
+  const text = data.choices?.[0]?.message?.content ?? "";
+  if (!text) {
+    console.error("[lucky-concierge] OpenAI returned empty text. Full response:", JSON.stringify(data));
+  }
+  return text;
 }
 
 // ── Main handler ──────────────────────────────────────────────────────────────
@@ -307,17 +313,26 @@ serve(async (req) => {
       );
     }
 
-    const supa = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-    );
+    console.log("[lucky-concierge] REQUEST:", { deviceId, destination, queryLength: query.length });
+
+    const supaUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supaKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    if (!supaUrl || !supaKey) {
+      console.error("[lucky-concierge] Missing Supabase env vars:", { supaUrl: !!supaUrl, supaKey: !!supaKey });
+    }
+
+    const supa = createClient(supaUrl, supaKey);
 
     // ── 1. Premium check ──
     const isPremium = await checkPremium(supa, deviceId);
+    console.log("[lucky-concierge] isPremium:", isPremium);
 
     // ── 2. Usage gate (server-side enforcement) ──
     const currentCount = await getQuestionCount(supa, deviceId);
+    console.log("[lucky-concierge] questionCount:", currentCount, "/ limit:", FREE_LIMIT);
+
     if (!isPremium && currentCount >= FREE_LIMIT) {
+      console.log("[lucky-concierge] GATE: limit reached — returning 402");
       return new Response(
         JSON.stringify({
           reply:         null,
@@ -331,10 +346,12 @@ serve(async (req) => {
 
     // ── 3. Intent routing + Supabase data fetch ──
     const intents = detectIntent(query);
+    console.log("[lucky-concierge] intents:", [...intents]);
     const contextParts: string[] = [];
 
     if (intents.has("restaurants")) {
       const rows = await fetchRestaurants(supa);
+      console.log("[lucky-concierge] restaurantes rows:", rows.length);
       if (rows.length) {
         contextParts.push(
           "RESTAURANTES DA CURADORIA (use apenas estes, nunca invente):\n" +
@@ -347,6 +364,7 @@ serve(async (req) => {
 
     if (intents.has("activities")) {
       const rows = await fetchActivities(supa);
+      console.log("[lucky-concierge] o_que_fazer_rio rows:", rows.length);
       if (rows.length) {
         contextParts.push(
           "O QUE FAZER NO RIO (use apenas estes):\n" +
@@ -359,6 +377,7 @@ serve(async (req) => {
 
     if (intents.has("hotels")) {
       const rows = await fetchHotels(supa);
+      console.log("[lucky-concierge] stay_hotels rows:", rows.length);
       if (rows.length) {
         contextParts.push(
           "ONDE FICAR NO RIO (use apenas estes):\n" +
@@ -371,6 +390,7 @@ serve(async (req) => {
 
     if (intents.has("neighborhoods")) {
       const rows = await fetchNeighborhoods(supa);
+      console.log("[lucky-concierge] stay_neighborhoods rows:", rows.length);
       if (rows.length) {
         contextParts.push(
           "BAIRROS DO RIO:\n" +
@@ -383,6 +403,7 @@ serve(async (req) => {
 
     if (intents.has("lucky_picks")) {
       const rows = await fetchLuckyPicks(supa);
+      console.log("[lucky-concierge] lucky_list_rio rows:", rows.length);
       if (rows.length) {
         contextParts.push(
           "LUCKY PICKS — SELEÇÃO EXCLUSIVA (use apenas estes):\n" +
@@ -394,6 +415,7 @@ serve(async (req) => {
     }
 
     const noData = contextParts.length === 0;
+    console.log("[lucky-concierge] contextParts:", contextParts.length, "noData:", noData);
 
     const systemPrompt =
 `Você é o Lucky, concierge pessoal do app The Lucky Trip — guia editorial premium do Rio de Janeiro.
@@ -418,14 +440,17 @@ ${noData
       { role: "user", content: query },
     ];
 
-    const answer = await callGemini(systemPrompt, allMessages);
+    console.log("[lucky-concierge] Calling OpenAI gpt-4o-mini...");
+    const answer = await callAI(systemPrompt, allMessages);
+    console.log("[lucky-concierge] AI answered:", answer.length > 0, "chars:", answer.length);
 
     if (!answer.trim()) {
-      throw new Error("Empty response from AI");
+      throw new Error("Empty response from AI — model returned no text");
     }
 
     // ── 4. Increment count AFTER successful answer ──
     const newCount = await incrementQuestionCount(supa, deviceId);
+    console.log("[lucky-concierge] SUCCESS — newCount:", newCount);
 
     return new Response(
       JSON.stringify({
@@ -437,8 +462,10 @@ ${noData
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
     );
   } catch (err) {
+    const errMsg = (err as Error).message ?? "unknown error";
+    console.error("[lucky-concierge] UNHANDLED ERROR:", errMsg);
     return new Response(
-      JSON.stringify({ error: (err as Error).message }),
+      JSON.stringify({ error: errMsg }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 },
     );
   }
