@@ -394,9 +394,6 @@ export default function HomeScreen() {
             resizeMode="contain"
           />
           <Text style={s.footerTagline}>inteligência humana em viagens</Text>
-          <Text style={s.footerText}>
-            Curadoria editorial para viajantes que entendem de beleza.
-          </Text>
         </View>
 
       </ScrollView>

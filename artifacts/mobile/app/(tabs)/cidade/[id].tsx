@@ -435,9 +435,6 @@ export default function CidadeScreen() {
 
           <View style={s.footer}>
             <Text style={s.footerL}>L.</Text>
-            <Text style={s.footerText}>
-              Curadoria editorial para viajantes que entendem de beleza.
-            </Text>
           </View>
         </View>
       </ScrollView>
