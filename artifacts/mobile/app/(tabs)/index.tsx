@@ -122,7 +122,7 @@ function RoteiroCard({ roteiro }: { roteiro: Roteiro }) {
   return (
     <Pressable
       style={({ pressed }) => [s.roteiroCard, pressed && { opacity: 0.90, transform: [{ scale: 0.97 }] }]}
-      onPress={() => router.push("/(tabs)/viagem")}
+      onPress={() => router.push({ pathname: "/(tabs)/roteiro/[id]", params: { id: roteiro.id } })}
     >
       <Image source={roteiro.image} style={s.roteiroImage} resizeMode="cover" />
       <LinearGradient

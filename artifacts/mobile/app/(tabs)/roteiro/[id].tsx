@@ -1,0 +1,395 @@
+/**
+ * roteiro/[id].tsx — Prebuilt itinerary detail screen.
+ *
+ * Renders a curated base roteiro (from mockData.roteiros) using the exact
+ * same DiaCard / PeriodoBlock / RoteiroSection model as the generated
+ * itinerary in viagem.tsx. Same visual hierarchy, same day cards, same
+ * period labels, same design standard.
+ *
+ * Navigation target: from Home RoteiroCard onPress.
+ */
+
+import React from "react";
+import {
+  Image,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { router, useLocalSearchParams } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Feather } from "@expo/vector-icons";
+
+import Colors from "@/constants/colors";
+import {
+  roteiros,
+  type RoteiroDia,
+  type RoteiroSlot,
+  type RoteiroCategory,
+} from "@/data/mockData";
+import {
+  PERIODO_LABEL,
+  PERIODO_ICON,
+  type DiaRoteiro,
+  type DiaPeriodo,
+  type PeriodoDia,
+} from "@/utils/buildRoteiro";
+import type { SavedItem, SavedCategory } from "@/context/GuiaContext";
+
+const C    = Colors.light;
+const GOLD = "#D4AF37";
+
+// ── Category mapping: RoteiroCategory → SavedCategory ─────────────────────────
+const CAT_MAP: Record<RoteiroCategory, SavedCategory> = {
+  passeio:      "oQueFazer",
+  gastronomia:  "restaurante",
+  cultura:      "oQueFazer",
+  "contemplação": "oQueFazer",
+  natureza:     "oQueFazer",
+  compras:      "oQueFazer",
+  noite:        "oQueFazer",
+};
+
+// Slot name → periodo key mapping (mockData slot keys → buildRoteiro PeriodoDia)
+const SLOT_PERIODO: Record<string, PeriodoDia> = {
+  manha:  "manha",
+  almoco: "almoco",
+  tarde:  "tarde",
+  jantar: "jantar",
+  noite:  "late_night",
+};
+
+// ── Converters ─────────────────────────────────────────────────────────────────
+
+function slotToItem(slot: RoteiroSlot, key: string): SavedItem {
+  return {
+    id:           key,
+    titulo:       slot.name,
+    localizacao:  slot.neighborhood,
+    image:        require("@/assets/images/hero-rio.png"),
+    categoria:    CAT_MAP[slot.category],
+  };
+}
+
+function toDiaRoteiros(itinerary: RoteiroDia[], roteiroId: string): DiaRoteiro[] {
+  return itinerary.map((dia) => {
+    const periodos: DiaPeriodo[] = [];
+    const SLOTS: [keyof RoteiroDia, string][] = [
+      ["manha",  "manha"],
+      ["almoco", "almoco"],
+      ["tarde",  "tarde"],
+      ["jantar", "jantar"],
+      ["noite",  "noite"],
+    ];
+    for (const [field, periodoKey] of SLOTS) {
+      const slot = dia[field] as RoteiroSlot | undefined;
+      if (!slot) continue;
+      periodos.push({
+        periodo: SLOT_PERIODO[periodoKey],
+        items:   [slotToItem(slot, `${roteiroId}-d${dia.dia}-${periodoKey}`)],
+      });
+    }
+    return { numero: dia.dia, bairro: dia.bairro, periodos };
+  });
+}
+
+// ── Shared itinerary components — identical model to viagem.tsx ────────────────
+
+function PeriodoBlock({ periodo, items }: DiaPeriodo) {
+  const label = PERIODO_LABEL[periodo];
+  const icon  = PERIODO_ICON[periodo] as keyof typeof Feather.glyphMap;
+  return (
+    <View style={rot.periodoWrap}>
+      <View style={rot.periodoHeader}>
+        <Feather name={icon} size={10} color={GOLD} />
+        <Text style={rot.periodoLabel}>{label}</Text>
+      </View>
+      {items.map((item) => (
+        <View key={item.id} style={rot.itemRow}>
+          <View style={rot.itemDot} />
+          <Text style={rot.itemNome} numberOfLines={1}>{item.titulo}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function DiaCard({ dia }: { dia: DiaRoteiro }) {
+  return (
+    <View style={rot.diaCard}>
+      <View style={rot.diaHeader}>
+        <Text style={rot.diaNum}>DIA {dia.numero}</Text>
+        <Text style={rot.diaBairro}>{dia.bairro}</Text>
+      </View>
+      <View style={rot.separator} />
+      {dia.periodos.map((p) => (
+        <PeriodoBlock key={p.periodo} {...p} />
+      ))}
+    </View>
+  );
+}
+
+// ── Main screen ────────────────────────────────────────────────────────────────
+
+export default function RoteiroDetailScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const insets    = useSafeAreaInsets();
+  const topPad    = Platform.OS === "web" ? 67 : insets.top + 12;
+  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+
+  const roteiro = roteiros.find((r) => r.id === id);
+  if (!roteiro) return null;
+
+  const dias = toDiaRoteiros(roteiro.itinerary, roteiro.id);
+
+  return (
+    <View style={s.root}>
+
+      {/* ── Cinematic background — blurred roteiro hero image ── */}
+      <Image
+        source={roteiro.image}
+        style={StyleSheet.absoluteFillObject}
+        resizeMode="cover"
+        blurRadius={Platform.OS === "ios" ? 28 : 16}
+      />
+      <LinearGradient
+        colors={[
+          "rgba(0,0,0,0.10)",
+          "rgba(0,0,0,0.38)",
+          "rgba(0,0,0,0.66)",
+          "rgba(0,0,0,0.82)",
+        ]}
+        locations={[0, 0.25, 0.55, 1]}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          s.content,
+          { paddingTop: topPad + 8, paddingBottom: bottomPad + 90 },
+        ]}
+      >
+
+        {/* ── Back button ── */}
+        <Pressable
+          onPress={() => router.back()}
+          style={({ pressed }) => [s.backBtn, pressed && { opacity: 0.65 }]}
+          hitSlop={12}
+        >
+          <Feather name="arrow-left" size={18} color="rgba(255,255,255,0.80)" />
+        </Pressable>
+
+        {/* ── Header ── */}
+        <View style={s.header}>
+          <Text style={s.eyebrow}>ROTEIRO</Text>
+          <Text style={s.title}>{roteiro.titulo}</Text>
+          <View style={s.metaRow}>
+            <View style={s.metaPill}>
+              <Feather name="clock" size={11} color={GOLD} />
+              <Text style={s.metaText}>{roteiro.dias}</Text>
+            </View>
+            {roteiro.tags.map((tag) => (
+              <View key={tag} style={s.metaPill}>
+                <Text style={s.metaText}>{tag}</Text>
+              </View>
+            ))}
+            <View style={s.metaPill}>
+              <Text style={s.metaText}>{roteiro.numLugares} lugares</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* ── Thin rule ── */}
+        <View style={s.rule} />
+
+        {/* ── Itinerary — same day cards as generated roteiro ── */}
+        <View style={rot.wrap}>
+          <View style={rot.titleRow}>
+            <Text style={rot.sectionLabel}>Roteiro completo</Text>
+            <View style={rot.pill}>
+              <Text style={rot.pillText}>
+                {dias.length} {dias.length === 1 ? "dia" : "dias"}
+              </Text>
+            </View>
+          </View>
+          {dias.map((dia) => (
+            <DiaCard key={dia.numero} dia={dia} />
+          ))}
+        </View>
+
+      </ScrollView>
+    </View>
+  );
+}
+
+// ── Screen styles ──────────────────────────────────────────────────────────────
+
+const s = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: "#100D09",
+  },
+  content: {
+    paddingHorizontal: 24,
+  },
+  backBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "rgba(0,0,0,0.32)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 20,
+  },
+  header: {
+    gap: 10,
+    marginBottom: 18,
+  },
+  eyebrow: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    color: GOLD,
+    letterSpacing: 2.5,
+  },
+  title: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 36,
+    color: C.cream,
+    lineHeight: 42,
+  },
+  metaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 4,
+  },
+  metaPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: `${GOLD}12`,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: `${GOLD}28`,
+  },
+  metaText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    color: GOLD,
+  },
+  rule: {
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    marginBottom: 22,
+  },
+});
+
+// ── Itinerary styles — pixel-identical to viagem.tsx rot stylesheet ────────────
+
+const rot = StyleSheet.create({
+  wrap: {
+    gap: 10,
+  },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 2,
+  },
+  sectionLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    color: "rgba(255,255,255,0.55)",
+    letterSpacing: 1.4,
+    textTransform: "uppercase",
+  },
+  pill: {
+    backgroundColor: `${GOLD}10`,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: `${GOLD}24`,
+  },
+  pillText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 10,
+    color: GOLD,
+  },
+  diaCard: {
+    borderRadius: 16,
+    backgroundColor: "rgba(0,0,0,0.22)",
+    borderWidth: 1,
+    borderColor: `${GOLD}18`,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    boxShadow: `0px 2px 12px rgba(0,0,0,0.20)`,
+  },
+  diaHeader: {
+    marginBottom: 10,
+    gap: 1,
+  },
+  diaNum: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    color: GOLD,
+    letterSpacing: 1.6,
+    textTransform: "uppercase",
+  },
+  diaBairro: {
+    fontFamily: "PlayfairDisplay_600SemiBold",
+    fontSize: 20,
+    color: C.cream,
+    lineHeight: 26,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: `${GOLD}14`,
+    marginBottom: 12,
+  },
+  periodoWrap: {
+    marginBottom: 10,
+  },
+  periodoHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginBottom: 5,
+  },
+  periodoLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 9,
+    color: GOLD,
+    letterSpacing: 1.4,
+    textTransform: "uppercase",
+  },
+  itemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 3,
+  },
+  itemDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.25)",
+    flexShrink: 0,
+  },
+  itemNome: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.75)",
+    flex: 1,
+  },
+});

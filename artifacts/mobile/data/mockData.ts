@@ -112,6 +112,7 @@ export const heroDestinos = [
     badge: "Onde comer",
     image: require("../assets/images/restaurante1.png"),
     cityId: "rio",
+    route: "/(tabs)/comerBem/rio",
   },
   {
     id: "e2",
@@ -120,6 +121,7 @@ export const heroDestinos = [
     badge: "Experiências",
     image: require("../assets/images/pao-acucar.png"),
     cityId: "rio",
+    route: "/(tabs)/oQueFazer/rio",
   },
   {
     id: "2",

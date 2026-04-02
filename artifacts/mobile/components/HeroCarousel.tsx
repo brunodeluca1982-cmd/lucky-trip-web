@@ -26,6 +26,7 @@ interface HeroItem {
   badge: string;
   image: ImageSourcePropType;
   cityId?: string;
+  route?: string;
 }
 
 interface HeroCarouselProps {
@@ -39,14 +40,18 @@ function HeroSlide({ item }: { item: HeroItem }) {
       style={({ pressed }) => [styles.slide, pressed && { opacity: 0.94 }]}
       onPress={() => {
         if (!item.cityId) return;
-        if (item.cityId === "rio") {
-          router.push({ pathname: "/cidade/[id]", params: { id: item.cityId } });
-        } else {
+        if (item.cityId !== "rio") {
           Alert.alert(
             "Em breve disponível",
             "Estamos preparando esse destino com o cuidado do The Lucky Trip",
             [{ text: "OK" }]
           );
+          return;
+        }
+        if (item.route) {
+          router.push(item.route as any);
+        } else {
+          router.push({ pathname: "/cidade/[id]", params: { id: item.cityId } });
         }
       }}
     >

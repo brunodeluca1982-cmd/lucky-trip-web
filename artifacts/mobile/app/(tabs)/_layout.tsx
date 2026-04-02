@@ -131,6 +131,7 @@ export default function TabLayout() {
       <Tabs.Screen name="agoraNoRio/[id]"  options={{ href: null }} />
       <Tabs.Screen name="luckyList/[id]"   options={{ href: null }} />
       <Tabs.Screen name="roteiro/index"    options={{ href: null }} />
+      <Tabs.Screen name="roteiro/[id]"    options={{ href: null }} />
     </Tabs>
   );
 }
