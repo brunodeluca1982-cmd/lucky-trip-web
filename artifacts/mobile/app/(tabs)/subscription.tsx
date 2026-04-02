@@ -31,7 +31,7 @@ const GOLD_DIM  = "rgba(212,175,55,0.14)";
 const GOLD_BDR  = "rgba(212,175,55,0.30)";
 const LOGO_MARK = require("@/assets/images/logo-symbol.png");
 
-type Plan = "annual" | "monthly" | "weekly";
+type Plan = "annual" | "monthly" | "weekly" | "one_time";
 
 const PLANS = {
   annual: {

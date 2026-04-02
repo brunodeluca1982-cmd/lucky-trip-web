@@ -18,9 +18,10 @@ const corsHeaders = {
 };
 
 const PLAN_ENV_MAP: Record<string, string> = {
-  annual:  "STRIPE_PRICE_ID_ANNUAL",
-  monthly: "STRIPE_PRICE_ID_MONTHLY",
-  weekly:  "STRIPE_PRICE_ID_WEEKLY",
+  annual:   "STRIPE_PRICE_ID_ANNUAL",
+  monthly:  "STRIPE_PRICE_ID_MONTHLY",
+  weekly:   "STRIPE_PRICE_ID_WEEKLY",
+  one_time: "STRIPE_PRICE_ID_ONE_TIME",
 };
 
 Deno.serve(async (req: Request) => {
