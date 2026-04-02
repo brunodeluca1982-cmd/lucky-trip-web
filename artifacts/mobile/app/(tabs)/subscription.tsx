@@ -23,7 +23,6 @@ import {
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { getDeviceId } from "@/utils/deviceId";
 
 const GOLD      = "#D4AF37";
 const GOLD_DIM  = "rgba(212,175,55,0.14)";
@@ -74,37 +73,28 @@ export default function SubscriptionScreen() {
     setErrorMsg(null);
     setLoading(true);
     try {
-      const id = await getDeviceId();
-      const supabaseUrl  = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
-      const supabaseAnon = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
-      console.log("CHECKOUT STARTED — payload:", { deviceId: id, plan: selected });
-
-      const rawRes = await fetch(`${supabaseUrl}/functions/v1/create-checkout`, {
-        method:  "POST",
+      const res = await fetch("https://lsibzflaaqzvtzjlvrxw.supabase.co/functions/v1/create-checkout", {
+        method: "POST",
         headers: {
-          "Content-Type":  "application/json",
-          "Authorization": `Bearer ${supabaseAnon}`,
+          "Content-Type": "application/json"
         },
-        body: JSON.stringify({ deviceId: id, plan: selected }),
+        body: JSON.stringify({
+          plan: selected
+        })
       });
 
-      const json = await rawRes.json();
-      console.log("Checkout response — status:", rawRes.status, "body:", json);
+      const data = await res.json();
 
-      if (!rawRes.ok || !json?.url) {
-        const backendError = json?.error ?? JSON.stringify(json);
-        setErrorMsg(backendError);
-        return;
-      }
+      console.log("Checkout response:", data);
 
-      if (Platform.OS === "web") {
-        window.location.href = json.url;
+      if (data.url) {
+        window.location.href = data.url;
       } else {
-        await Linking.openURL(json.url);
+        alert(data.error || "Erro ao iniciar pagamento");
       }
     } catch (err: any) {
       console.error("Checkout fetch error:", err);
-      setErrorMsg(err?.message ?? String(err));
+      alert(err?.message ?? String(err));
     } finally {
       setLoading(false);
     }
