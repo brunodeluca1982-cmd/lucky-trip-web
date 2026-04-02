@@ -53,13 +53,15 @@ export default function LuckyScreen() {
 
   const scrollRef = useRef<ScrollView>(null);
 
-  const [messages,      setMessages]      = useState<Message[]>([]);
-  const [responsesUsed, setResponsesUsed] = useState(0);
-  const [isPremium,     setIsPremium]     = useState(false);
-  const [loading,       setLoading]       = useState(false);
-  const [checkingOut,   setCheckingOut]   = useState(false);
-  const [inputText,     setInputText]     = useState("");
-  const [deviceId,      setDeviceId]      = useState<string | null>(null);
+  const [messages,         setMessages]         = useState<Message[]>([]);
+  const [responsesUsed,    setResponsesUsed]    = useState(0);
+  const [isPremium,        setIsPremium]        = useState(false);
+  const [loading,          setLoading]          = useState(false);
+  const [checkingOut,      setCheckingOut]      = useState(false);
+  const [inputText,        setInputText]        = useState("");
+  const [deviceId,         setDeviceId]         = useState<string | null>(null);
+  // showSecondHint: true after the 2nd free answer is delivered (editorial nudge, no button)
+  const [showSecondHint,   setShowSecondHint]   = useState(false);
 
   const isAtLimit = !isPremium && responsesUsed >= FREE_LIMIT;
 
@@ -186,6 +188,11 @@ export default function LuckyScreen() {
         setResponsesUsed(newCount);
         await AsyncStorage.setItem(RESPONSES_USED_KEY, String(newCount));
 
+        // Show subtle editorial hint after 2nd free answer (question 2 only, not blocked)
+        if (!isPremium && newCount === FREE_LIMIT) {
+          setShowSecondHint(true);
+        }
+
         // Update premium status from server if changed
         if (data?.isPremium && !isPremium) {
           setIsPremium(true);
@@ -223,7 +230,6 @@ export default function LuckyScreen() {
   }, [deviceId, checkingOut]);
 
   const hasMessages = messages.length > 0;
-  const remaining   = Math.max(0, FREE_LIMIT - responsesUsed);
 
   return (
     <ImageBackground
@@ -264,16 +270,7 @@ export default function LuckyScreen() {
                   Pergunte sobre o Rio, peça sugestões ou deixe{"\n"}me guiar a sua viagem.
                 </Text>
               )}
-              {!isPremium && hasMessages && (
-                <View style={styles.counterBadge}>
-                  <Feather name="zap" size={11} color={remaining === 0 ? "rgba(255,255,255,0.55)" : GOLD} />
-                  <Text style={[styles.counterText, remaining === 0 && { color: "rgba(255,255,255,0.55)" }]}>
-                    {remaining === 0
-                      ? "Limite gratuito atingido"
-                      : `${remaining} de ${FREE_LIMIT} respostas gratuitas restantes`}
-                  </Text>
-                </View>
-              )}
+              {/* No counter badge during free questions — premium moment is question 3 only */}
               {isPremium && (
                 <View style={styles.premiumBadge}>
                   <Feather name="star" size={11} color={GOLD} />
@@ -341,6 +338,13 @@ export default function LuckyScreen() {
                   <Text style={styles.loadingText}>Consultando a curadoria...</Text>
                 </View>
               </View>
+            )}
+
+            {/* ── Subtle editorial nudge after 2nd answer (no button, no pressure) ── */}
+            {showSecondHint && !isAtLimit && !loading && (
+              <Text style={styles.secondHint}>
+                Posso refinar isso ainda mais para você.
+              </Text>
             )}
 
             {/* ── Paywall ── */}
@@ -467,23 +471,6 @@ const styles = StyleSheet.create({
     fontSize:   15,
     color:      "rgba(255,255,255,0.60)",
     lineHeight: 23,
-  },
-  counterBadge: {
-    flexDirection:     "row",
-    alignItems:        "center",
-    gap:               5,
-    alignSelf:         "flex-start",
-    backgroundColor:   "rgba(212,175,55,0.12)",
-    borderRadius:      20,
-    paddingHorizontal: 10,
-    paddingVertical:   5,
-    borderWidth:       1,
-    borderColor:       "rgba(212,175,55,0.22)",
-  },
-  counterText: {
-    fontFamily: "Inter_500Medium",
-    fontSize:   12,
-    color:      GOLD,
   },
   premiumBadge: {
     flexDirection:     "row",
@@ -626,6 +613,18 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize:   14,
     color:      "rgba(255,255,255,0.55)",
+  },
+
+  // Subtle editorial hint after question 2
+  secondHint: {
+    fontFamily:    "Inter_400Regular",
+    fontSize:      13,
+    fontStyle:     "italic",
+    color:         "rgba(255,255,255,0.42)",
+    textAlign:     "center",
+    marginTop:     4,
+    marginBottom:  20,
+    paddingHorizontal: 24,
   },
 
   // Paywall
