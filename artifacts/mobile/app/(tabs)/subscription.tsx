@@ -23,7 +23,6 @@ import {
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { supabase } from "@/lib/supabase";
 import { getDeviceId } from "@/utils/deviceId";
 
 const GOLD      = "#D4AF37";
@@ -76,24 +75,36 @@ export default function SubscriptionScreen() {
     setLoading(true);
     try {
       const id = await getDeviceId();
-      console.log("CHECKOUT STARTED");
-      const { data, error } = await supabase.functions.invoke("create-checkout", {
-        body: { deviceId: id, plan: selected },
-      });
-      console.log("Checkout response:", data, error);
-      if (error || !data?.url) throw error ?? new Error("No checkout URL");
+      const supabaseUrl  = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
+      const supabaseAnon = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
+      console.log("CHECKOUT STARTED — payload:", { deviceId: id, plan: selected });
 
-      // On web (Expo web / Replit preview) window.open is blocked by the iframe sandbox.
-      // Use same-tab navigation so the redirect is never blocked.
-      if (Platform.OS === "web") {
-        window.location.href = data.url;
-      } else {
-        await Linking.openURL(data.url);
+      const rawRes = await fetch(`${supabaseUrl}/functions/v1/create-checkout`, {
+        method:  "POST",
+        headers: {
+          "Content-Type":  "application/json",
+          "Authorization": `Bearer ${supabaseAnon}`,
+        },
+        body: JSON.stringify({ deviceId: id, plan: selected }),
+      });
+
+      const json = await rawRes.json();
+      console.log("Checkout response — status:", rawRes.status, "body:", json);
+
+      if (!rawRes.ok || !json?.url) {
+        const backendError = json?.error ?? JSON.stringify(json);
+        setErrorMsg(backendError);
+        return;
       }
-    } catch (err) {
-      console.error("Checkout error:", err);
-      // Inline error — Alert.alert is blocked inside the Replit iframe on web
-      setErrorMsg("Não foi possível iniciar o pagamento. Tente novamente.");
+
+      if (Platform.OS === "web") {
+        window.location.href = json.url;
+      } else {
+        await Linking.openURL(json.url);
+      }
+    } catch (err: any) {
+      console.error("Checkout fetch error:", err);
+      setErrorMsg(err?.message ?? String(err));
     } finally {
       setLoading(false);
     }
