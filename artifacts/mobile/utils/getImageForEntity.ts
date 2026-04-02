@@ -57,6 +57,18 @@ const RESTAURANT_WEB_IMAGES: Record<string, string> = {
     "https://commons.wikimedia.org/wiki/Special:FilePath/Arcos_da_Lapa_-_Rio_de_Janeiro.jpg",
   "banzeiro":
     "https://commons.wikimedia.org/wiki/Special:FilePath/Pao_de_Acucar_-_Rio_de_Janeiro_-_Brasil.jpg",
+  "laguna":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Lagoa_Rodrigo_de_Freitas_-_Rio_de_Janeiro%2C_Brazil.jpg",
+  "laguna restaurante":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Lagoa_Rodrigo_de_Freitas_-_Rio_de_Janeiro%2C_Brazil.jpg",
+  "ilha da gigóia":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Lagoa_Rodrigo_de_Freitas_-_Rio_de_Janeiro%2C_Brazil.jpg",
+  "ilha da gigoia":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Lagoa_Rodrigo_de_Freitas_-_Rio_de_Janeiro%2C_Brazil.jpg",
+  "almoçar no laguna restaurante na ilha da gigóia":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Lagoa_Rodrigo_de_Freitas_-_Rio_de_Janeiro%2C_Brazil.jpg",
+  "almocar no laguna restaurante na ilha da gigoia":
+    "https://commons.wikimedia.org/wiki/Special:FilePath/Lagoa_Rodrigo_de_Freitas_-_Rio_de_Janeiro%2C_Brazil.jpg",
 };
 
 const HOTEL_WEB_IMAGES: Record<string, string> = {

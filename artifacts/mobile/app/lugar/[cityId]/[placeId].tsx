@@ -188,19 +188,28 @@ function useSupabaseLugar(
           if (data) {
             const pin = resolvePin("rio", (data as any).bairro ?? "", 0);
             // photo_url IS present in lucky_list_rio — always use it when available
-            const photoUri = (data as any).photo_url as string | null ?? null;
-            const meuOlhar = (data as any).meu_olhar as string | null;
+            const photoUri  = (data as any).photo_url as string | null ?? null;
+            const meuOlhar  = (data as any).meu_olhar as string | null;
             const descricao = meuOlhar ?? "Um dos achados especiais da Lucky List — lugares que só quem sabe, sabe.";
+            const tipoItem  = (data as any).tipo_item as string | null;
+            const entityType =
+              tipoItem === "restaurante" ? "restaurant" :
+              tipoItem === "hotel"       ? "hotel"       :
+              "activity";
+            const resolvedTipo =
+              tipoItem === "restaurante" ? "restaurante" :
+              tipoItem === "hotel"       ? "hotel"       :
+              "experiencia";
             resolved = {
               id:          String((data as any).id),
               titulo:      (data as any).nome ?? "Lucky Pick",
               localizacao: (data as any).bairro ?? "Rio de Janeiro",
-              categoria:   ((data as any).tipo_item as string | null)?.toUpperCase() ?? "LUCKY LIST",
+              categoria:   (tipoItem?.toUpperCase()) ?? "LUCKY LIST",
               descricao,
-              image:       getImageForEntity("activity", (data as any).nome ?? "", (data as any).bairro ?? "", photoUri),
+              image:       getImageForEntity(entityType, (data as any).nome ?? "", (data as any).bairro ?? "", photoUri),
               xPct:        pin.xPct,
               yPct:        pin.yPct,
-              tipo_item:   "experiencia",
+              tipo_item:   resolvedTipo,
               google_maps_url: (data as any).google_maps_url ?? null,
             };
           }

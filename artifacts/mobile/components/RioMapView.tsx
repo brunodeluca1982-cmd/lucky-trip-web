@@ -165,8 +165,20 @@ function buildLeafletHTML(
       text-shadow: 0 1px 4px rgba(0,0,0,0.70);
     }
 
-    /* Leaflet chrome — glass style matching the app's floating UI */
-    .leaflet-control-attribution { font-size: 8px; opacity: 0.22; }
+    /* Leaflet attribution — legally required by Esri; styled to be non-intrusive */
+    .leaflet-control-attribution {
+      font-size: 7px;
+      opacity: 0.28;
+      background: transparent !important;
+      box-shadow: none !important;
+      border-radius: 0 !important;
+      color: rgba(255,255,255,0.65) !important;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.90);
+      padding: 2px 5px !important;
+    }
+    .leaflet-control-attribution a {
+      color: rgba(255,255,255,0.50) !important;
+    }
     .leaflet-bar a {
       background: rgba(255,255,255,0.14);
       color: rgba(255,255,255,0.80);

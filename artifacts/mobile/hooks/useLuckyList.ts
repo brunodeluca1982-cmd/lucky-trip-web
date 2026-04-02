@@ -51,16 +51,25 @@ export function useLuckyList(): State {
         const bairro    = (row.bairro as string | null) ?? "";
         const pin       = resolvePin("rio", bairro, idx % 6);
         const supaPhoto = (row as any).photo_url as string | null ?? null;
+        const tipoItem  = (row as any).tipo_item as string | null;
+        const entityType =
+          tipoItem === "restaurante" ? "restaurant" :
+          tipoItem === "hotel"       ? "hotel"       :
+          "activity";
+        const resolvedTipo =
+          tipoItem === "restaurante" ? "restaurante" :
+          tipoItem === "hotel"       ? "hotel"       :
+          "experiencia";
         return {
           id:          String(row.id),
           titulo:      (row.nome as string | null)     ?? "Lucky Pick",
           localizacao: bairro                          || "Rio de Janeiro",
           categoria:   "LUCKY LIST",
           descricao:   "Um dos achados especiais da Lucky List — lugares que só quem sabe, sabe.",
-          image:       getImageForEntity("activity", row.nome ?? "", bairro, supaPhoto) as ImageSourcePropType,
+          image:       getImageForEntity(entityType, row.nome ?? "", bairro, supaPhoto) as ImageSourcePropType,
           xPct:        pin.xPct,
           yPct:        pin.yPct,
-          tipo_item:   "experiencia",
+          tipo_item:   resolvedTipo,
         };
       });
 
