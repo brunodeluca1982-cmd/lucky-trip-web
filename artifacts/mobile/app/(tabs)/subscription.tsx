@@ -11,7 +11,6 @@
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Linking,
   Platform,
@@ -65,27 +64,36 @@ export default function SubscriptionScreen() {
   const params  = useLocalSearchParams<{ plan?: string }>();
 
   const defaultPlan: Plan = params.plan === "weekly" ? "weekly" : "annual";
-  const [selected,   setSelected]   = useState<Plan>(defaultPlan);
-  const [loading,    setLoading]    = useState(false);
+  const [selected,  setSelected] = useState<Plan>(defaultPlan);
+  const [loading,   setLoading]  = useState(false);
+  const [errorMsg,  setErrorMsg] = useState<string | null>(null);
 
   async function handleStart() {
     if (loading) return;
-    console.log("CHECKOUT CLICKED");
-    console.log("Selected plan:", selected);
+    console.log("BUTTON CLICKED");
+    console.log("PLAN:", selected);
+    setErrorMsg(null);
     setLoading(true);
     try {
-      // Always resolve deviceId directly — GuiaContext may not have loaded it yet
       const id = await getDeviceId();
-      console.log("Calling checkout...");
+      console.log("CHECKOUT STARTED");
       const { data, error } = await supabase.functions.invoke("create-checkout", {
         body: { deviceId: id, plan: selected },
       });
       console.log("Checkout response:", data, error);
       if (error || !data?.url) throw error ?? new Error("No checkout URL");
-      await Linking.openURL(data.url);
+
+      // On web (Expo web / Replit preview) window.open is blocked by the iframe sandbox.
+      // Use same-tab navigation so the redirect is never blocked.
+      if (Platform.OS === "web") {
+        window.location.href = data.url;
+      } else {
+        await Linking.openURL(data.url);
+      }
     } catch (err) {
       console.error("Checkout error:", err);
-      Alert.alert("Erro ao iniciar pagamento", "Tente novamente ou entre em contato.");
+      // Inline error — Alert.alert is blocked inside the Replit iframe on web
+      setErrorMsg("Não foi possível iniciar o pagamento. Tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -187,6 +195,10 @@ export default function SubscriptionScreen() {
             : <Text style={s.ctaText}>Começar agora</Text>
           }
         </Pressable>
+
+        {errorMsg && (
+          <Text style={s.errorText}>{errorMsg}</Text>
+        )}
 
         <Text style={s.micro}>7 dias grátis · Cancele quando quiser</Text>
 
@@ -390,6 +402,13 @@ const s = StyleSheet.create({
     fontSize:      17,
     color:         "#000000",
     letterSpacing: 0.1,
+  },
+  errorText: {
+    fontFamily:   "Inter_400Regular",
+    fontSize:     13,
+    color:        "#FF6B6B",
+    textAlign:    "center",
+    marginBottom: 10,
   },
   micro: {
     fontFamily: "Inter_400Regular",
