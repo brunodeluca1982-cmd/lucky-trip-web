@@ -24,13 +24,11 @@ import { getDeviceId } from "@/utils/deviceId";
 const C    = Colors.light;
 const GOLD = "#D4AF37";
 
-// Official brand mark — same file used in AppHeader across the entire app.
-// White strokes on transparent bg; renders correctly on any dark surface.
 const LOGO_MARK = require("@/assets/images/logo-symbol.png");
 
 const FREE_LIMIT         = 2;
-const RESPONSES_USED_KEY = "@luckytrip/lucky_responses_v1";
-const IS_PREMIUM_KEY     = "@luckytrip/lucky_premium_v1";
+const RESPONSES_USED_KEY = "@luckytrip/lucky_responses_v2";
+const IS_PREMIUM_KEY     = "@luckytrip/lucky_premium_v2";
 
 const SUGGESTED_PROMPTS = [
   "O que fazer hoje no Rio?",
@@ -65,6 +63,7 @@ export default function LuckyScreen() {
 
   const isAtLimit = !isPremium && responsesUsed >= FREE_LIMIT;
 
+  // ── Init: load count from AsyncStorage + sync from Supabase lucky_usage ──
   useEffect(() => {
     (async () => {
       const [id, countStr, premiumStr] = await Promise.all([
@@ -73,26 +72,50 @@ export default function LuckyScreen() {
         AsyncStorage.getItem(IS_PREMIUM_KEY),
       ]);
       setDeviceId(id);
-      setResponsesUsed(countStr ? parseInt(countStr, 10) : 0);
 
+      const localCount = countStr ? parseInt(countStr, 10) : 0;
+
+      // Check premium from AsyncStorage cache first (fast path)
       if (premiumStr === "true") {
         setIsPremium(true);
+        setResponsesUsed(localCount);
         return;
       }
 
-      const { data } = await supabase
-        .from("access_levels")
-        .select("plan_type, access_until")
-        .eq("device_id", id)
-        .maybeSingle();
+      // Fetch both premium status and usage count from Supabase in parallel
+      const [premiumResult, usageResult] = await Promise.allSettled([
+        supabase
+          .from("access_levels")
+          .select("plan_type, access_until")
+          .eq("user_id", id)
+          .maybeSingle(),
+        supabase
+          .from("lucky_usage")
+          .select("question_count")
+          .eq("device_id", id)
+          .maybeSingle(),
+      ]);
 
-      if (
-        data?.plan_type === "premium" &&
-        data.access_until &&
-        new Date(data.access_until) > new Date()
-      ) {
-        setIsPremium(true);
-        await AsyncStorage.setItem(IS_PREMIUM_KEY, "true");
+      // Premium check: plan_type must be premium/vip and access_until in future
+      if (premiumResult.status === "fulfilled") {
+        const d = premiumResult.value.data;
+        const validPlan = d?.plan_type === "premium" || d?.plan_type === "vip";
+        if (validPlan && d?.access_until && new Date(d.access_until) > new Date()) {
+          setIsPremium(true);
+          await AsyncStorage.setItem(IS_PREMIUM_KEY, "true");
+        }
+      }
+
+      // Usage count: use the higher of local (AsyncStorage) vs server (Supabase)
+      // Server is authoritative — prevents gaming by clearing AsyncStorage
+      let serverCount = 0;
+      if (usageResult.status === "fulfilled" && usageResult.value.data) {
+        serverCount = (usageResult.value.data as { question_count: number }).question_count ?? 0;
+      }
+      const authoritative = Math.max(localCount, serverCount);
+      setResponsesUsed(authoritative);
+      if (authoritative !== localCount) {
+        await AsyncStorage.setItem(RESPONSES_USED_KEY, String(authoritative));
       }
     })();
   }, []);
@@ -107,30 +130,49 @@ export default function LuckyScreen() {
 
       Keyboard.dismiss();
       const userMsg: Message = { role: "user", content: query.trim() };
+      const priorHistory     = messages.slice();
+
       setMessages((prev) => [...prev, userMsg]);
       setInputText("");
       setLoading(true);
       scrollToBottom();
 
       try {
-        const { data, error } = await supabase.functions.invoke("lucky-trip-ai", {
+        // Call lucky-concierge with Supabase-grounded context
+        const { data, error } = await supabase.functions.invoke("lucky-concierge", {
           body: {
-            messages: [...messages, userMsg].map((m) => ({
-              role:    m.role,
-              content: m.content,
-            })),
+            query:       userMsg.content,
+            history:     priorHistory.map((m) => ({ role: m.role, content: m.content })),
             deviceId,
+            destination: "Rio de Janeiro",
           },
         });
 
         if (error) throw error;
 
+        // 402 = server-side limit reached (authoritative enforcement)
+        if (data?.limitReached) {
+          const newCount = Math.max(responsesUsed, data.questionCount ?? FREE_LIMIT);
+          setResponsesUsed(newCount);
+          await AsyncStorage.setItem(RESPONSES_USED_KEY, String(newCount));
+          setLoading(false);
+          scrollToBottom();
+          return;
+        }
+
         const reply = data?.reply ?? "Desculpe, não consegui processar sua pergunta.";
         setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
 
-        const newCount = responsesUsed + 1;
+        // Sync count: use server's authoritative count
+        const newCount = data?.questionCount ?? responsesUsed + 1;
         setResponsesUsed(newCount);
         await AsyncStorage.setItem(RESPONSES_USED_KEY, String(newCount));
+
+        // Update premium status from server if changed
+        if (data?.isPremium && !isPremium) {
+          setIsPremium(true);
+          await AsyncStorage.setItem(IS_PREMIUM_KEY, "true");
+        }
       } catch {
         setMessages((prev) => [
           ...prev,
@@ -141,7 +183,7 @@ export default function LuckyScreen() {
         scrollToBottom();
       }
     },
-    [loading, isAtLimit, deviceId, messages, responsesUsed, scrollToBottom],
+    [loading, isAtLimit, deviceId, messages, responsesUsed, isPremium, scrollToBottom],
   );
 
   const handleUpgrade = useCallback(async () => {
@@ -191,7 +233,6 @@ export default function LuckyScreen() {
                   <Text style={styles.eyebrow}>Concierge</Text>
                   <Text style={styles.title}>Lucky</Text>
                 </View>
-                {/* Official logo mark — same asset as AppHeader */}
                 <Image
                   source={LOGO_MARK}
                   style={styles.logoMark}
@@ -286,7 +327,6 @@ export default function LuckyScreen() {
             {isAtLimit && !loading && (
               <View style={styles.paywallCard}>
                 <View style={styles.paywallTop}>
-                  {/* Official logo mark — same as AppHeader, sized for the card */}
                   <Image
                     source={LOGO_MARK}
                     style={styles.paywallLogo}
@@ -299,8 +339,8 @@ export default function LuckyScreen() {
                 </View>
                 <Text style={styles.paywallTitle}>Continue com o Lucky</Text>
                 <Text style={styles.paywallBody}>
-                  Você usou as 2 respostas gratuitas. Assine para refinamentos ilimitados,
-                  recomendações personalizadas e acesso completo ao concierge.
+                  Desbloqueie respostas ilimitadas e mais personalização. Assine para
+                  continuar refinando a sua viagem com o nosso concierge.
                 </Text>
                 <Pressable
                   style={({ pressed }) => [
@@ -396,8 +436,6 @@ const styles = StyleSheet.create({
     color:      "#FFFFFF",
     lineHeight: 44,
   },
-  // Official logo mark — horizontal image, matches AppHeader proportions.
-  // Floats top-right of the header; low opacity for a watermark feel.
   logoMark: {
     height:  28,
     width:   96,
@@ -521,7 +559,6 @@ const styles = StyleSheet.create({
     alignItems:    "center",
     gap:           10,
   },
-  // Avatar container — small gold-tinted pill that holds the logo mark
   luckyAvatar: {
     width:           52,
     height:          26,
@@ -587,7 +624,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom:   2,
   },
-  // Official logo mark inside paywall card — same file, scaled for card context
   paywallLogo: {
     height:  22,
     width:   78,

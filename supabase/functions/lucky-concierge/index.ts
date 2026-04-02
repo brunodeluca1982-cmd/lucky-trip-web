@@ -1,15 +1,16 @@
 /**
  * lucky-concierge/index.ts
  *
- * Lucky concierge AI for The Lucky Trip.
- * Only uses real Supabase data — never invents places.
+ * Lucky — Rio-first concierge AI for The Lucky Trip.
+ * Powered ONLY by real Supabase data. Never invents places.
  *
  * Pipeline:
- *  1. Check access_levels for deviceId (premium gate)
- *  2. Route query intent → query relevant Supabase tables
- *  3. Build rich context from real rows
- *  4. Call Gemini to synthesize a natural concierge response
- *  5. Return { answer, isPremium, places }
+ *  1. Check access_levels for userId (premium gate)
+ *  2. Check + increment lucky_usage count (2-question free limit)
+ *  3. Route query intent → query relevant Supabase tables
+ *  4. Build rich context from real rows only
+ *  5. Call Gemini to synthesize a natural concierge response
+ *  6. Return { reply, isPremium, questionCount }
  */
 
 import { serve }        from "https://deno.land/std@0.168.0/http/server.ts";
@@ -19,6 +20,8 @@ const corsHeaders = {
   "Access-Control-Allow-Origin":  "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+const FREE_LIMIT = 2;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -34,32 +37,85 @@ interface RequestBody {
   destination?: string;
 }
 
-interface PlaceRef {
-  id:    string;
-  name:  string;
-  bairro?: string;
-  categoria?: string;
+// ── Premium check ─────────────────────────────────────────────────────────────
+// Checks access_levels table by user_id (device_id is stored as user_id for
+// anonymous device-based access). Premium is active when plan_type is "premium"
+// or "vip" and access_until is in the future.
+
+async function checkPremium(supa: ReturnType<typeof createClient>, deviceId: string): Promise<boolean> {
+  try {
+    const { data } = await supa
+      .from("access_levels")
+      .select("plan_type, access_until")
+      .eq("user_id", deviceId)
+      .maybeSingle();
+
+    if (!data) return false;
+    const validPlan = data.plan_type === "premium" || data.plan_type === "vip";
+    if (!validPlan) return false;
+    if (!data.access_until) return false;
+    return new Date(data.access_until) > new Date();
+  } catch {
+    return false;
+  }
+}
+
+// ── Usage tracking ────────────────────────────────────────────────────────────
+// lucky_usage table: device_id TEXT PK, question_count INT, last_question_at TIMESTAMPTZ
+
+async function getQuestionCount(supa: ReturnType<typeof createClient>, deviceId: string): Promise<number> {
+  try {
+    const { data } = await supa
+      .from("lucky_usage")
+      .select("question_count")
+      .eq("device_id", deviceId)
+      .maybeSingle();
+    return (data as { question_count: number } | null)?.question_count ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function incrementQuestionCount(supa: ReturnType<typeof createClient>, deviceId: string): Promise<number> {
+  try {
+    const current = await getQuestionCount(supa, deviceId);
+    const next = current + 1;
+    await supa
+      .from("lucky_usage")
+      .upsert(
+        {
+          device_id:        deviceId,
+          question_count:   next,
+          last_question_at: new Date().toISOString(),
+          updated_at:       new Date().toISOString(),
+        },
+        { onConflict: "device_id" },
+      );
+    return next;
+  } catch {
+    return 1;
+  }
 }
 
 // ── Intent routing ────────────────────────────────────────────────────────────
-// Keyword sets for intent detection — used to query the right Supabase tables.
 
 const INTENT_KEYWORDS: Record<string, string[]> = {
   restaurants: [
     "restaurante","comer","gastronomia","comida","jantar","almoço","almoco",
     "café","cafe","bar","drink","drinks","pizza","sushi","frutos","mariscos",
     "churrasco","brunch","café da manhã","lanche","refeição","culinária","bistrô",
-    "fine dining","vinho","cerveja","prato","cardápio","menu",
+    "fine dining","vinho","cerveja","prato","cardápio","menu","onde comer",
   ],
   activities: [
     "fazer","atividade","visitar","conhecer","passeio","atração","atrações","tour",
     "museu","trilha","parque","praia","surf","mergulho","show","teatro","galeria",
     "compras","shopping","esporte","aventura","natureza","mirante","vista","pôr do sol",
     "cultura","história","arte","festa","carnaval","lapa","forró","samba","balada",
+    "o que fazer","hoje","fim de semana","amigos","criança","família",
   ],
   hotels: [
     "hotel","hospedagem","ficar","dormir","hospedar","pousada","resort","suite",
-    "quarto","acomodação","check-in","check in","accommodation","lodging",
+    "quarto","acomodação","check-in","check in","accommodation","lodging","onde ficar",
   ],
   neighborhoods: [
     "bairro","região","zona","área","melhor bairro","onde fica","localização",
@@ -69,7 +125,7 @@ const INTENT_KEYWORDS: Record<string, string[]> = {
   lucky_picks: [
     "dica","dicas","segredo","segredos","exclusivo","curadores","curadoria",
     "lucky","list","picks","especial","escondido","pouco conhecido","desconhecido",
-    "jóia","descoberta","insider","local",
+    "jóia","descoberta","insider","local","diferente","fora do comum",
   ],
 };
 
@@ -83,6 +139,7 @@ function detectIntent(query: string): Set<string> {
     }
   }
 
+  // Default: show activities + lucky picks if nothing detected
   if (intents.size === 0) {
     intents.add("activities");
     intents.add("lucky_picks");
@@ -92,132 +149,99 @@ function detectIntent(query: string): Set<string> {
 }
 
 // ── Supabase data fetching ────────────────────────────────────────────────────
+// Each fetch uses ONLY real curated columns. No invented data.
 
-async function fetchRestaurants(supa: ReturnType<typeof createClient>, query: string) {
+async function fetchRestaurants(supa: ReturnType<typeof createClient>) {
   const { data } = await supa
     .from("restaurantes")
-    .select("id, nome, bairro, tipo_de_cozinha, especialidade, perfil_publico, meu_olhar, tags_ia, vibe, melhor_para, seguro_mulher_sozinha")
-    .limit(20);
-  return (data ?? []).map((r) => ({
+    .select("id, nome, bairro, categoria, meu_olhar, vibe")
+    .limit(25);
+  return (data ?? []).map((r: Record<string, unknown>) => ({
     id:        String(r.id),
     name:      r.nome,
     bairro:    r.bairro,
     categoria: "restaurante",
-    tipo:      r.tipo_de_cozinha,
-    especialidade: r.especialidade,
-    perfil:    r.perfil_publico,
     meu_olhar: r.meu_olhar,
-    tags:      r.tags_ia,
     vibe:      r.vibe,
-    melhor_para: r.melhor_para,
-    seguro_mulher: r.seguro_mulher_sozinha,
   }));
 }
 
-async function fetchActivities(supa: ReturnType<typeof createClient>, query: string) {
+async function fetchActivities(supa: ReturnType<typeof createClient>) {
   const { data } = await supa
     .from("o_que_fazer_rio")
-    .select("id, titulo, localizacao, descricao, tags_ia, vibe, momento_ideal, nivel_esforco, com_criancas, meu_olhar, best_for, melhor_para")
-    .limit(25);
-  return (data ?? []).map((a) => ({
+    .select("id, nome, bairro, categoria, meu_olhar, vibe, momento_ideal")
+    .limit(30);
+  return (data ?? []).map((a: Record<string, unknown>) => ({
     id:        String(a.id),
-    name:      a.titulo,
-    bairro:    a.localizacao,
-    categoria: "atividade",
-    descricao: a.descricao,
-    tags:      a.tags_ia,
+    name:      a.nome,
+    bairro:    a.bairro,
+    categoria: a.categoria ?? "atividade",
+    meu_olhar: a.meu_olhar,
     vibe:      a.vibe,
     momento:   a.momento_ideal,
-    esforco:   a.nivel_esforco,
-    criancas:  a.com_criancas,
-    meu_olhar: a.meu_olhar,
-    best_for:  a.best_for,
   }));
 }
 
 async function fetchHotels(supa: ReturnType<typeof createClient>) {
   const { data } = await supa
     .from("stay_hotels")
-    .select("id, nome, bairro, my_view, how_to_enjoy, perfil_ideal, best_for, tags")
+    .select("id, hotel_name, neighborhood_slug, hotel_category, my_view, how_to_enjoy, audience")
     .limit(15);
-  return (data ?? []).map((h) => ({
+  return (data ?? []).map((h: Record<string, unknown>) => ({
     id:        String(h.id),
-    name:      h.nome,
-    bairro:    h.bairro,
+    name:      h.hotel_name,
+    bairro:    h.neighborhood_slug,
     categoria: "hotel",
+    tipo:      h.hotel_category,
     my_view:   h.my_view,
     how_to_enjoy: h.how_to_enjoy,
-    perfil:    h.perfil_ideal,
-    best_for:  h.best_for,
-    tags:      h.tags,
+    audience:  h.audience,
   }));
 }
 
 async function fetchNeighborhoods(supa: ReturnType<typeof createClient>) {
   const { data } = await supa
     .from("stay_neighborhoods")
-    .select("nome, identity_phrase, my_view, how_to_live, best_for_families, best_for_solo, best_for_couples, gastronomy, nightlife, scenery, walkable, safety_solo_woman")
+    .select("neighborhood_name, my_view, how_to_live, walkable, nightlife, gastronomy, scenery, safety_solo_woman, better_for")
     .limit(15);
-  return (data ?? []).map((n) => ({
-    name:          n.nome,
-    phrase:        n.identity_phrase,
-    my_view:       n.my_view,
-    how_to_live:   n.how_to_live,
-    best_families: n.best_for_families,
-    best_solo:     n.best_for_solo,
-    best_couples:  n.best_for_couples,
-    gastronomy:    n.gastronomy,
-    nightlife:     n.nightlife,
-    scenery:       n.scenery,
-    walkable:      n.walkable,
-    safety_solo:   n.safety_solo_woman,
+  return (data ?? []).map((n: Record<string, unknown>) => ({
+    name:       n.neighborhood_name,
+    my_view:    n.my_view,
+    how_to_live: n.how_to_live,
+    gastronomy: n.gastronomy,
+    nightlife:  n.nightlife,
+    scenery:    n.scenery,
+    walkable:   n.walkable,
+    safety_solo: n.safety_solo_woman,
+    better_for:  n.better_for,
   }));
 }
 
 async function fetchLuckyPicks(supa: ReturnType<typeof createClient>) {
   const { data } = await supa
     .from("lucky_list_rio")
-    .select("id, titulo, localizacao, descricao, categoria, tags, meu_olhar")
+    .select("id, nome, bairro, tipo_item, meu_olhar, destaque_lucky")
     .limit(20);
-  return (data ?? []).map((l) => ({
+  return (data ?? []).map((l: Record<string, unknown>) => ({
     id:        String(l.id),
-    name:      l.titulo,
-    bairro:    l.localizacao,
-    categoria: l.categoria ?? "lucky",
-    descricao: l.descricao,
-    tags:      l.tags,
+    name:      l.nome,
+    bairro:    l.bairro,
+    categoria: l.tipo_item ?? "lucky",
     meu_olhar: l.meu_olhar,
+    destaque:  l.destaque_lucky,
   }));
-}
-
-// ── Premium check ─────────────────────────────────────────────────────────────
-
-async function checkPremium(supa: ReturnType<typeof createClient>, deviceId: string): Promise<boolean> {
-  const { data } = await supa
-    .from("access_levels")
-    .select("plan_type, access_until")
-    .eq("device_id", deviceId)
-    .maybeSingle();
-
-  if (!data) return false;
-  if (data.plan_type !== "premium") return false;
-  if (!data.access_until) return false;
-
-  return new Date(data.access_until) > new Date();
 }
 
 // ── Gemini call ───────────────────────────────────────────────────────────────
 
-async function callGemini(systemPrompt: string, userMessages: Message[]): Promise<string> {
+async function callGemini(systemPrompt: string, allMessages: Message[]): Promise<string> {
   const apiKey = Deno.env.get("GEMINI_API_KEY");
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY not set");
-  }
+  if (!apiKey) throw new Error("GEMINI_API_KEY not set");
 
   const contents = [
     { role: "user",  parts: [{ text: systemPrompt }] },
-    { role: "model", parts: [{ text: "Entendido. Sou o concierge do The Lucky Trip, especialista em Rio de Janeiro. Responderei apenas com dados reais do nosso banco de curadoria." }] },
-    ...userMessages.map((m) => ({
+    { role: "model", parts: [{ text: "Entendido. Sou o Lucky, concierge do The Lucky Trip. Respondo apenas com dados reais da nossa curadoria do Rio de Janeiro." }] },
+    ...allMessages.map((m) => ({
       role:  m.role === "user" ? "user" : "model",
       parts: [{ text: m.content }],
     })),
@@ -230,10 +254,7 @@ async function callGemini(systemPrompt: string, userMessages: Message[]): Promis
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents,
-        generationConfig: {
-          temperature:     0.7,
-          maxOutputTokens: 600,
-        },
+        generationConfig: { temperature: 0.65, maxOutputTokens: 500 },
       }),
     },
   );
@@ -265,41 +286,74 @@ serve(async (req) => {
       );
     }
 
+    // Reject questions about destinations other than Rio
+    const lowerQuery = query.toLowerCase();
+    const otherCityKeywords = [
+      "paris","tokyo","tóquio","madrid","barcelona","nova york","new york",
+      "miami","londra","london","dubai","bali","santorini","kyoto","lisboa",
+      "buenos aires","florianópolis","florianopolis","gramado","paraty","ilhabela",
+    ];
+    const isNonRio = otherCityKeywords.some((c) => lowerQuery.includes(c)) &&
+      !lowerQuery.includes("rio");
+
+    if (isNonRio) {
+      const reply =
+        "Ainda sou especialista só no Rio de Janeiro nesta versão do app. " +
+        "Em breve expandiremos para outros destinos — por enquanto, me pergunte " +
+        "sobre o Rio e posso te guiar com muita precisão.";
+      return new Response(
+        JSON.stringify({ reply, isPremium: false, questionCount: 0, limitReached: false }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
+      );
+    }
+
     const supa = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
+    // ── 1. Premium check ──
     const isPremium = await checkPremium(supa, deviceId);
 
-    const intents = detectIntent(query);
+    // ── 2. Usage gate (server-side enforcement) ──
+    const currentCount = await getQuestionCount(supa, deviceId);
+    if (!isPremium && currentCount >= FREE_LIMIT) {
+      return new Response(
+        JSON.stringify({
+          reply:         null,
+          isPremium:     false,
+          questionCount: currentCount,
+          limitReached:  true,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 402 },
+      );
+    }
 
+    // ── 3. Intent routing + Supabase data fetch ──
+    const intents = detectIntent(query);
     const contextParts: string[] = [];
-    const mentionedPlaces: PlaceRef[] = [];
 
     if (intents.has("restaurants")) {
-      const rows = await fetchRestaurants(supa, query);
+      const rows = await fetchRestaurants(supa);
       if (rows.length) {
         contextParts.push(
-          "RESTAURANTES DISPONÍVEIS (use apenas estes):\n" +
+          "RESTAURANTES DA CURADORIA (use apenas estes, nunca invente):\n" +
           rows.map((r) =>
-            `- ${r.name} (${r.bairro}): ${r.tipo ?? ""} ${r.especialidade ?? ""}. ${r.meu_olhar ?? r.tags ?? ""}. Perfil: ${r.perfil ?? ""}. Seguro mulher: ${r.seguro_mulher ?? ""}`.trim()
+            `- ${r.name} (${r.bairro}): ${r.meu_olhar ?? r.vibe ?? ""}`.trim()
           ).join("\n"),
         );
-        rows.forEach((r) => mentionedPlaces.push({ id: r.id, name: r.name, bairro: r.bairro, categoria: "restaurante" }));
       }
     }
 
     if (intents.has("activities")) {
-      const rows = await fetchActivities(supa, query);
+      const rows = await fetchActivities(supa);
       if (rows.length) {
         contextParts.push(
-          "ATIVIDADES E ATRAÇÕES (use apenas estas):\n" +
+          "O QUE FAZER NO RIO (use apenas estes):\n" +
           rows.map((a) =>
-            `- ${a.name} (${a.bairro}): ${a.descricao ?? ""}. Momento: ${Array.isArray(a.momento) ? a.momento.join(", ") : a.momento ?? ""}. Esforço: ${a.esforco ?? ""}. ${a.meu_olhar ?? ""}`.trim()
+            `- ${a.name} (${a.bairro}): ${a.meu_olhar ?? a.vibe ?? ""}. Momento: ${Array.isArray(a.momento) ? a.momento.join(", ") : (a.momento ?? "")}`.trim()
           ).join("\n"),
         );
-        rows.forEach((a) => mentionedPlaces.push({ id: a.id, name: a.name, bairro: a.bairro, categoria: "atividade" }));
       }
     }
 
@@ -307,12 +361,11 @@ serve(async (req) => {
       const rows = await fetchHotels(supa);
       if (rows.length) {
         contextParts.push(
-          "HOTÉIS DISPONÍVEIS (use apenas estes):\n" +
+          "ONDE FICAR NO RIO (use apenas estes):\n" +
           rows.map((h) =>
-            `- ${h.name} (${h.bairro}): ${h.my_view ?? ""}. Para: ${h.perfil ?? ""}. ${h.how_to_enjoy ?? ""}`.trim()
+            `- ${h.name} (${h.bairro}): ${h.tipo ?? "hotel"}. ${h.my_view ?? ""}. Para: ${h.audience ?? ""}`.trim()
           ).join("\n"),
         );
-        rows.forEach((h) => mentionedPlaces.push({ id: h.id, name: h.name, bairro: h.bairro, categoria: "hotel" }));
       }
     }
 
@@ -320,9 +373,9 @@ serve(async (req) => {
       const rows = await fetchNeighborhoods(supa);
       if (rows.length) {
         contextParts.push(
-          "BAIRROS DO RIO (use apenas estes):\n" +
+          "BAIRROS DO RIO:\n" +
           rows.map((n) =>
-            `- ${n.name}: "${n.phrase ?? ""}". ${n.my_view ?? ""}. Gastronomia: ${n.gastronomy ?? ""}/5. Vida noturna: ${n.nightlife ?? ""}/5. Cenário: ${n.scenery ?? ""}/5. Caminhável: ${n.walkable ? "sim" : "não"}. Solo fem: ${n.safety_solo ?? ""}/5`.trim()
+            `- ${n.name}: ${n.my_view ?? ""}. Gastronomia: ${n.gastronomy ?? ""}/5, noite: ${n.nightlife ?? ""}/5, cenário: ${n.scenery ?? ""}/5, caminhável: ${n.walkable ? "sim" : "não"}. ${n.better_for ?? ""}`.trim()
           ).join("\n"),
         );
       }
@@ -334,28 +387,31 @@ serve(async (req) => {
         contextParts.push(
           "LUCKY PICKS — SELEÇÃO EXCLUSIVA (use apenas estes):\n" +
           rows.map((l) =>
-            `- ${l.name} (${l.bairro}): ${l.descricao ?? ""}. ${l.meu_olhar ?? ""}`.trim()
+            `- ${l.name} (${l.bairro}): ${l.meu_olhar ?? l.destaque ?? ""}`.trim()
           ).join("\n"),
         );
-        rows.forEach((l) => mentionedPlaces.push({ id: l.id, name: l.name, bairro: l.bairro, categoria: l.categoria }));
       }
     }
 
+    const noData = contextParts.length === 0;
+
     const systemPrompt =
-`Você é o Lucky, concierge pessoal do app The Lucky Trip — um guia editorial premium focado em ${destination}.
+`Você é o Lucky, concierge pessoal do app The Lucky Trip — guia editorial premium do Rio de Janeiro.
 
 REGRAS ABSOLUTAS:
-- Responda APENAS com lugares que aparecem nos dados abaixo. Nunca invente.
-- Se os dados não contiverem o que o usuário pediu, diga isso naturalmente.
+- Responda APENAS usando os lugares listados nos dados abaixo. Nunca invente lugares.
+- Se os dados não contiverem o que o usuário pediu, diga isso com naturalidade.
 - Tom: concierge local, editorial, direto. Não genérico. Não ChatGPT.
-- Máximo 250 palavras. Sem listas longas. Prefira 2-4 recomendações com detalhe.
-- Não use "claro!", "ótima pergunta!", disclaimers ou linguagem corporativa.
-- Se tiver meu_olhar no dado, use essa voz editorial.
-- Seja específico: mencione bairros, momentos ideais, para quem é.
+- Máximo 220 palavras. Prefira 2-4 recomendações com detalhe real.
+- Nunca use "claro!", "ótima pergunta!", disclaimers, ou linguagem de chatbot.
+- Use a voz do campo meu_olhar se disponível — é a voz editorial da curadoria.
+- Seja específico: mencione bairros, momentos, para quem é cada lugar.
 - Responda em português brasileiro.
+- Para questões fora do Rio, diga naturalmente que só cobre o Rio nesta versão.
 
-DADOS REAIS DA CURADORIA:
-${contextParts.join("\n\n") || "Sem dados encontrados para esta consulta. Diga ao usuário que você não tem informações para responder isso agora."}`;
+${noData
+  ? "Sem dados encontrados. Diga ao usuário que você não tem informações disponíveis para essa consulta agora."
+  : "DADOS REAIS DA CURADORIA — USE APENAS ESTES:\n" + contextParts.join("\n\n")}`;
 
     const allMessages: Message[] = [
       ...history.slice(-6),
@@ -365,14 +421,19 @@ ${contextParts.join("\n\n") || "Sem dados encontrados para esta consulta. Diga a
     const answer = await callGemini(systemPrompt, allMessages);
 
     if (!answer.trim()) {
-      return new Response(
-        JSON.stringify({ error: "Empty response from AI" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 },
-      );
+      throw new Error("Empty response from AI");
     }
 
+    // ── 4. Increment count AFTER successful answer ──
+    const newCount = await incrementQuestionCount(supa, deviceId);
+
     return new Response(
-      JSON.stringify({ answer: answer.trim(), isPremium, places: mentionedPlaces }),
+      JSON.stringify({
+        reply:         answer.trim(),
+        isPremium,
+        questionCount: newCount,
+        limitReached:  false,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
     );
   } catch (err) {
