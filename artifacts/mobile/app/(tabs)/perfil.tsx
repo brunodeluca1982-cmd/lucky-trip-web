@@ -2,7 +2,6 @@ import React, { useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   Image,
-  ImageBackground,
   Platform,
   Pressable,
   ScrollView,
@@ -42,11 +41,13 @@ export default function PerfilScreen() {
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
   return (
-    <ImageBackground
-      source={require("@/assets/images/rio-aerial-clean.png")}
-      style={styles.bg}
-      resizeMode="cover"
-    >
+    <View style={styles.bg}>
+      <Image
+        source={require("@/assets/images/rio-aerial-clean.png")}
+        style={StyleSheet.absoluteFill}
+        resizeMode="cover"
+        pointerEvents="none"
+      />
       <View style={styles.overlay}>
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -133,7 +134,7 @@ export default function PerfilScreen() {
           </TouchableOpacity>
         </ScrollView>
       </View>
-    </ImageBackground>
+    </View>
   );
 }
 
