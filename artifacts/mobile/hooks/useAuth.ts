@@ -4,19 +4,24 @@
  * Minimal Supabase Auth hook.
  * Exposes the current session/user and basic auth actions.
  *
- * Uses magic-link (OTP) sign-in — no password UI required.
+ * Supports magic-link (OTP) and Google OAuth sign-in.
  */
 
 import { useEffect, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
+import * as WebBrowser from "expo-web-browser";
+import * as Linking from "expo-linking";
 import { supabase } from "@/lib/supabase";
 
+WebBrowser.maybeCompleteAuthSession();
+
 export interface AuthState {
-  user:            User | null;
-  session:         Session | null;
-  loading:         boolean;
-  signInWithOtp:   (email: string) => Promise<{ error: string | null }>;
-  signOut:         () => Promise<void>;
+  user:              User | null;
+  session:           Session | null;
+  loading:           boolean;
+  signInWithOtp:     (email: string) => Promise<{ error: string | null }>;
+  signInWithGoogle:  () => Promise<{ error: string | null }>;
+  signOut:           () => Promise<void>;
 }
 
 export function useAuth(): AuthState {
@@ -24,13 +29,11 @@ export function useAuth(): AuthState {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Initial session
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setLoading(false);
     });
 
-    // Listen for auth changes (login, logout, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
     });
@@ -44,21 +47,49 @@ export function useAuth(): AuthState {
     return { error: null };
   }
 
-  async function signOut(): Promise<void> {
-    console.log("[logout] signOut called, current session:", session?.user?.id ?? "null");
-    try {
-      const { error } = await supabase.auth.signOut({ scope: "local" });
-      console.log("[logout] signOut completed, error:", error?.message ?? "none");
-    } catch (e) {
-      console.log("[logout] signOut threw:", e);
+  async function signInWithGoogle(): Promise<{ error: string | null }> {
+    const redirectTo = Linking.createURL("/");
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options:  { redirectTo, skipBrowserRedirect: true },
+    });
+
+    if (error || !data.url) {
+      return { error: error?.message ?? "OAuth error" };
     }
+
+    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+
+    if (result.type === "success") {
+      const parsed      = Linking.parse(result.url);
+      const accessToken  = parsed.queryParams?.access_token  as string | undefined;
+      const refreshToken = parsed.queryParams?.refresh_token as string | undefined;
+
+      if (accessToken && refreshToken) {
+        const { error: sessionErr } = await supabase.auth.setSession({
+          access_token:  accessToken,
+          refresh_token: refreshToken,
+        });
+        if (sessionErr) return { error: sessionErr.message };
+      }
+    }
+
+    return { error: null };
+  }
+
+  async function signOut(): Promise<void> {
+    try {
+      await supabase.auth.signOut({ scope: "local" });
+    } catch (_) {}
   }
 
   return {
-    user:    session?.user ?? null,
+    user:   session?.user ?? null,
     session,
     loading,
     signInWithOtp,
+    signInWithGoogle,
     signOut,
   };
 }

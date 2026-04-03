@@ -22,7 +22,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import { AntDesign, Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import type { User } from "@supabase/supabase-js";
 
@@ -32,15 +32,16 @@ const LOGO     = require("@/assets/images/logo-symbol.png");
 const BG       = require("@/assets/images/rio-aerial-clean.png");
 
 export default function PerfilScreen() {
-  const { user, signOut, signInWithOtp } = useAuth();
+  const { user, signOut, signInWithOtp, signInWithGoogle } = useAuth();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === "web" ? 60 : insets.top + 20;
   const botPad = Platform.OS === "web" ? 34 : insets.bottom + 20;
 
-  const [email,   setEmail]   = useState("");
-  const [loading, setLoading] = useState(false);
-  const [sent,    setSent]    = useState(false);
-  const [error,   setError]   = useState<string | null>(null);
+  const [email,         setEmail]         = useState("");
+  const [loading,       setLoading]       = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [sent,          setSent]          = useState(false);
+  const [error,         setError]         = useState<string | null>(null);
 
   async function handleSubmit() {
     if (!email.trim() || loading) return;
@@ -49,6 +50,15 @@ export default function PerfilScreen() {
     const { error: err } = await signInWithOtp(email.trim().toLowerCase());
     setLoading(false);
     if (err) { setError(err); } else { setSent(true); }
+  }
+
+  async function handleGoogle() {
+    if (googleLoading) return;
+    setGoogleLoading(true);
+    setError(null);
+    const { error: err } = await signInWithGoogle();
+    setGoogleLoading(false);
+    if (err) setError(err);
   }
 
   return (
@@ -72,8 +82,10 @@ export default function PerfilScreen() {
                   email={email}
                   setEmail={setEmail}
                   loading={loading}
+                  googleLoading={googleLoading}
                   error={error}
                   onSubmit={handleSubmit}
+                  onGooglePress={handleGoogle}
                 />
             }
           </ScrollView>
@@ -86,13 +98,15 @@ export default function PerfilScreen() {
 // ── Logged-out: account entry ─────────────────────────────────────────────────
 
 function LoggedOut({
-  email, setEmail, loading, error, onSubmit,
+  email, setEmail, loading, googleLoading, error, onSubmit, onGooglePress,
 }: {
   email: string;
   setEmail: (v: string) => void;
   loading: boolean;
+  googleLoading: boolean;
   error: string | null;
   onSubmit: () => void;
+  onGooglePress: () => void;
 }) {
   return (
     <View style={s.center}>
@@ -137,7 +151,15 @@ function LoggedOut({
         <View style={s.dividerLine} />
       </View>
 
-      <TouchableOpacity style={s.guestBtn} onPress={() => router.replace("/")} activeOpacity={0.7}>
+      <TouchableOpacity style={s.guestBtn} onPress={onGooglePress} activeOpacity={0.7} disabled={googleLoading}>
+        {googleLoading
+          ? <ActivityIndicator size="small" color="rgba(255,255,255,0.70)" />
+          : <AntDesign name="google" size={16} color="rgba(255,255,255,0.70)" />
+        }
+        <Text style={s.guestBtnText}>Continuar com Google</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={[s.guestBtn, { marginTop: 10 }]} onPress={() => router.replace("/")} activeOpacity={0.7}>
         <Feather name="arrow-right" size={16} color="rgba(255,255,255,0.70)" />
         <Text style={s.guestBtnText}>Continuar sem conta</Text>
       </TouchableOpacity>
