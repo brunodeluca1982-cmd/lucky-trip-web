@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useCallback } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Image,
   ImageBackground,
@@ -34,7 +35,8 @@ const settingsItems = [
 ];
 
 export default function PerfilScreen() {
-  const insets    = useSafeAreaInsets();
+  const { signOut } = useAuth();
+  const insets      = useSafeAreaInsets();
   const topPad    = Platform.OS === "web" ? 67 : insets.top + 16;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
@@ -124,7 +126,7 @@ export default function PerfilScreen() {
           </View>
 
           {/* Logout */}
-          <Pressable style={styles.logoutBtn}>
+          <Pressable style={styles.logoutBtn} onPress={signOut}>
             <Feather name="log-out" size={16} color="rgba(255,255,255,0.60)" />
             <Text style={styles.logoutText}>Sair da conta</Text>
           </Pressable>
