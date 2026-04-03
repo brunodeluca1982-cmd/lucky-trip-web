@@ -75,10 +75,14 @@ export default function RootLayout() {
     const el = document.createElement("style");
     el.id = "lucky-no-select";
     el.textContent = `
+      html, body, #root {
+        -webkit-tap-highlight-color: transparent;
+      }
       * {
-        -webkit-user-select:   none !important;
-        user-select:           none !important;
-        -webkit-touch-callout: none !important;
+        -webkit-tap-highlight-color: transparent;
+        -webkit-user-select:         none !important;
+        user-select:                 none !important;
+        -webkit-touch-callout:       none !important;
       }
       input, textarea, [contenteditable] {
         -webkit-user-select: text !important;
