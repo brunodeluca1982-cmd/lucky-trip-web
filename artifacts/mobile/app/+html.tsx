@@ -23,16 +23,34 @@ const GLOBAL_CSS = `
     -webkit-touch-callout:       none;
     -webkit-user-select:         none;
     user-select:                 none;
+    cursor:                      default;
   }
   * {
     -webkit-tap-highlight-color: transparent !important;
     -webkit-touch-callout:       none        !important;
     -webkit-user-select:         none        !important;
     user-select:                 none        !important;
+    cursor:                      default;
   }
+  /* Remove the blue focus ring on every tappable element.
+     This is the remaining "blue selected state" on iOS Safari web —
+     React Native Web renders TouchableOpacity as a focusable div;
+     the browser adds a :focus outline that looks like a blue highlight. */
+  *:focus,
+  *:focus-visible,
+  *:focus-within {
+    outline:                 none         !important;
+    -webkit-focus-ring-color:transparent  !important;
+    box-shadow:              none         !important;
+  }
+  /* Re-allow text cursor and selection inside actual form fields */
   input, textarea, [contenteditable] {
     -webkit-user-select: text !important;
     user-select:         text !important;
+    cursor:              text !important;
+  }
+  input:focus, textarea:focus, [contenteditable]:focus {
+    outline: auto !important;
   }
 `;
 

@@ -55,6 +55,20 @@ const WNS: object = Platform.OS === "web"
     } as any)
   : {};
 
+/**
+ * webCleanup — called in every auth handler finally block.
+ * Blurs the active element (removes focus ring) and clears any DOM selection.
+ * This is a local mirror of the one in useAuth.ts so it runs even if the
+ * auth function throws before reaching its own cleanup.
+ */
+function webCleanup() {
+  if (Platform.OS !== "web" || typeof document === "undefined") return;
+  try {
+    (document.activeElement as HTMLElement)?.blur();
+    window.getSelection()?.removeAllRanges();
+  } catch (_) {}
+}
+
 // ── Root screen ───────────────────────────────────────────────────────────────
 
 export default function PerfilScreen() {
@@ -77,18 +91,32 @@ export default function PerfilScreen() {
     if (!email.trim() || loading) return;
     setLoading(true);
     setError(null);
-    const { error: err } = await signInWithOtp(email.trim().toLowerCase());
-    setLoading(false);
-    if (err) { setError(err); } else { setSent(true); }
+    try {
+      const { error: err } = await signInWithOtp(email.trim().toLowerCase());
+      if (err) { setError(err); } else { setSent(true); }
+    } catch {
+      setError("Erro inesperado. Tente novamente.");
+    } finally {
+      setLoading(false);
+      webCleanup();
+    }
   }
 
   async function handleGoogle() {
     if (googleLoading) return;
     setGoogleLoading(true);
     setError(null);
-    const { error: err } = await signInWithGoogle();
-    setGoogleLoading(false);
-    if (err) setError(err);
+    try {
+      const { error: err } = await signInWithGoogle();
+      if (err) setError(err);
+    } catch {
+      setError("Erro inesperado. Tente novamente.");
+    } finally {
+      // On web, Google auth does a full-page redirect so this finally block
+      // is only reached on error or native flows — always safe to call.
+      setGoogleLoading(false);
+      webCleanup();
+    }
   }
 
   return (
