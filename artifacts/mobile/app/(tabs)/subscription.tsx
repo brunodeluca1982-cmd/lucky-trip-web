@@ -11,6 +11,7 @@
 import React, { useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Linking,
   Platform,
@@ -23,6 +24,7 @@ import {
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import { useAuth } from "@/hooks/useAuth";
 
 const GOLD      = "#D4AF37";
 const GOLD_DIM  = "rgba(212,175,55,0.14)";
@@ -60,6 +62,7 @@ export default function SubscriptionScreen() {
   const topPad  = Platform.OS === "web" ? 67 : insets.top + 12;
   const botPad  = Platform.OS === "web" ? 34 : insets.bottom;
   const params  = useLocalSearchParams<{ plan?: string }>();
+  const { user } = useAuth();
 
   const defaultPlan: Plan = params.plan === "weekly" ? "weekly" : "annual";
   const [selected,  setSelected] = useState<Plan>(defaultPlan);
@@ -68,8 +71,12 @@ export default function SubscriptionScreen() {
 
   async function handleStart() {
     if (loading) return;
-    console.log("BUTTON CLICKED");
-    console.log("PLAN:", selected);
+
+    if (!user) {
+      Alert.alert("Login necessário", "Faça login para continuar");
+      return;
+    }
+
     setErrorMsg(null);
     setLoading(true);
     try {
@@ -78,27 +85,30 @@ export default function SubscriptionScreen() {
       const res = await fetch(`${supabaseUrl}/functions/v1/create-checkout`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "apikey": supabaseAnonKey,
-          "Authorization": `Bearer ${supabaseAnonKey}`
+          "Content-Type":  "application/json",
+          "apikey":        supabaseAnonKey,
+          "Authorization": `Bearer ${supabaseAnonKey}`,
         },
         body: JSON.stringify({
-          plan: selected
-        })
+          plan:   selected,
+          userId: user.id,
+        }),
       });
 
       const data = await res.json();
 
-      console.log("Checkout response:", data);
-
       if (data.url) {
-        window.location.href = data.url;
+        if (typeof window !== "undefined") {
+          window.location.href = data.url;
+        } else {
+          Linking.openURL(data.url);
+        }
       } else {
-        alert(data.error || "Erro ao iniciar pagamento");
+        setErrorMsg(data.error || "Erro ao iniciar pagamento");
       }
     } catch (err: any) {
       console.error("Checkout fetch error:", err);
-      alert(err?.message ?? String(err));
+      setErrorMsg(err?.message ?? String(err));
     } finally {
       setLoading(false);
     }

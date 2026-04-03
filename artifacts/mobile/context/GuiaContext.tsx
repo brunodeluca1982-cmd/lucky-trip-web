@@ -11,7 +11,8 @@
  *
  * PREMIUM
  * ───────
- *   isPremium is loaded from AsyncStorage (fast path) then Supabase (authoritative).
+ *   isPremium is read from Supabase access_levels using the authenticated user.id.
+ *   AsyncStorage (PREMIUM_KEY) is used only as a fast-path cache — Supabase is authoritative.
  *   Access gates: save 2nd+ place, generate/edit itinerary, Lucky List locked items.
  *   Global paywall is triggered via showPaywall(type) — rendered by PaywallModal in layout.
  *
@@ -37,8 +38,8 @@ import React, {
 } from "react";
 import type { ImageSourcePropType } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
-import { getDeviceId } from "@/utils/deviceId";
 
 // ── Storage keys ───────────────────────────────────────────────────────────────
 
@@ -159,11 +160,11 @@ interface GuiaContextType {
   viagem: Viagem;
   /** Derived: one ViagemItem per saved place */
   viagemItens: ViagemItem[];
-  /** Premium status (authoritative, persisted via AsyncStorage + Supabase) */
+  /** Premium status (authoritative from Supabase access_levels via authenticated user.id) */
   isPremium: boolean;
-  /** Device identifier for Supabase queries */
-  deviceId: string | null;
-  /** Mark user as premium (called after successful purchase verification) */
+  /** Authenticated Supabase user (null if not logged in) */
+  user: User | null;
+  /** Mark user as premium locally (called after successful purchase verification) */
   markPremium: () => Promise<void>;
   /** Global paywall modal state */
   paywallVisible: boolean;
@@ -180,7 +181,7 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
   const [saved,          setSaved]          = useState<SavedItem[]>([]);
   const [hydrated,       setHydrated]       = useState(false);
   const [isPremium,      setIsPremium]      = useState(false);
-  const [deviceId,       setDeviceId]       = useState<string | null>(null);
+  const [user,           setUser]           = useState<User | null>(null);
   const [paywallVisible, setPaywallVisible] = useState(false);
   const [paywallType,    setPaywallType]    = useState<PaywallType>("depth");
 
@@ -200,38 +201,60 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
       .finally(() => setHydrated(true));
   }, []);
 
-  // ── Load premium status on mount ───────────────────────────────────────────
+  // ── Track Supabase Auth session ────────────────────────────────────────────
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user ?? null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // ── Load premium status — uses authenticated user.id (authoritative) ────────
   useEffect(() => {
     (async () => {
-      const [id, premiumStr] = await Promise.all([
-        getDeviceId(),
-        AsyncStorage.getItem(PREMIUM_KEY),
-      ]);
-      setDeviceId(id);
-
+      // Fast-path: AsyncStorage cache
+      const premiumStr = await AsyncStorage.getItem(PREMIUM_KEY);
       if (premiumStr === "true") {
         setIsPremium(true);
+      }
+
+      // Authoritative check: Supabase access_levels using auth user.id
+      if (!user) {
+        // Not logged in — clear any stale premium cache
+        setIsPremium(false);
+        await AsyncStorage.removeItem(PREMIUM_KEY);
         return;
       }
 
-      // Verify with Supabase (authoritative)
       try {
         const { data } = await supabase
           .from("access_levels")
           .select("plan_type, access_until")
-          .eq("user_id", id)
+          .eq("user_id", user.id)
           .maybeSingle();
 
         const validPlan = data?.plan_type === "premium" || data?.plan_type === "vip";
-        if (validPlan && data?.access_until && new Date(data.access_until) > new Date()) {
+        const notExpired = data?.access_until
+          ? new Date(data.access_until) > new Date()
+          : false;
+
+        if (validPlan && notExpired) {
           setIsPremium(true);
           await AsyncStorage.setItem(PREMIUM_KEY, "true");
+        } else {
+          setIsPremium(false);
+          await AsyncStorage.removeItem(PREMIUM_KEY);
         }
       } catch {
-        // Network error — rely on AsyncStorage cache
+        // Network error — keep fast-path value from AsyncStorage
       }
     })();
-  }, []);
+  }, [user]);
 
   // ── Persist to AsyncStorage whenever saved changes ─────────────────────────
   useEffect(() => {
@@ -265,7 +288,7 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
     [saved],
   );
 
-  // ── Mark premium ───────────────────────────────────────────────────────────
+  // ── Mark premium (local cache — webhook is the authoritative source) ────────
 
   const markPremium = useCallback(async () => {
     setIsPremium(true);
@@ -301,7 +324,7 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
         viagem: DEFAULT_VIAGEM,
         viagemItens,
         isPremium,
-        deviceId,
+        user,
         markPremium,
         paywallVisible,
         paywallType,

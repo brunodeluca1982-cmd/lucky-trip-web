@@ -4,12 +4,13 @@
  * Creates a Stripe Checkout Session for Lucky premium plan.
  * Requires STRIPE_SECRET_KEY Supabase secret.
  *
- * Accepts: { deviceId, plan?, priceId?, successUrl?, cancelUrl? }
- *   - plan: "annual" | "monthly" | "weekly" (maps to STRIPE_PRICE_ID_ANNUAL etc)
+ * Accepts: { userId, plan?, priceId?, successUrl?, cancelUrl? }
+ *   - userId:  Supabase Auth user.id (required — used as client_reference_id)
+ *   - plan:    "annual" | "monthly" | "weekly" | "one_time"
  *   - priceId: explicit Stripe price ID (overrides plan)
  *   - successUrl/cancelUrl: optional, falls back to env SUCCESS_URL / CANCEL_URL
  *
- * NOTE: Uses Deno.serve (not imported serve) — required for current Supabase Edge Runtime.
+ * NOTE: Uses Deno.serve — required for current Supabase Edge Runtime.
  */
 
 const corsHeaders = {
@@ -50,11 +51,11 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { deviceId, plan, priceId: explicitPriceId, successUrl, cancelUrl } = body;
+    const { userId, plan, priceId: explicitPriceId, successUrl, cancelUrl } = body;
 
-    if (!deviceId) {
+    if (!userId) {
       return new Response(
-        JSON.stringify({ error: "deviceId is required" }),
+        JSON.stringify({ error: "userId is required" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 },
       );
     }
@@ -98,8 +99,12 @@ Deno.serve(async (req: Request) => {
       "line_items[0][quantity]":                 "1",
       "success_url":                             resolvedSuccessUrl,
       "cancel_url":                              resolvedCancelUrl,
-      "metadata[device_id]":                     deviceId,
-      "subscription_data[metadata][device_id]":  deviceId,
+      // client_reference_id is Stripe's standard field for mapping sessions to users
+      "client_reference_id":                     userId,
+      // metadata on the session
+      "metadata[user_id]":                       userId,
+      // metadata propagated to the subscription object (accessible in subscription events)
+      "subscription_data[metadata][user_id]":    userId,
     });
 
     const stripeRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
