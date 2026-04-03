@@ -38,6 +38,23 @@ const GOLD_BDR = "rgba(212,175,55,0.50)";
 const LOGO     = require("@/assets/images/logo-symbol.png");
 const BG       = require("@/assets/images/rio-aerial-clean.png");
 
+/**
+ * WNS — "web no select"
+ * Applied to every non-input container on iOS web to prevent the blue
+ * text-selection highlight.  Includes all three properties iOS Safari needs:
+ *   -webkit-touch-callout : none  — suppresses long-press callout menu
+ *   -webkit-user-select   : none  — WebKit-prefixed selection disable
+ *   user-select           : none  — standard, also needed by React Native Web
+ * Cast to `any` because TypeScript's RN types don't expose webkit props.
+ */
+const WNS: object = Platform.OS === "web"
+  ? ({
+      userSelect:            "none",
+      WebkitUserSelect:      "none",
+      WebkitTouchCallout:    "none",
+    } as any)
+  : {};
+
 // ── Root screen ───────────────────────────────────────────────────────────────
 
 export default function PerfilScreen() {
@@ -75,7 +92,7 @@ export default function PerfilScreen() {
   }
 
   return (
-    <View style={s.root}>
+    <View style={[s.root, WNS]}>
       {/* Background photo — pointerEvents none so it never swallows touches */}
       <Image
         source={BG}
@@ -87,10 +104,11 @@ export default function PerfilScreen() {
       <View style={s.overlay} pointerEvents="none" />
 
       <KeyboardAvoidingView
-        style={s.kav}
+        style={[s.kav, WNS]}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <ScrollView
+          style={WNS}
           contentContainerStyle={[s.scroll, { paddingTop: topPad, paddingBottom: botPad }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -379,14 +397,13 @@ const s = StyleSheet.create({
   page: {
     flex:       1,
     alignItems: "center",
-    // prevent blue text-selection highlight on iOS web
-    ...(Platform.OS === "web" ? ({ userSelect: "none" } as object) : {}),
+    ...WNS,
   },
   center: {
     flex:            1,
     alignItems:      "center",
     justifyContent:  "center",
-    ...(Platform.OS === "web" ? ({ userSelect: "none" } as object) : {}),
+    ...WNS,
   },
 
   // ── Back button ──
@@ -397,6 +414,7 @@ const s = StyleSheet.create({
     alignSelf:     "flex-start",
     paddingVertical: 10,
     marginBottom:  4,
+    ...WNS,
   },
   backText: {
     fontFamily: "Inter_400Regular",
@@ -408,6 +426,7 @@ const s = StyleSheet.create({
   logoWrap: {
     alignItems:   "center",
     marginBottom: 12,
+    ...WNS,
   },
   logo: {
     width:        72,
@@ -429,6 +448,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical:   5,
     marginBottom:      18,
+    ...WNS,
   },
   badgeText: {
     fontFamily:    "Inter_500Medium",
@@ -479,6 +499,7 @@ const s = StyleSheet.create({
     gap:            10,
     marginTop:      4,
     marginBottom:   18,
+    ...WNS,
   },
   checkbox: {
     width:           20,
@@ -526,6 +547,7 @@ const s = StyleSheet.create({
     alignItems:      "center",
     minHeight:       54,
     justifyContent:  "center",
+    ...WNS,
   },
   ctaText: {
     fontFamily:    "Inter_600SemiBold",
@@ -541,6 +563,7 @@ const s = StyleSheet.create({
     width:          "100%",
     marginVertical: 18,
     gap:            10,
+    ...WNS,
   },
   dividerLine: {
     flex:            1,
@@ -559,6 +582,7 @@ const s = StyleSheet.create({
     width:         "100%",
     gap:           12,
     marginBottom:  24,
+    ...WNS,
   },
   socialBtn: {
     flex:              1,
@@ -571,6 +595,7 @@ const s = StyleSheet.create({
     borderWidth:       1,
     borderColor:       "rgba(255,255,255,0.18)",
     backgroundColor:   "rgba(255,255,255,0.08)",
+    ...WNS,
   },
   socialBtnText: {
     fontFamily: "Inter_500Medium",
@@ -584,6 +609,7 @@ const s = StyleSheet.create({
     alignItems:     "center",
     justifyContent: "center",
     marginBottom:   8,
+    ...WNS,
   },
   footerText: {
     fontFamily: "Inter_400Regular",
