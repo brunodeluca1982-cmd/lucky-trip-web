@@ -73,13 +73,14 @@ export default function SubscriptionScreen() {
     setErrorMsg(null);
     setLoading(true);
     try {
-      const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
-      const res = await fetch("https://lsibzflaaqzvtzjlvrxw.supabase.co/functions/v1/create-checkout", {
+      const supabaseUrl = "https://lsibzflaaqzvtzjlvrxw.supabase.co";
+      const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxzaWJ6ZmxhYXF6dnR6amx2cnh3Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NDE5MTQ1NCwiZXhwIjoyMDc5NzY3NDU0fQ.OL0HPzMVZSm7zvTODU4XyShMc6n8N0AZjAbP3mqi-0o";
+      const res = await fetch(`${supabaseUrl}/functions/v1/create-checkout`, {
         method: "POST",
         headers: {
-          "Content-Type":  "application/json",
-          "apikey":        anonKey,
-          "Authorization": `Bearer ${anonKey}`,
+          "Content-Type": "application/json",
+          "apikey": supabaseAnonKey,
+          "Authorization": `Bearer ${supabaseAnonKey}`
         },
         body: JSON.stringify({
           plan: selected
