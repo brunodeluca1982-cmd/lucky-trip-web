@@ -45,10 +45,12 @@ export function useAuth(): AuthState {
   }
 
   async function signOut(): Promise<void> {
+    console.log("[logout] signOut called, current session:", session?.user?.id ?? "null");
     try {
-      await supabase.auth.signOut({ scope: "local" });
-    } catch {
-      // local session cleared regardless of server errors
+      const { error } = await supabase.auth.signOut({ scope: "local" });
+      console.log("[logout] signOut completed, error:", error?.message ?? "none");
+    } catch (e) {
+      console.log("[logout] signOut threw:", e);
     }
   }
 

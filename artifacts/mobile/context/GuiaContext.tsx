@@ -215,6 +215,7 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("[logout] onAuthStateChange event:", event, "session user:", session?.user?.id ?? "null");
       if (event === "SIGNED_OUT") {
         setUser(null);
       } else {

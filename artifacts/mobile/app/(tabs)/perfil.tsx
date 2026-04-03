@@ -126,7 +126,7 @@ export default function PerfilScreen() {
           </View>
 
           {/* Logout */}
-          <Pressable style={styles.logoutBtn} onPress={signOut}>
+          <Pressable style={styles.logoutBtn} onPress={() => { console.log("[logout] button pressed"); signOut(); }}>
             <Feather name="log-out" size={16} color="rgba(255,255,255,0.60)" />
             <Text style={styles.logoutText}>Sair da conta</Text>
           </Pressable>
