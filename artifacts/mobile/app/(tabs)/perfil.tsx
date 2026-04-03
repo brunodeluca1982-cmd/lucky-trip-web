@@ -35,7 +35,7 @@ const settingsItems = [
 ];
 
 export default function PerfilScreen() {
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const insets      = useSafeAreaInsets();
   const topPad    = Platform.OS === "web" ? 67 : insets.top + 16;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
@@ -66,8 +66,14 @@ export default function PerfilScreen() {
             <View style={styles.avatar}>
               <Feather name="user" size={32} color={C.white} />
             </View>
-            <Text style={styles.name}>Viajante Lucky</Text>
-            <Text style={styles.email}>membro@theluckytrip.com</Text>
+            {user ? (
+              <>
+                <Text style={styles.name}>{user.email?.split("@")[0] ?? "—"}</Text>
+                <Text style={styles.email}>{user.email}</Text>
+              </>
+            ) : (
+              <Text style={styles.email}>Não conectado</Text>
+            )}
             <View style={styles.badgeRow}>
               <View style={styles.badge}>
                 <Feather name="star" size={11} color={GOLD} />
