@@ -58,9 +58,9 @@ function HeroSlide({ item }: { item: HeroItem }) {
       <Image source={item.image} style={styles.image} resizeMode="cover" />
       <View style={styles.dimOverlay} />
       <LinearGradient
-        colors={["transparent", "rgba(0,0,0,0.45)", "rgba(0,0,0,0.78)"]}
+        colors={["transparent", "rgba(0,0,0,0.50)", "rgba(0,0,0,0.88)"]}
         style={styles.gradient}
-        locations={[0.25, 0.60, 1]}
+        locations={[0.20, 0.58, 1]}
       />
       <View style={styles.content}>
         <View style={styles.badgeContainer}>
@@ -147,68 +147,64 @@ const styles = StyleSheet.create({
   image: {
     width: SCREEN_WIDTH,
     height: HERO_HEIGHT,
-    resizeMode: "cover",
   },
   dimOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.22)",
+    backgroundColor: "rgba(0,0,0,0.10)",
   },
   gradient: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    height: HERO_HEIGHT * 0.75,
+    height: HERO_HEIGHT * 0.80,
   },
   content: {
     position: "absolute",
-    bottom: 68,
+    bottom: 72,
     left: 0,
     right: 0,
     alignItems: "center",
     paddingHorizontal: 24,
   },
   badgeContainer: {
-    backgroundColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "rgba(212,175,55,0.14)",
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 5,
-    marginBottom: 12,
+    marginBottom: 14,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.3)",
+    borderColor: "rgba(212,175,55,0.35)",
   },
   badgeText: {
-    color: C.white,
+    color: "#D4AF37",
     fontFamily: "Inter_500Medium",
-    fontSize: 12,
-    letterSpacing: 0.5,
+    fontSize: 11,
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
   },
   cidade: {
     fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 42,
+    fontSize: 46,
     color: C.white,
     textAlign: "center",
-    lineHeight: 50,
+    lineHeight: 54,
     letterSpacing: -0.5,
-    textShadowColor: "rgba(0,0,0,0.85)",
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 10,
+    textShadow: "0px 2px 12px rgba(0,0,0,0.90)",
   },
   pais: {
     fontFamily: "Inter_400Regular",
-    fontSize: 16,
-    color: "rgba(255,255,255,0.90)",
-    marginTop: 4,
+    fontSize: 14,
+    color: "rgba(255,255,255,0.80)",
+    marginTop: 6,
     marginBottom: 24,
-    letterSpacing: 2,
+    letterSpacing: 3,
     textTransform: "uppercase",
-    textShadowColor: "rgba(0,0,0,0.75)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 6,
+    textShadow: "0px 1px 6px rgba(0,0,0,0.70)",
   },
   dots: {
     position: "absolute",
-    bottom: 36,
+    bottom: 38,
     left: 0,
     right: 0,
     flexDirection: "row",
@@ -217,14 +213,15 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "rgba(255,255,255,0.45)",
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: "rgba(255,255,255,0.38)",
   },
   dotActive: {
-    backgroundColor: C.white,
-    width: 22,
-    borderRadius: 3,
+    backgroundColor: "#D4AF37",
+    width: 26,
+    height: 5,
+    borderRadius: 2.5,
   },
 });

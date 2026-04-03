@@ -59,14 +59,10 @@ const styles = StyleSheet.create({
   card: {
     width: CARD_W,
     height: CARD_H,
-    borderRadius: 14,
+    borderRadius: 16,
     overflow: "hidden",
     backgroundColor: C.sand,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.16,
-    shadowRadius: 8,
-    elevation: 4,
+    boxShadow: "0px 3px 12px rgba(0,0,0,0.22)",
   },
   cardFeatured: {
     borderWidth: 2.5,
@@ -75,7 +71,6 @@ const styles = StyleSheet.create({
   image: {
     width: "100%",
     height: "100%",
-    resizeMode: "cover",
   },
   gradient: {
     position: "absolute",

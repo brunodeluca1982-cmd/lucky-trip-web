@@ -418,7 +418,7 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.36)",
+    backgroundColor: "rgba(0,0,0,0.44)",
   },
   content: {
     paddingHorizontal: 20,
@@ -497,16 +497,16 @@ const styles = StyleSheet.create({
     flexDirection:     "row",
     alignItems:        "center",
     justifyContent:    "space-between",
-    backgroundColor:   "rgba(255,255,255,0.08)",
-    borderRadius:      14,
+    backgroundColor:   "rgba(255,255,255,0.07)",
+    borderRadius:      16,
     paddingHorizontal: 16,
     paddingVertical:   13,
     borderWidth:       1,
-    borderColor:       "rgba(255,255,255,0.14)",
+    borderColor:       "rgba(255,255,255,0.12)",
   } as never,
   promptChipPressed: {
-    backgroundColor: "rgba(255,255,255,0.14)",
-    borderColor:     "rgba(212,175,55,0.30)",
+    backgroundColor: "rgba(255,255,255,0.13)",
+    borderColor:     "rgba(212,175,55,0.45)",
   },
   promptChipText: {
     fontFamily: "Inter_500Medium",

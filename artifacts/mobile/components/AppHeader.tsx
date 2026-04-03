@@ -67,19 +67,19 @@ const styles = StyleSheet.create({
   logoMark: {
     // RGBA asset: 2622×748 (ratio ~3.5:1) — L. mark only, no tagline text.
     // White strokes on transparent bg — renders correctly on any background.
-    // opacity: 0.50 → subtle watermark feel, premium and non-dominant.
+    // opacity: 0.65 → legible signature feel, premium without dominating.
     height: 28,
     width: 96,
-    opacity: 0.50,
+    opacity: 0.65,
   },
   avatarBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "rgba(255,255,255,0.18)",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.14)",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.3)",
+    borderColor: "rgba(255,255,255,0.24)",
   },
 });

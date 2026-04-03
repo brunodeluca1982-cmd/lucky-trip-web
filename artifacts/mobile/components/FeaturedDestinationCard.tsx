@@ -84,16 +84,11 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: C.darkBrown,
     alignSelf: "center",
-    shadowColor: "#2C1810",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.28,
-    shadowRadius: 20,
-    elevation: 10,
+    boxShadow: "0px 8px 28px rgba(44,24,16,0.32)",
   },
   image: {
     width: "100%",
     height: "100%",
-    resizeMode: "cover",
   },
   stamp: {
     position: "absolute",

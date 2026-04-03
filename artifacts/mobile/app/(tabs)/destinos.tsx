@@ -119,7 +119,7 @@ export default function DestinosScreen() {
           resizeMode="cover"
         />
         <LinearGradient
-          colors={["rgba(0,0,0,0.84)", "rgba(0,0,0,0.76)", "rgba(0,0,0,0.90)"]}
+          colors={["rgba(0,0,0,0.74)", "rgba(0,0,0,0.66)", "rgba(0,0,0,0.86)"]}
           locations={[0, 0.5, 1]}
           style={StyleSheet.absoluteFill}
         />
@@ -226,10 +226,10 @@ const s = StyleSheet.create({
   },
   title: {
     fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 30,
+    fontSize: 32,
     color: "#FFFFFF",
-    lineHeight: 36,
-    letterSpacing: -0.3,
+    lineHeight: 38,
+    letterSpacing: -0.4,
   },
   subtitle: {
     fontFamily: "Inter_400Regular",
@@ -283,7 +283,7 @@ const s = StyleSheet.create({
   card: {
     width: CARD_W,
     height: CARD_H,
-    borderRadius: 16,
+    borderRadius: 18,
     overflow: "hidden",
     backgroundColor: "#000000",
   },

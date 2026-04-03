@@ -131,26 +131,21 @@ export function PlaceCard({
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 18,
+    borderRadius: 20,
     overflow: "hidden",
     backgroundColor: C.sand,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 10,
-    elevation: 4,
+    boxShadow: "0px 4px 18px rgba(0,0,0,0.30)",
   },
   image: {
     width: "100%",
     height: "100%",
-    resizeMode: "cover",
   },
   gradient: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    height: "65%",
+    height: "68%",
   },
   overlay: {
     position: "absolute",
@@ -158,7 +153,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     padding: 14,
-    gap: 6,
+    gap: 5,
   },
   tagRow: {
     flexDirection: "row",
@@ -167,9 +162,9 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: "PlayfairDisplay_600SemiBold",
-    fontSize: 16,
+    fontSize: 15,
     color: C.white,
-    lineHeight: 21,
+    lineHeight: 20,
   },
   bookmark: {
     position: "absolute",
@@ -177,22 +172,19 @@ const styles = StyleSheet.create({
     right: 10,
   },
   secretCard: {
-    borderRadius: 18,
+    borderRadius: 20,
     overflow: "hidden",
-    backgroundColor: C.white,
+    backgroundColor: "rgba(12,10,8,0.92)",
     flexDirection: "row",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    boxShadow: "0px 3px 14px rgba(0,0,0,0.22)",
     marginHorizontal: 24,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
   },
   secretImage: {
     width: 100,
     height: 112,
-    resizeMode: "cover",
   },
   secretContent: {
     flex: 1,
@@ -202,14 +194,14 @@ const styles = StyleSheet.create({
   },
   secretTitle: {
     fontFamily: "PlayfairDisplay_600SemiBold",
-    fontSize: 16,
-    color: C.darkBrown,
-    lineHeight: 21,
+    fontSize: 15,
+    color: C.white,
+    lineHeight: 20,
   },
   secretDesc: {
     fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: C.warmGray,
+    fontSize: 12,
+    color: "rgba(255,255,255,0.55)",
     lineHeight: 18,
   },
   secretBookmark: {

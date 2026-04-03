@@ -236,10 +236,10 @@ export default function HomeScreen() {
     <View style={s.root}>
       {/* Fullscreen background image — persists behind all content */}
       <Image source={BG_IMAGE} style={s.bgImage} resizeMode="cover" />
-      {/* Editorial overlay — permeable enough that the photo reads as a surface, not black */}
+      {/* Editorial overlay — dark enough for legibility, permeable enough for depth */}
       <LinearGradient
-        colors={["rgba(0,0,0,0.38)", "rgba(0,0,0,0.50)", "rgba(0,0,0,0.58)"]}
-        locations={[0, 0.40, 1]}
+        colors={["rgba(0,0,0,0.44)", "rgba(0,0,0,0.56)", "rgba(0,0,0,0.70)"]}
+        locations={[0, 0.38, 1]}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
@@ -416,8 +416,7 @@ const s = StyleSheet.create({
     left: 0,
     width: "100%",
     height: "100%",
-    resizeMode: "cover",
-    opacity: 0.58,
+    opacity: 0.50,
   },
 
   scroll: {
@@ -425,16 +424,16 @@ const s = StyleSheet.create({
   },
 
   section: {
-    paddingTop: 28,
+    paddingTop: 24,
     paddingBottom: 8,
   },
 
   // Subtle hairline — barely visible on dark bg
   divider: {
     height: 1,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "rgba(255,255,255,0.08)",
     marginHorizontal: 24,
-    marginTop: 20,
+    marginTop: 18,
   },
 
   // ── Momento tabs (manhã / tarde / noite) ──
@@ -480,14 +479,15 @@ const s = StyleSheet.create({
 
   // ── Lucky List highlight ──
   luckyBlock: {
-    marginTop: 28,
+    marginTop: 24,
     marginHorizontal: 24,
-    borderRadius: 20,
+    borderRadius: 22,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(201,168,76,0.18)",
-    backgroundColor: "rgba(0,0,0,0.60)",
+    borderColor: "rgba(201,168,76,0.24)",
+    backgroundColor: "rgba(0,0,0,0.65)",
     padding: 24,
+    boxShadow: "0px 6px 28px rgba(201,168,76,0.08)",
   },
   luckyHeader: {
     flexDirection: "row",
@@ -555,11 +555,11 @@ const s = StyleSheet.create({
   },
   luckyBtn: {
     borderWidth: 1,
-    borderColor: "rgba(201,168,76,0.30)",
-    borderRadius: 12,
+    borderColor: "rgba(201,168,76,0.40)",
+    borderRadius: 14,
     paddingVertical: 14,
     alignItems: "center",
-    backgroundColor: "rgba(201,168,76,0.07)",
+    backgroundColor: "rgba(201,168,76,0.09)",
   },
   luckyBtnText: {
     fontFamily: "Inter_600SemiBold",
@@ -571,12 +571,12 @@ const s = StyleSheet.create({
   // ── Roteiro card ──
   roteiroCard: {
     width: CARD_W,
-    height: CARD_W * 1.3,
-    borderRadius: 16,
+    height: CARD_W * 1.35,
+    borderRadius: 18,
     overflow: "hidden",
     backgroundColor: "#1A1208",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
+    borderColor: "rgba(255,255,255,0.08)",
   },
   roteiroImage: {
     width: "100%",
@@ -632,14 +632,14 @@ const s = StyleSheet.create({
   // ── Influencer card ──
   influencerCard: {
     width: CARD_W,
-    height: CARD_W * 1.2,
-    borderRadius: 16,
+    height: CARD_W * 1.22,
+    borderRadius: 18,
     overflow: "hidden",
     backgroundColor: "#1A1208",
     position: "relative",
     justifyContent: "flex-end",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
+    borderColor: "rgba(255,255,255,0.08)",
   },
   influencerImage: {
     ...StyleSheet.absoluteFillObject,
@@ -676,9 +676,9 @@ const s = StyleSheet.create({
 
   // ── CTA block — glass card ──
   ctaBlock: {
-    marginTop: 28,
+    marginTop: 24,
     marginHorizontal: 24,
-    borderRadius: 20,
+    borderRadius: 22,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.10)",
@@ -725,25 +725,25 @@ const s = StyleSheet.create({
 
   // ── Footer ──
   footer: {
-    marginTop: 40,
+    marginTop: 48,
     marginHorizontal: 24,
-    paddingTop: 24,
+    paddingTop: 28,
     borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.06)",
+    borderTopColor: "rgba(255,255,255,0.08)",
     alignItems: "center",
-    gap: 8,
+    gap: 10,
     paddingBottom: 8,
   },
   footerLogo: {
     width: 110,
     height: 32,
-    opacity: 0.55,
+    opacity: 0.65,
   },
   footerTagline: {
     fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    color: "rgba(255,255,255,0.45)",
-    letterSpacing: 1.2,
+    fontSize: 10,
+    color: "rgba(255,255,255,0.38)",
+    letterSpacing: 2.0,
     textTransform: "uppercase",
     textAlign: "center",
   },

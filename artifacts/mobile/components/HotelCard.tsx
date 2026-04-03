@@ -74,19 +74,14 @@ const styles = StyleSheet.create({
   card: {
     width: CARD_W,
     height: CARD_W * 1.22,
-    borderRadius: 18,
+    borderRadius: 20,
     overflow: "hidden",
     backgroundColor: C.sand,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 10,
-    elevation: 4,
+    boxShadow: "0px 4px 18px rgba(0,0,0,0.28)",
   },
   image: {
     width: "100%",
     height: "100%",
-    resizeMode: "cover",
   },
   gradient: {
     position: "absolute",
