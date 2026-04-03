@@ -1,10 +1,17 @@
 /**
  * perfil.tsx — Profile tab
  *
- * STATE 1 — Logged out : account entry (email + Supabase OTP magic link)
- * STATE 2 — Logged in  : minimal real profile (email from Supabase, logout)
+ * STATE 1 — Logged out : full account creation form (matches design reference)
+ * STATE 2 — Sent       : check-your-email confirmation
+ * STATE 3 — Logged in  : minimal real profile (email from Supabase, logout)
  *
  * No mock data. No hardcoded values. No fake profile content.
+ *
+ * iOS web fixes applied:
+ *  - Background Image uses pointerEvents="none" (not ImageBackground)
+ *  - Dark overlay is absoluteFill + pointerEvents="none" — never blocks content touches
+ *  - userSelect: "none" on all text/containers prevents blue selection highlight
+ *  - suppressHighlighting on all Text inside Touchables
  */
 
 import React, { useState } from "react";
@@ -27,17 +34,23 @@ import { router } from "expo-router";
 import type { User } from "@supabase/supabase-js";
 
 const GOLD     = "#D4AF37";
-const GOLD_BDR = "rgba(212,175,55,0.35)";
+const GOLD_BDR = "rgba(212,175,55,0.50)";
 const LOGO     = require("@/assets/images/logo-symbol.png");
 const BG       = require("@/assets/images/rio-aerial-clean.png");
+
+// ── Root screen ───────────────────────────────────────────────────────────────
 
 export default function PerfilScreen() {
   const { user, signOut, signInWithOtp, signInWithGoogle } = useAuth();
   const insets = useSafeAreaInsets();
-  const topPad = Platform.OS === "web" ? 60 : insets.top + 20;
-  const botPad = Platform.OS === "web" ? 34 : insets.bottom + 20;
+  const topPad = Platform.OS === "web" ? 16 : insets.top + 8;
+  const botPad = Platform.OS === "web" ? 32 : insets.bottom + 16;
 
+  const [name,          setName]          = useState("");
   const [email,         setEmail]         = useState("");
+  const [password,      setPassword]      = useState("");
+  const [showPass,      setShowPass]      = useState(false);
+  const [agreed,        setAgreed]        = useState(false);
   const [loading,       setLoading]       = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [sent,          setSent]          = useState(false);
@@ -63,45 +76,64 @@ export default function PerfilScreen() {
 
   return (
     <View style={s.root}>
-      <Image source={BG} style={StyleSheet.absoluteFill} resizeMode="cover" pointerEvents="none" />
-      <View style={s.overlay}>
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+      {/* Background photo — pointerEvents none so it never swallows touches */}
+      <Image
+        source={BG}
+        style={StyleSheet.absoluteFill}
+        resizeMode="cover"
+        pointerEvents="none"
+      />
+      {/* Dark overlay — absoluteFill + pointerEvents none so content below receives all taps */}
+      <View style={s.overlay} pointerEvents="none" />
+
+      <KeyboardAvoidingView
+        style={s.kav}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <ScrollView
+          contentContainerStyle={[s.scroll, { paddingTop: topPad, paddingBottom: botPad }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          <ScrollView
-            contentContainerStyle={[s.scroll, { paddingTop: topPad, paddingBottom: botPad }]}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            {user
-              ? <LoggedIn  user={user} signOut={signOut} />
-              : sent
-              ? <SentState email={email} />
-              : <LoggedOut
-                  email={email}
-                  setEmail={setEmail}
-                  loading={loading}
-                  googleLoading={googleLoading}
-                  error={error}
-                  onSubmit={handleSubmit}
-                  onGooglePress={handleGoogle}
-                />
-            }
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </View>
+          {user
+            ? <LoggedIn user={user} signOut={signOut} />
+            : sent
+            ? <SentState email={email} />
+            : <LoggedOut
+                name={name}           setName={setName}
+                email={email}         setEmail={setEmail}
+                password={password}   setPassword={setPassword}
+                showPass={showPass}   setShowPass={setShowPass}
+                agreed={agreed}       setAgreed={setAgreed}
+                loading={loading}
+                googleLoading={googleLoading}
+                error={error}
+                onSubmit={handleSubmit}
+                onGooglePress={handleGoogle}
+              />
+          }
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
 
-// ── Logged-out: account entry ─────────────────────────────────────────────────
+// ── Logged-out: full account creation form ────────────────────────────────────
 
 function LoggedOut({
-  email, setEmail, loading, googleLoading, error, onSubmit, onGooglePress,
+  name, setName,
+  email, setEmail,
+  password, setPassword,
+  showPass, setShowPass,
+  agreed, setAgreed,
+  loading, googleLoading,
+  error, onSubmit, onGooglePress,
 }: {
-  email: string;
-  setEmail: (v: string) => void;
+  name: string;         setName: (v: string) => void;
+  email: string;        setEmail: (v: string) => void;
+  password: string;     setPassword: (v: string) => void;
+  showPass: boolean;    setShowPass: (v: boolean) => void;
+  agreed: boolean;      setAgreed: (v: boolean) => void;
   loading: boolean;
   googleLoading: boolean;
   error: string | null;
@@ -109,60 +141,167 @@ function LoggedOut({
   onGooglePress: () => void;
 }) {
   return (
-    <View style={s.center}>
-      <Image source={LOGO} style={s.logo} resizeMode="contain" />
-      <Text style={s.brand}>THE LUCKY TRIP</Text>
+    <View style={s.page}>
+      {/* ← Voltar */}
+      <TouchableOpacity
+        style={s.backBtn}
+        onPress={() => router.replace("/")}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+      >
+        <Feather name="arrow-left" size={16} color="rgba(255,255,255,0.80)" />
+        <Text style={s.backText} suppressHighlighting>Voltar</Text>
+      </TouchableOpacity>
 
-      <View style={s.badge}>
-        <Text style={s.badgeText}>CRIE SUA CONTA</Text>
+      {/* Logo + brand */}
+      <View style={s.logoWrap}>
+        <Image source={LOGO} style={s.logo} resizeMode="contain" />
+        <Text style={s.brand} suppressHighlighting>THE LUCKY TRIP</Text>
       </View>
 
-      <Text style={s.headline}>Comece a planejar{"\n"}sua viagem</Text>
-      <Text style={s.sub}>Salve lugares, crie roteiros e acesse o Lucky.</Text>
+      {/* Badge */}
+      <View style={s.badge}>
+        <Text style={s.badgeText} suppressHighlighting>CRIE SUA CONTA</Text>
+      </View>
 
-      <View style={s.inputWrap}>
-        <Feather name="mail" size={16} color="rgba(255,255,255,0.40)" style={s.inputIcon} />
+      {/* Headline */}
+      <Text style={s.headline} suppressHighlighting>
+        Comece a planejar suas viagens dos sonhos
+      </Text>
+
+      {/* Inputs */}
+      <View style={s.fieldWrap}>
+        <Feather name="user" size={16} color="rgba(255,255,255,0.40)" />
         <TextInput
-          style={s.input}
+          style={s.field}
+          placeholder="Nome completo"
+          placeholderTextColor="rgba(255,255,255,0.38)"
+          autoCapitalize="words"
+          autoCorrect={false}
+          value={name}
+          onChangeText={setName}
+          returnKeyType="next"
+        />
+      </View>
+
+      <View style={s.fieldWrap}>
+        <Feather name="mail" size={16} color="rgba(255,255,255,0.40)" />
+        <TextInput
+          style={s.field}
           placeholder="E-mail"
-          placeholderTextColor="rgba(255,255,255,0.35)"
+          placeholderTextColor="rgba(255,255,255,0.38)"
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
           value={email}
           onChangeText={setEmail}
           onSubmitEditing={onSubmit}
-          returnKeyType="send"
+          returnKeyType="next"
         />
       </View>
 
-      {error ? <Text style={s.errorText}>{error}</Text> : null}
+      <View style={s.fieldWrap}>
+        <Feather name="lock" size={16} color="rgba(255,255,255,0.40)" />
+        <TextInput
+          style={[s.field, { flex: 1 }]}
+          placeholder="Senha"
+          placeholderTextColor="rgba(255,255,255,0.38)"
+          secureTextEntry={!showPass}
+          autoCapitalize="none"
+          autoCorrect={false}
+          value={password}
+          onChangeText={setPassword}
+          returnKeyType="done"
+          onSubmitEditing={onSubmit}
+        />
+        <TouchableOpacity
+          onPress={() => setShowPass(!showPass)}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          activeOpacity={0.6}
+          accessibilityRole="button"
+        >
+          <Feather
+            name={showPass ? "eye-off" : "eye"}
+            size={16}
+            color="rgba(255,255,255,0.40)"
+          />
+        </TouchableOpacity>
+      </View>
 
-      <TouchableOpacity style={s.cta} onPress={onSubmit} activeOpacity={0.85} disabled={loading}>
+      {/* Terms checkbox */}
+      <TouchableOpacity
+        style={s.checkRow}
+        onPress={() => setAgreed(!agreed)}
+        activeOpacity={0.7}
+        accessibilityRole="checkbox"
+      >
+        <View style={[s.checkbox, agreed && s.checkboxChecked]}>
+          {agreed && <Feather name="check" size={11} color="#000" />}
+        </View>
+        <Text style={s.checkText} suppressHighlighting>
+          Concordo com os{" "}
+          <Text style={s.checkLink}>Termos de Uso</Text>
+          <Text style={s.checkLink}>  Política de Privacidade</Text>
+        </Text>
+      </TouchableOpacity>
+
+      {error ? <Text style={s.errorText} suppressHighlighting>{error}</Text> : null}
+
+      {/* Criar conta CTA */}
+      <TouchableOpacity
+        style={s.cta}
+        onPress={onSubmit}
+        activeOpacity={0.85}
+        disabled={loading}
+        accessibilityRole="button"
+      >
         {loading
           ? <ActivityIndicator color="#000" />
-          : <Text style={s.ctaText}>Continuar com e-mail</Text>
+          : <Text style={s.ctaText} suppressHighlighting>Criar conta</Text>
         }
       </TouchableOpacity>
 
+      {/* Divider "ou continue com" */}
       <View style={s.dividerRow}>
         <View style={s.dividerLine} />
-        <Text style={s.dividerText}>ou</Text>
+        <Text style={s.dividerText} suppressHighlighting>ou continue com</Text>
         <View style={s.dividerLine} />
       </View>
 
-      <TouchableOpacity style={s.guestBtn} onPress={onGooglePress} activeOpacity={0.7} disabled={googleLoading}>
-        {googleLoading
-          ? <ActivityIndicator size="small" color="rgba(255,255,255,0.70)" />
-          : <AntDesign name="google" size={16} color="rgba(255,255,255,0.70)" />
-        }
-        <Text style={s.guestBtnText}>Continuar com Google</Text>
-      </TouchableOpacity>
+      {/* Social buttons — side by side */}
+      <View style={s.socialRow}>
+        <TouchableOpacity
+          style={s.socialBtn}
+          onPress={onGooglePress}
+          activeOpacity={0.7}
+          disabled={googleLoading}
+          accessibilityRole="button"
+        >
+          {googleLoading
+            ? <ActivityIndicator size="small" color="rgba(255,255,255,0.70)" />
+            : <AntDesign name="google" size={17} color="#FFFFFF" />
+          }
+          <Text style={s.socialBtnText} suppressHighlighting>Google</Text>
+        </TouchableOpacity>
 
-      <TouchableOpacity style={[s.guestBtn, { marginTop: 10 }]} onPress={() => router.replace("/")} activeOpacity={0.7}>
-        <Feather name="arrow-right" size={16} color="rgba(255,255,255,0.70)" />
-        <Text style={s.guestBtnText}>Continuar sem conta</Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={s.socialBtn}
+          onPress={() => router.replace("/")}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+        >
+          <Feather name="compass" size={17} color="#FFFFFF" />
+          <Text style={s.socialBtnText} suppressHighlighting>Continuar sem conta</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Footer */}
+      <View style={s.footerRow}>
+        <Text style={s.footerText} suppressHighlighting>Já tem uma conta?  </Text>
+        <TouchableOpacity onPress={onSubmit} activeOpacity={0.7} accessibilityRole="button">
+          <Text style={s.footerLink} suppressHighlighting>Entrar</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -178,12 +317,14 @@ function SentState({ email }: { email: string }) {
         <Feather name="mail" size={28} color={GOLD} />
       </View>
 
-      <Text style={s.headline}>Verifique seu e-mail</Text>
-      <Text style={s.sub}>
+      <Text style={s.headline} suppressHighlighting>Verifique seu e-mail</Text>
+      <Text style={s.sub} suppressHighlighting>
         Enviamos um link de acesso para{"\n"}
         <Text style={{ color: GOLD, fontFamily: "Inter_500Medium" }}>{email}</Text>
       </Text>
-      <Text style={s.sentNote}>Clique no link para entrar automaticamente.</Text>
+      <Text style={s.sentNote} suppressHighlighting>
+        Clique no link para entrar automaticamente.
+      </Text>
     </View>
   );
 }
@@ -199,12 +340,17 @@ function LoggedIn({ user, signOut }: { user: User; signOut: () => void }) {
         <Feather name="user" size={32} color="#FFFFFF" />
       </View>
 
-      <Text style={s.name}>{displayName}</Text>
-      <Text style={s.emailText}>{user.email}</Text>
+      <Text style={s.name} suppressHighlighting>{displayName}</Text>
+      <Text style={s.emailText} suppressHighlighting>{user.email}</Text>
 
-      <TouchableOpacity style={s.logoutBtn} onPress={signOut} activeOpacity={0.7}>
+      <TouchableOpacity
+        style={s.logoutBtn}
+        onPress={signOut}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+      >
         <Feather name="log-out" size={15} color="rgba(255,255,255,0.60)" />
-        <Text style={s.logoutText}>Sair da conta</Text>
+        <Text style={s.logoutText} suppressHighlighting>Sair da conta</Text>
       </TouchableOpacity>
     </View>
   );
@@ -214,42 +360,75 @@ function LoggedIn({ user, signOut }: { user: User; signOut: () => void }) {
 
 const s = StyleSheet.create({
   root: {
-    flex: 1,
-    backgroundColor: "#000",
+    flex:            1,
+    backgroundColor: "#0a0a0a",
   },
   overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.58)",
+  },
+  kav: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.55)",
   },
   scroll: {
-    flexGrow:        1,
-    justifyContent:  "center",
-    paddingHorizontal: 28,
-  },
-  center: {
-    alignItems: "center",
+    flexGrow:          1,
+    paddingHorizontal: 24,
   },
 
+  // ── Page (logged-out) ──
+  page: {
+    flex:       1,
+    alignItems: "center",
+    // prevent blue text-selection highlight on iOS web
+    ...(Platform.OS === "web" ? ({ userSelect: "none" } as object) : {}),
+  },
+  center: {
+    flex:            1,
+    alignItems:      "center",
+    justifyContent:  "center",
+    ...(Platform.OS === "web" ? ({ userSelect: "none" } as object) : {}),
+  },
+
+  // ── Back button ──
+  backBtn: {
+    flexDirection: "row",
+    alignItems:    "center",
+    gap:           6,
+    alignSelf:     "flex-start",
+    paddingVertical: 10,
+    marginBottom:  4,
+  },
+  backText: {
+    fontFamily: "Inter_400Regular",
+    fontSize:   15,
+    color:      "rgba(255,255,255,0.80)",
+  },
+
+  // ── Logo / brand ──
+  logoWrap: {
+    alignItems:   "center",
+    marginBottom: 12,
+  },
   logo: {
-    width:        80,
-    height:       80,
-    marginBottom: 8,
+    width:        72,
+    height:       72,
+    marginBottom: 6,
   },
   brand: {
     fontFamily:    "Inter_600SemiBold",
     fontSize:      13,
     color:         "#FFFFFF",
     letterSpacing: 3,
-    marginBottom:  20,
   },
 
+  // ── Badge ──
   badge: {
     borderWidth:       1,
     borderColor:       GOLD_BDR,
     borderRadius:      20,
     paddingHorizontal: 14,
     paddingVertical:   5,
-    marginBottom:      22,
+    marginBottom:      18,
   },
   badgeText: {
     fontFamily:    "Inter_500Medium",
@@ -258,55 +437,90 @@ const s = StyleSheet.create({
     letterSpacing: 1.5,
   },
 
+  // ── Headline ──
   headline: {
-    fontFamily:    "PlayfairDisplay_700Bold",
-    fontSize:      28,
-    color:         "#FFFFFF",
-    textAlign:     "center",
-    lineHeight:    36,
-    marginBottom:  10,
-  },
-  sub: {
-    fontFamily:   "Inter_400Regular",
-    fontSize:     14,
-    color:        "rgba(255,255,255,0.60)",
+    fontFamily:   "PlayfairDisplay_700Bold",
+    fontSize:     26,
+    color:        "#FFFFFF",
     textAlign:    "center",
-    lineHeight:   21,
-    marginBottom: 28,
+    lineHeight:   34,
+    marginBottom: 22,
+    paddingHorizontal: 4,
   },
 
-  inputWrap: {
+  // ── Input fields ──
+  fieldWrap: {
     flexDirection:     "row",
     alignItems:        "center",
     width:             "100%",
-    backgroundColor:   "rgba(255,255,255,0.10)",
+    backgroundColor:   "rgba(255,255,255,0.09)",
     borderWidth:       1,
-    borderColor:       "rgba(255,255,255,0.16)",
+    borderColor:       "rgba(255,255,255,0.15)",
     borderRadius:      14,
     paddingHorizontal: 16,
-    marginBottom:      12,
+    paddingVertical:   Platform.OS === "ios" ? 4 : 0,
+    marginBottom:      10,
+    gap:               10,
   },
-  inputIcon: {
-    marginRight: 10,
-  },
-  input: {
+  field: {
     flex:       1,
-    paddingVertical: 16,
+    paddingVertical: 15,
     color:      "#FFFFFF",
     fontFamily: "Inter_400Regular",
     fontSize:   15,
+    ...(Platform.OS === "web" ? ({ outline: "none" } as object) : {}),
   },
+
+  // ── Checkbox ──
+  checkRow: {
+    flexDirection:  "row",
+    alignItems:     "flex-start",
+    width:          "100%",
+    gap:            10,
+    marginTop:      4,
+    marginBottom:   18,
+  },
+  checkbox: {
+    width:           20,
+    height:          20,
+    borderRadius:    5,
+    borderWidth:     1.5,
+    borderColor:     "rgba(255,255,255,0.35)",
+    backgroundColor: "rgba(255,255,255,0.07)",
+    alignItems:      "center",
+    justifyContent:  "center",
+    marginTop:       1,
+    flexShrink:      0,
+  },
+  checkboxChecked: {
+    backgroundColor: GOLD,
+    borderColor:     GOLD,
+  },
+  checkText: {
+    flex:       1,
+    fontFamily: "Inter_400Regular",
+    fontSize:   13,
+    color:      "rgba(255,255,255,0.60)",
+    lineHeight: 20,
+  },
+  checkLink: {
+    color:     GOLD,
+    fontFamily:"Inter_500Medium",
+  },
+
   errorText: {
     fontFamily:   "Inter_400Regular",
     fontSize:     13,
     color:        "#FF6B6B",
     textAlign:    "center",
     marginBottom: 10,
+    width:        "100%",
   },
 
+  // ── Criar conta CTA ──
   cta: {
     width:           "100%",
-    backgroundColor: GOLD,
+    backgroundColor: "#B8942A",
     borderRadius:    14,
     paddingVertical: 17,
     alignItems:      "center",
@@ -316,10 +530,73 @@ const s = StyleSheet.create({
   ctaText: {
     fontFamily:    "Inter_600SemiBold",
     fontSize:      16,
-    color:         "#000000",
-    letterSpacing: 0.1,
+    color:         "#FFFFFF",
+    letterSpacing: 0.2,
   },
 
+  // ── Divider ──
+  dividerRow: {
+    flexDirection:  "row",
+    alignItems:     "center",
+    width:          "100%",
+    marginVertical: 18,
+    gap:            10,
+  },
+  dividerLine: {
+    flex:            1,
+    height:          1,
+    backgroundColor: "rgba(255,255,255,0.13)",
+  },
+  dividerText: {
+    fontFamily: "Inter_400Regular",
+    fontSize:   12,
+    color:      "rgba(255,255,255,0.38)",
+  },
+
+  // ── Social buttons (side by side) ──
+  socialRow: {
+    flexDirection: "row",
+    width:         "100%",
+    gap:           12,
+    marginBottom:  24,
+  },
+  socialBtn: {
+    flex:              1,
+    flexDirection:     "row",
+    alignItems:        "center",
+    justifyContent:    "center",
+    gap:               8,
+    paddingVertical:   15,
+    borderRadius:      14,
+    borderWidth:       1,
+    borderColor:       "rgba(255,255,255,0.18)",
+    backgroundColor:   "rgba(255,255,255,0.08)",
+  },
+  socialBtnText: {
+    fontFamily: "Inter_500Medium",
+    fontSize:   14,
+    color:      "#FFFFFF",
+  },
+
+  // ── Footer ──
+  footerRow: {
+    flexDirection:  "row",
+    alignItems:     "center",
+    justifyContent: "center",
+    marginBottom:   8,
+  },
+  footerText: {
+    fontFamily: "Inter_400Regular",
+    fontSize:   14,
+    color:      "rgba(255,255,255,0.55)",
+  },
+  footerLink: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize:   14,
+    color:      GOLD,
+  },
+
+  // ── Sent state ──
   sentIcon: {
     width:           70,
     height:          70,
@@ -332,14 +609,23 @@ const s = StyleSheet.create({
     marginBottom:    20,
     marginTop:       16,
   },
+  sub: {
+    fontFamily:   "Inter_400Regular",
+    fontSize:     14,
+    color:        "rgba(255,255,255,0.60)",
+    textAlign:    "center",
+    lineHeight:   21,
+    marginBottom: 8,
+  },
   sentNote: {
     fontFamily: "Inter_400Regular",
     fontSize:   13,
-    color:      "rgba(255,255,255,0.40)",
+    color:      "rgba(255,255,255,0.38)",
     textAlign:  "center",
-    marginTop:  12,
+    marginTop:  8,
   },
 
+  // ── Logged-in ──
   avatar: {
     width:           80,
     height:          80,
@@ -364,7 +650,6 @@ const s = StyleSheet.create({
     color:        "rgba(255,255,255,0.55)",
     marginBottom: 36,
   },
-
   logoutBtn: {
     flexDirection:     "row",
     alignItems:        "center",
@@ -380,41 +665,5 @@ const s = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize:   14,
     color:      "rgba(255,255,255,0.60)",
-  },
-
-  dividerRow: {
-    flexDirection:  "row",
-    alignItems:     "center",
-    width:          "100%",
-    marginVertical: 16,
-    gap:            10,
-  },
-  dividerLine: {
-    flex:            1,
-    height:          1,
-    backgroundColor: "rgba(255,255,255,0.14)",
-  },
-  dividerText: {
-    fontFamily: "Inter_400Regular",
-    fontSize:   12,
-    color:      "rgba(255,255,255,0.35)",
-  },
-
-  guestBtn: {
-    flexDirection:     "row",
-    alignItems:        "center",
-    justifyContent:    "center",
-    gap:               8,
-    width:             "100%",
-    paddingVertical:   15,
-    borderRadius:      14,
-    borderWidth:       1,
-    borderColor:       "rgba(255,255,255,0.18)",
-    backgroundColor:   "rgba(255,255,255,0.07)",
-  },
-  guestBtnText: {
-    fontFamily: "Inter_500Medium",
-    fontSize:   15,
-    color:      "rgba(255,255,255,0.70)",
   },
 });
