@@ -2,10 +2,11 @@ import { Tabs } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { Platform, StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import PaywallModal from "@/components/PaywallModal";
 import AuthPrompt   from "@/components/AuthPrompt";
+import { useAuth }  from "@/hooks/useAuth";
 
 const GOLD   = "#D4AF37";
 const GRAY   = "#888888";
@@ -13,6 +14,7 @@ const TAB_BG = "#FFFFFF";
 const BORDER = "rgba(0,0,0,0.08)";
 
 export default function TabLayout() {
+  const { signOut } = useAuth();
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
   const insets = useSafeAreaInsets();
@@ -139,6 +141,12 @@ export default function TabLayout() {
       {/* Global paywall modal — rendered above all tabs */}
       <PaywallModal />
       <AuthPrompt />
+
+      {/* ── DEBUG ONLY — remove after auth validation ── */}
+      <TouchableOpacity onPress={signOut} style={{ position: "absolute", top: 54, right: 12, zIndex: 9999, backgroundColor: "red", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 }}>
+        <Text style={{ color: "#fff", fontSize: 11, fontWeight: "bold" }}>DEBUG LOGOUT</Text>
+      </TouchableOpacity>
+      {/* ── END DEBUG ── */}
     </>
   );
 }
