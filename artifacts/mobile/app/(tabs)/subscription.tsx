@@ -74,7 +74,7 @@ export default function SubscriptionScreen() {
     setLoading(true);
     try {
       const supabaseUrl = "https://lsibzflaaqzvtzjlvrxw.supabase.co";
-      const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxzaWJ6ZmxhYXF6dnR6amx2cnh3Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NDE5MTQ1NCwiZXhwIjoyMDc5NzY3NDU0fQ.OL0HPzMVZSm7zvTODU4XyShMc6n8N0AZjAbP3mqi-0o";
+      const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxzaWJ6ZmxhYXF6dnR6amx2cnh3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxOTE0NTQsImV4cCI6MjA3OTc2NzQ1NH0.8NzMek4d-XzysR4OiUXKLJ7APgiiio-6X35RG4XMKX4";
       const res = await fetch(`${supabaseUrl}/functions/v1/create-checkout`, {
         method: "POST",
         headers: {
