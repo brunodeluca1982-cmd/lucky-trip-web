@@ -15,6 +15,7 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
 import React, { useEffect } from "react";
+import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -68,6 +69,25 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    const el = document.createElement("style");
+    el.id = "lucky-no-select";
+    el.textContent = `
+      * {
+        -webkit-user-select:   none !important;
+        user-select:           none !important;
+        -webkit-touch-callout: none !important;
+      }
+      input, textarea, [contenteditable] {
+        -webkit-user-select: text !important;
+        user-select:         text !important;
+      }
+    `;
+    document.head.appendChild(el);
+    return () => { document.getElementById("lucky-no-select")?.remove(); };
+  }, []);
 
   if (!fontsLoaded && !fontError) return null;
 
