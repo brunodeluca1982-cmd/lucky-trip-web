@@ -23,6 +23,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import { router } from "expo-router";
 import type { User } from "@supabase/supabase-js";
 
 const GOLD     = "#D4AF37";
@@ -128,6 +129,17 @@ function LoggedOut({
           ? <ActivityIndicator color="#000" />
           : <Text style={s.ctaText}>Continuar com e-mail</Text>
         }
+      </TouchableOpacity>
+
+      <View style={s.dividerRow}>
+        <View style={s.dividerLine} />
+        <Text style={s.dividerText}>ou</Text>
+        <View style={s.dividerLine} />
+      </View>
+
+      <TouchableOpacity style={s.guestBtn} onPress={() => router.replace("/")} activeOpacity={0.7}>
+        <Feather name="arrow-right" size={16} color="rgba(255,255,255,0.70)" />
+        <Text style={s.guestBtnText}>Continuar sem conta</Text>
       </TouchableOpacity>
     </View>
   );
@@ -346,5 +358,41 @@ const s = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize:   14,
     color:      "rgba(255,255,255,0.60)",
+  },
+
+  dividerRow: {
+    flexDirection:  "row",
+    alignItems:     "center",
+    width:          "100%",
+    marginVertical: 16,
+    gap:            10,
+  },
+  dividerLine: {
+    flex:            1,
+    height:          1,
+    backgroundColor: "rgba(255,255,255,0.14)",
+  },
+  dividerText: {
+    fontFamily: "Inter_400Regular",
+    fontSize:   12,
+    color:      "rgba(255,255,255,0.35)",
+  },
+
+  guestBtn: {
+    flexDirection:     "row",
+    alignItems:        "center",
+    justifyContent:    "center",
+    gap:               8,
+    width:             "100%",
+    paddingVertical:   15,
+    borderRadius:      14,
+    borderWidth:       1,
+    borderColor:       "rgba(255,255,255,0.18)",
+    backgroundColor:   "rgba(255,255,255,0.07)",
+  },
+  guestBtnText: {
+    fontFamily: "Inter_500Medium",
+    fontSize:   15,
+    color:      "rgba(255,255,255,0.70)",
   },
 });
