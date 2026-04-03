@@ -45,7 +45,11 @@ export function useAuth(): AuthState {
   }
 
   async function signOut(): Promise<void> {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut({ scope: "local" });
+    } catch {
+      // local session cleared regardless of server errors
+    }
   }
 
   return {
