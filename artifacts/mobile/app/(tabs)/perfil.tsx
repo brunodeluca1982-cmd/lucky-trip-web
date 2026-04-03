@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -126,10 +127,10 @@ export default function PerfilScreen() {
           </View>
 
           {/* Logout */}
-          <Pressable accessibilityRole="button" style={styles.logoutBtn} onPress={() => { console.log("[logout] button pressed"); signOut(); }}>
+          <TouchableOpacity style={styles.logoutBtn} onPress={() => { console.log("[logout] button pressed"); signOut(); }} activeOpacity={0.7}>
             <Feather name="log-out" size={16} color="rgba(255,255,255,0.60)" />
             <Text style={styles.logoutText}>Sair da conta</Text>
-          </Pressable>
+          </TouchableOpacity>
         </ScrollView>
       </View>
     </ImageBackground>
