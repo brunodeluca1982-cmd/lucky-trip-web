@@ -5,6 +5,7 @@ import React from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import PaywallModal from "@/components/PaywallModal";
+import AuthPrompt   from "@/components/AuthPrompt";
 
 const GOLD   = "#D4AF37";
 const GRAY   = "#888888";
@@ -137,6 +138,7 @@ export default function TabLayout() {
 
       {/* Global paywall modal — rendered above all tabs */}
       <PaywallModal />
+      <AuthPrompt />
     </>
   );
 }
