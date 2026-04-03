@@ -150,8 +150,10 @@ export function tipoFromCategoria(
 interface GuiaContextType {
   saved: SavedItem[];
   /**
-   * Save a place. For non-premium users, the 2nd+ save triggers the depth
-   * paywall instead of adding the item. Returns true if the item was saved.
+   * Save a place.
+   * - Unauthenticated user → shows auth prompt, returns false.
+   * - Authenticated, non-premium, 2nd+ save → shows depth paywall, returns false.
+   * - Otherwise → saves and returns true.
    */
   save: (item: SavedItem) => boolean;
   unsave: (id: string) => void;
@@ -166,6 +168,10 @@ interface GuiaContextType {
   user: User | null;
   /** Mark user as premium locally (called after successful purchase verification) */
   markPremium: () => Promise<void>;
+  /** Global auth prompt state — shown when an unauthenticated user attempts a gated action */
+  authPromptVisible: boolean;
+  showAuthPrompt: () => void;
+  hideAuthPrompt: () => void;
   /** Global paywall modal state */
   paywallVisible: boolean;
   paywallType: PaywallType;
@@ -178,12 +184,13 @@ const GuiaContext = createContext<GuiaContextType | null>(null);
 // ── Provider ──────────────────────────────────────────────────────────────────
 
 export function GuiaProvider({ children }: { children: React.ReactNode }) {
-  const [saved,          setSaved]          = useState<SavedItem[]>([]);
-  const [hydrated,       setHydrated]       = useState(false);
-  const [isPremium,      setIsPremium]      = useState(false);
-  const [user,           setUser]           = useState<User | null>(null);
-  const [paywallVisible, setPaywallVisible] = useState(false);
-  const [paywallType,    setPaywallType]    = useState<PaywallType>("depth");
+  const [saved,             setSaved]             = useState<SavedItem[]>([]);
+  const [hydrated,          setHydrated]          = useState(false);
+  const [isPremium,         setIsPremium]         = useState(false);
+  const [user,              setUser]              = useState<User | null>(null);
+  const [authPromptVisible, setAuthPromptVisible] = useState(false);
+  const [paywallVisible,    setPaywallVisible]    = useState(false);
+  const [paywallType,       setPaywallType]       = useState<PaywallType>("depth");
 
   // ── Load saved places from AsyncStorage on mount ───────────────────────────
   useEffect(() => {
@@ -266,18 +273,26 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
 
   const save = useCallback((item: SavedItem): boolean => {
     if (saved.some((s) => s.id === item.id)) return true;
-    // Non-premium: only 1 free save; 2nd+ triggers depth paywall
+
+    // Step 1 — auth gate: unauthenticated users see login prompt, not paywall
+    if (!user) {
+      setAuthPromptVisible(true);
+      return false;
+    }
+
+    // Step 2 — premium gate: logged-in non-premium users get paywall on 2nd+ save
     if (!isPremium && saved.length >= 1) {
       setPaywallType("depth");
       setPaywallVisible(true);
       return false;
     }
+
     setSaved((prev) => {
       if (prev.some((s) => s.id === item.id)) return prev;
       return [...prev, item];
     });
     return true;
-  }, [saved, isPremium]);
+  }, [saved, user, isPremium]);
 
   const unsave = useCallback((id: string) => {
     setSaved((prev) => prev.filter((s) => s.id !== id));
@@ -294,6 +309,11 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
     setIsPremium(true);
     await AsyncStorage.setItem(PREMIUM_KEY, "true");
   }, []);
+
+  // ── Auth prompt controls ────────────────────────────────────────────────────
+
+  const showAuthPrompt = useCallback(() => setAuthPromptVisible(true),  []);
+  const hideAuthPrompt = useCallback(() => setAuthPromptVisible(false), []);
 
   // ── Paywall controls ───────────────────────────────────────────────────────
 
@@ -326,6 +346,9 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
         isPremium,
         user,
         markPremium,
+        authPromptVisible,
+        showAuthPrompt,
+        hideAuthPrompt,
         paywallVisible,
         paywallType,
         showPaywall,
