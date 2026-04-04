@@ -7,8 +7,6 @@ import { supabase } from "@/lib/supabase";
 
 WebBrowser.maybeCompleteAuthSession();
 
-// Blur active element and clear any DOM text selection.
-// Called after every auth action on web to prevent frozen focus / blue highlight.
 function webCleanup() {
   if (Platform.OS !== "web" || typeof document === "undefined") return;
   try {
@@ -18,12 +16,14 @@ function webCleanup() {
 }
 
 export interface AuthState {
-  user:             User | null;
-  session:          Session | null;
-  loading:          boolean;
-  signInWithOtp:    (email: string) => Promise<{ error: string | null }>;
-  signInWithGoogle: () => Promise<{ error: string | null }>;
-  signOut:          () => Promise<void>;
+  user:               User | null;
+  session:            Session | null;
+  loading:            boolean;
+  signInWithPassword: (email: string, password: string) => Promise<{ error: string | null }>;
+  signUp:             (email: string, password: string, name?: string) => Promise<{ error: string | null; needsConfirmation: boolean }>;
+  signInWithOtp:      (email: string) => Promise<{ error: string | null }>;
+  signInWithGoogle:   () => Promise<{ error: string | null }>;
+  signOut:            () => Promise<void>;
 }
 
 export function useAuth(): AuthState {
@@ -43,7 +43,47 @@ export function useAuth(): AuthState {
     return () => subscription.unsubscribe();
   }, []);
 
-  // ── Email OTP ──────────────────────────────────────────────────────────────
+  // ── Email + Password login ─────────────────────────────────────────────────
+
+  async function signInWithPassword(email: string, password: string): Promise<{ error: string | null }> {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      webCleanup();
+      if (error) return { error: error.message };
+      return { error: null };
+    } catch (e: any) {
+      webCleanup();
+      return { error: e?.message ?? "Erro inesperado." };
+    }
+  }
+
+  // ── Email + Password signup ────────────────────────────────────────────────
+  // Returns needsConfirmation=true when Supabase requires email verification
+  // before the session is activated (depends on project settings).
+
+  async function signUp(
+    email: string,
+    password: string,
+    name?: string,
+  ): Promise<{ error: string | null; needsConfirmation: boolean }> {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { name: name ?? "" } },
+      });
+      webCleanup();
+      if (error) return { error: error.message, needsConfirmation: false };
+      // session is null when email confirmation is required
+      const needsConfirmation = data.session === null && data.user !== null;
+      return { error: null, needsConfirmation };
+    } catch (e: any) {
+      webCleanup();
+      return { error: e?.message ?? "Erro inesperado.", needsConfirmation: false };
+    }
+  }
+
+  // ── Email OTP (magic link — kept as fallback) ──────────────────────────────
 
   async function signInWithOtp(email: string): Promise<{ error: string | null }> {
     try {
@@ -69,14 +109,11 @@ export function useAuth(): AuthState {
   // ── Google OAuth ───────────────────────────────────────────────────────────
 
   async function signInWithGoogle(): Promise<{ error: string | null }> {
-    // Web: full-page redirect. No WebBrowser, no Linking — both break on web.
     if (Platform.OS === "web") {
       try {
         const { error } = await supabase.auth.signInWithOAuth({
           provider: "google",
-          options: {
-            redirectTo: window.location.origin,
-          },
+          options: { redirectTo: window.location.origin },
         });
         webCleanup();
         if (error) return { error: error.message };
@@ -87,7 +124,6 @@ export function useAuth(): AuthState {
       }
     }
 
-    // Native: in-app browser session via expo-web-browser.
     try {
       const redirectTo = Linking.createURL("/");
 
@@ -132,9 +168,11 @@ export function useAuth(): AuthState {
   }
 
   return {
-    user:   session?.user ?? null,
+    user:               session?.user ?? null,
     session,
     loading,
+    signInWithPassword,
+    signUp,
     signInWithOtp,
     signInWithGoogle,
     signOut,

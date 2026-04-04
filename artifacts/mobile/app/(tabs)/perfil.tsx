@@ -71,13 +71,35 @@ function webCleanup() {
 
 // ── Root screen ───────────────────────────────────────────────────────────────
 
+// Translate common Supabase auth error messages to Portuguese.
+function translateAuthError(raw: string, isLogin: boolean): string {
+  const msg = raw.toLowerCase();
+  if (msg.includes("invalid login credentials") || msg.includes("invalid credentials"))
+    return isLogin
+      ? "E-mail ou senha incorretos. Verifique e tente novamente."
+      : "Erro ao criar conta. Tente novamente.";
+  if (msg.includes("email not confirmed"))
+    return "Confirme o seu e-mail antes de entrar. Verifique a caixa de entrada.";
+  if (msg.includes("user already registered") || msg.includes("already registered"))
+    return "Este e-mail já tem cadastro. Clique em \"Entrar\" para acessar.";
+  if (msg.includes("password should be at least"))
+    return "A senha deve ter pelo menos 6 caracteres.";
+  if (msg.includes("unable to validate email address"))
+    return "E-mail inválido. Verifique e tente novamente.";
+  if (msg.includes("signup is disabled"))
+    return "Cadastros temporariamente desabilitados. Tente mais tarde.";
+  if (msg.includes("email rate limit") || msg.includes("too many requests"))
+    return "Muitas tentativas. Aguarde alguns minutos e tente novamente.";
+  return raw;
+}
+
 export default function PerfilScreen() {
-  const { user, signOut, signInWithOtp, signInWithGoogle } = useAuth();
+  const { user, signOut, signInWithPassword, signUp, signInWithGoogle } = useAuth();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === "web" ? 16 : insets.top + 8;
   const botPad = Platform.OS === "web" ? 32 : insets.bottom + 16;
 
-  const [isLogin,       setIsLogin]       = useState(false);
+  const [isLogin,       setIsLogin]       = useState(true);
   const [name,          setName]          = useState("");
   const [email,         setEmail]         = useState("");
   const [password,      setPassword]      = useState("");
@@ -85,16 +107,46 @@ export default function PerfilScreen() {
   const [agreed,        setAgreed]        = useState(false);
   const [loading,       setLoading]       = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [sent,          setSent]          = useState(false);
+  const [needsConfirm,  setNeedsConfirm]  = useState(false);
   const [error,         setError]         = useState<string | null>(null);
 
   async function handleSubmit() {
-    if (!email.trim() || loading) return;
+    const trimEmail = email.trim().toLowerCase();
+    const trimPass  = password.trim();
+
+    if (!trimEmail || loading) return;
+
+    if (!trimPass) {
+      setError(isLogin ? "Digite sua senha." : "Escolha uma senha.");
+      return;
+    }
+
+    if (!isLogin && trimPass.length < 6) {
+      setError("A senha deve ter pelo menos 6 caracteres.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
+
     try {
-      const { error: err } = await signInWithOtp(email.trim().toLowerCase());
-      if (err) { setError(err); } else { setSent(true); }
+      if (isLogin) {
+        const { error: err } = await signInWithPassword(trimEmail, trimPass);
+        if (err) {
+          const translated = translateAuthError(err, true);
+          setError(translated);
+        }
+        // On success: onAuthStateChange fires → session → user set → LoggedIn renders
+      } else {
+        const { error: err, needsConfirmation } = await signUp(trimEmail, trimPass, name.trim() || undefined);
+        if (err) {
+          const translated = translateAuthError(err, false);
+          setError(translated);
+        } else if (needsConfirmation) {
+          setNeedsConfirm(true);
+        }
+        // No needsConfirmation → onAuthStateChange fires → LoggedIn renders
+      }
     } catch {
       setError("Erro inesperado. Tente novamente.");
     } finally {
@@ -113,8 +165,6 @@ export default function PerfilScreen() {
     } catch {
       setError("Erro inesperado. Tente novamente.");
     } finally {
-      // On web, Google auth does a full-page redirect so this finally block
-      // is only reached on error or native flows — always safe to call.
       setGoogleLoading(false);
       webCleanup();
     }
@@ -144,7 +194,7 @@ export default function PerfilScreen() {
         >
           {user
             ? <LoggedIn user={user} signOut={signOut} />
-            : sent
+            : needsConfirm
             ? <SentState email={email} />
             : <LoggedOut
                 isLogin={isLogin}
@@ -258,36 +308,34 @@ function LoggedOut({
         />
       </View>
 
-      {/* Password field — signup only */}
-      {!isLogin && (
-        <View style={s.fieldWrap}>
-          <Feather name="lock" size={16} color="rgba(255,255,255,0.40)" />
-          <TextInput
-            style={[s.field, { flex: 1 }]}
-            placeholder="Senha"
-            placeholderTextColor="rgba(255,255,255,0.38)"
-            secureTextEntry={!showPass}
-            autoCapitalize="none"
-            autoCorrect={false}
-            value={password}
-            onChangeText={setPassword}
-            returnKeyType="done"
-            onSubmitEditing={onSubmit}
+      {/* Password field — always shown */}
+      <View style={s.fieldWrap}>
+        <Feather name="lock" size={16} color="rgba(255,255,255,0.40)" />
+        <TextInput
+          style={[s.field, { flex: 1 }]}
+          placeholder="Senha"
+          placeholderTextColor="rgba(255,255,255,0.38)"
+          secureTextEntry={!showPass}
+          autoCapitalize="none"
+          autoCorrect={false}
+          value={password}
+          onChangeText={setPassword}
+          returnKeyType="done"
+          onSubmitEditing={onSubmit}
+        />
+        <TouchableOpacity
+          onPress={() => setShowPass(!showPass)}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          activeOpacity={0.6}
+          accessibilityRole="button"
+        >
+          <Feather
+            name={showPass ? "eye-off" : "eye"}
+            size={16}
+            color="rgba(255,255,255,0.40)"
           />
-          <TouchableOpacity
-            onPress={() => setShowPass(!showPass)}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            activeOpacity={0.6}
-            accessibilityRole="button"
-          >
-            <Feather
-              name={showPass ? "eye-off" : "eye"}
-              size={16}
-              color="rgba(255,255,255,0.40)"
-            />
-          </TouchableOpacity>
-        </View>
-      )}
+        </TouchableOpacity>
+      </View>
 
       {/* Terms checkbox — signup only */}
       {!isLogin && (
@@ -306,12 +354,6 @@ function LoggedOut({
             <Text style={s.checkLink}>  Política de Privacidade</Text>
           </Text>
         </TouchableOpacity>
-      )}
-
-      {isLogin && (
-        <Text style={s.loginHint} suppressHighlighting>
-          Enviaremos um link de acesso para o seu e-mail.
-        </Text>
       )}
 
       {error ? <Text style={s.errorText} suppressHighlighting>{error}</Text> : null}
@@ -392,13 +434,13 @@ function SentState({ email }: { email: string }) {
         <Feather name="mail" size={28} color={GOLD} />
       </View>
 
-      <Text style={s.headline} suppressHighlighting>Verifique seu e-mail</Text>
+      <Text style={s.headline} suppressHighlighting>Confirme seu e-mail</Text>
       <Text style={s.sub} suppressHighlighting>
-        Enviamos um link de acesso para{"\n"}
+        Enviamos um e-mail de confirmação para{"\n"}
         <Text style={{ color: GOLD, fontFamily: "Inter_500Medium" }}>{email}</Text>
       </Text>
       <Text style={s.sentNote} suppressHighlighting>
-        Clique no link para entrar automaticamente.
+        Clique no link no e-mail para ativar sua conta e entrar automaticamente.
       </Text>
     </View>
   );
