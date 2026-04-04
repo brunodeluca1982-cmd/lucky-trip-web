@@ -16,7 +16,9 @@
     "ios": {
       "supportsTablet": false
     },
-    "android": {},
+    "android": {
+      "navigationBarColor": "#000000"
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },

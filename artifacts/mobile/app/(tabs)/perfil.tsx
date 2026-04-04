@@ -77,6 +77,7 @@ export default function PerfilScreen() {
   const topPad = Platform.OS === "web" ? 16 : insets.top + 8;
   const botPad = Platform.OS === "web" ? 32 : insets.bottom + 16;
 
+  const [isLogin,       setIsLogin]       = useState(false);
   const [name,          setName]          = useState("");
   const [email,         setEmail]         = useState("");
   const [password,      setPassword]      = useState("");
@@ -146,6 +147,8 @@ export default function PerfilScreen() {
             : sent
             ? <SentState email={email} />
             : <LoggedOut
+                isLogin={isLogin}
+                onToggleMode={() => { setIsLogin(v => !v); setError(null); }}
                 name={name}           setName={setName}
                 email={email}         setEmail={setEmail}
                 password={password}   setPassword={setPassword}
@@ -167,6 +170,7 @@ export default function PerfilScreen() {
 // ── Logged-out: full account creation form ────────────────────────────────────
 
 function LoggedOut({
+  isLogin, onToggleMode,
   name, setName,
   email, setEmail,
   password, setPassword,
@@ -175,6 +179,7 @@ function LoggedOut({
   loading, googleLoading,
   error, onSubmit, onGooglePress,
 }: {
+  isLogin: boolean;     onToggleMode: () => void;
   name: string;         setName: (v: string) => void;
   email: string;        setEmail: (v: string) => void;
   password: string;     setPassword: (v: string) => void;
@@ -205,31 +210,38 @@ function LoggedOut({
         <Text style={s.brand} suppressHighlighting>THE LUCKY TRIP</Text>
       </View>
 
-      {/* Badge */}
+      {/* Badge — changes with mode */}
       <View style={s.badge}>
-        <Text style={s.badgeText} suppressHighlighting>CRIE SUA CONTA</Text>
+        <Text style={s.badgeText} suppressHighlighting>
+          {isLogin ? "ENTRAR" : "CRIE SUA CONTA"}
+        </Text>
       </View>
 
-      {/* Headline */}
+      {/* Headline — changes with mode */}
       <Text style={s.headline} suppressHighlighting>
-        Comece a planejar suas viagens dos sonhos
+        {isLogin
+          ? "Bem-vindo de volta"
+          : "Comece a planejar suas viagens dos sonhos"}
       </Text>
 
-      {/* Inputs */}
-      <View style={s.fieldWrap}>
-        <Feather name="user" size={16} color="rgba(255,255,255,0.40)" />
-        <TextInput
-          style={s.field}
-          placeholder="Nome completo"
-          placeholderTextColor="rgba(255,255,255,0.38)"
-          autoCapitalize="words"
-          autoCorrect={false}
-          value={name}
-          onChangeText={setName}
-          returnKeyType="next"
-        />
-      </View>
+      {/* Name field — signup only */}
+      {!isLogin && (
+        <View style={s.fieldWrap}>
+          <Feather name="user" size={16} color="rgba(255,255,255,0.40)" />
+          <TextInput
+            style={s.field}
+            placeholder="Nome completo"
+            placeholderTextColor="rgba(255,255,255,0.38)"
+            autoCapitalize="words"
+            autoCorrect={false}
+            value={name}
+            onChangeText={setName}
+            returnKeyType="next"
+          />
+        </View>
+      )}
 
+      {/* Email — always shown */}
       <View style={s.fieldWrap}>
         <Feather name="mail" size={16} color="rgba(255,255,255,0.40)" />
         <TextInput
@@ -242,58 +254,69 @@ function LoggedOut({
           value={email}
           onChangeText={setEmail}
           onSubmitEditing={onSubmit}
-          returnKeyType="next"
+          returnKeyType={isLogin ? "done" : "next"}
         />
       </View>
 
-      <View style={s.fieldWrap}>
-        <Feather name="lock" size={16} color="rgba(255,255,255,0.40)" />
-        <TextInput
-          style={[s.field, { flex: 1 }]}
-          placeholder="Senha"
-          placeholderTextColor="rgba(255,255,255,0.38)"
-          secureTextEntry={!showPass}
-          autoCapitalize="none"
-          autoCorrect={false}
-          value={password}
-          onChangeText={setPassword}
-          returnKeyType="done"
-          onSubmitEditing={onSubmit}
-        />
-        <TouchableOpacity
-          onPress={() => setShowPass(!showPass)}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          activeOpacity={0.6}
-          accessibilityRole="button"
-        >
-          <Feather
-            name={showPass ? "eye-off" : "eye"}
-            size={16}
-            color="rgba(255,255,255,0.40)"
+      {/* Password field — signup only */}
+      {!isLogin && (
+        <View style={s.fieldWrap}>
+          <Feather name="lock" size={16} color="rgba(255,255,255,0.40)" />
+          <TextInput
+            style={[s.field, { flex: 1 }]}
+            placeholder="Senha"
+            placeholderTextColor="rgba(255,255,255,0.38)"
+            secureTextEntry={!showPass}
+            autoCapitalize="none"
+            autoCorrect={false}
+            value={password}
+            onChangeText={setPassword}
+            returnKeyType="done"
+            onSubmitEditing={onSubmit}
           />
-        </TouchableOpacity>
-      </View>
-
-      {/* Terms checkbox */}
-      <TouchableOpacity
-        style={s.checkRow}
-        onPress={() => setAgreed(!agreed)}
-        activeOpacity={0.7}
-        accessibilityRole="checkbox"
-      >
-        <View style={[s.checkbox, agreed && s.checkboxChecked]}>
-          {agreed && <Feather name="check" size={11} color="#000" />}
+          <TouchableOpacity
+            onPress={() => setShowPass(!showPass)}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            activeOpacity={0.6}
+            accessibilityRole="button"
+          >
+            <Feather
+              name={showPass ? "eye-off" : "eye"}
+              size={16}
+              color="rgba(255,255,255,0.40)"
+            />
+          </TouchableOpacity>
         </View>
-        <Text style={s.checkText} suppressHighlighting>
-          Concordo com os{" "}
-          <Text style={s.checkLink}>Termos de Uso</Text>
-          <Text style={s.checkLink}>  Política de Privacidade</Text>
+      )}
+
+      {/* Terms checkbox — signup only */}
+      {!isLogin && (
+        <TouchableOpacity
+          style={s.checkRow}
+          onPress={() => setAgreed(!agreed)}
+          activeOpacity={0.7}
+          accessibilityRole="checkbox"
+        >
+          <View style={[s.checkbox, agreed && s.checkboxChecked]}>
+            {agreed && <Feather name="check" size={11} color="#000" />}
+          </View>
+          <Text style={s.checkText} suppressHighlighting>
+            Concordo com os{" "}
+            <Text style={s.checkLink}>Termos de Uso</Text>
+            <Text style={s.checkLink}>  Política de Privacidade</Text>
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      {isLogin && (
+        <Text style={s.loginHint} suppressHighlighting>
+          Enviaremos um link de acesso para o seu e-mail.
         </Text>
-      </TouchableOpacity>
+      )}
 
       {error ? <Text style={s.errorText} suppressHighlighting>{error}</Text> : null}
 
-      {/* Criar conta CTA */}
+      {/* Primary CTA — label changes with mode */}
       <TouchableOpacity
         style={s.cta}
         onPress={onSubmit}
@@ -303,7 +326,9 @@ function LoggedOut({
       >
         {loading
           ? <ActivityIndicator color="#000" />
-          : <Text style={s.ctaText} suppressHighlighting>Criar conta</Text>
+          : <Text style={s.ctaText} suppressHighlighting>
+              {isLogin ? "Entrar" : "Criar conta"}
+            </Text>
         }
       </TouchableOpacity>
 
@@ -341,11 +366,15 @@ function LoggedOut({
         </TouchableOpacity>
       </View>
 
-      {/* Footer */}
+      {/* Footer — toggles between modes */}
       <View style={s.footerRow}>
-        <Text style={s.footerText} suppressHighlighting>Já tem uma conta?  </Text>
-        <TouchableOpacity onPress={onSubmit} activeOpacity={0.7} accessibilityRole="button">
-          <Text style={s.footerLink} suppressHighlighting>Entrar</Text>
+        <Text style={s.footerText} suppressHighlighting>
+          {isLogin ? "Não tem conta?  " : "Já tem uma conta?  "}
+        </Text>
+        <TouchableOpacity onPress={onToggleMode} activeOpacity={0.7} accessibilityRole="button">
+          <Text style={s.footerLink} suppressHighlighting>
+            {isLogin ? "Criar conta" : "Entrar"}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -557,6 +586,15 @@ const s = StyleSheet.create({
     fontFamily:"Inter_500Medium",
   },
 
+  loginHint: {
+    fontFamily:   "Inter_400Regular",
+    fontSize:     13,
+    color:        "rgba(255,255,255,0.45)",
+    textAlign:    "center",
+    lineHeight:   20,
+    marginBottom: 16,
+    width:        "100%",
+  },
   errorText: {
     fontFamily:   "Inter_400Regular",
     fontSize:     13,
