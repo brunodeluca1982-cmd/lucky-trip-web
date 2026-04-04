@@ -74,7 +74,7 @@ export function AppTabBar({ activeTab }: Props) {
       {isIOS ? (
         <BlurView
           intensity={90}
-          tint="light"
+          tint="dark"
           style={[StyleSheet.absoluteFill, s.blur]}
         />
       ) : (
@@ -114,12 +114,12 @@ const s = StyleSheet.create({
     zIndex: 50,
   },
   blur: {
-    backgroundColor: "rgba(245,240,232,0.85)",
+    backgroundColor: "rgba(10,10,10,0.80)",
   },
   solidBg: {
-    backgroundColor: C.white,
+    backgroundColor: "#0D0D0D",
     borderTopWidth: 1,
-    borderTopColor: C.border,
+    borderTopColor: "rgba(255,255,255,0.08)",
   },
   tab: {
     flex: 1,

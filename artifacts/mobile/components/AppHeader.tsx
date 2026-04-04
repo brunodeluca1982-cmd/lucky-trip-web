@@ -1,5 +1,6 @@
 import React from "react";
 import { Image, Platform, Pressable, StyleSheet, View } from "react-native";
+import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
@@ -38,7 +39,11 @@ export function AppHeader({ transparent = false }: AppHeaderProps) {
           style={styles.logoMark}
           resizeMode="contain"
         />
-        <Pressable style={styles.avatarBtn}>
+        <Pressable
+          style={styles.avatarBtn}
+          onPress={() => router.push("/(tabs)/perfil")}
+          hitSlop={8}
+        >
           <Feather name="user" size={18} color={C.white} />
         </Pressable>
       </View>

@@ -8,9 +8,9 @@ import PaywallModal from "@/components/PaywallModal";
 import AuthPrompt   from "@/components/AuthPrompt";
 
 const GOLD   = "#D4AF37";
-const GRAY   = "#888888";
-const TAB_BG = "#FFFFFF";
-const BORDER = "rgba(0,0,0,0.08)";
+const GRAY   = "#666666";
+const TAB_BG = "#0D0D0D";
+const BORDER = "rgba(255,255,255,0.08)";
 
 export default function TabLayout() {
   const isIOS = Platform.OS === "ios";
