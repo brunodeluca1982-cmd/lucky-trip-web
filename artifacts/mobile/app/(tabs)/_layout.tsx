@@ -39,6 +39,7 @@ export default function TabLayout() {
             borderTopWidth: StyleSheet.hairlineWidth,
             borderTopColor: BORDER,
             boxShadow: "0px -1px 8px rgba(0,0,0,0.08)",
+            elevation: 12,
             paddingBottom: isWeb ? 4 : bottomInset,
             paddingTop: 6,
             height: isWeb ? 60 : TAB_HEIGHT,

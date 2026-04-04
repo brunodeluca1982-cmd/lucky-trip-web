@@ -190,7 +190,9 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 54,
     letterSpacing: -0.5,
-    textShadow: "0px 2px 12px rgba(0,0,0,0.90)",
+    textShadowColor: "rgba(0,0,0,0.90)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 12,
   },
   pais: {
     fontFamily: "Inter_400Regular",
@@ -200,7 +202,9 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     letterSpacing: 3,
     textTransform: "uppercase",
-    textShadow: "0px 1px 6px rgba(0,0,0,0.70)",
+    textShadowColor: "rgba(0,0,0,0.70)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
   },
   dots: {
     position: "absolute",
