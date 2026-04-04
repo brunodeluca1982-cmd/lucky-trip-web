@@ -1,9 +1,22 @@
 import { createClient } from "@supabase/supabase-js";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Platform } from "react-native";
 
 const supabaseUrl     = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    // On native: persist the session in AsyncStorage so it survives app restarts.
+    // On web: use the default localStorage (pass undefined to keep default behavior).
+    storage:            Platform.OS === "web" ? undefined : AsyncStorage,
+    autoRefreshToken:   true,
+    persistSession:     true,
+    // On web: detect tokens in the URL after an OAuth redirect.
+    // On native: Expo handles this through Linking + WebBrowser, not the URL.
+    detectSessionInUrl: Platform.OS === "web",
+  },
+});
 
 // ── Shared types ──────────────────────────────────────────────────────────────
 
