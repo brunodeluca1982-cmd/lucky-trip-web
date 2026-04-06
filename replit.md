@@ -180,6 +180,25 @@ Neighborhood map (defined in `data/neighborhoodImages.ts`):
 
 **CRITICAL**: Always use `select("*")` in mobile client for these tables — any explicit column that doesn't exist causes a 400 error that silently returns null (no data rendered). The edge function confirmed which columns exist.
 
+### Itinerary Generation (Gemini + Supabase)
+
+`POST /api/friend/generate-itinerary` — endpoint in `artifacts/api-server/src/routes/friend-itinerary.ts`
+
+- Body: `{ "guide_slug": "rio-carol-dieckmann" }`
+- Reads `friend_guides` + `friend_guide_places` from Supabase (anon key)
+- Sends structured prompt to Gemini (`gemini-2.5-flash`) requesting 3-day itinerary in JSON
+- Validates all returned `place_id`s against real Supabase IDs (rejects invented ones)
+- Deletes any existing `friend_guide_itinerary_items` for that guide, then inserts new rows
+- Uses `SUPABASE_SERVICE_ROLE_KEY` for writes (bypasses RLS), `AI_INTEGRATIONS_GEMINI_BASE_URL/API_KEY` for Gemini
+- Returns: `{ ok, guide_slug, guide_id, days_generated, items_saved, itinerary }`
+
+To regenerate the Carol Dieckmann itinerary:
+```bash
+curl -X POST https://$REPLIT_DEV_DOMAIN/api/friend/generate-itinerary \
+  -H "Content-Type: application/json" \
+  -d '{"guide_slug": "rio-carol-dieckmann"}'
+```
+
 ### Route Structure
 - `(tabs)/` — 5-tab navigator
 - `friend/[slug].tsx` — friend editorial profile page: hero (fallback to local image when photo_url null), "AMIGO DA LUCKY TRIP" eyebrow, Playfair name, guide cards from `v_friend_guides_cards`; navigates to `friend/guide/[slug]`
