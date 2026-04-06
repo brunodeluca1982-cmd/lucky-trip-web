@@ -292,7 +292,7 @@ function SavedCard({
         }
       }}
     >
-      <Image source={item.image} style={StyleSheet.absoluteFillObject as any} resizeMode="cover" />
+      <ExpoImage source={item.image} style={[StyleSheet.absoluteFillObject, { backgroundColor: "#1A0E04" }]} contentFit="cover" />
       <LinearGradient
         colors={["transparent", "rgba(0,0,0,0.62)"]}
         locations={[0.28, 1]}
