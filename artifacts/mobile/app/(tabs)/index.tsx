@@ -164,8 +164,8 @@ function InfluencerCard({ influencer }: { influencer: FriendCard }) {
     >
       <Image source={imgSource} style={s.influencerImage} resizeMode="cover" />
       <LinearGradient
-        colors={["rgba(0,0,0,0.04)", "rgba(0,0,0,0.78)"]}
-        locations={[0.35, 1]}
+        colors={["rgba(0,0,0,0.00)", "rgba(0,0,0,0.45)", "rgba(0,0,0,0.72)"]}
+        locations={[0.30, 0.65, 1]}
         style={StyleSheet.absoluteFill}
       />
       <View style={s.influencerBadge}>
@@ -655,7 +655,6 @@ const s = StyleSheet.create({
   },
   influencerImage: {
     ...StyleSheet.absoluteFillObject,
-    resizeMode: "cover",
   },
   influencerBadge: {
     position: "absolute",

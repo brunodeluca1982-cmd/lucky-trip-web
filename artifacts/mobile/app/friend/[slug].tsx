@@ -153,17 +153,13 @@ export default function FriendProfileScreen() {
           </View>
         </View>
 
-        {/* ── Bio block ── */}
-        <View style={s.bioBlock}>
-          {profileSource && (
-            <Image source={profileSource} style={s.profilePhoto} resizeMode="cover" />
-          )}
-          <View style={s.bioGoldLine} />
-          <Text style={s.displayName}>{friend.display_name}</Text>
-          {friend.bio ? (
+        {/* ── Bio block — only bio text, name lives in the hero only ── */}
+        {friend.bio ? (
+          <View style={s.bioBlock}>
+            <View style={s.bioGoldLine} />
             <Text style={s.bioText}>{friend.bio}</Text>
-          ) : null}
-        </View>
+          </View>
+        ) : null}
 
         {/* ── Roteiros curados ── */}
         <View style={s.guidesSection}>
