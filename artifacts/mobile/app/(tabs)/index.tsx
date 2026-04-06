@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Dimensions,
   Image,
+  ImageBackground,
   Platform,
   Pressable,
   ScrollView,
@@ -159,22 +160,28 @@ function InfluencerCard({ influencer }: { influencer: FriendCard }) {
 
   return (
     <Pressable
-      style={({ pressed }) => [s.influencerCard, pressed && { opacity: 0.90, transform: [{ scale: 0.97 }] }]}
+      style={({ pressed }) => [pressed && { opacity: 0.90, transform: [{ scale: 0.97 }] }]}
       onPress={() => router.push({ pathname: "/friend/[slug]", params: { slug: influencer.slug } })}
     >
-      <Image source={imgSource} style={s.influencerImage} resizeMode="cover" />
-      <LinearGradient
-        colors={["rgba(0,0,0,0.00)", "rgba(0,0,0,0.45)", "rgba(0,0,0,0.72)"]}
-        locations={[0.30, 0.65, 1]}
-        style={StyleSheet.absoluteFill}
-      />
-      <View style={s.influencerBadge}>
-        <Feather name="map" size={10} color={C.white} />
-        <Text style={s.influencerBadgeText}>
-          Roteiros: {String(influencer.guide_count).padStart(2, "0")}
-        </Text>
-      </View>
-      <Text style={s.influencerName}>{influencer.display_name}</Text>
+      <ImageBackground
+        source={imgSource}
+        style={s.influencerCard}
+        resizeMode="cover"
+        imageStyle={s.influencerImageStyle}
+      >
+        <LinearGradient
+          colors={["rgba(0,0,0,0.00)", "rgba(0,0,0,0.45)", "rgba(0,0,0,0.72)"]}
+          locations={[0.30, 0.65, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={s.influencerBadge}>
+          <Feather name="map" size={10} color={C.white} />
+          <Text style={s.influencerBadgeText}>
+            Roteiros: {String(influencer.guide_count).padStart(2, "0")}
+          </Text>
+        </View>
+        <Text style={s.influencerName}>{influencer.display_name}</Text>
+      </ImageBackground>
     </Pressable>
   );
 }
@@ -653,8 +660,8 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
-  influencerImage: {
-    ...StyleSheet.absoluteFillObject,
+  influencerImageStyle: {
+    borderRadius: 18,
   },
   influencerBadge: {
     position: "absolute",
