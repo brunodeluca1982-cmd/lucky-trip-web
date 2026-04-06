@@ -115,7 +115,7 @@ export default function SubscriptionScreen() {
         }
       } else {
         console.error("Checkout error response:", data);
-        setErrorMsg(data.error || "Erro ao iniciar pagamento. Tente novamente.");
+        setErrorMsg("Erro ao iniciar pagamento. Tente novamente.");
       }
     } catch (err: any) {
       console.error("Checkout fetch error:", err);

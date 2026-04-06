@@ -119,13 +119,10 @@ Deno.serve(async (req: Request) => {
     const session = await stripeRes.json();
 
     if (!stripeRes.ok) {
+      // Log full Stripe error server-side only — never expose raw messages to the client.
+      console.error("Stripe error:", JSON.stringify(session.error), "price_id:", targetPriceId);
       return new Response(
-        JSON.stringify({
-          error:         session.error?.message ?? "Stripe API error",
-          stripe_code:   session.error?.code ?? null,
-          stripe_type:   session.error?.type ?? null,
-          price_id_used: targetPriceId,
-        }),
+        JSON.stringify({ error: "Erro ao criar sessão de pagamento. Verifique as configurações do Stripe." }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 },
       );
     }
