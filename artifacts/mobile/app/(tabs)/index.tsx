@@ -148,7 +148,7 @@ function RoteiroCard({ roteiro }: { roteiro: Roteiro }) {
 }
 
 // ── Friend card (2-col grid) — dados reais do Supabase ───────────────────────
-const FRIEND_FALLBACK = require("../../assets/images/hero-rio.png");
+const FRIEND_FALLBACK = require("../../assets/images/carol-dieckmann.jpg");
 
 function InfluencerCard({ influencer }: { influencer: FriendCard }) {
   const imgSource = influencer.profile_photo_url

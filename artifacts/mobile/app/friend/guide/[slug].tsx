@@ -1,15 +1,16 @@
 /**
  * friend/guide/[slug].tsx — Roteiro curado do friend
  *
- * Mostra o guia curado de um amigo organizado por curation_dimension.
+ * Visual: hero-rio.png fixo ao fundo + glassmorphism iOS-style.
+ * Idêntico à linguagem visual de viagem.tsx / roteiro/[id].tsx.
  * Todos os dados vêm do Supabase — zero hardcoded.
  */
 
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Dimensions,
   Image,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -23,35 +24,22 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 
 import { supabase } from "@/lib/supabase";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const GOLD = "#C9A84C";
-const GOLD_LIGHT = "#D4AF37";
+const GOLD  = "#C9A84C";
+const CREAM = "#F5EDD6";
+const RIO_BG = require("../../../assets/images/hero-rio.png");
 
 // ── Section config por curation_dimension ────────────────────────────────────
 
-const DIMENSION_CONFIG: Record<string, { label: string; icon: string; description: string }> = {
-  hotel: {
-    label: "Onde Ficar",
-    icon: "home",
-    description: "A escolha da hospedagem muda tudo.",
-  },
-  gastronomy: {
-    label: "Onde Comer",
-    icon: "coffee",
-    description: "Lugares que fazem parte da vida de verdade.",
-  },
-  nightlife: {
-    label: "Para a Noite",
-    icon: "moon",
-    description: "Onde o Rio revela sua outra face.",
-  },
+const DIMENSION_CONFIG: Record<string, { label: string; icon: keyof typeof Feather.glyphMap }> = {
+  hotel:      { label: "Onde Ficar",  icon: "home"    },
+  gastronomy: { label: "Onde Comer",  icon: "coffee"  },
+  nightlife:  { label: "Para a Noite", icon: "moon"   },
 };
 
 function getDimensionConfig(dim: string) {
   return DIMENSION_CONFIG[dim] ?? {
     label: dim.charAt(0).toUpperCase() + dim.slice(1),
-    icon: "map-pin",
-    description: "",
+    icon: "map-pin" as keyof typeof Feather.glyphMap,
   };
 }
 
@@ -69,7 +57,6 @@ interface GuideDetail {
   access_type: string;
   friend_display_name: string;
   friend_full_name: string;
-  profile_photo_url: string | null;
   places_count: number;
   highlights_count: number;
 }
@@ -80,38 +67,33 @@ interface GuidePlace {
   categoria: string | null;
   bairro: string | null;
   meu_olhar: string | null;
-  photo_url: string | null;
   is_highlight: boolean;
   is_locked: boolean;
   ordem: number;
   curation_dimension: string | null;
 }
 
-type SectionData = {
-  dimension: string;
-  places: GuidePlace[];
-};
+type SectionData = { dimension: string; places: GuidePlace[] };
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function FriendGuideScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
-  const insets = useSafeAreaInsets();
+  const insets   = useSafeAreaInsets();
 
-  const [guide, setGuide] = useState<GuideDetail | null>(null);
+  const [guide,    setGuide]    = useState<GuideDetail | null>(null);
   const [sections, setSections] = useState<SectionData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading,  setLoading]  = useState(true);
   const [introExpanded, setIntroExpanded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-
     async function load() {
       try {
         const { data: guideData } = await supabase
           .from("v_friend_guides_cards")
           .select(
-            "id, slug, title, subtitle, tagline, intro_text, city, suggested_days, access_type, friend_display_name, friend_full_name, profile_photo_url, places_count, highlights_count"
+            "id, slug, title, subtitle, tagline, intro_text, city, suggested_days, access_type, friend_display_name, friend_full_name, places_count, highlights_count"
           )
           .eq("slug", slug)
           .single();
@@ -120,36 +102,26 @@ export default function FriendGuideScreen() {
 
         const { data: placesData } = await supabase
           .from("friend_guide_places")
-          .select("id, nome, categoria, bairro, meu_olhar, photo_url, is_highlight, is_locked, ordem, curation_dimension")
+          .select("id, nome, categoria, bairro, meu_olhar, is_highlight, is_locked, ordem, curation_dimension")
           .eq("guide_id", guideData.id)
           .order("ordem");
 
         if (cancelled) return;
 
-        // Group places by curation_dimension preserving insertion order
         const dimOrder: string[] = [];
         const dimMap: Record<string, GuidePlace[]> = {};
         for (const p of placesData ?? []) {
           const dim = p.curation_dimension ?? "outros";
-          if (!dimMap[dim]) {
-            dimOrder.push(dim);
-            dimMap[dim] = [];
-          }
+          if (!dimMap[dim]) { dimOrder.push(dim); dimMap[dim] = []; }
           dimMap[dim].push(p);
         }
 
-        const sectionList: SectionData[] = dimOrder.map((dim) => ({
-          dimension: dim,
-          places: dimMap[dim],
-        }));
-
         setGuide(guideData);
-        setSections(sectionList);
+        setSections(dimOrder.map((dim) => ({ dimension: dim, places: dimMap[dim] })));
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
-
     load();
     return () => { cancelled = true; };
   }, [slug]);
@@ -157,6 +129,8 @@ export default function FriendGuideScreen() {
   if (loading) {
     return (
       <View style={s.loadingRoot}>
+        <Image source={RIO_BG} style={StyleSheet.absoluteFillObject} resizeMode="cover" blurRadius={Platform.OS === "ios" ? 28 : 16} />
+        <LinearGradient colors={["rgba(0,0,0,0.55)", "rgba(0,0,0,0.80)"]} style={StyleSheet.absoluteFill} />
         <ActivityIndicator color={GOLD} size="large" />
       </View>
     );
@@ -165,79 +139,103 @@ export default function FriendGuideScreen() {
   if (!guide) {
     return (
       <View style={s.loadingRoot}>
+        <Image source={RIO_BG} style={StyleSheet.absoluteFillObject} resizeMode="cover" blurRadius={Platform.OS === "ios" ? 28 : 16} />
+        <LinearGradient colors={["rgba(0,0,0,0.55)", "rgba(0,0,0,0.80)"]} style={StyleSheet.absoluteFill} />
         <Text style={s.errorText}>Roteiro não encontrado.</Text>
       </View>
     );
   }
 
+  const topPad    = insets.top + 8;
+  const bottomPad = insets.bottom + 56;
+
   const introTruncated = (guide.intro_text ?? "").length > 220 && !introExpanded;
-  const introDisplay = introTruncated
+  const introDisplay   = introTruncated
     ? (guide.intro_text ?? "").slice(0, 220).trim() + "…"
-    : guide.intro_text ?? "";
+    : (guide.intro_text ?? "");
 
   return (
     <View style={s.root}>
+
+      {/* ── Fixed Rio background ── */}
+      <Image
+        source={RIO_BG}
+        style={StyleSheet.absoluteFillObject}
+        resizeMode="cover"
+      />
+      {/* Cinematic dark vignette — same pattern as viagem.tsx */}
+      <LinearGradient
+        colors={[
+          "rgba(0,0,0,0.08)",
+          "rgba(0,0,0,0.28)",
+          "rgba(0,0,0,0.58)",
+          "rgba(0,0,0,0.78)",
+        ]}
+        locations={[0, 0.25, 0.58, 1]}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
+
+      {/* ── Scrollable content over fixed bg ── */}
       <ScrollView
-        style={s.scroll}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 56 }}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={[s.content, { paddingTop: topPad, paddingBottom: bottomPad }]}
       >
 
-        {/* ── Header ── */}
-        <View style={[s.header, { paddingTop: insets.top + 16 }]}>
-          <LinearGradient
-            colors={["#0D0D0D", "#050505"]}
-            style={StyleSheet.absoluteFill}
-          />
+        {/* ── Back button ── */}
+        <Pressable
+          onPress={() => router.back()}
+          style={({ pressed }) => [s.backBtn, pressed && { opacity: 0.65 }]}
+          hitSlop={12}
+        >
+          <Feather name="arrow-left" size={18} color="rgba(255,255,255,0.85)" />
+        </Pressable>
 
-          {/* Back button */}
-          <Pressable style={s.backBtn} onPress={() => router.back()} hitSlop={12}>
-            <Feather name="arrow-left" size={20} color="#fff" />
-          </Pressable>
+        {/* ── Header block ── */}
+        <View style={s.header}>
+          <Text style={s.eyebrow}>CURADORIA DE {guide.friend_display_name.toUpperCase()}</Text>
+          {guide.tagline ? (
+            <Text style={s.tagline}>"{guide.tagline}"</Text>
+          ) : null}
+          <Text style={s.title}>{guide.title}</Text>
+          {guide.subtitle ? (
+            <Text style={s.subtitle}>{guide.subtitle}</Text>
+          ) : null}
 
-          {/* Meta */}
-          <View style={s.headerMeta}>
-            <Text style={s.headerByline}>Curadoria de {guide.friend_display_name}</Text>
-          </View>
-
-          {/* Title block */}
-          <View style={s.titleBlock}>
-            <View style={s.goldAccentLine} />
-            {guide.tagline ? (
-              <Text style={s.tagline}>"{guide.tagline}"</Text>
-            ) : null}
-            <Text style={s.title}>{guide.title}</Text>
-            {guide.subtitle ? (
-              <Text style={s.subtitle}>{guide.subtitle}</Text>
-            ) : null}
-          </View>
-
-          {/* Stats row */}
-          <View style={s.statsRow}>
-            <View style={s.statItem}>
-              <Feather name="map-pin" size={13} color={GOLD} />
-              <Text style={s.statText}>{guide.places_count} lugares</Text>
+          {/* Meta pills */}
+          <View style={s.pillRow}>
+            <View style={s.pill}>
+              <Feather name="map-pin" size={11} color={GOLD} />
+              <Text style={s.pillText}>{guide.places_count} lugares</Text>
             </View>
             {guide.suggested_days != null && (
-              <View style={s.statItem}>
-                <Feather name="calendar" size={13} color={GOLD} />
-                <Text style={s.statText}>{guide.suggested_days} dias sugeridos</Text>
+              <View style={s.pill}>
+                <Feather name="calendar" size={11} color={GOLD} />
+                <Text style={s.pillText}>{guide.suggested_days} dias</Text>
               </View>
             )}
-            <View style={s.statItem}>
-              <Ionicons name="diamond-outline" size={13} color={GOLD} />
-              <Text style={s.statText}>Premium</Text>
-            </View>
+            {guide.city ? (
+              <View style={s.pill}>
+                <Feather name="compass" size={11} color={GOLD} />
+                <Text style={s.pillText}>{guide.city}</Text>
+              </View>
+            ) : null}
           </View>
         </View>
 
-        {/* ── Intro text ── */}
+        {/* ── Thin rule ── */}
+        <View style={s.rule} />
+
+        {/* ── Intro text (glass card) ── */}
         {guide.intro_text ? (
-          <View style={s.introBlock}>
-            <Text style={s.introQuoteMark}>"</Text>
+          <View style={s.introCard}>
+            <Text style={s.introQuote}>"</Text>
             <Text style={s.introText}>{introDisplay}</Text>
             {(guide.intro_text ?? "").length > 220 && (
-              <Pressable onPress={() => setIntroExpanded((x) => !x)} style={s.introToggle}>
+              <Pressable
+                onPress={() => setIntroExpanded((x) => !x)}
+                style={s.introToggle}
+              >
                 <Text style={s.introToggleText}>
                   {introExpanded ? "Ler menos" : "Ler mais"}
                 </Text>
@@ -253,9 +251,11 @@ export default function FriendGuideScreen() {
         ) : null}
 
         {/* ── Sections ── */}
-        {sections.map((sec) => (
-          <DimensionSection key={sec.dimension} section={sec} />
-        ))}
+        <View style={s.sectionsWrap}>
+          {sections.map((sec) => (
+            <DimensionSection key={sec.dimension} section={sec} />
+          ))}
+        </View>
 
       </ScrollView>
     </View>
@@ -268,67 +268,76 @@ function DimensionSection({ section }: { section: SectionData }) {
   const config = getDimensionConfig(section.dimension);
 
   return (
-    <View style={s.section}>
-      {/* Section header */}
-      <View style={s.sectionHeader}>
-        <View style={s.sectionIconWrap}>
-          <Feather name={config.icon as any} size={16} color={GOLD} />
+    <View style={sec.wrap}>
+      {/* Section label */}
+      <View style={sec.headerRow}>
+        <View style={sec.iconWrap}>
+          <Feather name={config.icon} size={14} color={GOLD} />
         </View>
-        <View style={s.sectionHeaderText}>
-          <Text style={s.sectionLabel}>{config.label}</Text>
-          {config.description ? (
-            <Text style={s.sectionDescription}>{config.description}</Text>
-          ) : null}
+        <Text style={sec.label}>{config.label}</Text>
+        <View style={sec.countBadge}>
+          <Text style={sec.countText}>{section.places.length}</Text>
         </View>
       </View>
 
-      {/* Place cards */}
-      <View style={s.placeList}>
+      {/* Glass card wrapping all places */}
+      <View style={sec.card}>
         {section.places.map((place, idx) => (
-          <PlaceCard key={place.id} place={place} index={idx} />
+          <PlaceRow
+            key={place.id}
+            place={place}
+            index={idx}
+            isLast={idx === section.places.length - 1}
+          />
         ))}
       </View>
     </View>
   );
 }
 
-// ── Place card ────────────────────────────────────────────────────────────────
+// ── Place row ─────────────────────────────────────────────────────────────────
 
-function PlaceCard({ place, index }: { place: GuidePlace; index: number }) {
-  const photoSource = place.photo_url
-    ? { uri: place.photo_url }
-    : require("../../../assets/images/hero-rio.png");
-
+function PlaceRow({
+  place,
+  index,
+  isLast,
+}: {
+  place: GuidePlace;
+  index: number;
+  isLast: boolean;
+}) {
   return (
-    <View style={s.placeCard}>
-      {/* Top row: number + name + bairro */}
-      <View style={s.placeTopRow}>
-        <Text style={s.placeNumber}>{String(index + 1).padStart(2, "0")}</Text>
-        <View style={s.placeNameBlock}>
-          <View style={s.placeNameRow}>
-            <Text style={s.placeName}>{place.nome}</Text>
-            {place.is_highlight && (
-              <View style={s.highlightBadge}>
-                <Ionicons name="star" size={8} color={GOLD} />
-              </View>
-            )}
-          </View>
-          {place.bairro ? (
-            <Text style={s.placeBairro}>{place.bairro}</Text>
-          ) : null}
+    <View style={[row.wrap, !isLast && row.separator]}>
+      {/* Number */}
+      <Text style={row.num}>{String(index + 1).padStart(2, "0")}</Text>
+
+      {/* Info */}
+      <View style={row.info}>
+        <View style={row.nameRow}>
+          <Text style={row.name}>{place.nome}</Text>
+          {place.is_highlight && (
+            <View style={row.starBadge}>
+              <Ionicons name="star" size={8} color={GOLD} />
+            </View>
+          )}
         </View>
-        {place.categoria ? (
-          <View style={s.categoriaChip}>
-            <Text style={s.categoriaText}>{place.categoria}</Text>
+
+        {place.bairro ? (
+          <Text style={row.bairro}>{place.bairro}</Text>
+        ) : null}
+
+        {place.meu_olhar ? (
+          <View style={row.noteRow}>
+            <View style={row.noteLine} />
+            <Text style={row.noteText}>"{place.meu_olhar}"</Text>
           </View>
         ) : null}
       </View>
 
-      {/* Meu olhar — personal note */}
-      {place.meu_olhar ? (
-        <View style={s.meuOlharBlock}>
-          <View style={s.meuOlharLine} />
-          <Text style={s.meuOlharText}>"{place.meu_olhar}"</Text>
+      {/* Category chip */}
+      {place.categoria ? (
+        <View style={row.chip}>
+          <Text style={row.chipText}>{place.categoria}</Text>
         </View>
       ) : null}
     </View>
@@ -340,14 +349,11 @@ function PlaceCard({ place, index }: { place: GuidePlace; index: number }) {
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#000",
-  },
-  scroll: {
-    flex: 1,
+    backgroundColor: "#100D09",
   },
   loadingRoot: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: "#100D09",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -356,59 +362,47 @@ const s = StyleSheet.create({
     fontSize: 15,
     color: "rgba(255,255,255,0.55)",
   },
-
-  // ── Header ──
-  header: {
-    paddingHorizontal: 24,
-    paddingBottom: 28,
-    position: "relative",
-    overflow: "hidden",
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.06)",
+  content: {
+    paddingHorizontal: 22,
   },
+
+  // ── Back button ──
   backBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(0,0,0,0.32)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    marginBottom: 24,
+    alignSelf: "flex-start",
+  },
+
+  // ── Header ──
+  header: {
+    gap: 10,
     marginBottom: 20,
   },
-  headerMeta: {
-    marginBottom: 16,
-  },
-  headerByline: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 11,
+  eyebrow: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
     color: GOLD,
-    letterSpacing: 2,
-    textTransform: "uppercase",
-  },
-  titleBlock: {
-    marginBottom: 20,
-  },
-  goldAccentLine: {
-    width: 32,
-    height: 2,
-    backgroundColor: GOLD,
-    marginBottom: 14,
+    letterSpacing: 2.8,
   },
   tagline: {
     fontFamily: "PlayfairDisplay_400Regular_Italic",
     fontSize: 15,
     color: "rgba(255,255,255,0.60)",
     lineHeight: 22,
-    marginBottom: 10,
   },
   title: {
     fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 26,
-    color: "#fff",
-    lineHeight: 34,
-    marginBottom: 10,
+    fontSize: 32,
+    color: CREAM,
+    lineHeight: 38,
+    letterSpacing: -0.3,
   },
   subtitle: {
     fontFamily: "Inter_400Regular",
@@ -416,40 +410,52 @@ const s = StyleSheet.create({
     color: "rgba(255,255,255,0.58)",
     lineHeight: 20,
   },
-  statsRow: {
+  pillRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 16,
+    gap: 8,
+    marginTop: 4,
   },
-  statItem: {
+  pill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
+    backgroundColor: `${GOLD}12`,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: `${GOLD}28`,
   },
-  statText: {
+  pillText: {
     fontFamily: "Inter_500Medium",
-    fontSize: 12,
-    color: "rgba(255,255,255,0.55)",
+    fontSize: 11,
+    color: GOLD,
   },
 
-  // ── Intro ──
-  introBlock: {
-    marginHorizontal: 24,
-    marginTop: 28,
-    marginBottom: 8,
-    padding: 20,
-    backgroundColor: "rgba(255,255,255,0.03)",
+  // ── Rule ──
+  rule: {
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    marginBottom: 20,
+  },
+
+  // ── Intro card ──
+  introCard: {
+    backgroundColor: "rgba(0,0,0,0.28)",
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.07)",
+    borderColor: "rgba(255,255,255,0.10)",
+    padding: 20,
+    marginBottom: 20,
   },
-  introQuoteMark: {
+  introQuote: {
     fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 48,
+    fontSize: 44,
     color: GOLD,
-    lineHeight: 38,
+    lineHeight: 36,
     marginBottom: 4,
-    opacity: 0.6,
+    opacity: 0.55,
   },
   introText: {
     fontFamily: "Inter_400Regular",
@@ -477,90 +483,102 @@ const s = StyleSheet.create({
     letterSpacing: 0.3,
   },
 
-  // ── Sections ──
-  section: {
-    marginTop: 32,
-    paddingHorizontal: 20,
+  // ── Sections wrapper ──
+  sectionsWrap: {
+    gap: 24,
   },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
+});
+
+// ── Section styles ─────────────────────────────────────────────────────────────
+
+const sec = StyleSheet.create({
+  wrap: {
     gap: 12,
-    marginBottom: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.08)",
   },
-  sectionIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: `${GOLD}18`,
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  iconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 9,
+    backgroundColor: `${GOLD}16`,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: `${GOLD}30`,
-    marginTop: 2,
+    borderColor: `${GOLD}28`,
   },
-  sectionHeaderText: {
+  label: {
     flex: 1,
-  },
-  sectionLabel: {
     fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 20,
-    color: "#fff",
-    lineHeight: 26,
-    marginBottom: 4,
+    fontSize: 18,
+    color: CREAM,
+    lineHeight: 24,
   },
-  sectionDescription: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: "rgba(255,255,255,0.45)",
-    lineHeight: 18,
-  },
-
-  // ── Place list ──
-  placeList: {
-    gap: 12,
-  },
-
-  // ── Place card ──
-  placeCard: {
-    backgroundColor: "rgba(255,255,255,0.03)",
-    borderRadius: 14,
+  countBadge: {
+    backgroundColor: `${GOLD}10`,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.07)",
-    padding: 16,
+    borderColor: `${GOLD}24`,
   },
-  placeTopRow: {
+  countText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    color: GOLD,
+  },
+  // glass card holding all place rows
+  card: {
+    backgroundColor: "rgba(0,0,0,0.26)",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    overflow: "hidden",
+  },
+});
+
+// ── Place row styles ──────────────────────────────────────────────────────────
+
+const row = StyleSheet.create({
+  wrap: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
-  placeNumber: {
+  separator: {
+    borderBottomWidth: 1,
+    borderBottomColor: `${GOLD}12`,
+  },
+  num: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 22,
-    color: `${GOLD}40`,
-    lineHeight: 28,
-    width: 32,
+    fontSize: 20,
+    color: `${GOLD}44`,
+    lineHeight: 26,
+    width: 30,
     letterSpacing: -0.5,
   },
-  placeNameBlock: {
+  info: {
     flex: 1,
+    gap: 3,
   },
-  placeNameRow: {
+  nameRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     flexWrap: "wrap",
   },
-  placeName: {
+  name: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
-    color: "#fff",
+    fontSize: 14,
+    color: CREAM,
     lineHeight: 20,
   },
-  highlightBadge: {
+  starBadge: {
     width: 16,
     height: 16,
     borderRadius: 8,
@@ -570,49 +588,47 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: `${GOLD}40`,
   },
-  placeBairro: {
+  bairro: {
     fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: "rgba(255,255,255,0.45)",
-    marginTop: 3,
+    fontSize: 11,
+    color: "rgba(255,255,255,0.42)",
     letterSpacing: 0.2,
   },
-  categoriaChip: {
+  noteRow: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "flex-start",
+    marginTop: 6,
+  },
+  noteLine: {
+    width: 2,
+    backgroundColor: `${GOLD}48`,
+    borderRadius: 1,
+    alignSelf: "stretch",
+    minHeight: 14,
+  },
+  noteText: {
+    flex: 1,
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: "rgba(255,255,255,0.55)",
+    lineHeight: 18,
+    fontStyle: "italic",
+  },
+  chip: {
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 7,
     backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.10)",
+    alignSelf: "flex-start",
+    marginTop: 2,
   },
-  categoriaText: {
+  chipText: {
     fontFamily: "Inter_400Regular",
     fontSize: 10,
-    color: "rgba(255,255,255,0.50)",
+    color: "rgba(255,255,255,0.48)",
     textTransform: "capitalize",
-  },
-
-  // ── Meu olhar ──
-  meuOlharBlock: {
-    marginTop: 12,
-    paddingLeft: 44,
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "flex-start",
-  },
-  meuOlharLine: {
-    width: 2,
-    backgroundColor: `${GOLD}50`,
-    borderRadius: 1,
-    alignSelf: "stretch",
-    minHeight: 16,
-  },
-  meuOlharText: {
-    flex: 1,
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: "rgba(255,255,255,0.60)",
-    lineHeight: 20,
-    fontStyle: "italic",
   },
 });

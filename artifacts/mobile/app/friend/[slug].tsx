@@ -26,7 +26,8 @@ import { supabase } from "@/lib/supabase";
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const GOLD = "#C9A84C";
 const GOLD_LIGHT = "#D4AF37";
-const FALLBACK_IMG = require("../../assets/images/hero-rio.png");
+const FALLBACK_IMG = require("../../assets/images/carol-dieckmann.jpg");
+const RIO_FALLBACK = require("../../assets/images/hero-rio.png");
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -193,7 +194,7 @@ export default function FriendProfileScreen() {
 function GuideCardItem({ guide, friendName }: { guide: GuideCard; friendName: string }) {
   const coverSource = guide.cover_photo_url
     ? { uri: guide.cover_photo_url }
-    : FALLBACK_IMG;
+    : RIO_FALLBACK;
 
   const vibeLabels = (guide.vibe ?? []).slice(0, 3).map((v) =>
     v.replace(/_/g, " ")
