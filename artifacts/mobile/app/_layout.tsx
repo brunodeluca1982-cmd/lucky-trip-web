@@ -16,7 +16,7 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
 import React, { useEffect } from "react";
-import { Platform } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -28,9 +28,18 @@ SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
-// Warm root color — ensures every frame from the very first paint is amber/dark,
-// never the jarring cold black that causes the flash before screen gradients render.
+// Warm root color — the single source of truth for the app's base background.
+// Every wrapper, screen container, and navigator defaults to this so there is
+// never a cold-black frame between navigations or on first paint.
 const ROOT_BG = "#1A0E04";
+
+// ── Web: set body/html background synchronously at module load ──────────────
+// This runs BEFORE the first React render, so the HTML body never flashes
+// the browser's default background (which is dark/black in dark mode).
+if (Platform.OS === "web" && typeof document !== "undefined") {
+  document.documentElement.style.backgroundColor = ROOT_BG;
+  document.body.style.backgroundColor = ROOT_BG;
+}
 
 const AppTheme = {
   ...DefaultTheme,
@@ -83,6 +92,7 @@ export default function RootLayout() {
     el.id = "lucky-no-select";
     el.textContent = `
       html, body, #root {
+        background-color: ${ROOT_BG};
         -webkit-tap-highlight-color: transparent;
       }
       * {
@@ -100,7 +110,12 @@ export default function RootLayout() {
     return () => { document.getElementById("lucky-no-select")?.remove(); };
   }, []);
 
-  if (!fontsLoaded && !fontError) return null;
+  // Show warm background during font loading instead of null.
+  // On native, the splash screen overlays this anyway.
+  // On web, this prevents the browser body from showing through.
+  if (!fontsLoaded && !fontError) {
+    return <View style={styles.warmBlock} />;
+  }
 
   return (
     <SafeAreaProvider style={{ backgroundColor: ROOT_BG }}>
@@ -118,3 +133,10 @@ export default function RootLayout() {
     </SafeAreaProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  warmBlock: {
+    flex: 1,
+    backgroundColor: ROOT_BG,
+  },
+});

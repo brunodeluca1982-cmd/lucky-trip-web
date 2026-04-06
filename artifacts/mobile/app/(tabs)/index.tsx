@@ -425,7 +425,7 @@ export default function HomeScreen() {
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#000000",
+    backgroundColor: "#1A0E04",
   },
 
   // ── Background ──

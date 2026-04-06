@@ -17,10 +17,11 @@
       "supportsTablet": false
     },
     "android": {
-      "navigationBarColor": "#000000"
+      "navigationBarColor": "#1A0E04"
     },
     "web": {
-      "favicon": "./assets/images/icon.png"
+      "favicon": "./assets/images/icon.png",
+      "backgroundColor": "#1A0E04"
     },
     "plugins": [
       [
