@@ -24,6 +24,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GuiaProvider } from "@/context/GuiaContext";
+import { SplashOverlay } from "@/components/SplashOverlay";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -129,6 +130,8 @@ export default function RootLayout() {
               <KeyboardProvider>
                 <RootLayoutNav />
               </KeyboardProvider>
+              {/* Branded session splash — covers everything on first launch only */}
+              <SplashOverlay />
             </GestureHandlerRootView>
           </QueryClientProvider>
         </GuiaProvider>
