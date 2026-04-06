@@ -268,14 +268,14 @@ const HERO_H = SCREEN_WIDTH * 1.05;
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: "#1A0E04",
   },
   scroll: {
     flex: 1,
   },
   loadingRoot: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: "#1A0E04",
     alignItems: "center",
     justifyContent: "center",
   },

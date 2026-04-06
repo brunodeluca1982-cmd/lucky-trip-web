@@ -28,13 +28,15 @@ SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
-// All screens use a dark photographic aesthetic — root background must match
-// so there is no flash of white/transparent between navigations or on mount.
+// Warm root color — ensures every frame from the very first paint is amber/dark,
+// never the jarring cold black that causes the flash before screen gradients render.
+const ROOT_BG = "#1A0E04";
+
 const AppTheme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
-    background: "#000000",
+    background: ROOT_BG,
   },
 };
 
@@ -44,14 +46,14 @@ function RootLayoutNav() {
       <Stack
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: "#000000" },
+          contentStyle: { backgroundColor: ROOT_BG },
           animation: "none",
         }}
       >
-        <Stack.Screen name="(tabs)"          options={{ headerShown: false, contentStyle: { backgroundColor: "#000000" } }} />
-        <Stack.Screen name="auth/callback"   options={{ headerShown: false, contentStyle: { backgroundColor: "#000000" }, animation: "fade" }} />
-        <Stack.Screen name="friend/[slug]"   options={{ headerShown: false, contentStyle: { backgroundColor: "#000000" }, animation: "slide_from_right" }} />
-        <Stack.Screen name="friend/guide/[slug]" options={{ headerShown: false, contentStyle: { backgroundColor: "#000000" }, animation: "slide_from_right" }} />
+        <Stack.Screen name="(tabs)"              options={{ headerShown: false, contentStyle: { backgroundColor: ROOT_BG } }} />
+        <Stack.Screen name="auth/callback"       options={{ headerShown: false, contentStyle: { backgroundColor: ROOT_BG }, animation: "fade" }} />
+        <Stack.Screen name="friend/[slug]"       options={{ headerShown: false, contentStyle: { backgroundColor: ROOT_BG }, animation: "slide_from_right" }} />
+        <Stack.Screen name="friend/guide/[slug]" options={{ headerShown: false, contentStyle: { backgroundColor: ROOT_BG }, animation: "slide_from_right" }} />
       </Stack>
     </ThemeProvider>
   );
@@ -101,11 +103,11 @@ export default function RootLayout() {
   if (!fontsLoaded && !fontError) return null;
 
   return (
-    <SafeAreaProvider style={{ backgroundColor: "#000000" }}>
+    <SafeAreaProvider style={{ backgroundColor: ROOT_BG }}>
       <ErrorBoundary>
         <GuiaProvider>
           <QueryClientProvider client={queryClient}>
-            <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#000000" }}>
+            <GestureHandlerRootView style={{ flex: 1, backgroundColor: ROOT_BG }}>
               <KeyboardProvider>
                 <RootLayoutNav />
               </KeyboardProvider>
