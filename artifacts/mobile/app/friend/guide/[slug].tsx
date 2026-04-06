@@ -6,9 +6,10 @@
  * Todos os dados vêm do Supabase — zero hardcoded.
  */
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Image,
   Platform,
   Pressable,
@@ -85,6 +86,15 @@ export default function FriendGuideScreen() {
   const [sections, setSections] = useState<SectionData[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [introExpanded, setIntroExpanded] = useState(false);
+  const bgAnim = useRef(new Animated.Value(0)).current;
+
+  function handleBgLoad() {
+    Animated.timing(bgAnim, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -129,8 +139,7 @@ export default function FriendGuideScreen() {
   if (loading) {
     return (
       <View style={s.loadingRoot}>
-        <Image source={RIO_BG} style={StyleSheet.absoluteFillObject} resizeMode="cover" blurRadius={Platform.OS === "ios" ? 28 : 16} />
-        <LinearGradient colors={["rgba(0,0,0,0.55)", "rgba(0,0,0,0.80)"]} style={StyleSheet.absoluteFill} />
+        <LinearGradient colors={["#2D1A08", "#1A0E04"]} style={StyleSheet.absoluteFill} />
         <ActivityIndicator color={GOLD} size="large" />
       </View>
     );
@@ -139,8 +148,7 @@ export default function FriendGuideScreen() {
   if (!guide) {
     return (
       <View style={s.loadingRoot}>
-        <Image source={RIO_BG} style={StyleSheet.absoluteFillObject} resizeMode="cover" blurRadius={Platform.OS === "ios" ? 28 : 16} />
-        <LinearGradient colors={["rgba(0,0,0,0.55)", "rgba(0,0,0,0.80)"]} style={StyleSheet.absoluteFill} />
+        <LinearGradient colors={["#2D1A08", "#1A0E04"]} style={StyleSheet.absoluteFill} />
         <Text style={s.errorText}>Roteiro não encontrado.</Text>
       </View>
     );
@@ -157,24 +165,33 @@ export default function FriendGuideScreen() {
   return (
     <View style={s.root}>
 
-      {/* ── Fixed Rio background ── */}
-      <Image
-        source={RIO_BG}
-        style={StyleSheet.absoluteFillObject}
-        resizeMode="cover"
-      />
-      {/* Cinematic dark vignette — same pattern as viagem.tsx */}
+      {/* ── Warm placeholder — always visible immediately, no black flash ── */}
       <LinearGradient
-        colors={[
-          "rgba(0,0,0,0.08)",
-          "rgba(0,0,0,0.28)",
-          "rgba(0,0,0,0.58)",
-          "rgba(0,0,0,0.78)",
-        ]}
-        locations={[0, 0.25, 0.58, 1]}
+        colors={["#2D1A08", "#1A0E04"]}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
+
+      {/* ── Rio background + overlay fade in together after image loads ── */}
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: bgAnim }]}>
+        <Image
+          source={RIO_BG}
+          style={StyleSheet.absoluteFillObject}
+          resizeMode="cover"
+          onLoad={handleBgLoad}
+        />
+        <LinearGradient
+          colors={[
+            "rgba(0,0,0,0.08)",
+            "rgba(0,0,0,0.28)",
+            "rgba(0,0,0,0.58)",
+            "rgba(0,0,0,0.78)",
+          ]}
+          locations={[0, 0.25, 0.58, 1]}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
+      </Animated.View>
 
       {/* ── Scrollable content over fixed bg ── */}
       <ScrollView
@@ -349,11 +366,11 @@ function PlaceRow({
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#100D09",
+    backgroundColor: "#1A0E04",
   },
   loadingRoot: {
     flex: 1,
-    backgroundColor: "#100D09",
+    backgroundColor: "#1A0E04",
     alignItems: "center",
     justifyContent: "center",
   },

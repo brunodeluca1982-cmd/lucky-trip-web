@@ -9,8 +9,9 @@
  * Navigation target: from Home RoteiroCard onPress.
  */
 
-import React from "react";
+import React, { useRef } from "react";
 import {
+  Animated,
   Image,
   Platform,
   Pressable,
@@ -141,6 +142,16 @@ export default function RoteiroDetailScreen() {
   const topPad    = Platform.OS === "web" ? 67 : insets.top + 12;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
+  const bgAnim = useRef(new Animated.Value(0)).current;
+
+  function handleBgLoad() {
+    Animated.timing(bgAnim, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
+  }
+
   const roteiro = roteiros.find((r) => r.id === id);
   if (!roteiro) return null;
 
@@ -149,24 +160,34 @@ export default function RoteiroDetailScreen() {
   return (
     <View style={s.root}>
 
-      {/* ── Cinematic background — blurred roteiro hero image ── */}
-      <Image
-        source={roteiro.image}
-        style={StyleSheet.absoluteFillObject}
-        resizeMode="cover"
-        blurRadius={Platform.OS === "ios" ? 28 : 16}
-      />
+      {/* ── Warm placeholder — instant, no dark flash ── */}
       <LinearGradient
-        colors={[
-          "rgba(0,0,0,0.10)",
-          "rgba(0,0,0,0.38)",
-          "rgba(0,0,0,0.66)",
-          "rgba(0,0,0,0.82)",
-        ]}
-        locations={[0, 0.25, 0.55, 1]}
+        colors={["#2D1A08", "#1A0E04"]}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
+
+      {/* ── Blurred hero image + overlay fade in after load ── */}
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: bgAnim }]}>
+        <Image
+          source={roteiro.image}
+          style={StyleSheet.absoluteFillObject}
+          resizeMode="cover"
+          blurRadius={Platform.OS === "ios" ? 28 : 16}
+          onLoad={handleBgLoad}
+        />
+        <LinearGradient
+          colors={[
+            "rgba(0,0,0,0.10)",
+            "rgba(0,0,0,0.38)",
+            "rgba(0,0,0,0.66)",
+            "rgba(0,0,0,0.82)",
+          ]}
+          locations={[0, 0.25, 0.55, 1]}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
+      </Animated.View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -233,7 +254,7 @@ export default function RoteiroDetailScreen() {
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#100D09",
+    backgroundColor: "#1A0E04",
   },
   content: {
     paddingHorizontal: 24,

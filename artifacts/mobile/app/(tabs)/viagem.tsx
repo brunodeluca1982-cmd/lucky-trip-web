@@ -59,7 +59,9 @@ const CATEGORY_LABEL: Record<SavedCategory, string> = {
 function SceneBackground({ images }: { images: ImageSourcePropType[] }) {
   const hasSaved      = images.length > 0;
   const [idx, setIdx] = useState(0);
-  const fadeAnim      = useRef(new Animated.Value(1)).current;
+  // Start at 0 — fades to 1 on first image load, then used for crossfade rotation
+  const fadeAnim      = useRef(new Animated.Value(0)).current;
+  const firstLoaded   = useRef(false);
 
   useEffect(() => {
     if (images.length <= 1) return;
@@ -67,13 +69,13 @@ function SceneBackground({ images }: { images: ImageSourcePropType[] }) {
       Animated.timing(fadeAnim, {
         toValue: 0,
         duration: 800,
-        useNativeDriver: false,
+        useNativeDriver: true,
       }).start(() => {
         setIdx((prev) => (prev + 1) % images.length);
         Animated.timing(fadeAnim, {
           toValue: 1,
           duration: 800,
-          useNativeDriver: false,
+          useNativeDriver: true,
         }).start();
       });
     }, 5000);
@@ -82,27 +84,45 @@ function SceneBackground({ images }: { images: ImageSourcePropType[] }) {
 
   const src = hasSaved ? (images[idx] ?? images[0]) : FALLBACK_BG;
 
+  function handleLoad() {
+    if (firstLoaded.current) return;
+    firstLoaded.current = true;
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
+  }
+
   return (
     <>
-      {/* Blurred destination image — fills screen */}
-      <Animated.Image
-        source={src}
-        style={[StyleSheet.absoluteFillObject, { opacity: fadeAnim }]}
-        resizeMode="cover"
-        blurRadius={Platform.OS === "ios" ? 30 : 18}
-      />
-      {/* Cinematic dark vignette — image visible at top, dark at bottom */}
+      {/* Warm placeholder — always visible, matches Rio destination palette */}
       <LinearGradient
-        colors={[
-          "rgba(0,0,0,0.05)",
-          "rgba(0,0,0,0.25)",
-          "rgba(0,0,0,0.52)",
-          "rgba(0,0,0,0.72)",
-        ]}
-        locations={[0, 0.30, 0.62, 1]}
+        colors={["#2D1A08", "#1A0E04"]}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
+      {/* Image + cinematic overlay fade in together after load */}
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: fadeAnim }]}>
+        <Animated.Image
+          source={src}
+          style={StyleSheet.absoluteFillObject}
+          resizeMode="cover"
+          blurRadius={Platform.OS === "ios" ? 30 : 18}
+          onLoad={handleLoad}
+        />
+        <LinearGradient
+          colors={[
+            "rgba(0,0,0,0.05)",
+            "rgba(0,0,0,0.25)",
+            "rgba(0,0,0,0.52)",
+            "rgba(0,0,0,0.72)",
+          ]}
+          locations={[0, 0.30, 0.62, 1]}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
+      </Animated.View>
     </>
   );
 }
@@ -701,7 +721,7 @@ export default function MinhaViagemScreen() {
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#100D09",
+    backgroundColor: "#1A0E04",
   },
   content: {
     paddingHorizontal: 24,
