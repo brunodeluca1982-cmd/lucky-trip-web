@@ -16,7 +16,6 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
-  Image,
   ImageSourcePropType,
   Platform,
   Pressable,
@@ -25,6 +24,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { Image as ExpoImage } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -59,35 +59,24 @@ const CATEGORY_LABEL: Record<SavedCategory, string> = {
 function SceneBackground({ images }: { images: ImageSourcePropType[] }) {
   const hasSaved      = images.length > 0;
   const [idx, setIdx] = useState(0);
-  // Start at 0 — fades to 1 on first image load, then used for crossfade rotation
-  const fadeAnim      = useRef(new Animated.Value(0)).current;
-  const firstLoaded   = useRef(false);
+  // Overlay starts invisible — fades in once the first image is actually displayed.
+  // This guarantees content never lands on a darkened black canvas.
+  const overlayAnim   = useRef(new Animated.Value(0)).current;
 
+  // Cycle through saved place images every 5 s.
+  // expo-image crossfades automatically when `source` changes (transition prop below).
   useEffect(() => {
     if (images.length <= 1) return;
     const timer = setInterval(() => {
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 800,
-        useNativeDriver: true,
-      }).start(() => {
-        setIdx((prev) => (prev + 1) % images.length);
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 800,
-          useNativeDriver: true,
-        }).start();
-      });
+      setIdx((prev) => (prev + 1) % images.length);
     }, 5000);
     return () => clearInterval(timer);
   }, [images.length]);
 
   const src = hasSaved ? (images[idx] ?? images[0]) : FALLBACK_BG;
 
-  function handleLoad() {
-    if (firstLoaded.current) return;
-    firstLoaded.current = true;
-    Animated.timing(fadeAnim, {
+  function handleDisplay() {
+    Animated.timing(overlayAnim, {
       toValue: 1,
       duration: 600,
       useNativeDriver: true,
@@ -96,21 +85,26 @@ function SceneBackground({ images }: { images: ImageSourcePropType[] }) {
 
   return (
     <>
-      {/* Warm placeholder — always visible, matches Rio destination palette */}
+      {/* Warm amber base — renders instantly in the same frame as mount */}
       <LinearGradient
         colors={["#2D1A08", "#1A0E04"]}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
-      {/* Image + cinematic overlay fade in together after load */}
-      <Animated.View style={[StyleSheet.absoluteFill, { opacity: fadeAnim }]}>
-        <Animated.Image
-          source={src}
-          style={StyleSheet.absoluteFillObject}
-          resizeMode="cover"
-          blurRadius={Platform.OS === "ios" ? 30 : 18}
-          onLoad={handleLoad}
-        />
+      {/* expo-image: backgroundColor shows immediately; crossfades to real image */}
+      <ExpoImage
+        source={src}
+        style={[StyleSheet.absoluteFillObject, { backgroundColor: "#1A0E04" }]}
+        contentFit="cover"
+        blurRadius={Platform.OS === "ios" ? 30 : 18}
+        transition={{ duration: 600, effect: "cross-dissolve" }}
+        onDisplay={handleDisplay}
+      />
+      {/* Dark cinematic overlay fades in with the image — never above an empty canvas */}
+      <Animated.View
+        style={[StyleSheet.absoluteFill, { opacity: overlayAnim }]}
+        pointerEvents="none"
+      >
         <LinearGradient
           colors={[
             "rgba(0,0,0,0.05)",
@@ -120,7 +114,6 @@ function SceneBackground({ images }: { images: ImageSourcePropType[] }) {
           ]}
           locations={[0, 0.30, 0.62, 1]}
           style={StyleSheet.absoluteFill}
-          pointerEvents="none"
         />
       </Animated.View>
     </>

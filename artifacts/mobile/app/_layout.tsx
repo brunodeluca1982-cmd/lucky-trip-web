@@ -17,6 +17,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
 import React, { useEffect } from "react";
 import { Platform, StyleSheet, View } from "react-native";
+import { notifyFontsReady } from "@/lib/splashGate";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -82,7 +83,9 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync();
+      // splashGate waits for both fonts AND first hero bg before hiding.
+      // A 1-second safety timer in splashGate ensures we never block forever.
+      notifyFontsReady();
     }
   }, [fontsLoaded, fontError]);
 

@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useRef } from "react";
 import {
+  Animated,
   ActivityIndicator,
   Dimensions,
   Image,
@@ -11,6 +12,8 @@ import {
   Text,
   View,
 } from "react-native";
+import { Image as ExpoImage } from "expo-image";
+import { notifyHeroReady } from "@/lib/splashGate";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -247,17 +250,42 @@ export default function HomeScreen() {
     return filtered.length > 0 ? filtered : atividades.slice(0, 10);
   }, [atividades, momentoTab]);
 
+  // ── Hero background animation ─────────────────────────────────────────────
+  // overlayAnim starts at 0 so the dark editorial overlay is invisible until
+  // the hero image is actually displayed — content always lands on a warm bg.
+  const overlayAnim = useRef(new Animated.Value(0)).current;
+
+  function handleHeroDisplay() {
+    notifyHeroReady();                         // release the splash gate
+    Animated.timing(overlayAnim, {
+      toValue: 1,
+      duration: 500,
+      useNativeDriver: true,
+    }).start();
+  }
+
   return (
     <View style={s.root}>
-      {/* Fullscreen background image — persists behind all content */}
-      <Image source={BG_IMAGE} style={s.bgImage} resizeMode="cover" />
-      {/* Editorial overlay — dark enough for legibility, permeable enough for depth */}
-      <LinearGradient
-        colors={["rgba(0,0,0,0.44)", "rgba(0,0,0,0.56)", "rgba(0,0,0,0.70)"]}
-        locations={[0, 0.38, 1]}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
+      {/* ── expo-image: warm amber placeholder → actual image crossfade ── */}
+      {/* backgroundColor on the Image itself shows in the same frame as mount */}
+      <ExpoImage
+        source={BG_IMAGE}
+        style={[s.bgImage, { backgroundColor: "#1A0E04" }]}
+        contentFit="cover"
+        transition={{ duration: 500, effect: "cross-dissolve" }}
+        onDisplay={handleHeroDisplay}
       />
+      {/* Editorial overlay fades in WITH the image — never darkens a black canvas */}
+      <Animated.View
+        style={[StyleSheet.absoluteFill, { opacity: overlayAnim }]}
+        pointerEvents="none"
+      >
+        <LinearGradient
+          colors={["rgba(0,0,0,0.44)", "rgba(0,0,0,0.56)", "rgba(0,0,0,0.70)"]}
+          locations={[0, 0.38, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+      </Animated.View>
 
       <AppHeader transparent />
 

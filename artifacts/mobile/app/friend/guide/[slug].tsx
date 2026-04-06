@@ -10,7 +10,6 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
-  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -18,6 +17,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { Image as ExpoImage } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -86,10 +86,11 @@ export default function FriendGuideScreen() {
   const [sections, setSections] = useState<SectionData[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [introExpanded, setIntroExpanded] = useState(false);
-  const bgAnim = useRef(new Animated.Value(0)).current;
+  // Overlay starts invisible — fades in once expo-image displays the background.
+  const overlayAnim = useRef(new Animated.Value(0)).current;
 
-  function handleBgLoad() {
-    Animated.timing(bgAnim, {
+  function handleBgDisplay() {
+    Animated.timing(overlayAnim, {
       toValue: 1,
       duration: 600,
       useNativeDriver: true,
@@ -165,21 +166,27 @@ export default function FriendGuideScreen() {
   return (
     <View style={s.root}>
 
-      {/* ── Warm placeholder — always visible immediately, no black flash ── */}
+      {/* ── Warm amber base — renders in the same frame as mount, zero wait ── */}
       <LinearGradient
         colors={["#2D1A08", "#1A0E04"]}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
 
-      {/* ── Rio background + overlay fade in together after image loads ── */}
-      <Animated.View style={[StyleSheet.absoluteFill, { opacity: bgAnim }]}>
-        <Image
-          source={RIO_BG}
-          style={StyleSheet.absoluteFillObject}
-          resizeMode="cover"
-          onLoad={handleBgLoad}
-        />
+      {/* ── expo-image: backgroundColor shows immediately; crossfades to Rio ── */}
+      <ExpoImage
+        source={RIO_BG}
+        style={[StyleSheet.absoluteFillObject, { backgroundColor: "#1A0E04" }]}
+        contentFit="cover"
+        transition={{ duration: 600, effect: "cross-dissolve" }}
+        onDisplay={handleBgDisplay}
+      />
+
+      {/* ── Dark overlay fades in only after the image is displayed ── */}
+      <Animated.View
+        style={[StyleSheet.absoluteFill, { opacity: overlayAnim }]}
+        pointerEvents="none"
+      >
         <LinearGradient
           colors={[
             "rgba(0,0,0,0.08)",
@@ -189,7 +196,6 @@ export default function FriendGuideScreen() {
           ]}
           locations={[0, 0.25, 0.58, 1]}
           style={StyleSheet.absoluteFill}
-          pointerEvents="none"
         />
       </Animated.View>
 
