@@ -21,6 +21,7 @@ export interface AuthState {
   loading:            boolean;
   signInWithPassword: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp:             (email: string, password: string, name?: string) => Promise<{ error: string | null; needsConfirmation: boolean }>;
+  sendPasswordReset:  (email: string) => Promise<{ error: string | null }>;
   signInWithOtp:      (email: string) => Promise<{ error: string | null }>;
   signInWithGoogle:   () => Promise<{ error: string | null }>;
   signOut:            () => Promise<void>;
@@ -80,6 +81,28 @@ export function useAuth(): AuthState {
     } catch (e: any) {
       webCleanup();
       return { error: e?.message ?? "Erro inesperado.", needsConfirmation: false };
+    }
+  }
+
+  // ── Password reset ────────────────────────────────────────────────────────
+
+  async function sendPasswordReset(email: string): Promise<{ error: string | null }> {
+    try {
+      const redirectTo =
+        Platform.OS === "web" && typeof window !== "undefined"
+          ? window.location.origin
+          : undefined;
+
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo,
+      });
+
+      webCleanup();
+      if (error) return { error: error.message };
+      return { error: null };
+    } catch (e: any) {
+      webCleanup();
+      return { error: e?.message ?? "Erro inesperado." };
     }
   }
 
@@ -173,6 +196,7 @@ export function useAuth(): AuthState {
     loading,
     signInWithPassword,
     signUp,
+    sendPasswordReset,
     signInWithOtp,
     signInWithGoogle,
     signOut,

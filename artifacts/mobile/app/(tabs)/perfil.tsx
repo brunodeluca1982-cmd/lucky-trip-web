@@ -94,12 +94,13 @@ function translateAuthError(raw: string, isLogin: boolean): string {
 }
 
 export default function PerfilScreen() {
-  const { user, signOut, signInWithPassword, signUp, signInWithGoogle } = useAuth();
+  const { user, signOut, signInWithPassword, signUp, sendPasswordReset, signInWithGoogle } = useAuth();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === "web" ? 16 : insets.top + 8;
   const botPad = Platform.OS === "web" ? 32 : insets.bottom + 16;
 
   const [isLogin,       setIsLogin]       = useState(true);
+  const [isForgot,      setIsForgot]      = useState(false);
   const [name,          setName]          = useState("");
   const [email,         setEmail]         = useState("");
   const [password,      setPassword]      = useState("");
@@ -108,7 +109,13 @@ export default function PerfilScreen() {
   const [loading,       setLoading]       = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [needsConfirm,  setNeedsConfirm]  = useState(false);
+  const [resetSent,     setResetSent]     = useState(false);
   const [error,         setError]         = useState<string | null>(null);
+
+  function resetAll() {
+    setIsForgot(false); setNeedsConfirm(false); setResetSent(false);
+    setError(null); setPassword(""); setShowPass(false);
+  }
 
   async function handleSubmit() {
     const trimEmail = email.trim().toLowerCase();
@@ -136,7 +143,6 @@ export default function PerfilScreen() {
           const translated = translateAuthError(err, true);
           setError(translated);
         }
-        // On success: onAuthStateChange fires → session → user set → LoggedIn renders
       } else {
         const { error: err, needsConfirmation } = await signUp(trimEmail, trimPass, name.trim() || undefined);
         if (err) {
@@ -145,7 +151,26 @@ export default function PerfilScreen() {
         } else if (needsConfirmation) {
           setNeedsConfirm(true);
         }
-        // No needsConfirmation → onAuthStateChange fires → LoggedIn renders
+      }
+    } catch {
+      setError("Erro inesperado. Tente novamente.");
+    } finally {
+      setLoading(false);
+      webCleanup();
+    }
+  }
+
+  async function handleReset() {
+    const trimEmail = email.trim().toLowerCase();
+    if (!trimEmail || loading) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const { error: err } = await sendPasswordReset(trimEmail);
+      if (err) {
+        setError("Não foi possível enviar o e-mail. Verifique o endereço.");
+      } else {
+        setResetSent(true);
       }
     } catch {
       setError("Erro inesperado. Tente novamente.");
@@ -195,10 +220,15 @@ export default function PerfilScreen() {
           {user
             ? <LoggedIn user={user} signOut={signOut} />
             : needsConfirm
-            ? <SentState email={email} />
+            ? <SentState email={email} kind="confirm" onBack={resetAll} />
+            : resetSent
+            ? <SentState email={email} kind="reset" onBack={resetAll} />
             : <LoggedOut
                 isLogin={isLogin}
-                onToggleMode={() => { setIsLogin(v => !v); setError(null); }}
+                isForgot={isForgot}
+                onToggleMode={() => { setIsLogin(v => !v); resetAll(); }}
+                onForgot={() => { setIsForgot(true); setError(null); }}
+                onBackFromForgot={() => { setIsForgot(false); setError(null); }}
                 name={name}           setName={setName}
                 email={email}         setEmail={setEmail}
                 password={password}   setPassword={setPassword}
@@ -207,7 +237,7 @@ export default function PerfilScreen() {
                 loading={loading}
                 googleLoading={googleLoading}
                 error={error}
-                onSubmit={handleSubmit}
+                onSubmit={isForgot ? handleReset : handleSubmit}
                 onGooglePress={handleGoogle}
               />
           }
@@ -220,7 +250,7 @@ export default function PerfilScreen() {
 // ── Logged-out: full account creation form ────────────────────────────────────
 
 function LoggedOut({
-  isLogin, onToggleMode,
+  isLogin, isForgot, onToggleMode, onForgot, onBackFromForgot,
   name, setName,
   email, setEmail,
   password, setPassword,
@@ -229,18 +259,69 @@ function LoggedOut({
   loading, googleLoading,
   error, onSubmit, onGooglePress,
 }: {
-  isLogin: boolean;     onToggleMode: () => void;
-  name: string;         setName: (v: string) => void;
-  email: string;        setEmail: (v: string) => void;
-  password: string;     setPassword: (v: string) => void;
-  showPass: boolean;    setShowPass: (v: boolean) => void;
-  agreed: boolean;      setAgreed: (v: boolean) => void;
+  isLogin: boolean;           onToggleMode: () => void;
+  isForgot: boolean;          onForgot: () => void; onBackFromForgot: () => void;
+  name: string;               setName: (v: string) => void;
+  email: string;              setEmail: (v: string) => void;
+  password: string;           setPassword: (v: string) => void;
+  showPass: boolean;          setShowPass: (v: boolean) => void;
+  agreed: boolean;            setAgreed: (v: boolean) => void;
   loading: boolean;
   googleLoading: boolean;
   error: string | null;
   onSubmit: () => void;
   onGooglePress: () => void;
 }) {
+  if (isForgot) {
+    return (
+      <View style={s.page}>
+        <TouchableOpacity style={s.backBtn} onPress={onBackFromForgot} activeOpacity={0.7} accessibilityRole="button">
+          <Feather name="arrow-left" size={16} color="rgba(255,255,255,0.80)" />
+          <Text style={s.backText} suppressHighlighting>Voltar</Text>
+        </TouchableOpacity>
+
+        <View style={s.logoWrap}>
+          <Image source={LOGO} style={s.logo} resizeMode="contain" />
+          <Text style={s.brand} suppressHighlighting>THE LUCKY TRIP</Text>
+        </View>
+
+        <View style={s.badge}>
+          <Text style={s.badgeText} suppressHighlighting>REDEFINIR SENHA</Text>
+        </View>
+
+        <Text style={s.headline} suppressHighlighting>Recuperar acesso</Text>
+        <Text style={[s.loginHint, { marginBottom: 20 }]} suppressHighlighting>
+          Digite seu e-mail e enviaremos um link para você criar uma nova senha.
+        </Text>
+
+        <View style={s.fieldWrap}>
+          <Feather name="mail" size={16} color="rgba(255,255,255,0.40)" />
+          <TextInput
+            style={s.field}
+            placeholder="E-mail"
+            placeholderTextColor="rgba(255,255,255,0.38)"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            value={email}
+            onChangeText={setEmail}
+            returnKeyType="done"
+            onSubmitEditing={onSubmit}
+          />
+        </View>
+
+        {error ? <Text style={s.errorText} suppressHighlighting>{error}</Text> : null}
+
+        <TouchableOpacity style={s.cta} onPress={onSubmit} activeOpacity={0.85} disabled={loading} accessibilityRole="button">
+          {loading
+            ? <ActivityIndicator color="#000" />
+            : <Text style={s.ctaText} suppressHighlighting>Enviar link de redefinição</Text>
+          }
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={s.page}>
       {/* ← Voltar */}
@@ -408,7 +489,7 @@ function LoggedOut({
         </TouchableOpacity>
       </View>
 
-      {/* Footer — toggles between modes */}
+      {/* Footer — mode toggle + forgot password */}
       <View style={s.footerRow}>
         <Text style={s.footerText} suppressHighlighting>
           {isLogin ? "Não tem conta?  " : "Já tem uma conta?  "}
@@ -419,13 +500,27 @@ function LoggedOut({
           </Text>
         </TouchableOpacity>
       </View>
+
+      {isLogin && (
+        <TouchableOpacity
+          style={{ marginTop: 6 }}
+          onPress={onForgot}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+        >
+          <Text style={[s.footerLink, { fontSize: 13 }]} suppressHighlighting>
+            Esqueceu a senha?
+          </Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
 
 // ── Post-submit: check email ──────────────────────────────────────────────────
 
-function SentState({ email }: { email: string }) {
+function SentState({ email, kind, onBack }: { email: string; kind: "confirm" | "reset"; onBack: () => void }) {
+  const isReset = kind === "reset";
   return (
     <View style={s.center}>
       <Image source={LOGO} style={s.logo} resizeMode="contain" />
@@ -434,14 +529,22 @@ function SentState({ email }: { email: string }) {
         <Feather name="mail" size={28} color={GOLD} />
       </View>
 
-      <Text style={s.headline} suppressHighlighting>Confirme seu e-mail</Text>
+      <Text style={s.headline} suppressHighlighting>
+        {isReset ? "Verifique seu e-mail" : "Confirme seu e-mail"}
+      </Text>
       <Text style={s.sub} suppressHighlighting>
-        Enviamos um e-mail de confirmação para{"\n"}
+        {isReset ? "Enviamos o link de redefinição para" : "Enviamos um e-mail de confirmação para"}{"\n"}
         <Text style={{ color: GOLD, fontFamily: "Inter_500Medium" }}>{email}</Text>
       </Text>
       <Text style={s.sentNote} suppressHighlighting>
-        Clique no link no e-mail para ativar sua conta e entrar automaticamente.
+        {isReset
+          ? "Clique no link para criar uma nova senha e voltar a acessar sua conta."
+          : "Clique no link no e-mail para ativar sua conta e entrar automaticamente."}
       </Text>
+
+      <TouchableOpacity style={{ marginTop: 24 }} onPress={onBack} activeOpacity={0.7} accessibilityRole="button">
+        <Text style={[s.footerLink, { fontSize: 14 }]} suppressHighlighting>← Voltar ao login</Text>
+      </TouchableOpacity>
     </View>
   );
 }
