@@ -24,8 +24,6 @@ import { SectionHeader } from "@/components/SectionHeader";
 import Colors from "@/constants/colors";
 import {
   heroDestinos,
-  influencers,
-  Influencer,
   Roteiro,
   roteiros,
 } from "@/data/mockData";
@@ -33,6 +31,7 @@ import { useGuia } from "@/context/GuiaContext";
 import { useLuckyList } from "@/hooks/useLuckyList";
 import { useOQueFazer } from "@/hooks/useOQueFazer";
 import { useRestaurants } from "@/hooks/useRestaurants";
+import { useFriends, type FriendCard } from "@/hooks/useFriends";
 
 // ── Context-aware "O que fazer agora" title ───────────────────────────────────
 // Prepositions for known destinations (Portuguese grammar)
@@ -148,14 +147,22 @@ function RoteiroCard({ roteiro }: { roteiro: Roteiro }) {
   );
 }
 
-// ── Influencer card (2-col grid) ──────────────────────────────────────────────
-function InfluencerCard({ influencer }: { influencer: Influencer }) {
+// ── Friend card (2-col grid) — dados reais do Supabase ───────────────────────
+const FRIEND_FALLBACK = require("../../assets/images/hero-rio.png");
+
+function InfluencerCard({ influencer }: { influencer: FriendCard }) {
+  const imgSource = influencer.profile_photo_url
+    ? { uri: influencer.profile_photo_url }
+    : influencer.cover_photo_url
+    ? { uri: influencer.cover_photo_url }
+    : FRIEND_FALLBACK;
+
   return (
     <Pressable
       style={({ pressed }) => [s.influencerCard, pressed && { opacity: 0.90, transform: [{ scale: 0.97 }] }]}
-      onPress={() => router.push({ pathname: "/luckyList/[id]", params: { id: "rio" } })}
+      onPress={() => router.push({ pathname: "/friend/[slug]", params: { slug: influencer.slug } })}
     >
-      <Image source={influencer.image} style={s.influencerImage} resizeMode="cover" />
+      <Image source={imgSource} style={s.influencerImage} resizeMode="cover" />
       <LinearGradient
         colors={["rgba(0,0,0,0.04)", "rgba(0,0,0,0.78)"]}
         locations={[0.35, 1]}
@@ -164,10 +171,10 @@ function InfluencerCard({ influencer }: { influencer: Influencer }) {
       <View style={s.influencerBadge}>
         <Feather name="map" size={10} color={C.white} />
         <Text style={s.influencerBadgeText}>
-          Roteiros: {String(influencer.numRoteiros).padStart(2, "0")}
+          Roteiros: {String(influencer.guide_count).padStart(2, "0")}
         </Text>
       </View>
-      <Text style={s.influencerName}>{influencer.nome}</Text>
+      <Text style={s.influencerName}>{influencer.display_name}</Text>
     </Pressable>
   );
 }
@@ -221,6 +228,7 @@ export default function HomeScreen() {
   const agoraTitle = getAgoraTitle(viagem.destino || undefined);
   const { lugares: atividades, loading: loadingAtividades } = useOQueFazer();
   const { restaurantes: restos, loading: loadingRestos } = useRestaurants();
+  const { friends, loading: loadingFriends } = useFriends();
   const momentoTab = getCurrentMomento();
 
   const filteredAtividades = React.useMemo(() => {
@@ -366,7 +374,7 @@ export default function HomeScreen() {
 
         <Divider />
 
-        {/* ── 9. VIAJE COMO ELES ── */}
+        {/* ── 9. VIAJE COMO ELES — Supabase: friends ── */}
         <View style={s.section}>
           <SectionHeader
             title="Viaje como eles"
@@ -374,11 +382,15 @@ export default function HomeScreen() {
             subtitle="Siga os passos de quem você admira. Acesse roteiros detalhados, segredos e dicas pessoais das nossas estrelas convidadas."
             dark
           />
-          <View style={s.grid2}>
-            {influencers.map((inf) => (
-              <InfluencerCard key={inf.id} influencer={inf} />
-            ))}
-          </View>
+          {loadingFriends ? (
+            <ActivityIndicator color="rgba(201,168,76,0.7)" style={{ marginVertical: 16 }} />
+          ) : (
+            <View style={s.grid2}>
+              {friends.map((f) => (
+                <InfluencerCard key={f.id} influencer={f} />
+              ))}
+            </View>
+          )}
         </View>
 
         <Divider />

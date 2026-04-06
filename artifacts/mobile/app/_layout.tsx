@@ -6,6 +6,7 @@ import {
 } from "@expo-google-fonts/inter";
 import {
   PlayfairDisplay_400Regular,
+  PlayfairDisplay_400Regular_Italic,
   PlayfairDisplay_600SemiBold,
   PlayfairDisplay_700Bold,
 } from "@expo-google-fonts/playfair-display";
@@ -49,6 +50,8 @@ function RootLayoutNav() {
       >
         <Stack.Screen name="(tabs)"          options={{ headerShown: false, contentStyle: { backgroundColor: "#000000" } }} />
         <Stack.Screen name="auth/callback"   options={{ headerShown: false, contentStyle: { backgroundColor: "#000000" }, animation: "fade" }} />
+        <Stack.Screen name="friend/[slug]"   options={{ headerShown: false, contentStyle: { backgroundColor: "#000000" }, animation: "slide_from_right" }} />
+        <Stack.Screen name="friend/guide/[slug]" options={{ headerShown: false, contentStyle: { backgroundColor: "#000000" }, animation: "slide_from_right" }} />
       </Stack>
     </ThemeProvider>
   );
@@ -61,6 +64,7 @@ export default function RootLayout() {
     Inter_600SemiBold,
     Inter_700Bold,
     PlayfairDisplay_400Regular,
+    PlayfairDisplay_400Regular_Italic,
     PlayfairDisplay_600SemiBold,
     PlayfairDisplay_700Bold,
   });

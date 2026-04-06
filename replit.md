@@ -182,6 +182,8 @@ Neighborhood map (defined in `data/neighborhoodImages.ts`):
 
 ### Route Structure
 - `(tabs)/` — 5-tab navigator
+- `friend/[slug].tsx` — friend editorial profile page: hero (fallback to local image when photo_url null), "AMIGO DA LUCKY TRIP" eyebrow, Playfair name, guide cards from `v_friend_guides_cards`; navigates to `friend/guide/[slug]`
+- `friend/guide/[slug].tsx` — friend curated guide: header with tagline/title/subtitle/stats, collapsible intro_text, places organized by `curation_dimension` (hotel→"Onde Ficar", gastronomy→"Onde Comer", nightlife→"Para a Noite"); each place card shows name, bairro, category chip, highlight star, and `meu_olhar` personal note; data from `v_friend_guides_cards` + `friend_guide_places`
 - `ondeFicar/[id].tsx` — hotels map screen (RioMapView); tap neighborhood → navigates directly to bairro page; all hotels always visible in scrollable list below; no floating card
 - `ondeFicar/hotel/[hotelId].tsx` — hotel detail screen (full my_view, how_to_enjoy, reserve_url, Google Maps link)
 - `ondeFicar/bairro/[slug].tsx` — neighborhood detail: hero + "Ver X hotéis" + "Por dentro do bairro" toggle; collapsible editorial; hotel list
