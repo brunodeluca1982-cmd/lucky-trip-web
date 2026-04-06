@@ -8,9 +8,18 @@ import { supabase } from "@/lib/supabase";
 WebBrowser.maybeCompleteAuthSession();
 
 // Single stable origin used for all web auth redirects.
-// Set EXPO_PUBLIC_APP_ORIGIN to your deployed app URL (e.g. https://yourapp.replit.app).
-// Falls back to empty string — Supabase will use its configured Site URL as fallback.
-const WEB_ORIGIN: string = process.env.EXPO_PUBLIC_APP_ORIGIN ?? "";
+// Priority: EXPO_PUBLIC_APP_ORIGIN (deployed URL) → EXPO_PUBLIC_EXPO_DOMAIN (dev) → ""
+const WEB_ORIGIN: string = process.env.EXPO_PUBLIC_APP_ORIGIN
+  ? process.env.EXPO_PUBLIC_APP_ORIGIN
+  : process.env.EXPO_PUBLIC_EXPO_DOMAIN
+    ? `https://${process.env.EXPO_PUBLIC_EXPO_DOMAIN}`
+    : "";
+
+// All auth emails should land on the /auth/callback route which handles
+// both email confirmation (SIGNED_IN) and password reset (PASSWORD_RECOVERY).
+function callbackUrl(): string | undefined {
+  return WEB_ORIGIN ? `${WEB_ORIGIN}/auth/callback` : undefined;
+}
 
 function webCleanup() {
   if (Platform.OS !== "web" || typeof document === "undefined") return;
@@ -93,7 +102,7 @@ export function useAuth(): AuthState {
 
   async function sendPasswordReset(email: string): Promise<{ error: string | null }> {
     try {
-      const redirectTo = Platform.OS === "web" ? (WEB_ORIGIN || undefined) : undefined;
+      const redirectTo = Platform.OS === "web" ? callbackUrl() : undefined;
 
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo,
@@ -112,7 +121,7 @@ export function useAuth(): AuthState {
 
   async function signInWithOtp(email: string): Promise<{ error: string | null }> {
     try {
-      const emailRedirectTo = Platform.OS === "web" ? (WEB_ORIGIN || undefined) : undefined;
+      const emailRedirectTo = Platform.OS === "web" ? callbackUrl() : undefined;
 
       const { error } = await supabase.auth.signInWithOtp({
         email,
@@ -135,7 +144,7 @@ export function useAuth(): AuthState {
       try {
         const { error } = await supabase.auth.signInWithOAuth({
           provider: "google",
-          options: { redirectTo: WEB_ORIGIN || undefined },
+          options: { redirectTo: callbackUrl() },
         });
         webCleanup();
         if (error) return { error: error.message };

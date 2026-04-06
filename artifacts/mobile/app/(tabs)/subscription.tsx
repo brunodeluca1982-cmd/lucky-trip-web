@@ -25,6 +25,7 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/lib/supabase";
 
 const GOLD      = "#D4AF37";
 const GOLD_DIM  = "rgba(212,175,55,0.14)";
@@ -80,35 +81,45 @@ export default function SubscriptionScreen() {
     setErrorMsg(null);
     setLoading(true);
     try {
-      const supabaseUrl = "https://lsibzflaaqzvtzjlvrxw.supabase.co";
-      const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxzaWJ6ZmxhYXF6dnR6amx2cnh3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxOTE0NTQsImV4cCI6MjA3OTc2NzQ1NH0.8NzMek4d-XzysR4OiUXKLJ7APgiiio-6X35RG4XMKX4";
+      const supabaseUrl     = process.env.EXPO_PUBLIC_SUPABASE_URL     ?? "https://lsibzflaaqzvtzjlvrxw.supabase.co";
+      const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
+
+      // Use the user's JWT so the Edge Function can verify identity.
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      const bearerToken = currentSession?.access_token ?? supabaseAnonKey;
+
       const res = await fetch(`${supabaseUrl}/functions/v1/create-checkout`, {
         method: "POST",
         headers: {
           "Content-Type":  "application/json",
           "apikey":        supabaseAnonKey,
-          "Authorization": `Bearer ${supabaseAnonKey}`,
+          "Authorization": `Bearer ${bearerToken}`,
         },
         body: JSON.stringify({
-          plan:   selected,
-          userId: user.id,
+          plan:       selected,
+          userId:     user.id,
+          successUrl: `${process.env.EXPO_PUBLIC_APP_ORIGIN || `https://${process.env.EXPO_PUBLIC_EXPO_DOMAIN}`}/post-purchase`,
+          cancelUrl:  `${process.env.EXPO_PUBLIC_APP_ORIGIN || `https://${process.env.EXPO_PUBLIC_EXPO_DOMAIN}`}/subscription`,
         }),
       });
 
       const data = await res.json();
 
       if (data.url) {
-        if (typeof window !== "undefined") {
+        // On native, typeof window is "object" (RN has a window global) but
+        // window.location is undefined — always use Linking.openURL on native.
+        if (Platform.OS === "web") {
           window.location.href = data.url;
         } else {
-          Linking.openURL(data.url);
+          await Linking.openURL(data.url);
         }
       } else {
-        setErrorMsg(data.error || "Erro ao iniciar pagamento");
+        console.error("Checkout error response:", data);
+        setErrorMsg(data.error || "Erro ao iniciar pagamento. Tente novamente.");
       }
     } catch (err: any) {
       console.error("Checkout fetch error:", err);
-      setErrorMsg(err?.message ?? String(err));
+      setErrorMsg(err?.message ?? "Erro de conexão. Verifique sua internet.");
     } finally {
       setLoading(false);
     }

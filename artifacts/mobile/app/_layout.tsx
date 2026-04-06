@@ -47,7 +47,8 @@ function RootLayoutNav() {
           animation: "none",
         }}
       >
-        <Stack.Screen name="(tabs)" options={{ headerShown: false, contentStyle: { backgroundColor: "#000000" } }} />
+        <Stack.Screen name="(tabs)"          options={{ headerShown: false, contentStyle: { backgroundColor: "#000000" } }} />
+        <Stack.Screen name="auth/callback"   options={{ headerShown: false, contentStyle: { backgroundColor: "#000000" }, animation: "fade" }} />
       </Stack>
     </ThemeProvider>
   );
