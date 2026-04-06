@@ -374,7 +374,7 @@ export default function HomeScreen() {
                   nome={r.nome}
                   bairro={r.bairro ?? "Rio de Janeiro"}
                   categoria={r.categoria ?? "Restaurante"}
-                  image={r.resolvedPhotoUri ? { uri: r.resolvedPhotoUri } : require("../../assets/images/hero-rio.png")}
+                  image={r.resolvedPhotoUri ? { uri: r.resolvedPhotoUri } : null}
                   onPress={() => router.push({
                     pathname: "/lugar/[cityId]/[placeId]",
                     params: { cityId: "rio", placeId: String(r.id), source_table: "restaurantes" },

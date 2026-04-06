@@ -10,7 +10,6 @@ import { supabase } from "@/lib/supabase";
 import type { LugarPlace } from "@/data/lugares";
 import { resolvePin } from "@/data/lugares";
 import { getImageForEntity } from "@/utils/getImageForEntity";
-import { fetchWikipediaImage } from "@/utils/fetchWikipediaImage";
 
 type State = {
   lugares: LugarPlace[];
@@ -66,22 +65,6 @@ export function useOQueFazer(): State {
 
       setLugares(initial);
       setLoading(false);
-
-      // ── Phase 2: Enrich photos from Wikipedia in background ─────────────
-      const needsWiki = rows.filter((r) => !(r as any).photo_url);
-      for (const row of needsWiki) {
-        if (cancelled) break;
-        const wikiUrl = await fetchWikipediaImage(row.nome ?? "", "Rio de Janeiro");
-        if (!wikiUrl || cancelled) continue;
-
-        setLugares((prev) =>
-          prev.map((p) =>
-            p.id === String(row.id)
-              ? { ...p, image: { uri: wikiUrl } as ImageSourcePropType }
-              : p,
-          ),
-        );
-      }
     }
 
     load();

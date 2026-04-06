@@ -40,61 +40,6 @@ function cacheKey(type: EntityType, name: string, localizacao = ""): string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Curated entity web images (NATIVE ONLY — tier 2)
-// Wikipedia Commons Special:FilePath links — deterministic, permanent URLs.
-// Skipped on Expo web (CORS failures make images blank, which is worse than
-// the local neighborhood image fallback).
-// ─────────────────────────────────────────────────────────────────────────────
-
-const RESTAURANT_WEB_IMAGES: Record<string, string> = {
-  "confeitaria colombo":
-    "https://commons.wikimedia.org/wiki/Special:FilePath/Confeitaria_Colombo_Rio_de_Janeiro.jpg",
-  "oro restaurant":
-    "https://commons.wikimedia.org/wiki/Special:FilePath/Ipanema_from_Arpoador.jpg",
-  "beco das sardinhas":
-    "https://commons.wikimedia.org/wiki/Special:FilePath/Arcos_da_Lapa_-_Rio_de_Janeiro.jpg",
-  "cobri":
-    "https://commons.wikimedia.org/wiki/Special:FilePath/Arcos_da_Lapa_-_Rio_de_Janeiro.jpg",
-  "banzeiro":
-    "https://commons.wikimedia.org/wiki/Special:FilePath/Pao_de_Acucar_-_Rio_de_Janeiro_-_Brasil.jpg",
-  "laguna":
-    "https://commons.wikimedia.org/wiki/Special:FilePath/Lagoa_Rodrigo_de_Freitas_-_Rio_de_Janeiro%2C_Brazil.jpg",
-  "laguna restaurante":
-    "https://commons.wikimedia.org/wiki/Special:FilePath/Lagoa_Rodrigo_de_Freitas_-_Rio_de_Janeiro%2C_Brazil.jpg",
-  "ilha da gigóia":
-    "https://commons.wikimedia.org/wiki/Special:FilePath/Lagoa_Rodrigo_de_Freitas_-_Rio_de_Janeiro%2C_Brazil.jpg",
-  "ilha da gigoia":
-    "https://commons.wikimedia.org/wiki/Special:FilePath/Lagoa_Rodrigo_de_Freitas_-_Rio_de_Janeiro%2C_Brazil.jpg",
-  "almoçar no laguna restaurante na ilha da gigóia":
-    "https://commons.wikimedia.org/wiki/Special:FilePath/Lagoa_Rodrigo_de_Freitas_-_Rio_de_Janeiro%2C_Brazil.jpg",
-  "almocar no laguna restaurante na ilha da gigoia":
-    "https://commons.wikimedia.org/wiki/Special:FilePath/Lagoa_Rodrigo_de_Freitas_-_Rio_de_Janeiro%2C_Brazil.jpg",
-};
-
-const HOTEL_WEB_IMAGES: Record<string, string> = {
-  "copacabana palace":
-    "https://commons.wikimedia.org/wiki/Special:FilePath/Copacabana_Palace_Hotel.jpg",
-  "santa teresa hotel":
-    "https://commons.wikimedia.org/wiki/Special:FilePath/Santa_Teresa_Rio_de_Janeiro_Brasil.jpg",
-  "hotel santa teresa":
-    "https://commons.wikimedia.org/wiki/Special:FilePath/Santa_Teresa_Rio_de_Janeiro_Brasil.jpg",
-  "santa teresa hotel mgallery":
-    "https://commons.wikimedia.org/wiki/Special:FilePath/Santa_Teresa_Rio_de_Janeiro_Brasil.jpg",
-  "fasano rio de janeiro":
-    "https://commons.wikimedia.org/wiki/Special:FilePath/Ipanema_from_Arpoador.jpg",
-  "hotel fasano rio de janeiro":
-    "https://commons.wikimedia.org/wiki/Special:FilePath/Ipanema_from_Arpoador.jpg",
-  "fasano":
-    "https://commons.wikimedia.org/wiki/Special:FilePath/Ipanema_from_Arpoador.jpg",
-  "mama ruisa":
-    "https://commons.wikimedia.org/wiki/Special:FilePath/Santa_Teresa_Rio_de_Janeiro_Brasil.jpg",
-  "yoo2 rio de janeiro":
-    "https://commons.wikimedia.org/wiki/Special:FilePath/Botafogo_Cove_from_Morro_do_Pasmado.jpg",
-  "yoo2":
-    "https://commons.wikimedia.org/wiki/Special:FilePath/Botafogo_Cove_from_Morro_do_Pasmado.jpg",
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Curated activity images (NATIVE ONLY — tier 2)
 // Priority over neighborhood fallback — geographically precise.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -234,23 +179,14 @@ function _resolve(
     case "neighborhood":
       return getNeighborhoodImage(name);
 
-    case "restaurant": {
-      // On native: try curated Wikipedia Commons URL first
-      if (isNative) {
-        const uri = RESTAURANT_WEB_IMAGES[nameLower];
-        if (uri) return { uri };
-      }
-      // Web + native fallback: neighborhood local/web image
+    case "restaurant":
+      // No Supabase photo: show neighborhood image — clearly a placeholder,
+      // never another restaurant's photo.
       return getNeighborhoodImage(loc || name);
-    }
 
-    case "hotel": {
-      if (isNative) {
-        const uri = HOTEL_WEB_IMAGES[nameLower];
-        if (uri) return { uri };
-      }
+    case "hotel":
+      // No Supabase photo: show neighborhood image.
       return getNeighborhoodImage(loc || name);
-    }
 
     case "city": {
       if (isNative) {

@@ -21,7 +21,7 @@ interface RestauranteCardProps {
   nome: string;
   bairro: string;
   categoria: string;
-  image: ImageSourcePropType;
+  image: ImageSourcePropType | null;
   onPress?: () => void;
 }
 
@@ -34,7 +34,9 @@ export function RestauranteCard({ id, nome, bairro, categoria, image, onPress }:
         pressed && { opacity: 0.92, transform: [{ scale: 0.97 }] },
       ]}
     >
-      <Image source={image} style={styles.image} resizeMode="cover" />
+      {image != null && (
+        <Image source={image} style={styles.image} resizeMode="cover" />
+      )}
       <LinearGradient
         colors={["transparent", "rgba(0,0,0,0.78)"]}
         style={styles.gradient}
@@ -47,7 +49,7 @@ export function RestauranteCard({ id, nome, bairro, categoria, image, onPress }:
         </Text>
         <Text style={styles.bairro}>{bairro}</Text>
       </View>
-      {id && (
+      {id && image != null && (
         <View style={styles.bookmark}>
           <BookmarkButton
             item={{ id, titulo: nome, localizacao: bairro, image, categoria: "restaurante" }}
