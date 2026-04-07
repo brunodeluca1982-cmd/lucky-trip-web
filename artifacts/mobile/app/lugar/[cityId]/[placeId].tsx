@@ -240,6 +240,43 @@ function useSupabaseLugar(
               booking_url: (data as any).reserve_url ?? null,
             };
           }
+        } else if (effectiveTable === "friend_guide_places") {
+          const { data, error: err } = await supabase
+            .from("friend_guide_places")
+            .select("id, nome, bairro, categoria, meu_olhar, photo_url, google_maps_url, instagram_handle, website_url, reserve_url")
+            .eq("id", placeId)
+            .maybeSingle();
+          if (err) console.warn("[useSupabaseLugar] friend_guide_places error:", err.message);
+          if (data) {
+            const bairro    = (data as any).bairro as string | null ?? "Rio de Janeiro";
+            const pin       = resolvePin("rio", bairro, 0);
+            const photoUri  = (data as any).photo_url as string | null ?? null;
+            const meuOlhar  = (data as any).meu_olhar as string | null;
+            const catRaw    = (data as any).categoria as string | null;
+            const descricao = meuOlhar ?? "Um dos lugares desta curadoria especial no Rio de Janeiro.";
+            const entityType =
+              catRaw === "hotel"       ? "hotel"      :
+              catRaw === "restaurante" ? "restaurant" :
+              "activity";
+            const tipoItem =
+              catRaw === "hotel"       ? "hotel"       :
+              catRaw === "restaurante" ? "restaurante"  :
+              "experiencia";
+            resolved = {
+              id:               String((data as any).id),
+              titulo:           (data as any).nome ?? "Lugar",
+              localizacao:      bairro,
+              categoria:        catRaw?.toUpperCase() ?? "LUGAR",
+              descricao,
+              image:            getImageForEntity(entityType, (data as any).nome ?? "", bairro, photoUri),
+              xPct:             pin.xPct,
+              yPct:             pin.yPct,
+              tipo_item:        tipoItem,
+              google_maps_url:  (data as any).google_maps_url ?? null,
+              instagram_handle: (data as any).instagram_handle ?? null,
+              booking_url:      (data as any).reserve_url ?? (data as any).website_url ?? null,
+            };
+          }
         }
 
         console.log("[useSupabaseLugar] resolved", resolved ? resolved.id : "null");
