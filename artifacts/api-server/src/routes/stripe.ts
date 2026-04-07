@@ -59,9 +59,10 @@ function requireAuth(
 
 // ── Price resolution ──────────────────────────────────────────────────────────
 // Priority:
-//   1. STRIPE_PRICE_ID (single env var — used for live account)
-//   2. plan name → STRIPE_PRICE_ID_<PLAN> legacy env vars
-//   3. DB lookup
+//   1. Explicit price_... ID (passed directly by caller)
+//   2. Plan-specific env var: STRIPE_PRICE_ID_ANNUAL / MONTHLY / WEEKLY
+//   3. DB lookup by billing interval (year/month/week) — reflects Stripe catalogue
+//   4. STRIPE_PRICE_ID env var (single catch-all fallback for unknown plans)
 
 const PLAN_TO_INTERVAL: Record<string, string> = {
   annual:  "year",
