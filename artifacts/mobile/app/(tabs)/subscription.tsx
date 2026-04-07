@@ -81,25 +81,31 @@ export default function SubscriptionScreen() {
     setErrorMsg(null);
     setLoading(true);
     try {
-      const supabaseUrl     = process.env.EXPO_PUBLIC_SUPABASE_URL     ?? "https://lsibzflaaqzvtzjlvrxw.supabase.co";
-      const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
-
-      // Use the user's JWT so the Edge Function can verify identity.
+      // Get JWT to authenticate with the API server
       const { data: { session: currentSession } } = await supabase.auth.getSession();
-      const bearerToken = currentSession?.access_token ?? supabaseAnonKey;
+      if (!currentSession?.access_token) {
+        setErrorMsg("Sessão expirada. Faça login novamente.");
+        setLoading(false);
+        return;
+      }
 
-      const res = await fetch(`${supabaseUrl}/functions/v1/create-checkout`, {
+      // Base URL for the API server (proxied through the same Replit domain)
+      const apiBase = process.env.EXPO_PUBLIC_APP_ORIGIN
+        ?? (process.env.EXPO_PUBLIC_DOMAIN ? `https://${process.env.EXPO_PUBLIC_DOMAIN}` : "");
+
+      const appOrigin = process.env.EXPO_PUBLIC_APP_ORIGIN
+        ?? (process.env.EXPO_PUBLIC_EXPO_DOMAIN ? `https://${process.env.EXPO_PUBLIC_EXPO_DOMAIN}` : "");
+
+      const res = await fetch(`${apiBase}/api/stripe/checkout`, {
         method: "POST",
         headers: {
           "Content-Type":  "application/json",
-          "apikey":        supabaseAnonKey,
-          "Authorization": `Bearer ${bearerToken}`,
+          "Authorization": `Bearer ${currentSession.access_token}`,
         },
         body: JSON.stringify({
-          plan:       selected,
-          userId:     user.id,
-          successUrl: `${process.env.EXPO_PUBLIC_APP_ORIGIN || `https://${process.env.EXPO_PUBLIC_EXPO_DOMAIN}`}/post-purchase`,
-          cancelUrl:  `${process.env.EXPO_PUBLIC_APP_ORIGIN || `https://${process.env.EXPO_PUBLIC_EXPO_DOMAIN}`}/subscription`,
+          plan:        selected,
+          success_url: `${appOrigin}/post-purchase?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url:  `${appOrigin}/subscription`,
         }),
       });
 

@@ -162,7 +162,7 @@ interface GuiaContextType {
   viagem: Viagem;
   /** Derived: one ViagemItem per saved place */
   viagemItens: ViagemItem[];
-  /** Premium status (authoritative from Supabase access_levels via authenticated user.id) */
+  /** Premium status (authoritative from Supabase app_metadata — admin-only write via webhook) */
   isPremium: boolean;
   /** Authenticated Supabase user (null if not logged in) */
   user: User | null;
@@ -226,7 +226,9 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // ── Load premium status — uses authenticated user.id (authoritative) ────────
+  // ── Load premium status — reads from Supabase app_metadata (admin-only write) ──
+  // app_metadata.plan_type is written exclusively by the server webhook handler
+  // using the service role key — it cannot be spoofed by the client.
   useEffect(() => {
     (async () => {
       // Fast-path: AsyncStorage cache
@@ -235,24 +237,20 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
         setIsPremium(true);
       }
 
-      // Authoritative check: Supabase access_levels using auth user.id
       if (!user) {
-        // Not logged in — clear any stale premium cache
         setIsPremium(false);
         await AsyncStorage.removeItem(PREMIUM_KEY);
         return;
       }
 
       try {
-        const { data } = await supabase
-          .from("access_levels")
-          .select("plan_type, access_until")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        const validPlan = data?.plan_type === "premium" || data?.plan_type === "vip";
-        const notExpired = data?.access_until
-          ? new Date(data.access_until) > new Date()
+        // supabase.auth.getUser() fetches fresh data from the Supabase Auth API,
+        // returning the latest app_metadata (not the stale JWT-decoded value).
+        const { data: { user: freshUser } } = await supabase.auth.getUser();
+        const metadata  = freshUser?.app_metadata as Record<string, any> | undefined;
+        const validPlan = metadata?.plan_type === "premium" || metadata?.plan_type === "vip";
+        const notExpired = metadata?.access_until
+          ? new Date(metadata.access_until) > new Date()
           : false;
 
         if (validPlan && notExpired) {

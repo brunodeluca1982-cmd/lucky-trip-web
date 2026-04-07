@@ -83,13 +83,10 @@ export default function LuckyScreen() {
         return;
       }
 
-      // Fetch both premium status and usage count from Supabase in parallel
+      // Fetch premium status (from Supabase app_metadata) and usage count in parallel.
+      // app_metadata is admin-only writeable — safe to trust for premium gating.
       const [premiumResult, usageResult] = await Promise.allSettled([
-        supabase
-          .from("access_levels")
-          .select("plan_type, access_until")
-          .eq("user_id", id)
-          .maybeSingle(),
+        supabase.auth.getUser(),
         supabase
           .from("lucky_usage")
           .select("question_count")
@@ -97,11 +94,12 @@ export default function LuckyScreen() {
           .maybeSingle(),
       ]);
 
-      // Premium check: plan_type must be premium/vip and access_until in future
+      // Premium check: read app_metadata set by the webhook handler
       if (premiumResult.status === "fulfilled") {
-        const d = premiumResult.value.data;
-        const validPlan = d?.plan_type === "premium" || d?.plan_type === "vip";
-        if (validPlan && d?.access_until && new Date(d.access_until) > new Date()) {
+        const meta = premiumResult.value.data?.user?.app_metadata as Record<string, any> | undefined;
+        const validPlan  = meta?.plan_type === "premium" || meta?.plan_type === "vip";
+        const notExpired = meta?.access_until ? new Date(meta.access_until) > new Date() : false;
+        if (validPlan && notExpired) {
           setIsPremium(true);
           await AsyncStorage.setItem(IS_PREMIUM_KEY, "true");
         }

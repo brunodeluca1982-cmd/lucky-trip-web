@@ -32,7 +32,7 @@ app.use(cors());
 
 // ── Stripe webhook — MUST be registered BEFORE express.json() ────────────────
 // Stripe requires the raw body Buffer for signature verification.
-// Using express.raw() here only for this path; all other routes use express.json().
+// express.raw() is used ONLY for this route; all others get express.json().
 app.post(
   "/api/stripe/webhook",
   express.raw({ type: "application/json" }),
@@ -44,29 +44,44 @@ app.post(
       return res.status(400).json({ error: "Missing stripe-signature header" });
     }
 
-    // 1. Let stripe-replit-sync process + sync the event to the stripe schema
+    // Load webhook secret from DB (managed webhook secret stored in stripe._managed_webhooks)
+    const webhookSecret = await storage.getWebhookSecret();
+
+    if (!webhookSecret) {
+      logger.error(
+        "No webhook secret found in stripe._managed_webhooks — " +
+        "set STRIPE_WEBHOOK_SECRET env var or ensure the managed webhook is registered"
+      );
+      // Return 200 to avoid Stripe retrying; log for manual investigation
+      return res.json({ received: true, warning: "no_webhook_secret" });
+    }
+
+    // 1. Verify signature + parse event
+    let event: any;
+    try {
+      const stripe = await getUncachableStripeClient();
+      event = stripe.webhooks.constructEvent(req.body as Buffer, sig, webhookSecret);
+    } catch (err: any) {
+      logger.error({ err }, "Stripe webhook signature verification failed");
+      return res.status(400).json({ error: `Webhook signature error: ${err.message}` });
+    }
+
+    // 2. Respond 200 immediately — Stripe requires a fast response
+    res.json({ received: true });
+
+    // 3. Sync to stripe schema (stripe-replit-sync)
     try {
       await WebhookHandlers.processWebhook(req.body as Buffer, sig);
     } catch (err: any) {
-      logger.error({ err }, "stripe-replit-sync processWebhook failed");
-      return res.status(400).json({ error: "Webhook processing failed" });
+      logger.error({ err }, "stripe-replit-sync processWebhook failed (non-fatal after 200)");
     }
 
-    // 2. Business logic: update user_subscriptions based on the event
-    const webhookSecret = process.env["STRIPE_WEBHOOK_SECRET"];
-    if (webhookSecret) {
-      try {
-        const stripe = await getUncachableStripeClient();
-        const event = stripe.webhooks.constructEvent(req.body as Buffer, sig, webhookSecret);
-
-        await handleSubscriptionWebhook(event);
-      } catch (err: any) {
-        // Non-fatal: log but still return 200 so Stripe doesn't retry
-        logger.error({ err }, "Subscription webhook business-logic handler failed");
-      }
+    // 4. Business logic: update user_subscriptions + Supabase app_metadata
+    try {
+      await handleSubscriptionWebhook(event);
+    } catch (err: any) {
+      logger.error({ err }, "handleSubscriptionWebhook failed");
     }
-
-    res.json({ received: true });
   }
 );
 
@@ -82,6 +97,7 @@ export default app;
 
 async function handleSubscriptionWebhook(event: any) {
   switch (event.type) {
+
     case "checkout.session.completed": {
       const session = event.data.object;
       if (session.mode !== "subscription") break;
@@ -89,15 +105,26 @@ async function handleSubscriptionWebhook(event: any) {
       const customerId     = session.customer as string;
       const subscriptionId = session.subscription as string;
 
-      // Find user by Stripe customer ID and update their subscription record
       const sub = await storage.getSubscriptionByCustomerId(customerId);
-      if (sub) {
-        await storage.upsertUserSubscription(sub.user_id, {
-          stripe_subscription_id: subscriptionId,
-          subscription_status:    "active",
-        });
-        logger.info({ userId: sub.user_id, subscriptionId }, "Subscription activated via checkout");
+      if (!sub) {
+        logger.warn({ customerId }, "checkout.session.completed: no user_subscription found for customer");
+        break;
       }
+
+      // Fetch full subscription from Stripe to get period_end
+      const stripe = await getUncachableStripeClient();
+      const stripeSubscription = await stripe.subscriptions.retrieve(subscriptionId);
+      const periodEndMs = stripeSubscription.current_period_end * 1000;
+      const interval    = stripeSubscription.items.data[0]?.price?.recurring?.interval;
+
+      await storage.upsertUserSubscription(sub.user_id, {
+        stripe_subscription_id: subscriptionId,
+        subscription_status:    stripeSubscription.status,
+        plan_type:              interval ?? null,
+      });
+
+      await storage.provisionPremiumInSupabase(sub.user_id, periodEndMs, interval);
+      logger.info({ userId: sub.user_id, subscriptionId }, "Premium provisioned via checkout");
       break;
     }
 
@@ -105,17 +132,23 @@ async function handleSubscriptionWebhook(event: any) {
       const subscription = event.data.object;
       const customerId   = subscription.customer as string;
       const sub          = await storage.getSubscriptionByCustomerId(customerId);
+      if (!sub) break;
 
-      if (sub) {
-        await storage.upsertUserSubscription(sub.user_id, {
-          stripe_subscription_id: subscription.id,
-          subscription_status:    subscription.status,
-          plan_type:              subscription.items?.data?.[0]?.price?.recurring?.interval ?? null,
-        });
-        logger.info(
-          { userId: sub.user_id, status: subscription.status },
-          "Subscription status updated"
-        );
+      const interval     = subscription.items?.data?.[0]?.price?.recurring?.interval ?? null;
+      const periodEndMs  = (subscription.current_period_end ?? 0) * 1000;
+
+      await storage.upsertUserSubscription(sub.user_id, {
+        stripe_subscription_id: subscription.id,
+        subscription_status:    subscription.status,
+        plan_type:              interval,
+      });
+
+      if (subscription.status === "active") {
+        await storage.provisionPremiumInSupabase(sub.user_id, periodEndMs, interval ?? undefined);
+        logger.info({ userId: sub.user_id, status: subscription.status }, "Premium updated");
+      } else if (["canceled", "unpaid", "paused"].includes(subscription.status)) {
+        await storage.revokePremiumInSupabase(sub.user_id);
+        logger.info({ userId: sub.user_id, status: subscription.status }, "Premium revoked");
       }
       break;
     }
@@ -124,14 +157,35 @@ async function handleSubscriptionWebhook(event: any) {
       const subscription = event.data.object;
       const customerId   = subscription.customer as string;
       const sub          = await storage.getSubscriptionByCustomerId(customerId);
+      if (!sub) break;
 
-      if (sub) {
-        await storage.upsertUserSubscription(sub.user_id, {
-          stripe_subscription_id: subscription.id,
-          subscription_status:    "canceled",
-        });
-        logger.info({ userId: sub.user_id }, "Subscription canceled");
-      }
+      await storage.upsertUserSubscription(sub.user_id, {
+        stripe_subscription_id: subscription.id,
+        subscription_status:    "canceled",
+      });
+      await storage.revokePremiumInSupabase(sub.user_id);
+      logger.info({ userId: sub.user_id }, "Premium revoked — subscription canceled");
+      break;
+    }
+
+    case "invoice.paid": {
+      // Renewal — extend access_until
+      const invoice    = event.data.object;
+      const customerId = invoice.customer as string;
+      const sub        = await storage.getSubscriptionByCustomerId(customerId);
+      if (!sub || !invoice.subscription) break;
+
+      const stripe = await getUncachableStripeClient();
+      const stripeSubscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
+      const periodEndMs = stripeSubscription.current_period_end * 1000;
+      const interval    = stripeSubscription.items.data[0]?.price?.recurring?.interval;
+
+      await storage.upsertUserSubscription(sub.user_id, {
+        subscription_status: "active",
+        plan_type:           interval ?? null,
+      });
+      await storage.provisionPremiumInSupabase(sub.user_id, periodEndMs, interval);
+      logger.info({ userId: sub.user_id }, "Premium renewed via invoice.paid");
       break;
     }
 
@@ -139,18 +193,17 @@ async function handleSubscriptionWebhook(event: any) {
       const invoice    = event.data.object;
       const customerId = invoice.customer as string;
       const sub        = await storage.getSubscriptionByCustomerId(customerId);
+      if (!sub) break;
 
-      if (sub) {
-        await storage.upsertUserSubscription(sub.user_id, {
-          subscription_status: "past_due",
-        });
-        logger.info({ userId: sub.user_id }, "Invoice payment failed — marked past_due");
-      }
+      await storage.upsertUserSubscription(sub.user_id, {
+        subscription_status: "past_due",
+      });
+      // Don't revoke immediately — Stripe will retry; revoke on subscription.deleted
+      logger.info({ userId: sub.user_id }, "Invoice payment failed — marked past_due");
       break;
     }
 
     default:
-      // Unhandled event type — not an error
       break;
   }
 }

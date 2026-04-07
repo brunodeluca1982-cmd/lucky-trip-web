@@ -3,8 +3,11 @@
  *
  * All data goes through Replit PostgreSQL (no Supabase DDL needed):
  *
- *   stripe.*            — synced by stripe-replit-sync (read-only)
+ *   stripe.*                  — synced by stripe-replit-sync (read-only)
  *   public.user_subscriptions — user ↔ Stripe customer/subscription mapping (read-write)
+ *
+ * Supabase app_metadata is written via the admin API for premium provisioning.
+ * app_metadata is admin-only writeable (not spoofable by the client).
  *
  * Drizzle ORM via @workspace/db.
  */
@@ -12,10 +15,42 @@
 import { eq, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { userSubscriptionsTable, type UserSubscription } from "@workspace/db/schema";
+import { createClient } from "@supabase/supabase-js";
 
 export type { UserSubscription };
 
+// ── Supabase admin client ────────────────────────────────────────────────────
+
+function makeSupabaseAdmin() {
+  const url = process.env["SUPABASE_URL"];
+  const key = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+  if (!url || !key) throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set");
+  return createClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
+// ── Storage class ─────────────────────────────────────────────────────────────
+
 export class Storage {
+
+  // ── Webhook secret (cached from stripe._managed_webhooks) ────────────────
+
+  private _webhookSecret: string | null = null;
+
+  async getWebhookSecret(): Promise<string | null> {
+    if (this._webhookSecret) return this._webhookSecret;
+    try {
+      const result = await db.execute(
+        sql`SELECT secret FROM stripe._managed_webhooks LIMIT 1`
+      );
+      const secret = result.rows[0]?.secret as string | null;
+      if (secret) this._webhookSecret = secret;
+      return secret ?? null;
+    } catch {
+      return null;
+    }
+  }
 
   // ── Stripe schema reads (stripe-replit-sync, read-only) ──────────────────
 
@@ -69,6 +104,21 @@ export class Storage {
     return result.rows[0] ?? null;
   }
 
+  /**
+   * Look up first active recurring price matching a billing interval.
+   * interval: "year" | "month" | "week"
+   */
+  async getPriceByInterval(interval: string): Promise<{ id: string } | null> {
+    const result = await db.execute(sql`
+      SELECT id FROM stripe.prices
+      WHERE active = true
+        AND (recurring::jsonb->>'interval') = ${interval}
+      ORDER BY created DESC
+      LIMIT 1
+    `);
+    return (result.rows[0] as { id: string } | null) ?? null;
+  }
+
   async getSubscriptionFromStripe(subscriptionId: string) {
     const result = await db.execute(
       sql`SELECT * FROM stripe.subscriptions WHERE id = ${subscriptionId}`
@@ -116,6 +166,46 @@ export class Storage {
       .where(eq(userSubscriptionsTable.stripe_customer_id, stripeCustomerId))
       .limit(1);
     return rows[0] ?? null;
+  }
+
+  // ── Supabase app_metadata (premium provisioning) ──────────────────────────
+  // app_metadata is admin-only — cannot be set by the client, so it's tamper-proof.
+
+  /**
+   * Grant premium in Supabase app_metadata.
+   * @param userId  Supabase auth user ID
+   * @param accessUntilMs  Unix timestamp (ms) of subscription end date
+   * @param interval  Stripe billing interval ("year" | "month" | "week")
+   */
+  async provisionPremiumInSupabase(
+    userId: string,
+    accessUntilMs: number,
+    interval?: string,
+  ): Promise<void> {
+    const sb = makeSupabaseAdmin();
+    const { error } = await sb.auth.admin.updateUserById(userId, {
+      app_metadata: {
+        plan_type:    "premium",
+        access_until: new Date(accessUntilMs).toISOString(),
+        plan_interval: interval ?? null,
+      },
+    });
+    if (error) throw new Error(`provisionPremiumInSupabase: ${error.message}`);
+  }
+
+  /**
+   * Revoke premium in Supabase app_metadata.
+   */
+  async revokePremiumInSupabase(userId: string): Promise<void> {
+    const sb = makeSupabaseAdmin();
+    const { error } = await sb.auth.admin.updateUserById(userId, {
+      app_metadata: {
+        plan_type:    null,
+        access_until: null,
+        plan_interval: null,
+      },
+    });
+    if (error) throw new Error(`revokePremiumInSupabase: ${error.message}`);
   }
 }
 
