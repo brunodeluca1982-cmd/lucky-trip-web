@@ -1,0 +1,58 @@
+import { getUncachableStripeClient } from "./stripeClient.js";
+
+/**
+ * StripeService — thin wrapper around the Stripe API for write operations.
+ * Read operations use the PostgreSQL stripe schema via storage.ts.
+ */
+export class StripeService {
+  async createCustomer(email: string, userId: string) {
+    const stripe = await getUncachableStripeClient();
+    return stripe.customers.create({ email, metadata: { userId } });
+  }
+
+  async createCheckoutSession(
+    customerId: string,
+    priceId: string,
+    successUrl: string,
+    cancelUrl: string,
+    customerEmail?: string,
+  ) {
+    const stripe = await getUncachableStripeClient();
+    return stripe.checkout.sessions.create({
+      customer: customerId,
+      payment_method_types: ["card"],
+      line_items: [{ price: priceId, quantity: 1 }],
+      mode: "subscription",
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      ...(customerEmail && !customerId ? { customer_email: customerEmail } : {}),
+    });
+  }
+
+  async createCheckoutSessionForNewCustomer(
+    email: string,
+    priceId: string,
+    successUrl: string,
+    cancelUrl: string,
+  ) {
+    const stripe = await getUncachableStripeClient();
+    return stripe.checkout.sessions.create({
+      customer_email: email,
+      payment_method_types: ["card"],
+      line_items: [{ price: priceId, quantity: 1 }],
+      mode: "subscription",
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+    });
+  }
+
+  async createCustomerPortalSession(customerId: string, returnUrl: string) {
+    const stripe = await getUncachableStripeClient();
+    return stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: returnUrl,
+    });
+  }
+}
+
+export const stripeService = new StripeService();
