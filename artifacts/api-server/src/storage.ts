@@ -116,9 +116,20 @@ export class Storage {
   /**
    * Look up first active recurring price matching a billing interval.
    * interval: "year" | "month" | "week"
-   * If STRIPE_PRODUCT_ID is set, restricts to prices under that product only.
+   * Checks STRIPE_PRICE_ID_ANNUAL / MONTHLY / WEEKLY env vars first,
+   * then falls back to DB lookup (optionally filtered by STRIPE_PRODUCT_ID).
    */
   async getPriceByInterval(interval: string): Promise<{ id: string } | null> {
+    const envKey =
+      interval === "year"
+        ? process.env["STRIPE_PRICE_ID_ANNUAL"]
+        : interval === "month"
+        ? process.env["STRIPE_PRICE_ID_MONTHLY"]
+        : interval === "week"
+        ? process.env["STRIPE_PRICE_ID_WEEKLY"]
+        : undefined;
+    if (envKey) return { id: envKey };
+
     const productId = process.env["STRIPE_PRODUCT_ID"] ?? null;
     const result = productId
       ? await db.execute(sql`
