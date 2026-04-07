@@ -33,3 +33,4 @@ channel = "stable-25_05"
 
 [userenv.shared]
 STRIPE_PRICE_ID = "price_1TJYjpGqZMbebHIjLdoi6H1b"
+STRIPE_FORCE_SANDBOX = "true"
