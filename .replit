@@ -28,3 +28,9 @@ timeoutMs = 20000
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+STRIPE_PUBLISHABLE_KEY = "pk_live_51SUd9wJ2w2OK6FGMFZamAXZR5tTy5oLhcJ8JUEkzOrynbyUJRr6j1Dd4UyUiMN9RbEE4jbvT0m9BrAK7aOYTBeRX00LgC9Z3yG"
+STRIPE_PRODUCT_ID = "prod_U7n9q0p7VbaRfP"

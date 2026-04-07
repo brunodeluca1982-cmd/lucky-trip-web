@@ -13,9 +13,19 @@ import Stripe from "stripe";
 import { StripeSync } from "stripe-replit-sync";
 import { logger } from "./lib/logger.js";
 
-// ── Replit Connector credential fetch ────────────────────────────────────────
+// ── Credential resolution ─────────────────────────────────────────────────────
+// Priority: STRIPE_SECRET_KEY / STRIPE_PUBLISHABLE_KEY env vars (user-supplied live keys)
+//           → Replit Connector sandbox (fallback for development/testing)
 
 async function getCredentials(): Promise<{ publishableKey: string; secretKey: string }> {
+  // If the user supplied their own Stripe keys via env vars, use them directly
+  const envSecret      = process.env["STRIPE_SECRET_KEY"];
+  const envPublishable = process.env["STRIPE_PUBLISHABLE_KEY"];
+  if (envSecret && envPublishable) {
+    return { publishableKey: envPublishable, secretKey: envSecret };
+  }
+
+  // Fall back to Replit Connectors API (sandbox / test mode)
   const hostname = process.env["REPLIT_CONNECTORS_HOSTNAME"];
   const xReplitToken = process.env["REPL_IDENTITY"]
     ? "repl " + process.env["REPL_IDENTITY"]

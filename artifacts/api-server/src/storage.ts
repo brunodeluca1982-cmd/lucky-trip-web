@@ -107,15 +107,26 @@ export class Storage {
   /**
    * Look up first active recurring price matching a billing interval.
    * interval: "year" | "month" | "week"
+   * If STRIPE_PRODUCT_ID is set, restricts to prices under that product only.
    */
   async getPriceByInterval(interval: string): Promise<{ id: string } | null> {
-    const result = await db.execute(sql`
-      SELECT id FROM stripe.prices
-      WHERE active = true
-        AND (recurring::jsonb->>'interval') = ${interval}
-      ORDER BY created DESC
-      LIMIT 1
-    `);
+    const productId = process.env["STRIPE_PRODUCT_ID"] ?? null;
+    const result = productId
+      ? await db.execute(sql`
+          SELECT id FROM stripe.prices
+          WHERE active = true
+            AND product = ${productId}
+            AND (recurring::jsonb->>'interval') = ${interval}
+          ORDER BY created DESC
+          LIMIT 1
+        `)
+      : await db.execute(sql`
+          SELECT id FROM stripe.prices
+          WHERE active = true
+            AND (recurring::jsonb->>'interval') = ${interval}
+          ORDER BY created DESC
+          LIMIT 1
+        `);
     return (result.rows[0] as { id: string } | null) ?? null;
   }
 
