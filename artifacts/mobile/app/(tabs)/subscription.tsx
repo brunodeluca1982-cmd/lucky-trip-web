@@ -91,10 +91,10 @@ export default function SubscriptionScreen() {
 
       // Base URL for the API server (proxied through the same Replit domain)
       const apiBase = process.env.EXPO_PUBLIC_APP_ORIGIN
-        ?? (process.env.EXPO_PUBLIC_DOMAIN ? `https://${process.env.EXPO_PUBLIC_DOMAIN}` : "");
+        || (process.env.EXPO_PUBLIC_DOMAIN ? `https://${process.env.EXPO_PUBLIC_DOMAIN}` : "");
 
       const appOrigin = process.env.EXPO_PUBLIC_APP_ORIGIN
-        ?? (process.env.EXPO_PUBLIC_EXPO_DOMAIN ? `https://${process.env.EXPO_PUBLIC_EXPO_DOMAIN}` : "");
+        || (process.env.EXPO_PUBLIC_EXPO_DOMAIN ? `https://${process.env.EXPO_PUBLIC_EXPO_DOMAIN}` : "");
 
       const res = await fetch(`${apiBase}/api/stripe/checkout`, {
         method: "POST",
