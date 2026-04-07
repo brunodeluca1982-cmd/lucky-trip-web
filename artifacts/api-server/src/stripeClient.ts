@@ -18,11 +18,15 @@ import { logger } from "./lib/logger.js";
 //           → Replit Connector sandbox (fallback for development/testing)
 
 async function getCredentials(): Promise<{ publishableKey: string; secretKey: string }> {
-  // If the user supplied their own Stripe keys via env vars, use them directly
+  // If the user supplied their own Stripe secret key, use it directly.
+  // The publishable key is only needed for the /publishable-key endpoint (returned to client).
+  // We don't require both — sk alone is sufficient for all server-side Stripe API calls.
   const envSecret      = process.env["STRIPE_SECRET_KEY"];
-  const envPublishable = process.env["STRIPE_PUBLISHABLE_KEY"];
-  if (envSecret && envPublishable) {
-    return { publishableKey: envPublishable, secretKey: envSecret };
+  const envPublishable = process.env["STRIPE_PUBLISHABLE_KEY"] ?? "";
+  if (envSecret) {
+    // Strip any non-ASCII characters from the publishable key (copy-paste corruption guard)
+    const cleanPk = envPublishable.replace(/[^\x20-\x7E]/g, "");
+    return { publishableKey: cleanPk, secretKey: envSecret };
   }
 
   // Fall back to Replit Connectors API (sandbox / test mode)
