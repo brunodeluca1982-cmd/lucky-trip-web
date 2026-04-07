@@ -32,5 +32,3 @@ channel = "stable-25_05"
 [userenv]
 
 [userenv.shared]
-STRIPE_PRICE_ID_ANNUAL = "price_1TJc67R3a6pYwmdVP8eavz6N"
-STRIPE_PRICE_ID_MONTHLY = "price_1TJc67R3a6pYwmdVd6o4wzM3"

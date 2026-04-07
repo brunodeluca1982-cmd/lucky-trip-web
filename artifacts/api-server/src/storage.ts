@@ -6,8 +6,10 @@
  *   stripe.*                  — synced by stripe-replit-sync (read-only)
  *   public.user_subscriptions — user ↔ Stripe customer/subscription mapping (read-write)
  *
- * Supabase app_metadata is written via the admin API for premium provisioning.
- * app_metadata is admin-only writeable (not spoofable by the client).
+ * Supabase writes:
+ *   - auth.users app_metadata (premium provisioning via admin API)
+ *   - public.subscriptions    (subscription state)
+ *   - public.access_levels    (access grants)
  *
  * Drizzle ORM via @workspace/db.
  */
@@ -34,21 +36,21 @@ function makeSupabaseAdmin() {
 
 export class Storage {
 
-  // ── Webhook secret (cached from stripe._managed_webhooks) ────────────────
+  // ── Webhook secret ───────────────────────────────────────────────────────
 
   private _webhookSecret: string | null = null;
 
   async getWebhookSecret(): Promise<string | null> {
     if (this._webhookSecret) return this._webhookSecret;
 
-    // Priority 1: user-supplied env var (works with live keys + manually registered webhooks)
+    // Priority 1: user-supplied env var
     const envSecret = process.env["STRIPE_WEBHOOK_SECRET"];
     if (envSecret) {
       this._webhookSecret = envSecret;
       return envSecret;
     }
 
-    // Priority 2: stripe-replit-sync managed webhook secret (sandbox/test connector)
+    // Priority 2: stripe-replit-sync managed webhook secret
     try {
       const result = await db.execute(
         sql`SELECT secret FROM stripe._managed_webhooks LIMIT 1`
@@ -113,23 +115,7 @@ export class Storage {
     return result.rows[0] ?? null;
   }
 
-  /**
-   * Look up first active recurring price matching a billing interval.
-   * interval: "year" | "month" | "week"
-   * Checks STRIPE_PRICE_ID_ANNUAL / MONTHLY / WEEKLY env vars first,
-   * then falls back to DB lookup (optionally filtered by STRIPE_PRODUCT_ID).
-   */
   async getPriceByInterval(interval: string): Promise<{ id: string } | null> {
-    const envKey =
-      interval === "year"
-        ? process.env["STRIPE_PRICE_ID_ANNUAL"]
-        : interval === "month"
-        ? process.env["STRIPE_PRICE_ID_MONTHLY"]
-        : interval === "week"
-        ? process.env["STRIPE_PRICE_ID_WEEKLY"]
-        : undefined;
-    if (envKey) return { id: envKey };
-
     const productId = process.env["STRIPE_PRODUCT_ID"] ?? null;
     const result = productId
       ? await db.execute(sql`
@@ -157,7 +143,7 @@ export class Storage {
     return result.rows[0] ?? null;
   }
 
-  // ── User subscription reads/writes (Drizzle) ─────────────────────────────
+  // ── User subscription reads/writes (Drizzle — Replit DB) ─────────────────
 
   async getUserSubscription(userId: string): Promise<UserSubscription | null> {
     const rows = await db
@@ -199,44 +185,142 @@ export class Storage {
     return rows[0] ?? null;
   }
 
+  // ── Supabase public.access_levels ─────────────────────────────────────────
+
+  async upsertSupabaseAccessLevel(
+    userId: string,
+    planType: string,
+    accessUntil: Date,
+  ): Promise<void> {
+    const sb = makeSupabaseAdmin();
+    const { error } = await sb
+      .from("access_levels")
+      .upsert(
+        {
+          user_id:      userId,
+          plan_type:    planType,
+          access_until: accessUntil.toISOString(),
+        },
+        { onConflict: "user_id" }
+      );
+    if (error) throw new Error(`upsertSupabaseAccessLevel: ${error.message}`);
+  }
+
+  async revokeSupabaseAccessLevel(userId: string): Promise<void> {
+    const sb = makeSupabaseAdmin();
+    const { error } = await sb
+      .from("access_levels")
+      .delete()
+      .eq("user_id", userId);
+    if (error) throw new Error(`revokeSupabaseAccessLevel: ${error.message}`);
+  }
+
+  // ── Supabase public.subscriptions ─────────────────────────────────────────
+
+  async upsertSupabaseSubscription(
+    userId: string,
+    data: {
+      stripe_customer_id?:     string;
+      stripe_subscription_id?: string;
+      status?:                 string;
+      current_period_end?:     Date;
+    }
+  ): Promise<void> {
+    const sb = makeSupabaseAdmin();
+    const payload: Record<string, any> = { user_id: userId };
+    if (data.stripe_customer_id)     payload["stripe_customer_id"]     = data.stripe_customer_id;
+    if (data.stripe_subscription_id) payload["stripe_subscription_id"] = data.stripe_subscription_id;
+    if (data.status)                 payload["status"]                  = data.status;
+    if (data.current_period_end)     payload["current_period_end"]      = data.current_period_end.toISOString();
+
+    const { error } = await sb
+      .from("subscriptions")
+      .upsert(payload, { onConflict: "user_id" });
+    if (error) throw new Error(`upsertSupabaseSubscription: ${error.message}`);
+  }
+
+  async revokeSupabaseSubscription(userId: string): Promise<void> {
+    const sb = makeSupabaseAdmin();
+    const { error } = await sb
+      .from("subscriptions")
+      .upsert(
+        { user_id: userId, status: "canceled" },
+        { onConflict: "user_id" }
+      );
+    if (error) throw new Error(`revokeSupabaseSubscription: ${error.message}`);
+  }
+
   // ── Supabase app_metadata (premium provisioning) ──────────────────────────
   // app_metadata is admin-only — cannot be set by the client, so it's tamper-proof.
 
   /**
-   * Grant premium in Supabase app_metadata.
-   * @param userId  Supabase auth user ID
-   * @param accessUntilMs  Unix timestamp (ms) of subscription end date
-   * @param interval  Stripe billing interval ("year" | "month" | "week")
+   * Grant premium:
+   *   - Supabase auth app_metadata
+   *   - public.subscriptions
+   *   - public.access_levels
    */
   async provisionPremiumInSupabase(
     userId: string,
     accessUntilMs: number,
     interval?: string,
+    stripeData?: {
+      customerId?:     string;
+      subscriptionId?: string;
+      status?:         string;
+    }
   ): Promise<void> {
+    const accessUntil = new Date(accessUntilMs);
+    const planType = interval === "year" ? "annual" : interval === "month" ? "monthly" : (interval ?? "premium");
+
+    // 1. Update auth app_metadata
     const sb = makeSupabaseAdmin();
-    const { error } = await sb.auth.admin.updateUserById(userId, {
+    const { error: authError } = await sb.auth.admin.updateUserById(userId, {
       app_metadata: {
         plan_type:    "premium",
-        access_until: new Date(accessUntilMs).toISOString(),
+        access_until: accessUntil.toISOString(),
         plan_interval: interval ?? null,
       },
     });
-    if (error) throw new Error(`provisionPremiumInSupabase: ${error.message}`);
+    if (authError) throw new Error(`provisionPremiumInSupabase (auth): ${authError.message}`);
+
+    // 2. Upsert access_levels
+    await this.upsertSupabaseAccessLevel(userId, planType, accessUntil);
+
+    // 3. Upsert subscriptions (if we have Stripe data)
+    if (stripeData) {
+      await this.upsertSupabaseSubscription(userId, {
+        stripe_customer_id:     stripeData.customerId,
+        stripe_subscription_id: stripeData.subscriptionId,
+        status:                 stripeData.status ?? "active",
+        current_period_end:     accessUntil,
+      });
+    }
   }
 
   /**
-   * Revoke premium in Supabase app_metadata.
+   * Revoke premium:
+   *   - Supabase auth app_metadata
+   *   - public.access_levels (delete row)
+   *   - public.subscriptions (set status=canceled)
    */
   async revokePremiumInSupabase(userId: string): Promise<void> {
     const sb = makeSupabaseAdmin();
-    const { error } = await sb.auth.admin.updateUserById(userId, {
+
+    // 1. Clear auth app_metadata
+    const { error: authError } = await sb.auth.admin.updateUserById(userId, {
       app_metadata: {
-        plan_type:    null,
-        access_until: null,
+        plan_type:     null,
+        access_until:  null,
         plan_interval: null,
       },
     });
-    if (error) throw new Error(`revokePremiumInSupabase: ${error.message}`);
+    if (authError) throw new Error(`revokePremiumInSupabase (auth): ${authError.message}`);
+
+    // 2. Remove access_levels row
+    await this.revokeSupabaseAccessLevel(userId).catch(() => {});
+
+    // 3. Mark subscription as canceled
+    await this.revokeSupabaseSubscription(userId).catch(() => {});
   }
 }
 

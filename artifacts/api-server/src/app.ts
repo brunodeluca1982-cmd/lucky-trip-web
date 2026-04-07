@@ -123,7 +123,11 @@ async function handleSubscriptionWebhook(event: any) {
         plan_type:              interval ?? null,
       });
 
-      await storage.provisionPremiumInSupabase(sub.user_id, periodEndMs, interval);
+      await storage.provisionPremiumInSupabase(sub.user_id, periodEndMs, interval, {
+        customerId,
+        subscriptionId,
+        status: stripeSubscription.status,
+      });
       logger.info({ userId: sub.user_id, subscriptionId }, "Premium provisioned via checkout");
       break;
     }
@@ -144,7 +148,11 @@ async function handleSubscriptionWebhook(event: any) {
       });
 
       if (subscription.status === "active") {
-        await storage.provisionPremiumInSupabase(sub.user_id, periodEndMs, interval ?? undefined);
+        await storage.provisionPremiumInSupabase(sub.user_id, periodEndMs, interval ?? undefined, {
+          customerId,
+          subscriptionId: subscription.id,
+          status: subscription.status,
+        });
         logger.info({ userId: sub.user_id, status: subscription.status }, "Premium updated");
       } else if (["canceled", "unpaid", "paused"].includes(subscription.status)) {
         await storage.revokePremiumInSupabase(sub.user_id);
@@ -181,10 +189,15 @@ async function handleSubscriptionWebhook(event: any) {
       const interval    = stripeSubscription.items.data[0]?.price?.recurring?.interval;
 
       await storage.upsertUserSubscription(sub.user_id, {
-        subscription_status: "active",
-        plan_type:           interval ?? null,
+        stripe_subscription_id: stripeSubscription.id,
+        subscription_status:    "active",
+        plan_type:              interval ?? null,
       });
-      await storage.provisionPremiumInSupabase(sub.user_id, periodEndMs, interval);
+      await storage.provisionPremiumInSupabase(sub.user_id, periodEndMs, interval, {
+        customerId,
+        subscriptionId: stripeSubscription.id,
+        status:         "active",
+      });
       logger.info({ userId: sub.user_id }, "Premium renewed via invoice.paid");
       break;
     }
