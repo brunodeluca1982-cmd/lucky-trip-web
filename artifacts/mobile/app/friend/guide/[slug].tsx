@@ -1,9 +1,17 @@
 /**
- * friend/guide/[slug].tsx — Roteiro curado do friend
+ * friend/guide/[slug].tsx — Roteiro curado do friend (itinerary view)
  *
- * Visual: hero-rio.png fixo ao fundo + glassmorphism iOS-style.
- * Idêntico à linguagem visual de viagem.tsx / roteiro/[id].tsx.
- * Todos os dados vêm do Supabase — zero hardcoded.
+ * Data flow (all from Supabase, zero hardcoded):
+ *   1. friend_guides       → guide metadata (via v_friend_guides_cards)
+ *   2. friend_guide_days   → day headers ordered by day_number
+ *   3. friend_guide_itinerary_items → chronological structure per day
+ *   4. friend_guide_places → entity data joined via place_id
+ *
+ * Renders as a 7-day itinerary grouped by day, ordered by display_time
+ * then item_order. Each item is pressable and navigates to its place card.
+ *
+ * Visual: hero-rio.png fixed background + glassmorphism — same language as
+ * viagem.tsx / roteiro/[id].tsx.
  */
 
 import React, { useEffect, useRef, useState } from "react";
@@ -21,7 +29,7 @@ import { Image as ExpoImage } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather, Ionicons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 
 import { supabase } from "@/lib/supabase";
 
@@ -29,19 +37,28 @@ const GOLD  = "#C9A84C";
 const CREAM = "#F5EDD6";
 const RIO_BG = require("../../../assets/images/hero-rio.png");
 
-// ── Section config por curation_dimension ────────────────────────────────────
+// ── Period display config ─────────────────────────────────────────────────────
 
-const DIMENSION_CONFIG: Record<string, { label: string; icon: keyof typeof Feather.glyphMap }> = {
-  hotel:      { label: "Onde Ficar",  icon: "home"    },
-  gastronomy: { label: "Onde Comer",  icon: "coffee"  },
-  nightlife:  { label: "Para a Noite", icon: "moon"   },
+const PERIOD_ICON: Record<string, keyof typeof Feather.glyphMap> = {
+  morning:   "sunrise",
+  lunch:     "coffee",
+  afternoon: "sun",
+  sunset:    "sunset",
+  evening:   "moon",
+  night:     "moon",
 };
 
-function getDimensionConfig(dim: string) {
-  return DIMENSION_CONFIG[dim] ?? {
-    label: dim.charAt(0).toUpperCase() + dim.slice(1),
-    icon: "map-pin" as keyof typeof Feather.glyphMap,
-  };
+const PERIOD_LABEL: Record<string, string> = {
+  morning:   "Manhã",
+  lunch:     "Almoço",
+  afternoon: "Tarde",
+  sunset:    "Entardecer",
+  evening:   "Noite",
+  night:     "Noite",
+};
+
+function periodIcon(period: string): keyof typeof Feather.glyphMap {
+  return PERIOD_ICON[period] ?? "clock";
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -62,19 +79,33 @@ interface GuideDetail {
   highlights_count: number;
 }
 
-interface GuidePlace {
+interface ItineraryPlace {
   id: string;
   nome: string;
-  categoria: string | null;
   bairro: string | null;
+  categoria: string | null;
   meu_olhar: string | null;
-  is_highlight: boolean;
-  is_locked: boolean;
-  ordem: number;
-  curation_dimension: string | null;
+  source_table: string | null;
+  source_id: string | null;
 }
 
-type SectionData = { dimension: string; places: GuidePlace[] };
+interface ItineraryItem {
+  id: string;
+  day_number: number;
+  period: string;
+  item_order: number;
+  display_time: string | null;
+  note: string | null;
+  is_optional: boolean;
+  place: ItineraryPlace;
+}
+
+interface ItineraryDay {
+  day_number: number;
+  title: string;
+  description: string | null;
+  items: ItineraryItem[];
+}
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
@@ -82,60 +113,101 @@ export default function FriendGuideScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const insets   = useSafeAreaInsets();
 
-  const [guide,    setGuide]    = useState<GuideDetail | null>(null);
-  const [sections, setSections] = useState<SectionData[]>([]);
-  const [loading,  setLoading]  = useState(true);
+  const [guide,   setGuide]   = useState<GuideDetail | null>(null);
+  const [days,    setDays]    = useState<ItineraryDay[]>([]);
+  const [loading, setLoading] = useState(true);
   const [introExpanded, setIntroExpanded] = useState(false);
-  // Overlay starts invisible — fades in once expo-image displays the background.
-  const overlayAnim = useRef(new Animated.Value(0)).current;
 
+  const overlayAnim = useRef(new Animated.Value(0)).current;
   function handleBgDisplay() {
-    Animated.timing(overlayAnim, {
-      toValue: 1,
-      duration: 600,
-      useNativeDriver: true,
-    }).start();
+    Animated.timing(overlayAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
   }
 
   useEffect(() => {
     let cancelled = false;
+
     async function load() {
       try {
+        // ── 1. Guide metadata ──────────────────────────────────────────────
         const { data: guideData } = await supabase
           .from("v_friend_guides_cards")
-          .select(
-            "id, slug, title, subtitle, tagline, intro_text, city, suggested_days, access_type, friend_display_name, friend_full_name, places_count, highlights_count"
-          )
+          .select("id, slug, title, subtitle, tagline, intro_text, city, suggested_days, access_type, friend_display_name, friend_full_name, places_count, highlights_count")
           .eq("slug", slug)
           .single();
 
         if (!guideData || cancelled) return;
 
-        const { data: placesData } = await supabase
-          .from("friend_guide_places")
-          .select("id, nome, categoria, bairro, meu_olhar, is_highlight, is_locked, ordem, curation_dimension")
-          .eq("guide_id", guideData.id)
-          .order("ordem");
+        const guideId = guideData.id as string;
+
+        // ── 2. Parallel fetch: days + items + places ────────────────────────
+        const [{ data: daysData }, { data: itemsData }, { data: placesData }] = await Promise.all([
+          supabase
+            .from("friend_guide_days")
+            .select("day_number, title, description")
+            .eq("guide_id", guideId)
+            .order("day_number"),
+
+          supabase
+            .from("friend_guide_itinerary_items")
+            .select("id, day_number, period, item_order, display_time, note, is_optional, place_id")
+            .eq("guide_id", guideId)
+            .order("day_number")
+            .order("display_time")
+            .order("item_order"),
+
+          supabase
+            .from("friend_guide_places")
+            .select("id, nome, bairro, categoria, meu_olhar, source_table, source_id")
+            .eq("guide_id", guideId),
+        ]);
 
         if (cancelled) return;
 
-        const dimOrder: string[] = [];
-        const dimMap: Record<string, GuidePlace[]> = {};
+        // ── 3. Build place lookup map ──────────────────────────────────────
+        const placeMap: Record<string, ItineraryPlace> = {};
         for (const p of placesData ?? []) {
-          const dim = p.curation_dimension ?? "outros";
-          if (!dimMap[dim]) { dimOrder.push(dim); dimMap[dim] = []; }
-          dimMap[dim].push(p);
+          placeMap[p.id] = p as ItineraryPlace;
         }
 
+        // ── 4. Group items by day_number, join place ───────────────────────
+        const itemsByDay: Record<number, ItineraryItem[]> = {};
+        for (const raw of itemsData ?? []) {
+          const place = placeMap[raw.place_id];
+          if (!place) continue;              // skip orphaned items
+          const item: ItineraryItem = {
+            id:           raw.id,
+            day_number:   raw.day_number,
+            period:       raw.period,
+            item_order:   raw.item_order,
+            display_time: raw.display_time,
+            note:         raw.note,
+            is_optional:  raw.is_optional,
+            place,
+          };
+          if (!itemsByDay[raw.day_number]) itemsByDay[raw.day_number] = [];
+          itemsByDay[raw.day_number].push(item);
+        }
+
+        // ── 5. Build final days array ──────────────────────────────────────
+        const builtDays: ItineraryDay[] = (daysData ?? []).map((d) => ({
+          day_number:  d.day_number,
+          title:       d.title,
+          description: d.description,
+          items:       itemsByDay[d.day_number] ?? [],
+        }));
+
         setGuide(guideData);
-        setSections(dimOrder.map((dim) => ({ dimension: dim, places: dimMap[dim] })));
+        setDays(builtDays);
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
+
     load();
     return () => { cancelled = true; };
   }, [slug]);
+
+  // ── Loading / error ────────────────────────────────────────────────────────
 
   if (loading) {
     return (
@@ -163,17 +235,19 @@ export default function FriendGuideScreen() {
     ? (guide.intro_text ?? "").slice(0, 220).trim() + "…"
     : (guide.intro_text ?? "");
 
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
     <View style={s.root}>
 
-      {/* ── Warm amber base — renders in the same frame as mount, zero wait ── */}
+      {/* ── Warm amber base ── */}
       <LinearGradient
         colors={["#2D1A08", "#1A0E04"]}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
 
-      {/* ── expo-image: backgroundColor shows immediately; crossfades to Rio ── */}
+      {/* ── expo-image: crossfades to Rio background ── */}
       <ExpoImage
         source={RIO_BG}
         style={[StyleSheet.absoluteFillObject, { backgroundColor: "#1A0E04" }]}
@@ -182,30 +256,22 @@ export default function FriendGuideScreen() {
         onDisplay={handleBgDisplay}
       />
 
-      {/* ── Dark overlay fades in only after the image is displayed ── */}
-      <Animated.View
-        style={[StyleSheet.absoluteFill, { opacity: overlayAnim }]}
-        pointerEvents="none"
-      >
+      {/* ── Dark overlay fades in after image renders ── */}
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: overlayAnim }]} pointerEvents="none">
         <LinearGradient
-          colors={[
-            "rgba(0,0,0,0.08)",
-            "rgba(0,0,0,0.28)",
-            "rgba(0,0,0,0.58)",
-            "rgba(0,0,0,0.78)",
-          ]}
+          colors={["rgba(0,0,0,0.08)", "rgba(0,0,0,0.28)", "rgba(0,0,0,0.58)", "rgba(0,0,0,0.78)"]}
           locations={[0, 0.25, 0.58, 1]}
           style={StyleSheet.absoluteFill}
         />
       </Animated.View>
 
-      {/* ── Scrollable content over fixed bg ── */}
+      {/* ── Scrollable content ── */}
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[s.content, { paddingTop: topPad, paddingBottom: bottomPad }]}
       >
 
-        {/* ── Back button ── */}
+        {/* Back */}
         <Pressable
           onPress={() => router.back()}
           style={({ pressed }) => [s.backBtn, pressed && { opacity: 0.65 }]}
@@ -214,29 +280,22 @@ export default function FriendGuideScreen() {
           <Feather name="arrow-left" size={18} color="rgba(255,255,255,0.85)" />
         </Pressable>
 
-        {/* ── Header block ── */}
+        {/* ── Header ── */}
         <View style={s.header}>
           <Text style={s.eyebrow}>CURADORIA DE {guide.friend_display_name.toUpperCase()}</Text>
-          {guide.tagline ? (
-            <Text style={s.tagline}>"{guide.tagline}"</Text>
-          ) : null}
+          {guide.tagline ? <Text style={s.tagline}>"{guide.tagline}"</Text> : null}
           <Text style={s.title}>{guide.title}</Text>
-          {guide.subtitle ? (
-            <Text style={s.subtitle}>{guide.subtitle}</Text>
-          ) : null}
+          {guide.subtitle ? <Text style={s.subtitle}>{guide.subtitle}</Text> : null}
 
-          {/* Meta pills */}
           <View style={s.pillRow}>
             <View style={s.pill}>
-              <Feather name="map-pin" size={11} color={GOLD} />
-              <Text style={s.pillText}>{guide.places_count} lugares</Text>
+              <Feather name="calendar" size={11} color={GOLD} />
+              <Text style={s.pillText}>{days.length} dias</Text>
             </View>
-            {guide.suggested_days != null && (
-              <View style={s.pill}>
-                <Feather name="calendar" size={11} color={GOLD} />
-                <Text style={s.pillText}>{guide.suggested_days} dias</Text>
-              </View>
-            )}
+            <View style={s.pill}>
+              <Feather name="map-pin" size={11} color={GOLD} />
+              <Text style={s.pillText}>{days.reduce((n, d) => n + d.items.length, 0)} lugares</Text>
+            </View>
             {guide.city ? (
               <View style={s.pill}>
                 <Feather name="compass" size={11} color={GOLD} />
@@ -246,37 +305,28 @@ export default function FriendGuideScreen() {
           </View>
         </View>
 
-        {/* ── Thin rule ── */}
+        {/* ── Rule ── */}
         <View style={s.rule} />
 
-        {/* ── Intro text (glass card) ── */}
+        {/* ── Intro (glass card) ── */}
         {guide.intro_text ? (
           <View style={s.introCard}>
             <Text style={s.introQuote}>"</Text>
             <Text style={s.introText}>{introDisplay}</Text>
             {(guide.intro_text ?? "").length > 220 && (
-              <Pressable
-                onPress={() => setIntroExpanded((x) => !x)}
-                style={s.introToggle}
-              >
-                <Text style={s.introToggleText}>
-                  {introExpanded ? "Ler menos" : "Ler mais"}
-                </Text>
-                <Feather
-                  name={introExpanded ? "chevron-up" : "chevron-down"}
-                  size={13}
-                  color={GOLD}
-                />
+              <Pressable onPress={() => setIntroExpanded((x) => !x)} style={s.introToggle}>
+                <Text style={s.introToggleText}>{introExpanded ? "Ler menos" : "Ler mais"}</Text>
+                <Feather name={introExpanded ? "chevron-up" : "chevron-down"} size={13} color={GOLD} />
               </Pressable>
             )}
             <Text style={s.introAuthor}>— {guide.friend_display_name}</Text>
           </View>
         ) : null}
 
-        {/* ── Sections ── */}
-        <View style={s.sectionsWrap}>
-          {sections.map((sec) => (
-            <DimensionSection key={sec.dimension} section={sec} />
+        {/* ── 7-day itinerary ── */}
+        <View style={s.daysWrap}>
+          {days.map((day) => (
+            <DayBlock key={day.day_number} day={day} />
           ))}
         </View>
 
@@ -285,85 +335,94 @@ export default function FriendGuideScreen() {
   );
 }
 
-// ── Dimension section ─────────────────────────────────────────────────────────
+// ── Day block ─────────────────────────────────────────────────────────────────
 
-function DimensionSection({ section }: { section: SectionData }) {
-  const config = getDimensionConfig(section.dimension);
-
+function DayBlock({ day }: { day: ItineraryDay }) {
   return (
-    <View style={sec.wrap}>
-      {/* Section label */}
-      <View style={sec.headerRow}>
-        <View style={sec.iconWrap}>
-          <Feather name={config.icon} size={14} color={GOLD} />
+    <View style={d.wrap}>
+      {/* Day header */}
+      <View style={d.header}>
+        <View style={d.dayNumWrap}>
+          <Text style={d.dayNumLabel}>DIA</Text>
+          <Text style={d.dayNum}>{day.day_number}</Text>
         </View>
-        <Text style={sec.label}>{config.label}</Text>
-        <View style={sec.countBadge}>
-          <Text style={sec.countText}>{section.places.length}</Text>
+        <View style={d.titleBlock}>
+          <Text style={d.title}>{day.title}</Text>
+          {day.description ? <Text style={d.desc}>{day.description}</Text> : null}
         </View>
       </View>
 
-      {/* Glass card wrapping all places */}
-      <View style={sec.card}>
-        {section.places.map((place, idx) => (
-          <PlaceRow
-            key={place.id}
-            place={place}
-            index={idx}
-            isLast={idx === section.places.length - 1}
+      {/* Items glass card */}
+      <View style={d.card}>
+        {day.items.map((item, idx) => (
+          <ItemRow
+            key={item.id}
+            item={item}
+            isLast={idx === day.items.length - 1}
           />
         ))}
+        {day.items.length === 0 && (
+          <View style={d.emptyRow}>
+            <Text style={d.emptyText}>Nenhum item neste dia.</Text>
+          </View>
+        )}
       </View>
     </View>
   );
 }
 
-// ── Place row ─────────────────────────────────────────────────────────────────
+// ── Item row ─────────────────────────────────────────────────────────────────
 
-function PlaceRow({
-  place,
-  index,
-  isLast,
-}: {
-  place: GuidePlace;
-  index: number;
-  isLast: boolean;
-}) {
+function ItemRow({ item, isLast }: { item: ItineraryItem; isLast: boolean }) {
+  function handlePress() {
+    if (item.place.source_table && item.place.source_id) {
+      router.push({
+        pathname: "/lugar/[cityId]/[placeId]",
+        params: { cityId: "rio", placeId: item.place.source_id, source_table: item.place.source_table },
+      });
+    } else {
+      router.push({
+        pathname: "/lugar/[cityId]/[placeId]",
+        params: { cityId: "rio", placeId: item.place.id, source_table: "friend_guide_places" },
+      });
+    }
+  }
+
+  const icon = periodIcon(item.period);
+  const timeLabel = item.display_time ?? PERIOD_LABEL[item.period] ?? item.period;
+
   return (
-    <View style={[row.wrap, !isLast && row.separator]}>
-      {/* Number */}
-      <Text style={row.num}>{String(index + 1).padStart(2, "0")}</Text>
-
-      {/* Info */}
-      <View style={row.info}>
-        <View style={row.nameRow}>
-          <Text style={row.name}>{place.nome}</Text>
-          {place.is_highlight && (
-            <View style={row.starBadge}>
-              <Ionicons name="star" size={8} color={GOLD} />
-            </View>
-          )}
-        </View>
-
-        {place.bairro ? (
-          <Text style={row.bairro}>{place.bairro}</Text>
-        ) : null}
-
-        {place.meu_olhar ? (
-          <View style={row.noteRow}>
-            <View style={row.noteLine} />
-            <Text style={row.noteText}>"{place.meu_olhar}"</Text>
-          </View>
-        ) : null}
+    <Pressable
+      onPress={handlePress}
+      style={({ pressed }) => [ir.wrap, !isLast && ir.separator, pressed && { backgroundColor: "rgba(255,255,255,0.04)" }]}
+    >
+      {/* Time column */}
+      <View style={ir.timeCol}>
+        <Feather name={icon} size={11} color={GOLD} style={ir.periodIcon} />
+        <Text style={ir.time}>{timeLabel}</Text>
       </View>
 
-      {/* Category chip */}
-      {place.categoria ? (
-        <View style={row.chip}>
-          <Text style={row.chipText}>{place.categoria}</Text>
-        </View>
-      ) : null}
-    </View>
+      {/* Info */}
+      <View style={ir.info}>
+        <Text style={ir.name} numberOfLines={2}>{item.place.nome}</Text>
+        {item.place.bairro ? <Text style={ir.bairro}>{item.place.bairro}</Text> : null}
+        {item.note ? (
+          <View style={ir.noteRow}>
+            <View style={ir.noteLine} />
+            <Text style={ir.noteText}>"{item.note}"</Text>
+          </View>
+        ) : item.place.meu_olhar ? (
+          <View style={ir.noteRow}>
+            <View style={ir.noteLine} />
+            <Text style={ir.noteText}>"{item.place.meu_olhar}"</Text>
+          </View>
+        ) : null}
+        {item.is_optional ? <Text style={ir.optional}>opcional</Text> : null}
+      </View>
+
+      {/* Chevron */}
+      <Feather name="chevron-right" size={13} color="rgba(255,255,255,0.25)" />
+    </Pressable>
   );
 }
 
@@ -389,7 +448,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 22,
   },
 
-  // ── Back button ──
   backBtn: {
     width: 40,
     height: 40,
@@ -403,7 +461,6 @@ const s = StyleSheet.create({
     alignSelf: "flex-start",
   },
 
-  // ── Header ──
   header: {
     gap: 10,
     marginBottom: 20,
@@ -456,14 +513,12 @@ const s = StyleSheet.create({
     color: GOLD,
   },
 
-  // ── Rule ──
   rule: {
     height: 1,
     backgroundColor: "rgba(255,255,255,0.08)",
     marginBottom: 20,
   },
 
-  // ── Intro card ──
   introCard: {
     backgroundColor: "rgba(0,0,0,0.28)",
     borderRadius: 16,
@@ -506,54 +561,63 @@ const s = StyleSheet.create({
     letterSpacing: 0.3,
   },
 
-  // ── Sections wrapper ──
-  sectionsWrap: {
-    gap: 24,
+  daysWrap: {
+    gap: 28,
   },
 });
 
-// ── Section styles ─────────────────────────────────────────────────────────────
+// ── Day block styles ──────────────────────────────────────────────────────────
 
-const sec = StyleSheet.create({
+const d = StyleSheet.create({
   wrap: {
     gap: 12,
   },
-  headerRow: {
+  header: {
     flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 14,
+  },
+  dayNumWrap: {
     alignItems: "center",
-    gap: 10,
-  },
-  iconWrap: {
-    width: 30,
-    height: 30,
-    borderRadius: 9,
-    backgroundColor: `${GOLD}16`,
-    alignItems: "center",
-    justifyContent: "center",
+    backgroundColor: `${GOLD}14`,
     borderWidth: 1,
-    borderColor: `${GOLD}28`,
+    borderColor: `${GOLD}30`,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    minWidth: 44,
   },
-  label: {
-    flex: 1,
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 18,
-    color: CREAM,
-    lineHeight: 24,
-  },
-  countBadge: {
-    backgroundColor: `${GOLD}10`,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderWidth: 1,
-    borderColor: `${GOLD}24`,
-  },
-  countText: {
+  dayNumLabel: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 11,
+    fontSize: 8,
     color: GOLD,
+    letterSpacing: 2,
   },
-  // glass card holding all place rows
+  dayNum: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 22,
+    color: GOLD,
+    lineHeight: 26,
+  },
+  titleBlock: {
+    flex: 1,
+    gap: 3,
+    paddingTop: 4,
+  },
+  title: {
+    fontFamily: "PlayfairDisplay_600SemiBold",
+    fontSize: 17,
+    color: CREAM,
+    lineHeight: 22,
+    letterSpacing: 0.2,
+  },
+  desc: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: "rgba(255,255,255,0.45)",
+    lineHeight: 17,
+    fontStyle: "italic",
+  },
   card: {
     backgroundColor: "rgba(0,0,0,0.26)",
     borderRadius: 18,
@@ -561,11 +625,21 @@ const sec = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.10)",
     overflow: "hidden",
   },
+  emptyRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  emptyText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.35)",
+    fontStyle: "italic",
+  },
 });
 
-// ── Place row styles ──────────────────────────────────────────────────────────
+// ── Item row styles ───────────────────────────────────────────────────────────
 
-const row = StyleSheet.create({
+const ir = StyleSheet.create({
   wrap: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -577,39 +651,33 @@ const row = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: `${GOLD}12`,
   },
-  num: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 20,
-    color: `${GOLD}44`,
-    lineHeight: 26,
-    width: 30,
-    letterSpacing: -0.5,
+
+  timeCol: {
+    alignItems: "center",
+    gap: 4,
+    width: 42,
+    paddingTop: 2,
   },
+  periodIcon: {
+    opacity: 0.7,
+  },
+  time: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 10,
+    color: GOLD,
+    letterSpacing: 0.4,
+    textAlign: "center",
+  },
+
   info: {
     flex: 1,
     gap: 3,
-  },
-  nameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    flexWrap: "wrap",
   },
   name: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 14,
     color: CREAM,
     lineHeight: 20,
-  },
-  starBadge: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: `${GOLD}20`,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: `${GOLD}40`,
   },
   bairro: {
     fontFamily: "Inter_400Regular",
@@ -638,20 +706,12 @@ const row = StyleSheet.create({
     lineHeight: 18,
     fontStyle: "italic",
   },
-  chip: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 7,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    alignSelf: "flex-start",
-    marginTop: 2,
-  },
-  chipText: {
+  optional: {
     fontFamily: "Inter_400Regular",
     fontSize: 10,
-    color: "rgba(255,255,255,0.48)",
-    textTransform: "capitalize",
+    color: "rgba(255,255,255,0.28)",
+    fontStyle: "italic",
+    marginTop: 3,
+    letterSpacing: 0.3,
   },
 });
