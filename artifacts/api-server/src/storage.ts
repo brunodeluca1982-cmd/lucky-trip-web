@@ -40,6 +40,15 @@ export class Storage {
 
   async getWebhookSecret(): Promise<string | null> {
     if (this._webhookSecret) return this._webhookSecret;
+
+    // Priority 1: user-supplied env var (works with live keys + manually registered webhooks)
+    const envSecret = process.env["STRIPE_WEBHOOK_SECRET"];
+    if (envSecret) {
+      this._webhookSecret = envSecret;
+      return envSecret;
+    }
+
+    // Priority 2: stripe-replit-sync managed webhook secret (sandbox/test connector)
     try {
       const result = await db.execute(
         sql`SELECT secret FROM stripe._managed_webhooks LIMIT 1`
