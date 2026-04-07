@@ -7,18 +7,22 @@
  *   3. Register / verify the managed webhook endpoint with Stripe
  *   4. Run a backfill of all Stripe objects into the local stripe schema
  *
- * This is a non-blocking best-effort init. If STRIPE_SECRET_KEY is not set,
- * initialization is skipped with a warning (so the server still boots in dev).
+ * Non-blocking best-effort: if Stripe credentials are unavailable (e.g. connector
+ * not yet connected in dev), initialization is skipped with a warning so the server
+ * still boots normally.
  */
 
-import { runMigrations } from "stripe-replit-sync";
 import { getStripeSync } from "./stripeClient.js";
 import { logger } from "./lib/logger.js";
 
 export async function initStripe(): Promise<void> {
-  const stripeKey = process.env["STRIPE_SECRET_KEY"];
-  if (!stripeKey) {
-    logger.warn("STRIPE_SECRET_KEY is not set — skipping Stripe initialization");
+  // Check if the Replit connector env vars are present
+  const hasConnector =
+    !!(process.env["REPL_IDENTITY"] || process.env["WEB_REPL_RENEWAL"]) &&
+    !!process.env["REPLIT_CONNECTORS_HOSTNAME"];
+
+  if (!hasConnector) {
+    logger.warn("Replit Stripe connector env vars not found — skipping Stripe initialization");
     return;
   }
 
@@ -28,16 +32,11 @@ export async function initStripe(): Promise<void> {
     return;
   }
 
-  try {
-    logger.info("Running stripe-replit-sync migrations…");
-    await runMigrations({ databaseUrl });
-    logger.info("stripe-replit-sync migrations complete");
-  } catch (err) {
-    logger.error({ err }, "stripe-replit-sync migrations failed");
-    return;
-  }
+  // Migrations are run by scripts/run-stripe-migrations.mjs before server boot.
+  // (runMigrations uses __dirname internally which breaks inside esbuild bundles)
 
-  let sync;
+  // 1. Instantiate StripeSync
+  let sync: any;
   try {
     sync = await getStripeSync();
   } catch (err) {
@@ -45,27 +44,26 @@ export async function initStripe(): Promise<void> {
     return;
   }
 
-  // Register managed webhook (auto-creates an endpoint in Stripe if not present)
+  // 3. Register managed webhook
   const rawDomains = process.env["REPLIT_DOMAINS"] ?? "";
   const domain = rawDomains.split(",")[0]?.trim();
   if (domain) {
     const webhookUrl = `https://${domain}/api/stripe/webhook`;
     try {
       logger.info({ webhookUrl }, "Registering managed Stripe webhook…");
-      await (sync as any).findOrCreateManagedWebhook?.(webhookUrl);
+      await sync.findOrCreateManagedWebhook?.(webhookUrl);
       logger.info("Stripe webhook registered");
     } catch (err) {
-      // Non-fatal — webhook may already be registered
-      logger.warn({ err }, "Stripe managed webhook registration skipped");
+      logger.warn({ err }, "Stripe managed webhook registration skipped (may already exist)");
     }
   } else {
     logger.warn("REPLIT_DOMAINS is not set — skipping webhook registration");
   }
 
-  // Backfill Stripe data into the local stripe schema
+  // 4. Backfill Stripe data
   try {
     logger.info("Starting Stripe backfill…");
-    await (sync as any).syncBackfill?.();
+    await sync.syncBackfill?.();
     logger.info("Stripe backfill complete");
   } catch (err) {
     logger.warn({ err }, "Stripe backfill failed (non-fatal)");
