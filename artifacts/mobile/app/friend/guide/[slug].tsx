@@ -4,14 +4,16 @@
  * Data flow (all from Supabase, zero hardcoded):
  *   1. friend_guides       → guide metadata (via v_friend_guides_cards)
  *   2. friend_guide_days   → day headers ordered by day_number
- *   3. friend_guide_itinerary_items → chronological structure per day
- *   4. friend_guide_places → entity data joined via place_id
+ *   3. friend_guide_itinerary_items → chronological structure per day (includes preview_rank)
+ *   4. friend_guide_places → entity data joined via place_id (includes source_table, source_id, place_canonical_id)
  *
  * Renders as a 7-day itinerary grouped by day, ordered by display_time
  * then item_order. Each item is pressable and navigates to its place card.
  *
- * Visual: hero-rio.png fixed background + glassmorphism — same language as
- * viagem.tsx / roteiro/[id].tsx.
+ * Premium/preview logic:
+ *   - Guide access_type=premium + user not premium → items without preview_rank (or rank > limit) are locked
+ *   - Locked items show a teaser state; pressing navigates to subscription
+ *   - Unlocked and all premium-user items navigate normally with from_guide_slug context
  */
 
 import React, { useEffect, useRef, useState } from "react";
@@ -32,6 +34,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 
 import { supabase } from "@/lib/supabase";
+import { useGuia } from "@/context/GuiaContext";
 
 const GOLD  = "#C9A84C";
 const CREAM = "#F5EDD6";
@@ -73,6 +76,8 @@ interface GuideDetail {
   city: string | null;
   suggested_days: number | null;
   access_type: string;
+  preview_enabled: boolean;
+  preview_items_limit: number;
   friend_display_name: string;
   friend_full_name: string;
   places_count: number;
@@ -87,6 +92,7 @@ interface ItineraryPlace {
   meu_olhar: string | null;
   source_table: string | null;
   source_id: string | null;
+  place_canonical_id: string | null;
 }
 
 interface ItineraryItem {
@@ -97,6 +103,7 @@ interface ItineraryItem {
   display_time: string | null;
   note: string | null;
   is_optional: boolean;
+  preview_rank: number | null;
   place: ItineraryPlace;
 }
 
@@ -107,11 +114,30 @@ interface ItineraryDay {
   items: ItineraryItem[];
 }
 
+// ── Guide context passed down to rows ─────────────────────────────────────────
+
+interface GuideCtx {
+  slug: string;
+  isPremium: boolean;
+  access_type: string;
+  preview_enabled: boolean;
+  preview_items_limit: number;
+}
+
+function isItemLocked(item: ItineraryItem, ctx: GuideCtx): boolean {
+  if (ctx.access_type !== "premium") return false;
+  if (ctx.isPremium) return false;
+  if (!ctx.preview_enabled) return true;
+  // Items with a valid preview_rank within the limit are freely accessible
+  return item.preview_rank === null || item.preview_rank > ctx.preview_items_limit;
+}
+
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function FriendGuideScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const insets   = useSafeAreaInsets();
+  const { isPremium } = useGuia();
 
   const [guide,   setGuide]   = useState<GuideDetail | null>(null);
   const [days,    setDays]    = useState<ItineraryDay[]>([]);
@@ -131,7 +157,7 @@ export default function FriendGuideScreen() {
         // ── 1. Guide metadata ──────────────────────────────────────────────
         const { data: guideData } = await supabase
           .from("v_friend_guides_cards")
-          .select("id, slug, title, subtitle, tagline, intro_text, city, suggested_days, access_type, friend_display_name, friend_full_name, places_count, highlights_count")
+          .select("id, slug, title, subtitle, tagline, intro_text, city, suggested_days, access_type, preview_enabled, preview_items_limit, friend_display_name, friend_full_name, places_count, highlights_count")
           .eq("slug", slug)
           .single();
 
@@ -149,7 +175,7 @@ export default function FriendGuideScreen() {
 
           supabase
             .from("friend_guide_itinerary_items")
-            .select("id, day_number, period, item_order, display_time, note, is_optional, place_id")
+            .select("id, day_number, period, item_order, display_time, note, is_optional, place_id, preview_rank")
             .eq("guide_id", guideId)
             .order("day_number")
             .order("display_time")
@@ -157,7 +183,7 @@ export default function FriendGuideScreen() {
 
           supabase
             .from("friend_guide_places")
-            .select("id, nome, bairro, categoria, meu_olhar, source_table, source_id")
+            .select("id, nome, bairro, categoria, meu_olhar, source_table, source_id, place_canonical_id")
             .eq("guide_id", guideId),
         ]);
 
@@ -182,6 +208,7 @@ export default function FriendGuideScreen() {
             display_time: raw.display_time,
             note:         raw.note,
             is_optional:  raw.is_optional,
+            preview_rank: raw.preview_rank ?? null,
             place,
           };
           if (!itemsByDay[raw.day_number]) itemsByDay[raw.day_number] = [];
@@ -196,7 +223,7 @@ export default function FriendGuideScreen() {
           items:       itemsByDay[d.day_number] ?? [],
         }));
 
-        setGuide(guideData);
+        setGuide(guideData as GuideDetail);
         setDays(builtDays);
       } finally {
         if (!cancelled) setLoading(false);
@@ -234,6 +261,14 @@ export default function FriendGuideScreen() {
   const introDisplay   = introTruncated
     ? (guide.intro_text ?? "").slice(0, 220).trim() + "…"
     : (guide.intro_text ?? "");
+
+  const guideCtx: GuideCtx = {
+    slug:                guide.slug,
+    isPremium,
+    access_type:         guide.access_type,
+    preview_enabled:     guide.preview_enabled,
+    preview_items_limit: guide.preview_items_limit ?? 0,
+  };
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -326,7 +361,7 @@ export default function FriendGuideScreen() {
         {/* ── 7-day itinerary ── */}
         <View style={s.daysWrap}>
           {days.map((day) => (
-            <DayBlock key={day.day_number} day={day} />
+            <DayBlock key={day.day_number} day={day} guideCtx={guideCtx} />
           ))}
         </View>
 
@@ -337,7 +372,7 @@ export default function FriendGuideScreen() {
 
 // ── Day block ─────────────────────────────────────────────────────────────────
 
-function DayBlock({ day }: { day: ItineraryDay }) {
+function DayBlock({ day, guideCtx }: { day: ItineraryDay; guideCtx: GuideCtx }) {
   return (
     <View style={d.wrap}>
       {/* Day header */}
@@ -359,6 +394,7 @@ function DayBlock({ day }: { day: ItineraryDay }) {
             key={item.id}
             item={item}
             isLast={idx === day.items.length - 1}
+            guideCtx={guideCtx}
           />
         ))}
         {day.items.length === 0 && (
@@ -373,23 +409,77 @@ function DayBlock({ day }: { day: ItineraryDay }) {
 
 // ── Item row ─────────────────────────────────────────────────────────────────
 
-function ItemRow({ item, isLast }: { item: ItineraryItem; isLast: boolean }) {
+function ItemRow({ item, isLast, guideCtx }: { item: ItineraryItem; isLast: boolean; guideCtx: GuideCtx }) {
+  const locked = isItemLocked(item, guideCtx);
+
   function handlePress() {
+    if (locked) {
+      // Navigate to subscription screen — preserve navigation stack
+      router.push("/(tabs)/subscription");
+      return;
+    }
+
+    // Entity resolution (Step 1→2 per spec):
+    // 2A: source_table + source_id → open core Lucky Trip entity
     if (item.place.source_table && item.place.source_id) {
       router.push({
         pathname: "/lugar/[cityId]/[placeId]",
-        params: { cityId: "rio", placeId: item.place.source_id, source_table: item.place.source_table },
+        params: {
+          cityId:          "rio",
+          placeId:         item.place.source_id,
+          source_table:    item.place.source_table,
+          from_guide_slug: guideCtx.slug,
+        },
       });
-    } else {
-      router.push({
-        pathname: "/lugar/[cityId]/[placeId]",
-        params: { cityId: "rio", placeId: item.place.id, source_table: "friend_guide_places" },
-      });
+      return;
     }
+
+    // 2B: place_canonical_id present but no source resolved yet →
+    //     fall through to friend-only entity (canonical resolver not yet built)
+    // 2C: friend-only → render directly from friend_guide_places
+    router.push({
+      pathname: "/lugar/[cityId]/[placeId]",
+      params: {
+        cityId:          "rio",
+        placeId:         item.place.id,
+        source_table:    "friend_guide_places",
+        from_guide_slug: guideCtx.slug,
+      },
+    });
   }
 
-  const icon = periodIcon(item.period);
+  const icon      = periodIcon(item.period);
   const timeLabel = item.display_time ?? PERIOD_LABEL[item.period] ?? item.period;
+
+  if (locked) {
+    return (
+      <Pressable
+        onPress={handlePress}
+        style={({ pressed }) => [ir.wrap, !isLast && ir.separator, pressed && { backgroundColor: "rgba(255,255,255,0.03)" }]}
+      >
+        {/* Time column */}
+        <View style={ir.timeCol}>
+          <Feather name={icon} size={11} color={`${GOLD}55`} style={ir.periodIcon} />
+          <Text style={[ir.time, { opacity: 0.4 }]}>{timeLabel}</Text>
+        </View>
+
+        {/* Info — teaser only, no meu_olhar exposed */}
+        <View style={ir.info}>
+          <View style={ir.lockedNameRow}>
+            <Text style={[ir.name, { opacity: 0.38 }]} numberOfLines={2}>{item.place.nome}</Text>
+            <Feather name="lock" size={11} color={`${GOLD}88`} style={{ marginTop: 3 }} />
+          </View>
+          {item.place.bairro ? (
+            <Text style={[ir.bairro, { opacity: 0.28 }]}>{item.place.bairro}</Text>
+          ) : null}
+          <View style={ir.lockedBadge}>
+            <Feather name="star" size={9} color={GOLD} />
+            <Text style={ir.lockedBadgeText}>Exclusivo Lucky Pro</Text>
+          </View>
+        </View>
+      </Pressable>
+    );
+  }
 
   return (
     <Pressable
@@ -713,5 +803,31 @@ const ir = StyleSheet.create({
     fontStyle: "italic",
     marginTop: 3,
     letterSpacing: 0.3,
+  },
+
+  // Locked item styles
+  lockedNameRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+  },
+  lockedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 6,
+    backgroundColor: `${GOLD}14`,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    alignSelf: "flex-start",
+    borderWidth: 1,
+    borderColor: `${GOLD}28`,
+  },
+  lockedBadgeText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 10,
+    color: GOLD,
+    letterSpacing: 0.4,
   },
 });

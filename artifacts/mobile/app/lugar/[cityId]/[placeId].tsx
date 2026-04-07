@@ -313,8 +313,8 @@ const FALLBACK: LugarPlace = {
 // ── Screen ─────────────────────────────────────────────────────────────────────
 
 export default function LugarDetailScreen() {
-  const { cityId, placeId, source_table, categoria, titulo: tituloPar, localizacao: localizacaoPar } =
-    useLocalSearchParams<{ cityId: string; placeId: string; source_table?: string; categoria?: string; titulo?: string; localizacao?: string }>();
+  const { cityId, placeId, source_table, categoria, titulo: tituloPar, localizacao: localizacaoPar, from_guide_slug } =
+    useLocalSearchParams<{ cityId: string; placeId: string; source_table?: string; categoria?: string; titulo?: string; localizacao?: string; from_guide_slug?: string }>();
 
   const insets = useSafeAreaInsets();
   const topInset = Platform.OS === "web" ? 67 : insets.top;
@@ -533,6 +533,14 @@ export default function LugarDetailScreen() {
         {/* ── Content card ── */}
         <View style={s.contentCard}>
 
+          {/* Guide attribution badge — only when entered from a friend guide */}
+          {from_guide_slug ? (
+            <View style={s.guideBadge}>
+              <Feather name="star" size={10} color="#C9A84C" />
+              <Text style={s.guideBadgeText}>Curadoria Exclusiva</Text>
+            </View>
+          ) : null}
+
           {/* Tags row: CATEGORIA + LOCALIZACAO */}
           <View style={s.tagsRow}>
             <View style={s.tag}>
@@ -715,6 +723,28 @@ const s = StyleSheet.create({
     paddingBottom: 12,
     borderTopWidth: 1,
     borderTopColor: "rgba(255,255,255,0.06)",
+  },
+
+  // ── Guide attribution badge ──
+  guideBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(201,168,76,0.10)",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: "rgba(201,168,76,0.24)",
+    marginBottom: 14,
+  },
+  guideBadgeText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 10,
+    color: "#C9A84C",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
   },
 
   // ── Tags ──
