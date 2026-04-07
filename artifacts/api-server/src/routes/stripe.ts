@@ -70,24 +70,26 @@ const PLAN_TO_INTERVAL: Record<string, string> = {
 };
 
 async function resolvePriceId(planOrPriceId: string): Promise<string | null> {
-  // Direct price ID
+  // Direct price ID — use as-is
   if (planOrPriceId.startsWith("price_")) return planOrPriceId;
 
-  // Priority 1: single STRIPE_PRICE_ID env var (live account)
-  const singlePriceId = process.env["STRIPE_PRICE_ID"];
-  if (singlePriceId) return singlePriceId;
-
-  // Priority 2: plan-specific env var (legacy)
+  // Priority 1: plan-specific env var (STRIPE_PRICE_ID_ANNUAL / MONTHLY / WEEKLY)
   const envKey = `STRIPE_PRICE_ID_${planOrPriceId.toUpperCase()}`;
   const envVal = process.env[envKey];
   if (envVal) return envVal;
 
-  // Priority 3: DB lookup by interval
+  // Priority 2: DB lookup by billing interval (most reliable — reflects actual Stripe catalogue)
   const interval = PLAN_TO_INTERVAL[planOrPriceId];
-  if (!interval) return null;
+  if (interval) {
+    const price = await storage.getPriceByInterval(interval);
+    if (price?.id) return price.id;
+  }
 
-  const price = await storage.getPriceByInterval(interval);
-  return price?.id ?? null;
+  // Priority 3: single STRIPE_PRICE_ID env var (catch-all fallback for unknown plans)
+  const singlePriceId = process.env["STRIPE_PRICE_ID"];
+  if (singlePriceId) return singlePriceId;
+
+  return null;
 }
 
 // ── GET /api/stripe/publishable-key ──────────────────────────────────────────
