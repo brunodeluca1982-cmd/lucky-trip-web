@@ -35,6 +35,7 @@ import { AntDesign, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useAuth } from "@/hooks/useAuth";
 import { useGuia } from "@/context/GuiaContext";
+import type { User } from "@supabase/supabase-js";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -813,7 +814,7 @@ function ProfileHeader({
   user,
   badge,
 }: {
-  user: { email?: string | null; user_metadata?: any };
+  user: User;
   badge: React.ReactNode;
 }) {
   const insets = useSafeAreaInsets();
@@ -843,7 +844,7 @@ function ProfileHeader({
 function FreeProfileScreen({
   user, signOut,
 }: {
-  user: any; signOut: () => void;
+  user: User; signOut: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const botPad = Platform.OS === "web" ? 32 : insets.bottom + 80;
@@ -888,14 +889,14 @@ function FreeProfileScreen({
             icon={<Feather name="book-open" size={18} color={GOLD} />}
             label="Diário de Viagem"
             sublabel="Registre memórias e momentos"
-            onPress={() => router.push("/diario" as any)}
+            onPress={() => router.navigate("/diario")}
           />
           <View style={s.menuDivider} />
           <MenuItem
             icon={<Feather name="divide-circle" size={18} color={GOLD} />}
             label="Divisão de Contas"
             sublabel="Organize os gastos do grupo"
-            onPress={() => router.push("/contas" as any)}
+            onPress={() => router.navigate("/contas")}
           />
         </View>
 
@@ -947,7 +948,7 @@ function FreeProfileScreen({
 function ProProfileScreen({
   user, signOut,
 }: {
-  user: any; signOut: () => void;
+  user: User; signOut: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const botPad = Platform.OS === "web" ? 32 : insets.bottom + 80;
@@ -995,14 +996,14 @@ function ProProfileScreen({
             icon={<Feather name="book-open" size={18} color={GOLD} />}
             label="Diário de Viagem"
             sublabel="Registre memórias e momentos"
-            onPress={() => router.push("/diario" as any)}
+            onPress={() => router.navigate("/diario")}
           />
           <View style={s.menuDivider} />
           <MenuItem
             icon={<Feather name="divide-circle" size={18} color={GOLD} />}
             label="Divisão de Contas"
             sublabel="Organize os gastos do grupo"
-            onPress={() => router.push("/contas" as any)}
+            onPress={() => router.navigate("/contas")}
           />
         </View>
 
