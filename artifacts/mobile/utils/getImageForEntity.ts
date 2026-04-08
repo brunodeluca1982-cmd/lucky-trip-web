@@ -139,7 +139,11 @@ const CITY_LOCAL_ASSETS: Record<string, NeighborhoodImageSource> = {
 // Non-Google-Places URLs are returned unchanged.
 function upgradePhotoUrl(url: string): string {
   if (!url.includes("maps.googleapis.com/maps/api/place/photo")) return url;
-  return url.replace(/maxwidth=\d+/i, "maxwidth=800");
+  if (/maxwidth=\d+/i.test(url)) {
+    return url.replace(/maxwidth=\d+/i, "maxwidth=800");
+  }
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}maxwidth=800`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
