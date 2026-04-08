@@ -47,7 +47,7 @@ export default function HotelDetailScreen() {
 
   // Hero image — Supabase photo_url first, then neighborhood fallback
   const heroImage = hotel
-    ? getImageForEntity("hotel", hotel.hotel_name, hotel.neighborhood.neighborhood_name, (hotel as any).photo_url ?? null)
+    ? getImageForEntity("hotel", hotel.hotel_name, hotel.neighborhood.neighborhood_name, hotel.photo_url ?? null)
     : getImageForEntity("neighborhood", "Ipanema");
 
   return (
