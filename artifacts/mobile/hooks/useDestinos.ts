@@ -45,17 +45,18 @@ export function useDestinos() {
         const { data, error: err } = await supabase
           .from("destinos")
           .select("id, nome, pais, lancado, descricao, slug")
+          .not("slug", "is", null)
           .order("lancado", { ascending: false })
           .order("nome");
 
         if (err) throw err;
 
         const rows: Destino[] = (data ?? []).map((row) => ({
-          id:        row.slug ?? String(row.id),
+          id:        row.slug as string,
           cidade:    row.nome,
           pais:      row.pais,
           descricao: row.descricao ?? "",
-          image:     destinoImage(row.slug ?? String(row.id), row.nome),
+          image:     destinoImage(row.slug as string, row.nome),
           lancado:   row.lancado ?? false,
         }));
 
