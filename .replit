@@ -35,4 +35,3 @@ channel = "stable-25_05"
 STRIPE_PRICE_ID = "price_1TJYjpGqZMbebHIjLdoi6H1b"
 
 [userenv.development]
-STRIPE_FORCE_SANDBOX = "true"
