@@ -2951,13 +2951,15 @@ export default function RoteiroScreen() {
   const params      = useLocalSearchParams<{ contextual?: string }>();
   const isContextual = params.contextual === "1";
 
-  const { saved } = useGuia();
+  const { saved, user } = useGuia();
 
-  const [result,        setResult]        = useState<ItineraryResult | null>(null);
-  const [generating,    setGenerating]    = useState(false);
-  const [editMode,      setEditMode]      = useState(false);
-  const [isExporting,   setIsExporting]   = useState(false);
-  const [replacingItem, setReplacingItem] = useState<{ item: SavedItem; diaNum: number } | null>(null);
+  const [result,            setResult]            = useState<ItineraryResult | null>(null);
+  const [generating,        setGenerating]        = useState(false);
+  const [editMode,          setEditMode]          = useState(false);
+  const [isExporting,       setIsExporting]       = useState(false);
+  const [replacingItem,     setReplacingItem]     = useState<{ item: SavedItem; diaNum: number } | null>(null);
+  /** ID of the auto-saved user_itineraries row — set after generation, used by Share/Export to update rather than re-insert. */
+  const [savedItineraryId,  setSavedItineraryId]  = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
   function replaceItem(diaNum: number, itemId: string, newItem: SavedItem) {
@@ -3003,51 +3005,61 @@ export default function RoteiroScreen() {
     if (!result) return;
     let shareSlug: string | undefined;
 
-    // 1. Try to persist the itinerary and get a shareable slug
+    // 1. Persist (or mark public) and get a shareable slug
     try {
       shareSlug = Array.from({ length: 8 }, () => Math.random().toString(36)[2]).join("");
 
-      const { data: itinerary, error: itinErr } = await supabase
-        .from("user_itineraries")
-        .insert({
-          destination_id:   "rio-de-janeiro",
-          destination_name: result.destination ?? "Rio de Janeiro",
-          status:           "generated",
-          is_public:        true,
-          share_slug:       shareSlug,
-          days_count:       result.summary.totalDays,
-          items_count:      result.summary.totalItems,
-          inspiration_tags: (result.preferences?.inspirations ?? []) as string[],
-          travel_company:   null,
-          budget_style:     result.preferences?.vibe ?? null,
-          generated_at:     new Date().toISOString(),
-        })
-        .select("id")
-        .single();
-
-      if (itinErr || !itinerary) {
-        shareSlug = undefined;
+      if (savedItineraryId) {
+        // Auto-save already ran — just mark public and attach the share slug
+        const { error } = await supabase
+          .from("user_itineraries")
+          .update({ is_public: true, share_slug: shareSlug })
+          .eq("id", savedItineraryId);
+        if (error) shareSlug = undefined;
       } else {
-        const roteiroItens = result.days.flatMap((dia) =>
-          dia.periodos.flatMap((periodo, _pi) =>
-            periodo.items.map((item, idx) => ({
-              roteiro_id:   itinerary.id,
-              name:         item.titulo,
-              day_index:    dia.numero - 1,
-              order_in_day: idx,
-              time_slot:    periodo.periodo,
-              source:       item.isExternal ? "external" : "saved",
-              ref_table:    item.isExternal ? "external" : null,
-              place_id:     item.isExternal ? (item.placeId ?? null) : null,
-              neighborhood: item.localizacao ?? dia.bairro,
-              address:      item.isExternal ? (item.address ?? null) : null,
-              city:         "Rio de Janeiro",
-              lat:          item.isExternal ? (item.lat ?? null) : null,
-              lng:          item.isExternal ? (item.lng ?? null) : null,
-            }))
-          )
-        );
-        await supabase.from("roteiro_itens").insert(roteiroItens);
+        // Unauthenticated fallback — full insert (preserves existing behavior)
+        const { data: itinerary, error: itinErr } = await supabase
+          .from("user_itineraries")
+          .insert({
+            destination_id:   "rio-de-janeiro",
+            destination_name: result.destination ?? "Rio de Janeiro",
+            status:           "generated",
+            is_public:        true,
+            share_slug:       shareSlug,
+            days_count:       result.summary.totalDays,
+            items_count:      result.summary.totalItems,
+            inspiration_tags: (result.preferences?.inspirations ?? []) as string[],
+            travel_company:   null,
+            budget_style:     result.preferences?.vibe ?? null,
+            generated_at:     new Date().toISOString(),
+          })
+          .select("id")
+          .single();
+
+        if (itinErr || !itinerary) {
+          shareSlug = undefined;
+        } else {
+          const roteiroItens = result.days.flatMap((dia) =>
+            dia.periodos.flatMap((periodo, _pi) =>
+              periodo.items.map((item, idx) => ({
+                roteiro_id:   itinerary.id,
+                name:         item.titulo,
+                day_index:    dia.numero - 1,
+                order_in_day: idx,
+                time_slot:    periodo.periodo,
+                source:       item.isExternal ? "external" : "saved",
+                ref_table:    item.isExternal ? "external" : null,
+                place_id:     item.isExternal ? (item.placeId ?? null) : null,
+                neighborhood: item.localizacao ?? dia.bairro,
+                address:      item.isExternal ? (item.address ?? null) : null,
+                city:         "Rio de Janeiro",
+                lat:          item.isExternal ? (item.lat ?? null) : null,
+                lng:          item.isExternal ? (item.lng ?? null) : null,
+              }))
+            )
+          );
+          await supabase.from("roteiro_itens").insert(roteiroItens);
+        }
       }
     } catch {
       shareSlug = undefined;
@@ -3122,46 +3134,57 @@ export default function RoteiroScreen() {
     // 1. Generate slug + persist itinerary to Supabase
     try {
       const slug = Array.from({ length: 8 }, () => Math.random().toString(36)[2]).join("");
-      const { data: itinerary, error: itinErr } = await supabase
-        .from("user_itineraries")
-        .insert({
-          destination_id:   "rio-de-janeiro",
-          destination_name: result.destination ?? "Rio de Janeiro",
-          status:           "generated",
-          is_public:        true,
-          share_slug:       slug,
-          days_count:       result.summary.totalDays,
-          items_count:      result.summary.totalItems,
-          inspiration_tags: (result.preferences?.inspirations ?? []) as string[],
-          travel_company:   null,
-          budget_style:     result.preferences?.vibe ?? null,
-          generated_at:     new Date().toISOString(),
-        })
-        .select("id")
-        .single();
 
-      if (!itinErr && itinerary) {
-        const roteiroItens = result.days.flatMap((dia) =>
-          dia.periodos.flatMap((periodo) =>
-            periodo.items.map((item, idx) => ({
-              roteiro_id:   itinerary.id,
-              name:         item.titulo,
-              day_index:    dia.numero - 1,
-              order_in_day: idx,
-              time_slot:    periodo.periodo,
-              source:       item.isExternal ? "external" : "saved",
-              ref_table:    item.isExternal ? "external" : null,
-              place_id:     item.isExternal ? (item.placeId ?? null) : null,
-              neighborhood: item.localizacao ?? dia.bairro,
-              address:      item.isExternal ? (item.address ?? null) : null,
-              city:         "Rio de Janeiro",
-              lat:          item.isExternal ? (item.lat ?? null) : null,
-              lng:          item.isExternal ? (item.lng ?? null) : null,
-            }))
-          )
-        );
-        await supabase.from("roteiro_itens").insert(roteiroItens);
-        exportUrl = `https://theluckytrip.app/r/${slug}`;
+      if (savedItineraryId) {
+        // Auto-save already ran — just mark public and attach the export slug
+        const { error } = await supabase
+          .from("user_itineraries")
+          .update({ is_public: true, share_slug: slug })
+          .eq("id", savedItineraryId);
+        if (!error) exportUrl = `https://theluckytrip.app/r/${slug}`;
+      } else {
+        // Unauthenticated fallback — full insert (preserves existing behavior)
+        const { data: itinerary, error: itinErr } = await supabase
+          .from("user_itineraries")
+          .insert({
+            destination_id:   "rio-de-janeiro",
+            destination_name: result.destination ?? "Rio de Janeiro",
+            status:           "generated",
+            is_public:        true,
+            share_slug:       slug,
+            days_count:       result.summary.totalDays,
+            items_count:      result.summary.totalItems,
+            inspiration_tags: (result.preferences?.inspirations ?? []) as string[],
+            travel_company:   null,
+            budget_style:     result.preferences?.vibe ?? null,
+            generated_at:     new Date().toISOString(),
+          })
+          .select("id")
+          .single();
+
+        if (!itinErr && itinerary) {
+          const roteiroItens = result.days.flatMap((dia) =>
+            dia.periodos.flatMap((periodo) =>
+              periodo.items.map((item, idx) => ({
+                roteiro_id:   itinerary.id,
+                name:         item.titulo,
+                day_index:    dia.numero - 1,
+                order_in_day: idx,
+                time_slot:    periodo.periodo,
+                source:       item.isExternal ? "external" : "saved",
+                ref_table:    item.isExternal ? "external" : null,
+                place_id:     item.isExternal ? (item.placeId ?? null) : null,
+                neighborhood: item.localizacao ?? dia.bairro,
+                address:      item.isExternal ? (item.address ?? null) : null,
+                city:         "Rio de Janeiro",
+                lat:          item.isExternal ? (item.lat ?? null) : null,
+                lng:          item.isExternal ? (item.lng ?? null) : null,
+              }))
+            )
+          );
+          await supabase.from("roteiro_itens").insert(roteiroItens);
+          exportUrl = `https://theluckytrip.app/r/${slug}`;
+        }
       }
     } catch { /* Supabase unavailable — proceed without URL */ }
 
@@ -3246,6 +3269,61 @@ export default function RoteiroScreen() {
         })),
       }));
 
+      // ── Auto-save for authenticated users ─────────────────────────────────
+      // Persists the itinerary header + items to Supabase before showing the result.
+      // Share/Export will UPDATE this row rather than inserting a duplicate.
+      // Failures are silent — the user still sees the generated itinerary.
+      let autoSavedId: string | null = null;
+      if (user) {
+        try {
+          const itemCount = hydratedDays.reduce(
+            (n, d) => n + d.periodos.reduce((m, p) => m + p.items.length, 0),
+            0,
+          );
+          const { data: itin, error: itinErr } = await supabase
+            .from("user_itineraries")
+            .insert({
+              user_id:          user.id,
+              destination_id:   "rio-de-janeiro",
+              destination_name: data.destination ?? "Rio de Janeiro",
+              status:           "generated",
+              is_public:        false,
+              days_count:       data.summary?.totalDays ?? hydratedDays.length,
+              items_count:      data.summary?.totalItems ?? itemCount,
+              inspiration_tags: (inspirations ?? []) as string[],
+              budget_style:     vibe ?? null,
+              generated_at:     new Date().toISOString(),
+            })
+            .select("id")
+            .single();
+
+          if (!itinErr && itin) {
+            autoSavedId = itin.id as string;
+            const roteiroItens = hydratedDays.flatMap((dia) =>
+              dia.periodos.flatMap((periodo) =>
+                periodo.items.map((item, idx) => ({
+                  roteiro_id:        itin.id,
+                  user_itinerary_id: itin.id,
+                  name:              item.titulo,
+                  day_index:         dia.numero - 1,
+                  order_in_day:      idx,
+                  time_slot:         periodo.periodo,
+                  source:            item.isExternal ? "external" : "saved",
+                  ref_table:         item.isExternal ? "external" : null,
+                  place_id:          item.isExternal ? (item.placeId ?? null) : null,
+                  neighborhood:      item.localizacao ?? dia.bairro,
+                  address:           item.isExternal ? (item.address ?? null) : null,
+                  city:              "Rio de Janeiro",
+                  lat:               item.isExternal ? (item.lat ?? null) : null,
+                  lng:               item.isExternal ? (item.lng ?? null) : null,
+                }))
+              )
+            );
+            await supabase.from("roteiro_itens").insert(roteiroItens);
+          }
+        } catch { /* auto-save failure is silent — result still shows */ }
+      }
+
       setResult({
         destination: data.destination ?? "Rio de Janeiro",
         source:      "trip_saved_places",
@@ -3253,6 +3331,7 @@ export default function RoteiroScreen() {
         summary:     data.summary,
         days:        hydratedDays,
       });
+      if (autoSavedId) setSavedItineraryId(autoSavedId);
     } catch (_) {
       const prefs: ItineraryPreferences = { inspirations, vibe };
       setResult(buildItinerary(saved, prefs));
@@ -3285,7 +3364,7 @@ export default function RoteiroScreen() {
         <View style={{ paddingTop: topPad }}>
           <ScreenHeader
             phase={phase}
-            onBack={() => { setResult(null); setGenerating(false); setEditMode(false); }}
+            onBack={() => { setResult(null); setGenerating(false); setEditMode(false); setSavedItineraryId(null); }}
             onShare={handleShare}
           />
         </View>

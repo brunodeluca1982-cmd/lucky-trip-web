@@ -308,6 +308,14 @@ Map tap → navigate directly to bairro page (no floating card). Bairro pages ha
 - `luckyList/[id].tsx` — "Salvar" button on each lucky pick card (toggles Salvar↔Salvo with gold fill)
 - `luckyList/bairro/[bairroNome].tsx` — same "Salvar" button in neighborhood lucky picks view
 
+### Itinerary Persistence (`user_itineraries` + `roteiro_itens`)
+
+- **Auto-save** — After `handleGenerate` receives a successful result, if the user is authenticated, the itinerary header is inserted into `user_itineraries` (`user_id`, `destination_id`, `status="generated"`, `is_public=false`) and each item into `roteiro_itens` (with **both** `roteiro_id` and `user_itinerary_id` pointing to the same itinerary UUID).
+- **`savedItineraryId` state** — tracks the auto-saved row ID. `handleShare` and `handleExport` check this: if set → UPDATE `is_public=true` + `share_slug` (no re-insert); if null (unauthenticated) → full INSERT (legacy fallback).
+- **Schema**: `roteiro_itens` has `roteiro_id UUID → user_itineraries.id` (original FK, always populated) and `user_itinerary_id UUID → user_itineraries.id ON DELETE CASCADE` (nullable; set by auto-save path). Index on `user_itinerary_id WHERE user_itinerary_id IS NOT NULL`.
+- **RLS**: `users_manage_own_itineraries` (ALL where `auth.uid()=user_id`), `anon_insert_public_itineraries` (INSERT, no where), `anon_select_public_itineraries` (SELECT where `is_public=true`).
+- **Back navigation** resets `savedItineraryId` to null so a new generation gets a fresh auto-save.
+
 ### Roteiro AI Flow (roteiro/index.tsx)
 
 **Entry routing**:
