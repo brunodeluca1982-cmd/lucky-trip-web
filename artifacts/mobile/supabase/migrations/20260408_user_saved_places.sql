@@ -44,6 +44,17 @@ BEGIN
     CREATE POLICY users_own_saves_delete ON user_saved_places
       FOR DELETE USING (auth.uid() = user_id);
   END IF;
+
+  -- UPDATE policy is required for upsert on-conflict paths
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE tablename = 'user_saved_places' AND policyname = 'users_own_saves_update'
+  ) THEN
+    CREATE POLICY users_own_saves_update ON user_saved_places
+      FOR UPDATE
+      USING (auth.uid() = user_id)
+      WITH CHECK (auth.uid() = user_id);
+  END IF;
 END
 $$;
 

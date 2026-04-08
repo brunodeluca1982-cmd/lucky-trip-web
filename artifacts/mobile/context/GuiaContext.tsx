@@ -285,6 +285,10 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
       console.log("[logout] onAuthStateChange event:", event, "session user:", session?.user?.id ?? "null");
       if (event === "SIGNED_OUT") {
         setUser(null);
+        // Clear local cache on sign-out so a different user logging in on the same
+        // device cannot inadvertently inherit and upload the previous user's saves.
+        setSaved([]);
+        AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
       } else {
         setUser(session?.user ?? null);
       }
