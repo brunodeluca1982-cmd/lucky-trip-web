@@ -25,6 +25,7 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { useAuth } from "@/hooks/useAuth";
+import { useGuia } from "@/context/GuiaContext";
 import { supabase } from "@/lib/supabase";
 
 const GOLD      = "#D4AF37";
@@ -64,11 +65,14 @@ export default function SubscriptionScreen() {
   const botPad  = Platform.OS === "web" ? 34 : insets.bottom;
   const params  = useLocalSearchParams<{ plan?: string }>();
   const { user } = useAuth();
+  const { markPremium } = useGuia();
 
   const defaultPlan: Plan = params.plan === "weekly" ? "weekly" : "annual";
-  const [selected,  setSelected] = useState<Plan>(defaultPlan);
-  const [loading,   setLoading]  = useState(false);
-  const [errorMsg,  setErrorMsg] = useState<string | null>(null);
+  const [selected,   setSelected]   = useState<Plan>(defaultPlan);
+  const [loading,    setLoading]    = useState(false);
+  const [errorMsg,   setErrorMsg]   = useState<string | null>(null);
+  const [restoring,  setRestoring]  = useState(false);
+  const [restoreMsg, setRestoreMsg] = useState<string | null>(null);
 
   async function handleStart() {
     if (loading) return;
@@ -128,6 +132,38 @@ export default function SubscriptionScreen() {
       setErrorMsg(err?.message ?? "Erro de conexão. Verifique sua internet.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleRestore() {
+    if (restoring || !user) return;
+    setRestoreMsg(null);
+    setRestoring(true);
+    try {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (!currentSession?.access_token) {
+        setRestoreMsg("Sessão expirada. Faça login novamente.");
+        return;
+      }
+      const apiBase = process.env.EXPO_PUBLIC_APP_ORIGIN || "";
+      const res = await fetch(`${apiBase}/api/stripe/sync-subscription`, {
+        headers: { Authorization: `Bearer ${currentSession.access_token}` },
+      });
+      const data = await res.json();
+      if (data.synced) {
+        await supabase.auth.refreshSession();
+        await markPremium();
+        setRestoreMsg("Acesso restaurado! Você já é Lucky Pro.");
+        setTimeout(() => router.replace("/(tabs)/"), 1800);
+      } else if (data.reason === "no_customer") {
+        setRestoreMsg("Nenhuma compra encontrada nesta conta.");
+      } else {
+        setRestoreMsg("Nenhuma assinatura ativa encontrada.");
+      }
+    } catch {
+      setRestoreMsg("Erro de conexão. Tente novamente.");
+    } finally {
+      setRestoring(false);
     }
   }
 
@@ -244,6 +280,28 @@ export default function SubscriptionScreen() {
         >
           <Text style={s.weeklyLinkText}>Acesso por 7 dias — R$9,90</Text>
         </Pressable>
+
+        {/* Restore purchase */}
+        {user && (
+          <Pressable
+            style={({ pressed }) => [s.restoreLink, pressed && { opacity: 0.6 }]}
+            onPress={handleRestore}
+            disabled={restoring}
+          >
+            {restoring
+              ? <ActivityIndicator size="small" color="rgba(255,255,255,0.28)" />
+              : <Text style={s.restoreLinkText}>Já sou assinante — Restaurar acesso</Text>
+            }
+          </Pressable>
+        )}
+        {restoreMsg && (
+          <Text style={[
+            s.errorText,
+            restoreMsg.startsWith("Acesso") && { color: "#4CAF50" },
+          ]}>
+            {restoreMsg}
+          </Text>
+        )}
       </ScrollView>
     </View>
   );
@@ -457,6 +515,18 @@ const s = StyleSheet.create({
     fontFamily:         "Inter_400Regular",
     fontSize:           13,
     color:              "rgba(255,255,255,0.28)",
+    textDecorationLine: "underline",
+  },
+  restoreLink: {
+    alignItems:   "center",
+    paddingTop:   16,
+    paddingBottom: 4,
+    minHeight:    32,
+  },
+  restoreLinkText: {
+    fontFamily:         "Inter_400Regular",
+    fontSize:           12,
+    color:              "rgba(255,255,255,0.22)",
     textDecorationLine: "underline",
   },
 });

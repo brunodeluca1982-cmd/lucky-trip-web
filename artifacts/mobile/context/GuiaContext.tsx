@@ -34,9 +34,10 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
-import type { ImageSourcePropType } from "react-native";
+import { AppState, type AppStateStatus, type ImageSourcePropType } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
@@ -226,45 +227,60 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // ── Load premium status — reads from Supabase app_metadata (admin-only write) ──
-  // app_metadata.plan_type is written exclusively by the server webhook handler
-  // using the service role key — it cannot be spoofed by the client.
-  useEffect(() => {
-    (async () => {
-      // Fast-path: AsyncStorage cache
-      const premiumStr = await AsyncStorage.getItem(PREMIUM_KEY);
-      if (premiumStr === "true") {
-        setIsPremium(true);
-      }
+  // ── Shared premium-check helper ────────────────────────────────────────────
+  // Called on: user change, app foreground, and manual refresh after purchase.
+  // Reads fresh app_metadata from Supabase Auth (admin-only write — tamper-proof).
+  const checkPremiumStatus = useCallback(async (currentUser: User | null) => {
+    if (!currentUser) {
+      setIsPremium(false);
+      await AsyncStorage.removeItem(PREMIUM_KEY);
+      return;
+    }
+    try {
+      const { data: { user: freshUser } } = await supabase.auth.getUser();
+      const metadata  = freshUser?.app_metadata as Record<string, any> | undefined;
+      const validPlan = metadata?.plan_type === "premium" || metadata?.plan_type === "vip";
+      // null access_until = lifetime / no expiry — treat as valid; only deny when explicitly expired
+      const notExpired = !metadata?.access_until
+        || new Date(metadata.access_until) > new Date();
 
-      if (!user) {
+      if (validPlan && notExpired) {
+        setIsPremium(true);
+        await AsyncStorage.setItem(PREMIUM_KEY, "true");
+      } else {
         setIsPremium(false);
         await AsyncStorage.removeItem(PREMIUM_KEY);
-        return;
       }
+    } catch {
+      // Network error — keep existing in-memory value
+    }
+  }, []);
 
-      try {
-        // supabase.auth.getUser() fetches fresh data from the Supabase Auth API,
-        // returning the latest app_metadata (not the stale JWT-decoded value).
-        const { data: { user: freshUser } } = await supabase.auth.getUser();
-        const metadata  = freshUser?.app_metadata as Record<string, any> | undefined;
-        const validPlan = metadata?.plan_type === "premium" || metadata?.plan_type === "vip";
-        const notExpired = metadata?.access_until
-          ? new Date(metadata.access_until) > new Date()
-          : false;
+  // ── Load premium status on user change ─────────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      // Fast-path: show cached value instantly while the network check runs
+      const premiumStr = await AsyncStorage.getItem(PREMIUM_KEY);
+      if (premiumStr === "true") setIsPremium(true);
 
-        if (validPlan && notExpired) {
-          setIsPremium(true);
-          await AsyncStorage.setItem(PREMIUM_KEY, "true");
-        } else {
-          setIsPremium(false);
-          await AsyncStorage.removeItem(PREMIUM_KEY);
-        }
-      } catch {
-        // Network error — keep fast-path value from AsyncStorage
-      }
+      await checkPremiumStatus(user);
     })();
-  }, [user]);
+  }, [user, checkPremiumStatus]);
+
+  // ── Re-check premium when app returns to foreground ────────────────────────
+  // Handles the case where the user completed the Stripe checkout in an external
+  // browser and returns to the app. The fresh getUser() call picks up any
+  // app_metadata written by verify-session or the webhook during that time.
+  const appStateRef = useRef(AppState.currentState);
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", async (nextState: AppStateStatus) => {
+      if (appStateRef.current !== "active" && nextState === "active") {
+        await checkPremiumStatus(user);
+      }
+      appStateRef.current = nextState;
+    });
+    return () => sub.remove();
+  }, [user, checkPremiumStatus]);
 
   // ── Persist to AsyncStorage whenever saved changes ─────────────────────────
   useEffect(() => {

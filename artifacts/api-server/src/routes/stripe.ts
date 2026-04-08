@@ -165,15 +165,23 @@ router.post(
         }) as any;
       }
 
-      // Build success / cancel URLs
-      const appOrigin =
+      // Build success / cancel URLs — always use an absolute HTTPS base.
+      // The client may send a relative URL if EXPO_PUBLIC_APP_ORIGIN is not set;
+      // in that case, fall back to the server's known domain so Stripe can redirect correctly.
+      const serverOrigin =
         process.env["APP_ORIGIN"] ||
         (process.env["REPLIT_DOMAINS"]
           ? `https://${process.env["REPLIT_DOMAINS"]!.split(",")[0]}`
           : "https://example.com");
 
-      const successUrl = success_url ?? `${appOrigin}/post-purchase?session_id={CHECKOUT_SESSION_ID}`;
-      const cancelUrl  = cancel_url  ?? `${appOrigin}/subscription`;
+      const isAbsolute = (u?: string) => typeof u === "string" && /^https?:\/\//i.test(u);
+
+      const successUrl = isAbsolute(success_url)
+        ? success_url!
+        : `${serverOrigin}/post-purchase?session_id={CHECKOUT_SESSION_ID}`;
+      const cancelUrl = isAbsolute(cancel_url)
+        ? cancel_url!
+        : `${serverOrigin}/subscription`;
 
       // Find or create Stripe customer
       let sub        = await storage.getUserSubscription(req.user.id);
@@ -316,6 +324,83 @@ router.get(
     } catch (err: any) {
       logger.error({ err }, "GET /subscription failed");
       res.status(500).json({ error: "Failed to fetch subscription" });
+    }
+  })
+);
+
+// ── GET /api/stripe/sync-subscription ────────────────────────────────────────
+// Healing endpoint: queries Stripe for the user's customer subscriptions and
+// provisions premium in Supabase if an active subscription is found.
+// Safe to call on every app foreground — idempotent.
+
+router.get(
+  "/sync-subscription",
+  requireAuth(async (req, res) => {
+    try {
+      const sub = await storage.getUserSubscription(req.user.id);
+      if (!sub?.stripe_customer_id) {
+        return res.json({ synced: false, reason: "no_customer" }) as any;
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const subscriptions = await stripe.subscriptions.list({
+        customer: sub.stripe_customer_id,
+        status:   "active",
+        limit:    5,
+      });
+
+      const activeSub = subscriptions.data[0];
+      if (!activeSub) {
+        // Also check trialing
+        const trialSubs = await stripe.subscriptions.list({
+          customer: sub.stripe_customer_id,
+          status:   "trialing",
+          limit:    5,
+        });
+        const trialSub = trialSubs.data[0];
+        if (!trialSub) {
+          return res.json({ synced: false, reason: "no_active_subscription" }) as any;
+        }
+        // Provision from trialing subscription
+        const periodEndMs = trialSub.current_period_end * 1000;
+        const interval    = trialSub.items.data[0]?.price?.recurring?.interval;
+        await storage.upsertUserSubscription(req.user.id, {
+          stripe_customer_id:     sub.stripe_customer_id,
+          stripe_subscription_id: trialSub.id,
+          subscription_status:    trialSub.status,
+          plan_type:              interval ?? null,
+        });
+        await storage.provisionPremiumInSupabase(req.user.id, periodEndMs, interval, {
+          customerId:     sub.stripe_customer_id,
+          subscriptionId: trialSub.id,
+          status:         trialSub.status,
+        });
+        logger.info({ userId: req.user.id, subId: trialSub.id }, "Premium synced (trialing)");
+        return res.json({ synced: true, status: trialSub.status }) as any;
+      }
+
+      // Provision from active subscription
+      const periodEndMs = activeSub.current_period_end * 1000;
+      const interval    = activeSub.items.data[0]?.price?.recurring?.interval;
+
+      await storage.upsertUserSubscription(req.user.id, {
+        stripe_customer_id:     sub.stripe_customer_id,
+        stripe_subscription_id: activeSub.id,
+        subscription_status:    activeSub.status,
+        plan_type:              interval ?? null,
+      });
+
+      await storage.provisionPremiumInSupabase(req.user.id, periodEndMs, interval, {
+        customerId:     sub.stripe_customer_id,
+        subscriptionId: activeSub.id,
+        status:         activeSub.status,
+      });
+
+      logger.info({ userId: req.user.id, subId: activeSub.id }, "Premium synced (active)");
+      res.json({ synced: true, status: activeSub.status });
+    } catch (err: any) {
+      logger.error({ err }, "GET /sync-subscription failed");
+      res.status(500).json({ error: err.message ?? "Failed to sync subscription" });
     }
   })
 );
