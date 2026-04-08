@@ -193,14 +193,17 @@ function syncSaveToServer(userId: string, item: SavedItem): void {
 
 /**
  * Deletes a saved item from user_saved_places.
+ * Requires source_table so the delete matches the unique key (user_id, place_id, source_table)
+ * and never over-deletes when two items share the same place_id from different tables.
  * Fire-and-forget — errors are logged but never surfaced to the user.
  */
-function syncUnsaveFromServer(userId: string, itemId: string): void {
+function syncUnsaveFromServer(userId: string, itemId: string, sourceTable: SourceTable): void {
   supabase
     .from("user_saved_places")
     .delete()
     .eq("user_id", userId)
     .eq("place_id", itemId)
+    .eq("source_table", sourceTable)
     .then(({ error }) => {
       if (error) console.warn("[GuiaContext] syncUnsave error:", error.message);
     });
@@ -374,32 +377,53 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
 
         const serverRows = data ?? [];
         const localItems = savedRef.current;
-        const serverIds  = new Set(serverRows.map((r) => r.place_id));
-        const localIds   = new Set(localItems.map((s) => s.id));
+
+        // Composite key matches the table's unique constraint (user_id, place_id, source_table).
+        // Using place_id alone would incorrectly collapse distinct saves from different source tables.
+        const serverKeys = new Set(
+          serverRows.map((r) => `${r.place_id}::${r.source_table}`)
+        );
+        const localKeys = new Set(
+          localItems.map((s) =>
+            `${s.id}::${s.source_table ?? sourceTableFromCategoria(s.categoria)}`
+          )
+        );
 
         // Items on server but not locally — add to local state
         const toAdd: SavedItem[] = serverRows
-          .filter((row) => !localIds.has(row.place_id))
+          .filter((row) => !localKeys.has(`${row.place_id}::${row.source_table}`))
           .map((row) => ({
-            id:           row.place_id,
+            id:           row.place_id as string,
             categoria:    row.categoria as SavedCategory,
             source_table: row.source_table as SourceTable,
-            titulo:       row.titulo ?? "",
-            localizacao:  row.localizacao ?? "",
-            image:        row.image_url ? { uri: row.image_url } : { uri: "" },
+            titulo:       (row.titulo as string | null) ?? "",
+            localizacao:  (row.localizacao as string | null) ?? "",
+            image:        (row.image_url as string | null)
+                            ? { uri: row.image_url as string }
+                            : { uri: "" },
           }));
 
         if (toAdd.length > 0) {
           setSaved((prev) => {
-            const existingIds = new Set(prev.map((s) => s.id));
-            const newItems = toAdd.filter((i) => !existingIds.has(i.id));
+            const existingKeys = new Set(
+              prev.map((s) =>
+                `${s.id}::${s.source_table ?? sourceTableFromCategoria(s.categoria)}`
+              )
+            );
+            const newItems = toAdd.filter(
+              (i) => !existingKeys.has(`${i.id}::${i.source_table}`)
+            );
             return newItems.length > 0 ? [...prev, ...newItems] : prev;
           });
         }
 
         // Items local but not on server — upload in background
         localItems
-          .filter((item) => !serverIds.has(item.id))
+          .filter((item) =>
+            !serverKeys.has(
+              `${item.id}::${item.source_table ?? sourceTableFromCategoria(item.categoria)}`
+            )
+          )
           .forEach((item) => syncSaveToServer(currentUser.id, item));
 
       } catch {
@@ -432,13 +456,20 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
   }, [saved, user]);
 
   const unsave = useCallback((id: string) => {
-    setSaved((prev) => prev.filter((s) => s.id !== id));
-
-    // Background delete from Supabase (fire-and-forget)
+    // Find the item before removing it — we need source_table for the Supabase delete key.
+    // The delete must match (user_id, place_id, source_table) to avoid over-deleting.
     if (user) {
-      syncUnsaveFromServer(user.id, id);
+      const item = saved.find((s) => s.id === id);
+      if (item) {
+        syncUnsaveFromServer(
+          user.id,
+          id,
+          item.source_table ?? sourceTableFromCategoria(item.categoria),
+        );
+      }
     }
-  }, [user]);
+    setSaved((prev) => prev.filter((s) => s.id !== id));
+  }, [saved, user]);
 
   const isSaved = useCallback(
     (id: string) => saved.some((s) => s.id === id),
