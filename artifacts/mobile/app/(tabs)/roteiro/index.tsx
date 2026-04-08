@@ -1112,91 +1112,9 @@ interface Suggestion {
   localizacao: string;
   image: ReturnType<typeof getNeighborhoodImage>;
   categoria: SavedCategory;
-  /** Explicit Supabase table — always set for internal DB items. */
+  /** Explicit Supabase table — always set for curated DB items. */
   source_table?: SourceTable;
   subtitle?: string;
-  isExternal?: boolean;
-  // External places (Google Places)
-  placeId?: string;
-  address?: string;
-  lat?: number;
-  lng?: number;
-}
-
-const GOOGLE_PLACES_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_KEY ?? "";
-
-/**
- * Calls Google Places Autocomplete API (biased to Rio de Janeiro).
- * Returns up to 5 place suggestions with placeId + address.
- * Coordinates are fetched separately via fetchPlaceDetails when user selects a result.
- *
- * Endpoint: https://maps.googleapis.com/maps/api/place/autocomplete/json
- * Key: EXPO_PUBLIC_GOOGLE_PLACES_KEY (configured in Expo env)
- */
-async function fetchGooglePlaces(
-  query: string,
-  categoria: SavedCategory,
-): Promise<Suggestion[]> {
-  if (!GOOGLE_PLACES_KEY || query.trim().length < 2) return [];
-  try {
-    const typeParam = categoria === "restaurante"
-      ? "&types=restaurant"
-      : "&types=tourist_attraction|point_of_interest|establishment";
-    const biasedQuery = `${query.trim()} Rio de Janeiro`;
-    const url =
-      `https://maps.googleapis.com/maps/api/place/autocomplete/json` +
-      `?input=${encodeURIComponent(biasedQuery)}` +
-      `&location=-22.9068,-43.1729&radius=80000&language=pt-BR` +
-      `${typeParam}&key=${GOOGLE_PLACES_KEY}`;
-    const res = await fetch(url);
-    if (!res.ok) return [];
-    const data = await res.json();
-    if (!data.predictions?.length) return [];
-    return (data.predictions as Record<string, unknown>[]).map((p) => {
-      const fmt = (p as Record<string, Record<string, string>>).structured_formatting;
-      return {
-        id:          p.place_id as string,
-        placeId:     p.place_id as string,
-        titulo:      fmt?.main_text ?? (p.description as string),
-        localizacao: fmt?.secondary_text ?? "Rio de Janeiro",
-        address:     p.description as string,
-        image:       getNeighborhoodImage(""),
-        categoria,
-        subtitle:    "Lugar externo",
-        isExternal:  true,
-      };
-    });
-  } catch {
-    return [];
-  }
-}
-
-/**
- * Calls Google Places Details API to fetch lat/lng for a given place_id.
- * Only called on item selection to avoid unnecessary API quota usage.
- *
- * Endpoint: https://maps.googleapis.com/maps/api/place/details/json
- */
-async function fetchPlaceDetails(
-  placeId: string,
-): Promise<{ lat: number; lng: number } | null> {
-  if (!GOOGLE_PLACES_KEY || !placeId) return null;
-  try {
-    const url =
-      `https://maps.googleapis.com/maps/api/place/details/json` +
-      `?place_id=${encodeURIComponent(placeId)}&fields=geometry&language=pt-BR` +
-      `&key=${GOOGLE_PLACES_KEY}`;
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const data = await res.json();
-    const loc = data?.result?.geometry?.location as
-      | { lat: number; lng: number }
-      | undefined;
-    if (!loc) return null;
-    return { lat: loc.lat, lng: loc.lng };
-  } catch {
-    return null;
-  }
 }
 
 interface ReplaceSheetProps {
@@ -1207,14 +1125,12 @@ interface ReplaceSheetProps {
 }
 
 function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
-  const [suggestions,     setSuggestions]     = useState<Suggestion[]>([]);
-  const [crossResults,    setCrossResults]    = useState<Suggestion[]>([]);
-  const [externalResults, setExternalResults] = useState<Suggestion[]>([]);
-  const [loading,         setLoading]         = useState(true);
-  const [crossLoading,    setCrossLoading]    = useState(false);
-  const [extLoading,      setExtLoading]      = useState(false);
-  const [isConfirming,    setIsConfirming]    = useState(false);
-  const [searchQuery,     setSearchQuery]     = useState("");
+  const [suggestions,  setSuggestions]  = useState<Suggestion[]>([]);
+  const [crossResults, setCrossResults] = useState<Suggestion[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [crossLoading, setCrossLoading] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [searchQuery,  setSearchQuery]  = useState("");
 
   useEffect(() => { fetchSuggestions(); }, [item.id]);
 
@@ -1265,19 +1181,6 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Debounce Google Places search — starts at 2 chars, 500ms delay
-  useEffect(() => {
-    const q = searchQuery.trim();
-    if (q.length < 2) { setExternalResults([]); setExtLoading(false); return; }
-    if (!GOOGLE_PLACES_KEY) { setExternalResults([]); setExtLoading(false); return; }
-    setExtLoading(true);
-    const timer = setTimeout(async () => {
-      const results = await fetchGooglePlaces(q, item.categoria);
-      setExternalResults(results);
-      setExtLoading(false);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [searchQuery, item.categoria]);
 
   async function fetchSuggestions() {
     setLoading(true);
@@ -1356,44 +1259,21 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
     (c) => !localFiltered.some((l) => l.titulo === c.titulo),
   );
 
-  // External results — deduplicate against internal DB results
-  const externalDeduped = externalResults.filter(
-    (e) => !localFiltered.some((l) => l.id === e.id) && !crossDeduped.some((c) => c.titulo === e.titulo),
-  );
-
   /**
-   * On confirm: fetch lat/lng from Place Details API for external items, then
-   * create a fully-hydrated SavedItem and pass it up to the roteiro context.
+   * On confirm: create a fully-hydrated SavedItem from the curated DB suggestion
+   * and pass it up to the roteiro context.
    */
   async function confirmReplace(sug: Suggestion) {
     if (isConfirming) return;
     setIsConfirming(true);
     try {
-      let lat = sug.lat;
-      let lng = sug.lng;
-
-      // Fetch coordinates from Place Details API (only for external results)
-      if (sug.isExternal && sug.placeId) {
-        const geo = await fetchPlaceDetails(sug.placeId);
-        if (geo) { lat = geo.lat; lng = geo.lng; }
-      }
-
       const newItem: SavedItem = {
         id:           sug.id,
         titulo:       sug.titulo,
         localizacao:  sug.localizacao,
         image:        sug.image,
         categoria:    sug.categoria,
-        // Carry source_table for internal items so routing never infers from categoria
-        ...(sug.isExternal
-          ? {
-              isExternal: true,
-              placeId:    sug.placeId,
-              address:    sug.address,
-              lat,
-              lng,
-            }
-          : { source_table: sug.source_table ?? sourceTableFromCategoria(sug.categoria) }),
+        source_table: sug.source_table ?? sourceTableFromCategoria(sug.categoria),
       };
       onReplace(diaNum, item.id, newItem);
       onClose();
@@ -1402,7 +1282,7 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
     }
   }
 
-  /** Render a single suggestion card (shared for internal + external) */
+  /** Render a single curated suggestion card */
   function renderSugCard(sug: Suggestion) {
     return (
       <Pressable
@@ -1417,22 +1297,15 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
             colors={["transparent", "rgba(0,0,0,0.35)"]}
             style={StyleSheet.absoluteFill}
           />
-          {sug.isExternal && (
-            <View style={rs.externalMark}>
-              <Feather name="globe" size={9} color={GOLD} />
-            </View>
-          )}
         </View>
         <View style={rs.sugInfo}>
           <Text style={rs.sugName} numberOfLines={1}>{sug.titulo}</Text>
           <View style={rs.sugLocRow}>
             <Feather name="map-pin" size={9} color={`${GOLD}80`} />
-            <Text style={rs.sugLoc} numberOfLines={1}>
-              {sug.isExternal ? (sug.address ?? sug.localizacao) : sug.localizacao}
-            </Text>
+            <Text style={rs.sugLoc} numberOfLines={1}>{sug.localizacao}</Text>
           </View>
           {sug.subtitle ? (
-            <View style={[rs.sugBadge, sug.isExternal && rs.sugBadgeExternal]}>
+            <View style={rs.sugBadge}>
               <Text style={rs.sugBadgeText}>{sug.subtitle}</Text>
             </View>
           ) : null}
@@ -1518,66 +1391,17 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
             </>
           )}
 
-          {/* ── Google Places results (when API key is configured) ─── */}
-          {q.length >= 2 && GOOGLE_PLACES_KEY.length > 0 && (
-            <>
-              <View style={rs.sectionLabelRow}>
-                <Text style={rs.sectionLabel}>✦ Lugares externos</Text>
-                {extLoading && (
-                  <Text style={rs.sectionLabelSub}>buscando…</Text>
-                )}
-              </View>
-              {extLoading && externalDeduped.length === 0 ? (
-                <View style={rs.googleLoadingRow}>
-                  <Feather name="loader" size={16} color={`${GOLD}70`} />
-                  <Text style={rs.googleLoadingText}>Buscando lugares externos…</Text>
-                </View>
-              ) : externalDeduped.length > 0 ? (
-                externalDeduped.map(renderSugCard)
-              ) : (
-                !extLoading && (
-                  <View style={rs.googleEmptyRow}>
-                    <Text style={rs.googleEmptyText}>Nenhum resultado externo encontrado</Text>
-                  </View>
-                )
-              )}
-            </>
+          {/* ── Curated empty state — shown when search has results to offer ─── */}
+          {q.length >= 2 && localFiltered.length === 0 && crossDeduped.length === 0 && !crossLoading && (
+            <View style={rs.emptyState}>
+              <Feather name="search" size={24} color={`${GOLD}50`} />
+              <Text style={rs.emptyText}>Nenhum lugar encontrado na nossa curadoria</Text>
+              <Text style={rs.emptySub}>Tente outro nome ou categoria</Text>
+            </View>
           )}
 
-          {/* ── Manual external place — shown when no Google key or no results ─── */}
-          {q.length >= 2 && (GOOGLE_PLACES_KEY.length === 0 || (!extLoading && externalDeduped.length === 0)) && (
-            <>
-              <View style={rs.sectionLabelRow}>
-                <Text style={rs.sectionLabel}>✦ Adicionar lugar externo</Text>
-              </View>
-              <Pressable
-                style={({ pressed }) => [rs.sugCard, rs.manualCard, (pressed || isConfirming) && { opacity: 0.75 }]}
-                onPress={() => confirmReplace({
-                  id:          `ext-${Date.now()}`,
-                  titulo:      q,
-                  localizacao: "Rio de Janeiro",
-                  address:     q,
-                  image:       getNeighborhoodImage(""),
-                  categoria:   item.categoria,
-                  subtitle:    "Lugar adicionado manualmente",
-                  isExternal:  true,
-                })}
-                disabled={isConfirming}
-              >
-                <View style={rs.manualIconBox}>
-                  <Feather name="plus" size={18} color={GOLD} />
-                </View>
-                <View style={rs.manualTextBox}>
-                  <Text style={rs.manualTitle} numberOfLines={1}>{q}</Text>
-                  <Text style={rs.manualSub}>Adicionar como lugar externo</Text>
-                </View>
-                <Feather name="chevron-right" size={16} color={`${GOLD}60`} />
-              </Pressable>
-            </>
-          )}
-
-          {/* ── True empty state — only shown when no results anywhere and not loading ── */}
-          {localFiltered.length === 0 && crossDeduped.length === 0 && externalDeduped.length === 0 && !extLoading && !crossLoading && q.length < 2 && (
+          {/* ── Prompt: no query entered yet ── */}
+          {q.length < 2 && localFiltered.length === 0 && !loading && (
             <View style={rs.emptyState}>
               <Feather name="search" size={24} color={`${GOLD}50`} />
               <Text style={rs.emptyText}>Nenhum lugar encontrado</Text>
@@ -1770,78 +1594,6 @@ const rs = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     color: "rgba(255,255,255,0.30)",
-  },
-  // External place marker (globe icon in thumb corner)
-  externalMark: {
-    position: "absolute",
-    bottom: 4,
-    right: 4,
-    backgroundColor: "rgba(0,0,0,0.48)",
-    borderRadius: 5,
-    padding: 2,
-  },
-  // Badge variant for external/Google Places results
-  sugBadgeExternal: {
-    backgroundColor: "rgba(212,175,55,0.06)",
-    borderColor: "rgba(212,175,55,0.22)",
-  },
-  // Google Places section loading state
-  googleLoadingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 4,
-  },
-  googleLoadingText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: "rgba(255,255,255,0.35)",
-  },
-  // Google Places section — no results
-  googleEmptyRow: {
-    paddingVertical: 12,
-    paddingHorizontal: 4,
-  },
-  googleEmptyText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: "rgba(255,255,255,0.30)",
-  },
-  manualCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    borderRadius: 14,
-    backgroundColor: "rgba(212,175,55,0.06)",
-    borderWidth: 1,
-    borderColor: "rgba(212,175,55,0.22)",
-  },
-  manualIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: "rgba(212,175,55,0.12)",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(212,175,55,0.25)",
-  },
-  manualTextBox: {
-    flex: 1,
-  },
-  manualTitle: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
-    color: CREAM,
-  },
-  manualSub: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    color: `${GOLD}90`,
-    marginTop: 2,
   },
 });
 
