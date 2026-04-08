@@ -341,12 +341,39 @@ Map tap → navigate directly to bairro page (no floating card). Bairro pages ha
 - Annual plan (highlighted, "Mais escolhido" + "Economize 40%", R$19,90/mês / R$97/ano)
 - Monthly plan (R$29,90/mês)
 - Weekly link at bottom (R$9,90)
-- CTA calls `supabase.functions.invoke("create-checkout")` with `{ deviceId, plan }`
+- CTA calls `POST /api/stripe/checkout` (Bearer JWT auth) — server builds absolute success_url from REPLIT_DOMAINS fallback
+- "Já sou assinante — Restaurar acesso" link calls `GET /api/stripe/sync-subscription` to heal missed provisioning
 
 **Post-purchase screen** (`app/(tabs)/post-purchase.tsx`, hidden from tab bar):
-- Calls `markPremium()` on mount
+- Calls `GET /api/stripe/verify-session?session_id=...` (Bearer JWT) → provisions `app_metadata` in Supabase
 - "Você agora é Lucky Pro" — lists unlocked benefits
 - CTA → Lucky List; secondary → home
+
+**Premium check chain** (authoritative field: `user.app_metadata.plan_type === "premium"`):
+- `GuiaContext.checkPremiumStatus()` — calls `supabase.auth.getUser()` on: user change, app foreground, manual restore
+- `access_until = null` → treated as lifetime (never expires); explicit ISO date → checked against `new Date()`
+
+### Stripe Webhook Setup (manual, required for production)
+
+The API server handles all Stripe webhooks at `POST /api/stripe/webhook`. Without a webhook, premium is only provisioned via `verify-session` (post-purchase) or `sync-subscription` (restore).
+
+**To register the webhook in the Stripe Dashboard:**
+1. Go to [https://dashboard.stripe.com/webhooks](https://dashboard.stripe.com/webhooks)
+2. Click "Add endpoint"
+3. URL: `https://<REPLIT_DEV_DOMAIN>/api/stripe/webhook`
+   - Find `REPLIT_DEV_DOMAIN` in the Replit workspace (shown in the browser URL bar when viewing the app)
+4. Select these events:
+   - `checkout.session.completed`
+   - `invoice.paid`
+   - `customer.subscription.updated`
+   - `customer.subscription.deleted`
+5. Copy the webhook signing secret → add as `STRIPE_WEBHOOK_SECRET` env var in Replit Secrets
+
+**Emergency provisioning** (for users who paid but aren't recognized):
+```bash
+cd artifacts/api-server && node scripts/provision-user.mjs <supabase_user_id>
+```
+This script writes `app_metadata.plan_type = "premium"` directly via the Supabase admin API.
 
 **Lucky List locking** (`app/(tabs)/luckyList/[id].tsx`):
 - `FREE_ITEMS = 3`: first 3 picks visible to all; items 4+ are locked for non-premium
