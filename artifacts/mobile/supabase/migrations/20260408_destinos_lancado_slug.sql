@@ -22,5 +22,14 @@ ON CONFLICT (slug) DO UPDATE
   SET nome=EXCLUDED.nome, pais=EXCLUDED.pais, lancado=EXCLUDED.lancado, descricao=EXCLUDED.descricao;
 
 -- Public read policy (RLS was enabled, no policies existed)
-CREATE POLICY IF NOT EXISTS "anon_select_destinos"
-  ON destinos FOR SELECT USING (true);
+-- Uses DO $$ block for idempotency — CREATE POLICY IF NOT EXISTS is not valid PostgreSQL
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE tablename = 'destinos' AND policyname = 'anon_select_destinos'
+  ) THEN
+    CREATE POLICY "anon_select_destinos" ON destinos FOR SELECT USING (true);
+  END IF;
+END;
+$$;
