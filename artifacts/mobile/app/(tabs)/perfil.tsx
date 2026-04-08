@@ -32,6 +32,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AntDesign, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useAuth } from "@/hooks/useAuth";
 import { useGuia } from "@/context/GuiaContext";
@@ -782,6 +783,74 @@ function EmailSentState({
   );
 }
 
+// ── PROFILE HERO BACKGROUND ───────────────────────────────────────────────────
+// Uses local assets already bundled — no network requests, stable, MVP-safe.
+// Images: Rio de Janeiro only. Same crossfade pattern as the auth hero.
+
+const PROFILE_HERO_IMAGES = [
+  require("@/assets/images/rio-aerial-clean.png"),
+  require("@/assets/images/ipanema.png"),
+  require("@/assets/images/hero-rio.png"),
+  require("@/assets/images/pao-acucar.png"),
+  require("@/assets/images/lapa.png"),
+];
+
+const PROFILE_HERO_INTERVAL = 10_000;
+
+function ProfileHeroBg() {
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const [nextIdx,    setNextIdx]    = useState(1);
+  const nextOpacity = useRef(new Animated.Value(0)).current;
+  const timerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    timerRef.current = setInterval(() => {
+      Animated.timing(nextOpacity, {
+        toValue: 1,
+        duration: 1800,
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (!finished) return;
+        setCurrentIdx((c) => {
+          setNextIdx((c + 2) % PROFILE_HERO_IMAGES.length);
+          return (c + 1) % PROFILE_HERO_IMAGES.length;
+        });
+        nextOpacity.setValue(0);
+      });
+    }, PROFILE_HERO_INTERVAL);
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <>
+      <Image
+        source={PROFILE_HERO_IMAGES[currentIdx]}
+        style={StyleSheet.absoluteFill}
+        resizeMode="cover"
+        pointerEvents="none"
+      />
+      <Animated.Image
+        source={PROFILE_HERO_IMAGES[nextIdx]}
+        style={[StyleSheet.absoluteFill, { opacity: nextOpacity }]}
+        resizeMode="cover"
+        pointerEvents="none"
+      />
+      {/* Dark overlay — keeps avatar/text readable */}
+      <View style={s.profileHeroOverlay} pointerEvents="none" />
+      {/* Bottom gradient — fades into the dark card area below */}
+      <LinearGradient
+        colors={["transparent", "rgba(13,13,13,0.70)", "#0D0D0D"]}
+        locations={[0.35, 0.72, 1]}
+        style={s.profileHeroGradient}
+        pointerEvents="none"
+      />
+    </>
+  );
+}
+
 // ── PROFILE SHARED COMPONENTS ─────────────────────────────────────────────────
 
 type MenuItemProps = {
@@ -827,6 +896,10 @@ function ProfileHeader({
 
   return (
     <View style={[s.profileHeader, { paddingTop: topPad }]}>
+      {/* Rotating hero background — local assets, no network requests */}
+      <ProfileHeroBg />
+
+      {/* Content — sits above the hero layers */}
       <View style={s.avatar}>
         <Feather name="user" size={28} color={GOLD} />
       </View>
@@ -1309,10 +1382,20 @@ const s = StyleSheet.create({
   profileHeader: {
     alignItems: "center",
     paddingHorizontal: 24,
-    paddingBottom: 28,
-    backgroundColor: "#161616",
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.07)",
+    paddingBottom: 36,
+    overflow: "hidden",
+    minHeight: 240,
+  },
+  profileHeroOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.48)",
+  },
+  profileHeroGradient: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 100,
   },
   avatar: {
     width: 72,
@@ -1330,11 +1413,17 @@ const s = StyleSheet.create({
     fontSize: 22,
     color: "#FFFFFF",
     marginBottom: 4,
+    textShadowColor: "rgba(0,0,0,0.70)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 8,
   },
   profileEmail: {
     fontFamily: "Inter_400Regular",
     fontSize: 13,
-    color: "rgba(255,255,255,0.45)",
+    color: "rgba(255,255,255,0.65)",
+    textShadowColor: "rgba(0,0,0,0.60)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
 
   freeBadge: {
