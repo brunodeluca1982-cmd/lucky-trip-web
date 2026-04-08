@@ -1,25 +1,27 @@
 /**
  * perfil.tsx — Profile tab
  *
- * STATE 1 — Logged out : full account creation form (matches design reference)
- * STATE 2 — Sent       : check-your-email confirmation
- * STATE 3 — Logged in  : minimal real profile (email from Supabase, logout)
+ * STATE A — Visitante (não logado)  : tela de login + hero rotativo Rio
+ * STATE B — Usuário Free            : perfil com CTA Lucky Pro
+ * STATE C — Usuário Lucky Pro       : perfil premium com status Pro
  *
- * No mock data. No hardcoded values. No fake profile content.
+ * Regra de sessão: sessão persiste via Supabase onAuthStateChange.
+ * Usuário volta a ver login APENAS se clicar em "Sair" ou sessão expirar.
  *
- * iOS web fixes applied:
- *  - Background Image uses pointerEvents="none" (not ImageBackground)
- *  - Dark overlay is absoluteFill + pointerEvents="none" — never blocks content touches
- *  - userSelect: "none" on all text/containers prevents blue selection highlight
- *  - suppressHighlighting on all Text inside Touchables
+ * NÃO mexer em Stripe / checkout / webhook / catálogo de planos.
  */
 
-import React, { useState } from "react";
-import { useAuth } from "@/hooks/useAuth";
+import React, {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
+  Animated,
   Image,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -29,38 +31,44 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { AntDesign, Feather } from "@expo/vector-icons";
+import { AntDesign, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import type { User } from "@supabase/supabase-js";
+import { useAuth } from "@/hooks/useAuth";
+import { useGuia } from "@/context/GuiaContext";
 
-const GOLD     = "#D4AF37";
-const GOLD_BDR = "rgba(212,175,55,0.50)";
-const LOGO     = require("@/assets/images/logo-symbol.png");
-const BG       = require("@/assets/images/rio-aerial-clean.png");
+// ── Constants ─────────────────────────────────────────────────────────────────
 
-/**
- * WNS — "web no select"
- * Applied to every non-input container on iOS web to prevent the blue
- * text-selection highlight.  Includes all three properties iOS Safari needs:
- *   -webkit-touch-callout : none  — suppresses long-press callout menu
- *   -webkit-user-select   : none  — WebKit-prefixed selection disable
- *   user-select           : none  — standard, also needed by React Native Web
- * Cast to `any` because TypeScript's RN types don't expose webkit props.
- */
-const WNS: object = Platform.OS === "web"
-  ? ({
-      userSelect:            "none",
-      WebkitUserSelect:      "none",
-      WebkitTouchCallout:    "none",
-    } as any)
-  : {};
+const GOLD      = "#D4AF37";
+const GOLD_DIM  = "rgba(212,175,55,0.15)";
+const GOLD_BDR  = "rgba(212,175,55,0.45)";
+const DARK      = "#0D0D0D";
+const SURFACE   = "rgba(255,255,255,0.07)";
+const BORDER    = "rgba(255,255,255,0.12)";
 
-/**
- * webCleanup — called in every auth handler finally block.
- * Blurs the active element (removes focus ring) and clears any DOM selection.
- * This is a local mirror of the one in useAuth.ts so it runs even if the
- * auth function throws before reaching its own cleanup.
- */
+const LOGO      = require("@/assets/images/logo-symbol.png");
+
+// Hero images for rotating background (login screen only)
+const HERO_IMAGES = [
+  require("@/assets/images/rio-aerial-clean.png"),
+  require("@/assets/images/ipanema.png"),
+  require("@/assets/images/cristo.png"),
+  require("@/assets/images/pao-acucar.png"),
+  require("@/assets/images/lapa.png"),
+];
+
+const HERO_INTERVAL_MS = 10_000;
+
+// ── Web: no-select helper ─────────────────────────────────────────────────────
+
+const WNS: object =
+  Platform.OS === "web"
+    ? ({
+        userSelect: "none",
+        WebkitUserSelect: "none",
+        WebkitTouchCallout: "none",
+      } as any)
+    : {};
+
 function webCleanup() {
   if (Platform.OS !== "web" || typeof document === "undefined") return;
   try {
@@ -69,18 +77,21 @@ function webCleanup() {
   } catch (_) {}
 }
 
-// ── Root screen ───────────────────────────────────────────────────────────────
-
-// Translate common Supabase auth error messages to Portuguese.
 function translateAuthError(raw: string, isLogin: boolean): string {
   const msg = raw.toLowerCase();
-  if (msg.includes("invalid login credentials") || msg.includes("invalid credentials"))
+  if (
+    msg.includes("invalid login credentials") ||
+    msg.includes("invalid credentials")
+  )
     return isLogin
       ? "E-mail ou senha incorretos. Verifique e tente novamente."
       : "Erro ao criar conta. Tente novamente.";
   if (msg.includes("email not confirmed"))
     return "Confirme o seu e-mail antes de entrar. Verifique a caixa de entrada.";
-  if (msg.includes("user already registered") || msg.includes("already registered"))
+  if (
+    msg.includes("user already registered") ||
+    msg.includes("already registered")
+  )
     return "Este e-mail já tem cadastro. Clique em \"Entrar\" para acessar.";
   if (msg.includes("password should be at least"))
     return "A senha deve ter pelo menos 6 caracteres.";
@@ -88,19 +99,77 @@ function translateAuthError(raw: string, isLogin: boolean): string {
     return "E-mail inválido. Verifique e tente novamente.";
   if (msg.includes("signup is disabled"))
     return "Cadastros temporariamente desabilitados. Tente mais tarde.";
-  if (msg.includes("email rate limit") || msg.includes("too many requests"))
+  if (
+    msg.includes("email rate limit") ||
+    msg.includes("too many requests")
+  )
     return "Muitas tentativas. Aguarde alguns minutos e tente novamente.";
   return raw;
 }
 
-export default function PerfilScreen() {
-  const { user, signOut, signInWithPassword, signUp, sendPasswordReset, signInWithGoogle } = useAuth();
-  const insets = useSafeAreaInsets();
-  const topPad = Platform.OS === "web" ? 16 : insets.top + 8;
-  const botPad = Platform.OS === "web" ? 32 : insets.bottom + 16;
+// ── Rotating hero background ──────────────────────────────────────────────────
 
-  const [isLogin,       setIsLogin]       = useState(true);
-  const [isForgot,      setIsForgot]      = useState(false);
+function HeroBackground() {
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const [nextIdx,    setNextIdx]    = useState(1);
+  const nextOpacity = useRef(new Animated.Value(0)).current;
+  const timerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    timerRef.current = setInterval(() => {
+      // Fade in the next image, then promote it to current
+      Animated.timing(nextOpacity, {
+        toValue: 1,
+        duration: 1800,
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (!finished) return;
+        setCurrentIdx((c) => {
+          setNextIdx((c + 2) % HERO_IMAGES.length);
+          return (c + 1) % HERO_IMAGES.length;
+        });
+        nextOpacity.setValue(0);
+      });
+    }, HERO_INTERVAL_MS);
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <>
+      {/* Base (current) image */}
+      <Image
+        source={HERO_IMAGES[currentIdx]}
+        style={StyleSheet.absoluteFill}
+        resizeMode="cover"
+        pointerEvents="none"
+      />
+      {/* Next image fades in on top */}
+      <Animated.Image
+        source={HERO_IMAGES[nextIdx]}
+        style={[StyleSheet.absoluteFill, { opacity: nextOpacity }]}
+        resizeMode="cover"
+        pointerEvents="none"
+      />
+      {/* Gradient overlay for text legibility */}
+      <View style={s.heroOverlay} pointerEvents="none" />
+    </>
+  );
+}
+
+// ── Root screen ───────────────────────────────────────────────────────────────
+
+type AuthScreen = "login" | "signup" | "forgot";
+
+export default function PerfilScreen() {
+  const { user, loading: authLoading, signOut, signInWithPassword, signUp, sendPasswordReset, signInWithGoogle } = useAuth();
+  const { isPremium } = useGuia();
+  const insets = useSafeAreaInsets();
+
+  // Auth form state
+  const [screen,        setScreen]        = useState<AuthScreen>("login");
   const [name,          setName]          = useState("");
   const [email,         setEmail]         = useState("");
   const [password,      setPassword]      = useState("");
@@ -112,45 +181,51 @@ export default function PerfilScreen() {
   const [resetSent,     setResetSent]     = useState(false);
   const [error,         setError]         = useState<string | null>(null);
 
-  function resetAll() {
-    setIsForgot(false); setNeedsConfirm(false); setResetSent(false);
-    setError(null); setPassword(""); setShowPass(false);
+  function clearForm() {
+    setError(null);
+    setPassword("");
+    setShowPass(false);
+    setNeedsConfirm(false);
+    setResetSent(false);
   }
 
-  async function handleSubmit() {
+  function goLogin()  { clearForm(); setScreen("login");  }
+  function goSignup() { clearForm(); setScreen("signup"); }
+  function goForgot() { clearForm(); setScreen("forgot"); }
+
+  async function handleLogin() {
     const trimEmail = email.trim().toLowerCase();
     const trimPass  = password.trim();
-
-    if (!trimEmail || loading) return;
-
-    if (!trimPass) {
-      setError(isLogin ? "Digite sua senha." : "Escolha uma senha.");
-      return;
+    if (!trimEmail || !trimPass || loading) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const { error: err } = await signInWithPassword(trimEmail, trimPass);
+      if (err) setError(translateAuthError(err, true));
+    } catch {
+      setError("Erro inesperado. Tente novamente.");
+    } finally {
+      setLoading(false);
+      webCleanup();
     }
+  }
 
-    if (!isLogin && trimPass.length < 6) {
+  async function handleSignup() {
+    const trimEmail = email.trim().toLowerCase();
+    const trimPass  = password.trim();
+    if (!trimEmail || !trimPass || loading) return;
+    if (trimPass.length < 6) {
       setError("A senha deve ter pelo menos 6 caracteres.");
       return;
     }
-
     setLoading(true);
     setError(null);
-
     try {
-      if (isLogin) {
-        const { error: err } = await signInWithPassword(trimEmail, trimPass);
-        if (err) {
-          const translated = translateAuthError(err, true);
-          setError(translated);
-        }
-      } else {
-        const { error: err, needsConfirmation } = await signUp(trimEmail, trimPass, name.trim() || undefined);
-        if (err) {
-          const translated = translateAuthError(err, false);
-          setError(translated);
-        } else if (needsConfirmation) {
-          setNeedsConfirm(true);
-        }
+      const { error: err, needsConfirmation } = await signUp(trimEmail, trimPass, name.trim() || undefined);
+      if (err) {
+        setError(translateAuthError(err, false));
+      } else if (needsConfirmation) {
+        setNeedsConfirm(true);
       }
     } catch {
       setError("Erro inesperado. Tente novamente.");
@@ -167,11 +242,8 @@ export default function PerfilScreen() {
     setError(null);
     try {
       const { error: err } = await sendPasswordReset(trimEmail);
-      if (err) {
-        setError("Não foi possível enviar o e-mail. Verifique o endereço.");
-      } else {
-        setResetSent(true);
-      }
+      if (err) setError("Não foi possível enviar o e-mail. Verifique o endereço.");
+      else setResetSent(true);
     } catch {
       setError("Erro inesperado. Tente novamente.");
     } finally {
@@ -195,17 +267,30 @@ export default function PerfilScreen() {
     }
   }
 
+  // ── Auth is still resolving — show spinner (prevents flash of login for logged-in users)
+  if (authLoading) {
+    return (
+      <View style={[s.root, { backgroundColor: DARK, justifyContent: "center", alignItems: "center" }]}>
+        <ActivityIndicator color={GOLD} />
+      </View>
+    );
+  }
+
+  // ── Logged-in: route to correct profile
+  if (user) {
+    if (isPremium) {
+      return <ProProfileScreen user={user} signOut={signOut} />;
+    }
+    return <FreeProfileScreen user={user} signOut={signOut} />;
+  }
+
+  // ── Guest: auth screens with hero background
+  const topPad = Platform.OS === "web" ? 20 : insets.top + 8;
+  const botPad = Platform.OS === "web" ? 32 : insets.bottom + 16;
+
   return (
     <View style={[s.root, WNS]}>
-      {/* Background photo — pointerEvents none so it never swallows touches */}
-      <Image
-        source={BG}
-        style={StyleSheet.absoluteFill}
-        resizeMode="cover"
-        pointerEvents="none"
-      />
-      {/* Dark overlay — absoluteFill + pointerEvents none so content below receives all taps */}
-      <View style={s.overlay} pointerEvents="none" />
+      <HeroBackground />
 
       <KeyboardAvoidingView
         style={[s.kav, WNS]}
@@ -217,111 +302,67 @@ export default function PerfilScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {user
-            ? <LoggedIn user={user} signOut={signOut} />
-            : needsConfirm
-            ? <SentState email={email} kind="confirm" onBack={resetAll} />
-            : resetSent
-            ? <SentState email={email} kind="reset" onBack={resetAll} />
-            : <LoggedOut
-                isLogin={isLogin}
-                isForgot={isForgot}
-                onToggleMode={() => { setIsLogin(v => !v); resetAll(); }}
-                onForgot={() => { setIsForgot(true); setError(null); }}
-                onBackFromForgot={() => { setIsForgot(false); setError(null); }}
-                name={name}           setName={setName}
-                email={email}         setEmail={setEmail}
-                password={password}   setPassword={setPassword}
-                showPass={showPass}   setShowPass={setShowPass}
-                agreed={agreed}       setAgreed={setAgreed}
-                loading={loading}
-                googleLoading={googleLoading}
-                error={error}
-                onSubmit={isForgot ? handleReset : handleSubmit}
-                onGooglePress={handleGoogle}
-              />
-          }
+          {needsConfirm ? (
+            <EmailSentState email={email} kind="confirm" onBack={goLogin} />
+          ) : resetSent ? (
+            <EmailSentState email={email} kind="reset" onBack={goLogin} />
+          ) : screen === "forgot" ? (
+            <ForgotScreen
+              email={email} setEmail={setEmail}
+              loading={loading} error={error}
+              onBack={goLogin} onSubmit={handleReset}
+            />
+          ) : screen === "signup" ? (
+            <SignupScreen
+              name={name}         setName={setName}
+              email={email}       setEmail={setEmail}
+              password={password} setPassword={setPassword}
+              showPass={showPass} setShowPass={setShowPass}
+              agreed={agreed}     setAgreed={setAgreed}
+              loading={loading}   googleLoading={googleLoading}
+              error={error}
+              onSubmit={handleSignup}
+              onGooglePress={handleGoogle}
+              onGoLogin={goLogin}
+            />
+          ) : (
+            <LoginScreen
+              email={email}       setEmail={setEmail}
+              password={password} setPassword={setPassword}
+              showPass={showPass} setShowPass={setShowPass}
+              loading={loading}   googleLoading={googleLoading}
+              error={error}
+              onSubmit={handleLogin}
+              onGooglePress={handleGoogle}
+              onGoSignup={goSignup}
+              onGoForgot={goForgot}
+            />
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
   );
 }
 
-// ── Logged-out: full account creation form ────────────────────────────────────
+// ── LOGIN SCREEN — design ref: IMG_0636 ───────────────────────────────────────
 
-function LoggedOut({
-  isLogin, isForgot, onToggleMode, onForgot, onBackFromForgot,
-  name, setName,
+function LoginScreen({
   email, setEmail,
   password, setPassword,
   showPass, setShowPass,
-  agreed, setAgreed,
   loading, googleLoading,
-  error, onSubmit, onGooglePress,
+  error, onSubmit, onGooglePress, onGoSignup, onGoForgot,
 }: {
-  isLogin: boolean;           onToggleMode: () => void;
-  isForgot: boolean;          onForgot: () => void; onBackFromForgot: () => void;
-  name: string;               setName: (v: string) => void;
-  email: string;              setEmail: (v: string) => void;
-  password: string;           setPassword: (v: string) => void;
-  showPass: boolean;          setShowPass: (v: boolean) => void;
-  agreed: boolean;            setAgreed: (v: boolean) => void;
-  loading: boolean;
-  googleLoading: boolean;
+  email: string;       setEmail: (v: string) => void;
+  password: string;    setPassword: (v: string) => void;
+  showPass: boolean;   setShowPass: (v: boolean) => void;
+  loading: boolean;    googleLoading: boolean;
   error: string | null;
   onSubmit: () => void;
   onGooglePress: () => void;
+  onGoSignup: () => void;
+  onGoForgot: () => void;
 }) {
-  if (isForgot) {
-    return (
-      <View style={s.page}>
-        <TouchableOpacity style={s.backBtn} onPress={onBackFromForgot} activeOpacity={0.7} accessibilityRole="button">
-          <Feather name="arrow-left" size={16} color="rgba(255,255,255,0.80)" />
-          <Text style={s.backText} suppressHighlighting>Voltar</Text>
-        </TouchableOpacity>
-
-        <View style={s.logoWrap}>
-          <Image source={LOGO} style={s.logo} resizeMode="contain" />
-          <Text style={s.brand} suppressHighlighting>THE LUCKY TRIP</Text>
-        </View>
-
-        <View style={s.badge}>
-          <Text style={s.badgeText} suppressHighlighting>REDEFINIR SENHA</Text>
-        </View>
-
-        <Text style={s.headline} suppressHighlighting>Recuperar acesso</Text>
-        <Text style={[s.loginHint, { marginBottom: 20 }]} suppressHighlighting>
-          Digite seu e-mail e enviaremos um link para você criar uma nova senha.
-        </Text>
-
-        <View style={s.fieldWrap}>
-          <Feather name="mail" size={16} color="rgba(255,255,255,0.40)" />
-          <TextInput
-            style={s.field}
-            placeholder="E-mail"
-            placeholderTextColor="rgba(255,255,255,0.38)"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            value={email}
-            onChangeText={setEmail}
-            returnKeyType="done"
-            onSubmitEditing={onSubmit}
-          />
-        </View>
-
-        {error ? <Text style={s.errorText} suppressHighlighting>{error}</Text> : null}
-
-        <TouchableOpacity style={s.cta} onPress={onSubmit} activeOpacity={0.85} disabled={loading} accessibilityRole="button">
-          {loading
-            ? <ActivityIndicator color="#000" />
-            : <Text style={s.ctaText} suppressHighlighting>Enviar link de redefinição</Text>
-          }
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
   return (
     <View style={s.page}>
       {/* ← Voltar */}
@@ -341,38 +382,13 @@ function LoggedOut({
         <Text style={s.brand} suppressHighlighting>THE LUCKY TRIP</Text>
       </View>
 
-      {/* Badge — changes with mode */}
       <View style={s.badge}>
-        <Text style={s.badgeText} suppressHighlighting>
-          {isLogin ? "ENTRAR" : "CRIE SUA CONTA"}
-        </Text>
+        <Text style={s.badgeText} suppressHighlighting>ENTRAR</Text>
       </View>
 
-      {/* Headline — changes with mode */}
-      <Text style={s.headline} suppressHighlighting>
-        {isLogin
-          ? "Bem-vindo de volta"
-          : "Comece a planejar suas viagens dos sonhos"}
-      </Text>
+      <Text style={s.headline} suppressHighlighting>Bem-vindo de volta</Text>
 
-      {/* Name field — signup only */}
-      {!isLogin && (
-        <View style={s.fieldWrap}>
-          <Feather name="user" size={16} color="rgba(255,255,255,0.40)" />
-          <TextInput
-            style={s.field}
-            placeholder="Nome completo"
-            placeholderTextColor="rgba(255,255,255,0.38)"
-            autoCapitalize="words"
-            autoCorrect={false}
-            value={name}
-            onChangeText={setName}
-            returnKeyType="next"
-          />
-        </View>
-      )}
-
-      {/* Email — always shown */}
+      {/* E-mail */}
       <View style={s.fieldWrap}>
         <Feather name="mail" size={16} color="rgba(255,255,255,0.40)" />
         <TextInput
@@ -384,12 +400,11 @@ function LoggedOut({
           autoCorrect={false}
           value={email}
           onChangeText={setEmail}
-          onSubmitEditing={onSubmit}
-          returnKeyType={isLogin ? "done" : "next"}
+          returnKeyType="next"
         />
       </View>
 
-      {/* Password field — always shown */}
+      {/* Senha */}
       <View style={s.fieldWrap}>
         <Feather name="lock" size={16} color="rgba(255,255,255,0.40)" />
         <TextInput
@@ -418,28 +433,9 @@ function LoggedOut({
         </TouchableOpacity>
       </View>
 
-      {/* Terms checkbox — signup only */}
-      {!isLogin && (
-        <TouchableOpacity
-          style={s.checkRow}
-          onPress={() => setAgreed(!agreed)}
-          activeOpacity={0.7}
-          accessibilityRole="checkbox"
-        >
-          <View style={[s.checkbox, agreed && s.checkboxChecked]}>
-            {agreed && <Feather name="check" size={11} color="#000" />}
-          </View>
-          <Text style={s.checkText} suppressHighlighting>
-            Concordo com os{" "}
-            <Text style={s.checkLink}>Termos de Uso</Text>
-            <Text style={s.checkLink}>  Política de Privacidade</Text>
-          </Text>
-        </TouchableOpacity>
-      )}
-
       {error ? <Text style={s.errorText} suppressHighlighting>{error}</Text> : null}
 
-      {/* Primary CTA — label changes with mode */}
+      {/* Entrar */}
       <TouchableOpacity
         style={s.cta}
         onPress={onSubmit}
@@ -449,20 +445,18 @@ function LoggedOut({
       >
         {loading
           ? <ActivityIndicator color="#000" />
-          : <Text style={s.ctaText} suppressHighlighting>
-              {isLogin ? "Entrar" : "Criar conta"}
-            </Text>
+          : <Text style={s.ctaText} suppressHighlighting>Entrar</Text>
         }
       </TouchableOpacity>
 
-      {/* Divider "ou continue com" */}
+      {/* Divisor */}
       <View style={s.dividerRow}>
         <View style={s.dividerLine} />
         <Text style={s.dividerText} suppressHighlighting>ou continue com</Text>
         <View style={s.dividerLine} />
       </View>
 
-      {/* Social buttons — side by side */}
+      {/* Social */}
       <View style={s.socialRow}>
         <TouchableOpacity
           style={s.socialBtn}
@@ -489,51 +483,290 @@ function LoggedOut({
         </TouchableOpacity>
       </View>
 
-      {/* Footer — mode toggle + forgot password */}
+      {/* Footer */}
       <View style={s.footerRow}>
-        <Text style={s.footerText} suppressHighlighting>
-          {isLogin ? "Não tem conta?  " : "Já tem uma conta?  "}
-        </Text>
-        <TouchableOpacity onPress={onToggleMode} activeOpacity={0.7} accessibilityRole="button">
-          <Text style={s.footerLink} suppressHighlighting>
-            {isLogin ? "Criar conta" : "Entrar"}
-          </Text>
+        <Text style={s.footerText} suppressHighlighting>Não tem conta?{"  "}</Text>
+        <TouchableOpacity onPress={onGoSignup} activeOpacity={0.7} accessibilityRole="button">
+          <Text style={s.footerLink} suppressHighlighting>Criar conta</Text>
         </TouchableOpacity>
       </View>
 
-      {isLogin && (
-        <TouchableOpacity
-          style={{ marginTop: 6 }}
-          onPress={onForgot}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-        >
-          <Text style={[s.footerLink, { fontSize: 13 }]} suppressHighlighting>
-            Esqueceu a senha?
-          </Text>
-        </TouchableOpacity>
-      )}
+      <TouchableOpacity style={{ marginTop: 8 }} onPress={onGoForgot} activeOpacity={0.7} accessibilityRole="button">
+        <Text style={[s.footerLink, { fontSize: 13 }]} suppressHighlighting>
+          Esqueceu a senha?
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
-// ── Post-submit: check email ──────────────────────────────────────────────────
+// ── SIGNUP SCREEN — design ref: div-5.png ─────────────────────────────────────
 
-function SentState({ email, kind, onBack }: { email: string; kind: "confirm" | "reset"; onBack: () => void }) {
+function SignupScreen({
+  name, setName,
+  email, setEmail,
+  password, setPassword,
+  showPass, setShowPass,
+  agreed, setAgreed,
+  loading, googleLoading,
+  error, onSubmit, onGooglePress, onGoLogin,
+}: {
+  name: string;       setName: (v: string) => void;
+  email: string;      setEmail: (v: string) => void;
+  password: string;   setPassword: (v: string) => void;
+  showPass: boolean;  setShowPass: (v: boolean) => void;
+  agreed: boolean;    setAgreed: (v: boolean) => void;
+  loading: boolean;   googleLoading: boolean;
+  error: string | null;
+  onSubmit: () => void;
+  onGooglePress: () => void;
+  onGoLogin: () => void;
+}) {
+  return (
+    <View style={s.page}>
+      {/* ← Voltar */}
+      <TouchableOpacity
+        style={s.backBtn}
+        onPress={onGoLogin}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+      >
+        <Feather name="arrow-left" size={16} color="rgba(255,255,255,0.80)" />
+        <Text style={s.backText} suppressHighlighting>Voltar</Text>
+      </TouchableOpacity>
+
+      {/* Logo + brand */}
+      <View style={s.logoWrap}>
+        <Image source={LOGO} style={s.logo} resizeMode="contain" />
+        <Text style={s.brand} suppressHighlighting>THE LUCKY TRIP</Text>
+      </View>
+
+      <View style={s.badge}>
+        <Text style={s.badgeText} suppressHighlighting>CRIE SUA CONTA</Text>
+      </View>
+
+      <Text style={s.headline} suppressHighlighting>
+        Comece a planejar suas viagens dos sonhos
+      </Text>
+
+      {/* Nome */}
+      <View style={s.fieldWrap}>
+        <Feather name="user" size={16} color="rgba(255,255,255,0.40)" />
+        <TextInput
+          style={s.field}
+          placeholder="Nome completo"
+          placeholderTextColor="rgba(255,255,255,0.38)"
+          autoCapitalize="words"
+          autoCorrect={false}
+          value={name}
+          onChangeText={setName}
+          returnKeyType="next"
+        />
+      </View>
+
+      {/* E-mail */}
+      <View style={s.fieldWrap}>
+        <Feather name="mail" size={16} color="rgba(255,255,255,0.40)" />
+        <TextInput
+          style={s.field}
+          placeholder="E-mail"
+          placeholderTextColor="rgba(255,255,255,0.38)"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          value={email}
+          onChangeText={setEmail}
+          returnKeyType="next"
+        />
+      </View>
+
+      {/* Senha */}
+      <View style={s.fieldWrap}>
+        <Feather name="lock" size={16} color="rgba(255,255,255,0.40)" />
+        <TextInput
+          style={[s.field, { flex: 1 }]}
+          placeholder="Senha"
+          placeholderTextColor="rgba(255,255,255,0.38)"
+          secureTextEntry={!showPass}
+          autoCapitalize="none"
+          autoCorrect={false}
+          value={password}
+          onChangeText={setPassword}
+          returnKeyType="done"
+          onSubmitEditing={onSubmit}
+        />
+        <TouchableOpacity
+          onPress={() => setShowPass(!showPass)}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          activeOpacity={0.6}
+          accessibilityRole="button"
+        >
+          <Feather
+            name={showPass ? "eye-off" : "eye"}
+            size={16}
+            color="rgba(255,255,255,0.40)"
+          />
+        </TouchableOpacity>
+      </View>
+
+      {/* Termos */}
+      <TouchableOpacity
+        style={s.checkRow}
+        onPress={() => setAgreed(!agreed)}
+        activeOpacity={0.7}
+        accessibilityRole="checkbox"
+      >
+        <View style={[s.checkbox, agreed && s.checkboxChecked]}>
+          {agreed && <Feather name="check" size={11} color="#000" />}
+        </View>
+        <Text style={s.checkText} suppressHighlighting>
+          Concordo com os{" "}
+          <Text style={s.checkLink}>Termos de Uso</Text>
+          {"  "}
+          <Text style={s.checkLink}>Política de Privacidade</Text>
+        </Text>
+      </TouchableOpacity>
+
+      {error ? <Text style={s.errorText} suppressHighlighting>{error}</Text> : null}
+
+      {/* Criar conta */}
+      <TouchableOpacity
+        style={s.cta}
+        onPress={onSubmit}
+        activeOpacity={0.85}
+        disabled={loading}
+        accessibilityRole="button"
+      >
+        {loading
+          ? <ActivityIndicator color="#000" />
+          : <Text style={s.ctaText} suppressHighlighting>Criar conta</Text>
+        }
+      </TouchableOpacity>
+
+      {/* Divisor */}
+      <View style={s.dividerRow}>
+        <View style={s.dividerLine} />
+        <Text style={s.dividerText} suppressHighlighting>ou continue com</Text>
+        <View style={s.dividerLine} />
+      </View>
+
+      {/* Social */}
+      <View style={s.socialRow}>
+        <TouchableOpacity
+          style={s.socialBtn}
+          onPress={onGooglePress}
+          activeOpacity={0.7}
+          disabled={googleLoading}
+          accessibilityRole="button"
+        >
+          {googleLoading
+            ? <ActivityIndicator size="small" color="rgba(255,255,255,0.70)" />
+            : <AntDesign name="google" size={17} color="#FFFFFF" />
+          }
+          <Text style={s.socialBtnText} suppressHighlighting>Google</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[s.socialBtn, { opacity: 0.5 }]}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          disabled
+        >
+          <AntDesign name="apple1" size={17} color="#FFFFFF" />
+          <Text style={s.socialBtnText} suppressHighlighting>Apple</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Footer */}
+      <View style={s.footerRow}>
+        <Text style={s.footerText} suppressHighlighting>Já tem uma conta?{"  "}</Text>
+        <TouchableOpacity onPress={onGoLogin} activeOpacity={0.7} accessibilityRole="button">
+          <Text style={s.footerLink} suppressHighlighting>Entrar</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+// ── FORGOT PASSWORD SCREEN ────────────────────────────────────────────────────
+
+function ForgotScreen({
+  email, setEmail, loading, error, onBack, onSubmit,
+}: {
+  email: string; setEmail: (v: string) => void;
+  loading: boolean; error: string | null;
+  onBack: () => void; onSubmit: () => void;
+}) {
+  return (
+    <View style={s.page}>
+      <TouchableOpacity style={s.backBtn} onPress={onBack} activeOpacity={0.7} accessibilityRole="button">
+        <Feather name="arrow-left" size={16} color="rgba(255,255,255,0.80)" />
+        <Text style={s.backText} suppressHighlighting>Voltar</Text>
+      </TouchableOpacity>
+
+      <View style={s.logoWrap}>
+        <Image source={LOGO} style={s.logo} resizeMode="contain" />
+        <Text style={s.brand} suppressHighlighting>THE LUCKY TRIP</Text>
+      </View>
+
+      <View style={s.badge}>
+        <Text style={s.badgeText} suppressHighlighting>REDEFINIR SENHA</Text>
+      </View>
+
+      <Text style={s.headline} suppressHighlighting>Recuperar acesso</Text>
+      <Text style={[s.sub, { marginBottom: 20 }]} suppressHighlighting>
+        Digite seu e-mail e enviaremos um link para criar uma nova senha.
+      </Text>
+
+      <View style={s.fieldWrap}>
+        <Feather name="mail" size={16} color="rgba(255,255,255,0.40)" />
+        <TextInput
+          style={s.field}
+          placeholder="E-mail"
+          placeholderTextColor="rgba(255,255,255,0.38)"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          value={email}
+          onChangeText={setEmail}
+          returnKeyType="done"
+          onSubmitEditing={onSubmit}
+        />
+      </View>
+
+      {error ? <Text style={s.errorText} suppressHighlighting>{error}</Text> : null}
+
+      <TouchableOpacity style={s.cta} onPress={onSubmit} activeOpacity={0.85} disabled={loading} accessibilityRole="button">
+        {loading
+          ? <ActivityIndicator color="#000" />
+          : <Text style={s.ctaText} suppressHighlighting>Enviar link de redefinição</Text>
+        }
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ── EMAIL SENT STATE ──────────────────────────────────────────────────────────
+
+function EmailSentState({
+  email, kind, onBack,
+}: {
+  email: string; kind: "confirm" | "reset"; onBack: () => void;
+}) {
   const isReset = kind === "reset";
   return (
     <View style={s.center}>
       <Image source={LOGO} style={s.logo} resizeMode="contain" />
-
       <View style={s.sentIcon}>
         <Feather name="mail" size={28} color={GOLD} />
       </View>
-
       <Text style={s.headline} suppressHighlighting>
         {isReset ? "Verifique seu e-mail" : "Confirme seu e-mail"}
       </Text>
       <Text style={s.sub} suppressHighlighting>
-        {isReset ? "Enviamos o link de redefinição para" : "Enviamos um e-mail de confirmação para"}{"\n"}
+        {isReset
+          ? "Enviamos o link de redefinição para"
+          : "Enviamos um e-mail de confirmação para"}{"\n"}
         <Text style={{ color: GOLD, fontFamily: "Inter_500Medium" }}>{email}</Text>
       </Text>
       <Text style={s.sentNote} suppressHighlighting>
@@ -541,7 +774,6 @@ function SentState({ email, kind, onBack }: { email: string; kind: "confirm" | "
           ? "Clique no link para criar uma nova senha e voltar a acessar sua conta."
           : "Clique no link no e-mail para ativar sua conta e entrar automaticamente."}
       </Text>
-
       <TouchableOpacity style={{ marginTop: 24 }} onPress={onBack} activeOpacity={0.7} accessibilityRole="button">
         <Text style={[s.footerLink, { fontSize: 14 }]} suppressHighlighting>← Voltar ao login</Text>
       </TouchableOpacity>
@@ -549,358 +781,690 @@ function SentState({ email, kind, onBack }: { email: string; kind: "confirm" | "
   );
 }
 
-// ── Logged-in: minimal real profile ──────────────────────────────────────────
+// ── PROFILE SHARED COMPONENTS ─────────────────────────────────────────────────
 
-function LoggedIn({ user, signOut }: { user: User; signOut: () => void }) {
-  const displayName = user.email?.split("@")[0] ?? "—";
+type MenuItemProps = {
+  icon: React.ReactNode;
+  label: string;
+  sublabel?: string;
+  onPress: () => void;
+  rightContent?: React.ReactNode;
+  danger?: boolean;
+};
+
+function MenuItem({ icon, label, sublabel, onPress, rightContent, danger }: MenuItemProps) {
+  return (
+    <TouchableOpacity style={s.menuItem} onPress={onPress} activeOpacity={0.65} accessibilityRole="button">
+      <View style={s.menuIcon}>{icon}</View>
+      <View style={{ flex: 1 }}>
+        <Text style={[s.menuLabel, danger && { color: "#FF6B6B" }]} suppressHighlighting>
+          {label}
+        </Text>
+        {sublabel ? (
+          <Text style={s.menuSublabel} suppressHighlighting>{sublabel}</Text>
+        ) : null}
+      </View>
+      {rightContent ?? <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.25)" />}
+    </TouchableOpacity>
+  );
+}
+
+function ProfileHeader({
+  user,
+  badge,
+}: {
+  user: { email?: string | null; user_metadata?: any };
+  badge: React.ReactNode;
+}) {
+  const insets = useSafeAreaInsets();
+  const topPad = Platform.OS === "web" ? 20 : insets.top + 12;
+  const displayName: string =
+    user.user_metadata?.name ||
+    user.user_metadata?.full_name ||
+    user.email?.split("@")[0] ||
+    "Viajante";
 
   return (
-    <View style={s.center}>
+    <View style={[s.profileHeader, { paddingTop: topPad }]}>
       <View style={s.avatar}>
-        <Feather name="user" size={32} color="#FFFFFF" />
+        <Feather name="user" size={28} color={GOLD} />
       </View>
-
-      <Text style={s.name} suppressHighlighting>{displayName}</Text>
-      <Text style={s.emailText} suppressHighlighting>{user.email}</Text>
-
-      <TouchableOpacity
-        style={s.logoutBtn}
-        onPress={signOut}
-        activeOpacity={0.7}
-        accessibilityRole="button"
-      >
-        <Feather name="log-out" size={15} color="rgba(255,255,255,0.60)" />
-        <Text style={s.logoutText} suppressHighlighting>Sair da conta</Text>
-      </TouchableOpacity>
+      <Text style={s.profileName} suppressHighlighting>{displayName}</Text>
+      {user.email ? (
+        <Text style={s.profileEmail} suppressHighlighting>{user.email}</Text>
+      ) : null}
+      <View style={{ marginTop: 10 }}>{badge}</View>
     </View>
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
+// ── FREE PROFILE ──────────────────────────────────────────────────────────────
+
+function FreeProfileScreen({
+  user, signOut,
+}: {
+  user: any; signOut: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const botPad = Platform.OS === "web" ? 32 : insets.bottom + 80;
+
+  return (
+    <View style={s.profileRoot}>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: botPad }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <ProfileHeader
+          user={user}
+          badge={
+            <View style={s.freeBadge}>
+              <Text style={s.freeBadgeText} suppressHighlighting>Plano Free</Text>
+            </View>
+          }
+        />
+
+        {/* Lucky Pro CTA */}
+        <TouchableOpacity
+          style={s.proCta}
+          onPress={() => router.push("/(tabs)/subscription")}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+        >
+          <MaterialCommunityIcons name="crown-outline" size={20} color="#000" />
+          <View style={{ flex: 1, marginLeft: 10 }}>
+            <Text style={s.proCtaTitle} suppressHighlighting>Seja Lucky Pro</Text>
+            <Text style={s.proCtaSub} suppressHighlighting>
+              Desbloqueie 127 segredos do Rio
+            </Text>
+          </View>
+          <Feather name="arrow-right" size={16} color="#000" />
+        </TouchableOpacity>
+
+        {/* Seção: Minha Viagem */}
+        <Text style={s.sectionLabel} suppressHighlighting>MINHA VIAGEM</Text>
+        <View style={s.menuCard}>
+          <MenuItem
+            icon={<Feather name="book-open" size={18} color={GOLD} />}
+            label="Diário de Viagem"
+            sublabel="Registre memórias e momentos"
+            onPress={() => router.push("/diario" as any)}
+          />
+          <View style={s.menuDivider} />
+          <MenuItem
+            icon={<Feather name="divide-circle" size={18} color={GOLD} />}
+            label="Divisão de Contas"
+            sublabel="Organize os gastos do grupo"
+            onPress={() => router.push("/contas" as any)}
+          />
+        </View>
+
+        {/* Seção: Conta */}
+        <Text style={s.sectionLabel} suppressHighlighting>CONTA</Text>
+        <View style={s.menuCard}>
+          <MenuItem
+            icon={<Feather name="user" size={18} color="rgba(255,255,255,0.60)" />}
+            label="Informações da conta"
+            onPress={() => {}}
+          />
+          <View style={s.menuDivider} />
+          <MenuItem
+            icon={<Feather name="settings" size={18} color="rgba(255,255,255,0.60)" />}
+            label="Preferências"
+            onPress={() => {}}
+          />
+          <View style={s.menuDivider} />
+          <MenuItem
+            icon={<Feather name="help-circle" size={18} color="rgba(255,255,255,0.60)" />}
+            label="Ajuda e suporte"
+            onPress={() => Linking.openURL("mailto:contato@theluckytrip.com")}
+          />
+          <View style={s.menuDivider} />
+          <MenuItem
+            icon={<Feather name="file-text" size={18} color="rgba(255,255,255,0.60)" />}
+            label="Termos e Privacidade"
+            onPress={() => {}}
+          />
+        </View>
+
+        {/* Sair */}
+        <View style={[s.menuCard, { marginTop: 8 }]}>
+          <MenuItem
+            icon={<Feather name="log-out" size={18} color="#FF6B6B" />}
+            label="Sair"
+            onPress={signOut}
+            danger
+            rightContent={<View />}
+          />
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+// ── PRO PROFILE ───────────────────────────────────────────────────────────────
+
+function ProProfileScreen({
+  user, signOut,
+}: {
+  user: any; signOut: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const botPad = Platform.OS === "web" ? 32 : insets.bottom + 80;
+
+  return (
+    <View style={s.profileRoot}>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: botPad }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <ProfileHeader
+          user={user}
+          badge={
+            <View style={s.proBadge}>
+              <MaterialCommunityIcons name="crown" size={12} color="#000" style={{ marginRight: 5 }} />
+              <Text style={s.proBadgeText} suppressHighlighting>Lucky Pro</Text>
+            </View>
+          }
+        />
+
+        {/* Assinatura card */}
+        <View style={s.subscriptionCard}>
+          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+            <MaterialCommunityIcons name="crown" size={16} color={GOLD} />
+            <Text style={s.subscriptionTitle} suppressHighlighting> Lucky Pro ativo</Text>
+          </View>
+          <Text style={s.subscriptionSub} suppressHighlighting>
+            Você tem acesso completo a todos os segredos do Rio de Janeiro.
+          </Text>
+          <TouchableOpacity
+            style={s.manageBtn}
+            onPress={() => router.push("/(tabs)/subscription")}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+          >
+            <Text style={s.manageBtnText} suppressHighlighting>Gerenciar assinatura</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Seção: Minha Viagem */}
+        <Text style={s.sectionLabel} suppressHighlighting>MINHA VIAGEM</Text>
+        <View style={s.menuCard}>
+          <MenuItem
+            icon={<Feather name="book-open" size={18} color={GOLD} />}
+            label="Diário de Viagem"
+            sublabel="Registre memórias e momentos"
+            onPress={() => router.push("/diario" as any)}
+          />
+          <View style={s.menuDivider} />
+          <MenuItem
+            icon={<Feather name="divide-circle" size={18} color={GOLD} />}
+            label="Divisão de Contas"
+            sublabel="Organize os gastos do grupo"
+            onPress={() => router.push("/contas" as any)}
+          />
+        </View>
+
+        {/* Seção: Conta */}
+        <Text style={s.sectionLabel} suppressHighlighting>CONTA</Text>
+        <View style={s.menuCard}>
+          <MenuItem
+            icon={<Feather name="user" size={18} color="rgba(255,255,255,0.60)" />}
+            label="Informações da conta"
+            onPress={() => {}}
+          />
+          <View style={s.menuDivider} />
+          <MenuItem
+            icon={<Feather name="settings" size={18} color="rgba(255,255,255,0.60)" />}
+            label="Preferências"
+            onPress={() => {}}
+          />
+          <View style={s.menuDivider} />
+          <MenuItem
+            icon={<Feather name="help-circle" size={18} color="rgba(255,255,255,0.60)" />}
+            label="Ajuda e suporte"
+            onPress={() => Linking.openURL("mailto:contato@theluckytrip.com")}
+          />
+          <View style={s.menuDivider} />
+          <MenuItem
+            icon={<Feather name="file-text" size={18} color="rgba(255,255,255,0.60)" />}
+            label="Termos e Privacidade"
+            onPress={() => {}}
+          />
+        </View>
+
+        {/* Sair */}
+        <View style={[s.menuCard, { marginTop: 8 }]}>
+          <MenuItem
+            icon={<Feather name="log-out" size={18} color="#FF6B6B" />}
+            label="Sair"
+            onPress={signOut}
+            danger
+            rightContent={<View />}
+          />
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+// ── STYLES ────────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
+  // ── Auth screens ──
   root: {
-    flex:            1,
+    flex: 1,
     backgroundColor: "#0a0a0a",
   },
-  overlay: {
+  heroOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.58)",
+    backgroundColor: "rgba(0,0,0,0.55)",
   },
-  kav: {
-    flex: 1,
-  },
-  scroll: {
-    flexGrow:          1,
-    paddingHorizontal: 24,
-  },
+  kav:    { flex: 1 },
+  scroll: { flexGrow: 1, paddingHorizontal: 24 },
 
-  // ── Page (logged-out) ──
   page: {
-    flex:       1,
+    flex: 1,
     alignItems: "center",
     ...WNS,
   },
   center: {
-    flex:            1,
-    alignItems:      "center",
-    justifyContent:  "center",
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
     ...WNS,
   },
 
-  // ── Back button ──
   backBtn: {
     flexDirection: "row",
-    alignItems:    "center",
-    gap:           6,
-    alignSelf:     "flex-start",
+    alignItems: "center",
+    gap: 6,
+    alignSelf: "flex-start",
     paddingVertical: 10,
-    marginBottom:  4,
+    marginBottom: 4,
     ...WNS,
   },
   backText: {
     fontFamily: "Inter_400Regular",
-    fontSize:   15,
-    color:      "rgba(255,255,255,0.80)",
+    fontSize: 15,
+    color: "rgba(255,255,255,0.80)",
   },
 
-  // ── Logo / brand ──
   logoWrap: {
-    alignItems:   "center",
+    alignItems: "center",
     marginBottom: 12,
     ...WNS,
   },
   logo: {
-    width:        72,
-    height:       72,
-    marginBottom: 6,
+    width: 68,
+    height: 68,
+    marginBottom: 4,
   },
   brand: {
-    fontFamily:    "Inter_600SemiBold",
-    fontSize:      13,
-    color:         "#FFFFFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: "#FFFFFF",
     letterSpacing: 3,
   },
 
-  // ── Badge ──
   badge: {
-    borderWidth:       1,
-    borderColor:       GOLD_BDR,
-    borderRadius:      20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.35)",
+    borderRadius: 20,
     paddingHorizontal: 14,
-    paddingVertical:   5,
-    marginBottom:      18,
+    paddingVertical: 4,
+    marginBottom: 16,
     ...WNS,
   },
   badgeText: {
-    fontFamily:    "Inter_500Medium",
-    fontSize:      11,
-    color:         GOLD,
-    letterSpacing: 1.5,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+    color: "rgba(255,255,255,0.75)",
+    letterSpacing: 2,
   },
 
-  // ── Headline ──
   headline: {
-    fontFamily:   "PlayfairDisplay_700Bold",
-    fontSize:     26,
-    color:        "#FFFFFF",
-    textAlign:    "center",
-    lineHeight:   34,
-    marginBottom: 22,
-    paddingHorizontal: 4,
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 28,
+    color: "#FFFFFF",
+    textAlign: "center",
+    marginBottom: 20,
+    lineHeight: 36,
+    ...WNS,
   },
 
-  // ── Input fields ──
   fieldWrap: {
-    flexDirection:     "row",
-    alignItems:        "center",
-    width:             "100%",
-    backgroundColor:   "rgba(255,255,255,0.09)",
-    borderWidth:       1,
-    borderColor:       "rgba(255,255,255,0.15)",
-    borderRadius:      14,
-    paddingHorizontal: 16,
-    paddingVertical:   Platform.OS === "ios" ? 4 : 0,
-    marginBottom:      10,
-    gap:               10,
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.09)",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+    paddingHorizontal: 14,
+    paddingVertical: Platform.OS === "ios" ? 14 : 12,
+    marginBottom: 12,
+    gap: 10,
   },
   field: {
-    flex:       1,
-    paddingVertical: 15,
-    color:      "#FFFFFF",
+    flex: 1,
     fontFamily: "Inter_400Regular",
-    fontSize:   15,
-    ...(Platform.OS === "web" ? ({ outline: "none" } as object) : {}),
+    fontSize: 15,
+    color: "#FFFFFF",
   },
 
-  // ── Checkbox ──
   checkRow: {
-    flexDirection:  "row",
-    alignItems:     "flex-start",
-    width:          "100%",
-    gap:            10,
-    marginTop:      4,
-    marginBottom:   18,
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 10,
+    marginBottom: 16,
     ...WNS,
   },
   checkbox: {
-    width:           20,
-    height:          20,
-    borderRadius:    5,
-    borderWidth:     1.5,
-    borderColor:     "rgba(255,255,255,0.35)",
-    backgroundColor: "rgba(255,255,255,0.07)",
-    alignItems:      "center",
-    justifyContent:  "center",
-    marginTop:       1,
-    flexShrink:      0,
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.40)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   checkboxChecked: {
     backgroundColor: GOLD,
-    borderColor:     GOLD,
+    borderColor: GOLD,
   },
   checkText: {
-    flex:       1,
     fontFamily: "Inter_400Regular",
-    fontSize:   13,
-    color:      "rgba(255,255,255,0.60)",
-    lineHeight: 20,
+    fontSize: 12,
+    color: "rgba(255,255,255,0.65)",
+    flexShrink: 1,
   },
   checkLink: {
-    color:     GOLD,
-    fontFamily:"Inter_500Medium",
+    color: GOLD,
+    fontFamily: "Inter_500Medium",
   },
 
-  loginHint: {
-    fontFamily:   "Inter_400Regular",
-    fontSize:     13,
-    color:        "rgba(255,255,255,0.45)",
-    textAlign:    "center",
-    lineHeight:   20,
-    marginBottom: 16,
-    width:        "100%",
-  },
   errorText: {
-    fontFamily:   "Inter_400Regular",
-    fontSize:     13,
-    color:        "#FF6B6B",
-    textAlign:    "center",
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: "#FF6B6B",
     marginBottom: 10,
-    width:        "100%",
+    textAlign: "center",
+    ...WNS,
   },
 
-  // ── Criar conta CTA ──
   cta: {
-    width:           "100%",
-    backgroundColor: "#B8942A",
-    borderRadius:    14,
-    paddingVertical: 17,
-    alignItems:      "center",
-    minHeight:       54,
-    justifyContent:  "center",
-    ...WNS,
+    width: "100%",
+    backgroundColor: GOLD,
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: "center",
+    marginBottom: 18,
   },
   ctaText: {
-    fontFamily:    "Inter_600SemiBold",
-    fontSize:      16,
-    color:         "#FFFFFF",
-    letterSpacing: 0.2,
-  },
-
-  // ── Divider ──
-  dividerRow: {
-    flexDirection:  "row",
-    alignItems:     "center",
-    width:          "100%",
-    marginVertical: 18,
-    gap:            10,
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+    color: "#000000",
     ...WNS,
   },
+
+  dividerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: "100%",
+    marginBottom: 14,
+    gap: 10,
+  },
   dividerLine: {
-    flex:            1,
-    height:          1,
-    backgroundColor: "rgba(255,255,255,0.13)",
+    flex: 1,
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.16)",
   },
   dividerText: {
     fontFamily: "Inter_400Regular",
-    fontSize:   12,
-    color:      "rgba(255,255,255,0.38)",
+    fontSize: 12,
+    color: "rgba(255,255,255,0.45)",
+    ...WNS,
   },
 
-  // ── Social buttons (side by side) ──
   socialRow: {
     flexDirection: "row",
-    width:         "100%",
-    gap:           12,
-    marginBottom:  24,
-    ...WNS,
+    gap: 10,
+    width: "100%",
+    marginBottom: 20,
   },
   socialBtn: {
-    flex:              1,
-    flexDirection:     "row",
-    alignItems:        "center",
-    justifyContent:    "center",
-    gap:               8,
-    paddingVertical:   15,
-    borderRadius:      14,
-    borderWidth:       1,
-    borderColor:       "rgba(255,255,255,0.18)",
-    backgroundColor:   "rgba(255,255,255,0.08)",
-    ...WNS,
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "rgba(255,255,255,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+    borderRadius: 12,
+    paddingVertical: 13,
   },
   socialBtnText: {
     fontFamily: "Inter_500Medium",
-    fontSize:   14,
-    color:      "#FFFFFF",
+    fontSize: 13,
+    color: "#FFFFFF",
+    ...WNS,
   },
 
-  // ── Footer ──
   footerRow: {
-    flexDirection:  "row",
-    alignItems:     "center",
-    justifyContent: "center",
-    marginBottom:   8,
+    flexDirection: "row",
+    alignItems: "center",
     ...WNS,
   },
   footerText: {
     fontFamily: "Inter_400Regular",
-    fontSize:   14,
-    color:      "rgba(255,255,255,0.55)",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.55)",
   },
   footerLink: {
     fontFamily: "Inter_600SemiBold",
-    fontSize:   14,
-    color:      GOLD,
+    fontSize: 13,
+    color: GOLD,
   },
 
-  // ── Sent state ──
   sentIcon: {
-    width:           70,
-    height:          70,
-    borderRadius:    35,
-    backgroundColor: "rgba(212,175,55,0.14)",
-    borderWidth:     1,
-    borderColor:     GOLD_BDR,
-    alignItems:      "center",
-    justifyContent:  "center",
-    marginBottom:    20,
-    marginTop:       16,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "rgba(212,175,55,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginVertical: 16,
+    ...WNS,
   },
   sub: {
-    fontFamily:   "Inter_400Regular",
-    fontSize:     14,
-    color:        "rgba(255,255,255,0.60)",
-    textAlign:    "center",
-    lineHeight:   21,
-    marginBottom: 8,
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    color: "rgba(255,255,255,0.60)",
+    textAlign: "center",
+    marginBottom: 6,
+    lineHeight: 20,
+    ...WNS,
   },
   sentNote: {
     fontFamily: "Inter_400Regular",
-    fontSize:   13,
-    color:      "rgba(255,255,255,0.38)",
-    textAlign:  "center",
-    marginTop:  8,
+    fontSize: 13,
+    color: "rgba(255,255,255,0.45)",
+    textAlign: "center",
+    lineHeight: 18,
+    marginTop: 6,
+    paddingHorizontal: 16,
+    ...WNS,
   },
 
-  // ── Logged-in ──
-  avatar: {
-    width:           80,
-    height:          80,
-    borderRadius:    40,
-    backgroundColor: "rgba(212,175,55,0.12)",
-    borderWidth:     2,
-    borderColor:     GOLD_BDR,
-    alignItems:      "center",
-    justifyContent:  "center",
-    marginBottom:    16,
-    marginTop:       20,
+  // ── Profile screens ──
+  profileRoot: {
+    flex: 1,
+    backgroundColor: DARK,
   },
-  name: {
-    fontFamily:   "PlayfairDisplay_700Bold",
-    fontSize:     24,
-    color:        "#FFFFFF",
+  profileHeader: {
+    alignItems: "center",
+    paddingHorizontal: 24,
+    paddingBottom: 28,
+    backgroundColor: "#161616",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.07)",
+  },
+  avatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: "rgba(212,175,55,0.12)",
+    borderWidth: 1.5,
+    borderColor: GOLD_BDR,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  profileName: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 22,
+    color: "#FFFFFF",
     marginBottom: 4,
   },
-  emailText: {
-    fontFamily:   "Inter_400Regular",
-    fontSize:     14,
-    color:        "rgba(255,255,255,0.55)",
-    marginBottom: 36,
+  profileEmail: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.45)",
   },
-  logoutBtn: {
-    flexDirection:     "row",
-    alignItems:        "center",
-    gap:               8,
-    paddingVertical:   14,
-    paddingHorizontal: 28,
-    borderRadius:      12,
-    borderWidth:       1,
-    borderColor:       "rgba(255,255,255,0.16)",
-    backgroundColor:   "rgba(255,255,255,0.06)",
+
+  freeBadge: {
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
   },
-  logoutText: {
+  freeBadgeText: {
     fontFamily: "Inter_500Medium",
-    fontSize:   14,
-    color:      "rgba(255,255,255,0.60)",
+    fontSize: 11,
+    color: "rgba(255,255,255,0.55)",
+    letterSpacing: 0.5,
+  },
+
+  proBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: GOLD,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+  },
+  proBadgeText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+    color: "#000000",
+    letterSpacing: 0.5,
+  },
+
+  proCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: GOLD,
+    marginHorizontal: 20,
+    marginTop: 20,
+    borderRadius: 14,
+    padding: 16,
+  },
+  proCtaTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    color: "#000",
+  },
+  proCtaSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: "rgba(0,0,0,0.65)",
+    marginTop: 1,
+  },
+
+  subscriptionCard: {
+    backgroundColor: GOLD_DIM,
+    borderWidth: 1,
+    borderColor: GOLD_BDR,
+    borderRadius: 14,
+    marginHorizontal: 20,
+    marginTop: 20,
+    padding: 16,
+  },
+  subscriptionTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: GOLD,
+  },
+  subscriptionSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.55)",
+    lineHeight: 18,
+    marginBottom: 14,
+  },
+  manageBtn: {
+    alignSelf: "flex-start",
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: GOLD_BDR,
+    backgroundColor: "rgba(212,175,55,0.08)",
+  },
+  manageBtnText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: GOLD,
+  },
+
+  sectionLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+    color: "rgba(255,255,255,0.30)",
+    letterSpacing: 1.5,
+    marginTop: 24,
+    marginBottom: 8,
+    paddingHorizontal: 20,
+  },
+  menuCard: {
+    marginHorizontal: 20,
+    backgroundColor: SURFACE,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: BORDER,
+    overflow: "hidden",
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 12,
+  },
+  menuIcon: {
+    width: 28,
+    alignItems: "center",
+  },
+  menuLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    color: "#FFFFFF",
+  },
+  menuSublabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: "rgba(255,255,255,0.40)",
+    marginTop: 1,
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    marginLeft: 56,
   },
 });

@@ -65,6 +65,8 @@ function RootLayoutNav() {
         <Stack.Screen name="auth/callback"       options={{ headerShown: false, contentStyle: { backgroundColor: ROOT_BG }, animation: "fade" }} />
         <Stack.Screen name="friend/[slug]"       options={{ headerShown: false, contentStyle: { backgroundColor: ROOT_BG }, animation: "slide_from_right" }} />
         <Stack.Screen name="friend/guide/[slug]" options={{ headerShown: false, contentStyle: { backgroundColor: ROOT_BG }, animation: "slide_from_right" }} />
+        <Stack.Screen name="diario"              options={{ headerShown: false, contentStyle: { backgroundColor: "#0D0D0D" }, animation: "slide_from_right" }} />
+        <Stack.Screen name="contas"              options={{ headerShown: false, contentStyle: { backgroundColor: "#0D0D0D" }, animation: "slide_from_right" }} />
       </Stack>
     </ThemeProvider>
   );
