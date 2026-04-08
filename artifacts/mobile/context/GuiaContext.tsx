@@ -150,6 +150,15 @@ export function tipoFromCategoria(
 // ── Supabase sync helpers (module-level, no hooks) ────────────────────────────
 
 /**
+ * Canonical composite key for a saved item — mirrors the server unique constraint
+ * (user_id, place_id, source_table). Use this wherever item identity matters
+ * to avoid false matches when the same place_id appears in two different source tables.
+ */
+function savedItemKey(id: string, source_table: SourceTable | undefined, categoria: SavedCategory): string {
+  return `${id}::${source_table ?? sourceTableFromCategoria(categoria)}`;
+}
+
+/**
  * Extracts a portable URI string from a SavedItem's image field.
  * Returns null for local require() module IDs (numbers) — those are not portable.
  */
@@ -438,9 +447,14 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
   }, [hydrated, user]);
 
   // ── Save / unsave ──────────────────────────────────────────────────────────
+  //
+  // Identity model: an item is uniquely identified by (id, source_table) — the same
+  // place_id can validly appear in different source tables (e.g. a restaurant that is
+  // also a lucky pick). All checks and server operations use savedItemKey() composite.
 
   const save = useCallback((item: SavedItem): boolean => {
-    if (saved.some((s) => s.id === item.id)) return true;
+    const key = savedItemKey(item.id, item.source_table, item.categoria);
+    if (saved.some((s) => savedItemKey(s.id, s.source_table, s.categoria) === key)) return true;
 
     // Auth gate: unauthenticated users see login prompt
     if (!user) {
@@ -449,7 +463,7 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
     }
 
     setSaved((prev) => {
-      if (prev.some((s) => s.id === item.id)) return prev;
+      if (prev.some((s) => savedItemKey(s.id, s.source_table, s.categoria) === key)) return prev;
       return [...prev, item];
     });
 
@@ -460,17 +474,20 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
   }, [saved, user]);
 
   const unsave = useCallback((id: string) => {
-    // Find the item before removing it — we need source_table for the Supabase delete key.
-    // The delete must match (user_id, place_id, source_table) to avoid over-deleting.
+    // Delete ALL server rows that map to this place_id — mirrors the local filter
+    // which removes every item with s.id === id regardless of source_table.
+    // This keeps local and server state in sync even when the same place_id exists
+    // across multiple source tables.
     if (user) {
-      const item = saved.find((s) => s.id === id);
-      if (item) {
-        syncUnsaveFromServer(
-          user.id,
-          id,
-          item.source_table ?? sourceTableFromCategoria(item.categoria),
-        );
-      }
+      saved
+        .filter((s) => s.id === id)
+        .forEach((s) => {
+          syncUnsaveFromServer(
+            user.id,
+            id,
+            s.source_table ?? sourceTableFromCategoria(s.categoria),
+          );
+        });
     }
     setSaved((prev) => prev.filter((s) => s.id !== id));
   }, [saved, user]);
