@@ -83,6 +83,10 @@ interface EnrichedPlace {
     best_for_1:         string;
     safety_solo_woman:  string;
   };
+  // ── Computed in Step 3b, consumed by Step 4 only (internal, never serialized)
+  // Stamped by scoreAndSortPool; read by sortBucket for intra-zone ordering.
+  // Optional: absent on synthetic places created after scoring runs.
+  prefScore?: number;
 }
 
 /** Output types — must stay compatible with the existing DiaRoteiro UI shape */
@@ -670,11 +674,17 @@ function chunkInto(items: EnrichedPlace[], n: number): EnrichedPlace[][] {
   );
 }
 
-// Sort a bucket by zone then by neighborhood name
+// Sort a bucket by zone (primary), then by preference score descending within
+// the same zone (Step B), then by area name alphabetically as a final
+// deterministic tiebreaker for equal scores.
+// prefScore is stamped by scoreAndSortPool before groupByGeography runs.
+// Falls back to alphabetical when prefScore is absent (0 via ?? 0).
 function sortBucket(items: EnrichedPlace[]): EnrichedPlace[] {
-  return [...items].sort((a, b) =>
-    a.zone !== b.zone ? a.zone - b.zone : a.area.localeCompare(b.area),
-  );
+  return [...items].sort((a, b) => {
+    if (a.zone !== b.zone) return a.zone - b.zone;
+    const scoreDiff = (b.prefScore ?? 0) - (a.prefScore ?? 0);
+    return scoreDiff !== 0 ? scoreDiff : a.area.localeCompare(b.area);
+  });
 }
 
 function groupByGeography(
@@ -883,16 +893,24 @@ function compositePreferenceScore(p: EnrichedPlace, prefs: Preferences): number 
 }
 
 // Re-rank: saved items before complementary; within each tier, sort by composite score.
-// Stable for ties → insertion order preserved within each tier.
+// Step B: stamps prefScore onto each place before sorting so that downstream
+// steps (Step 4 sortBucket) can use it without receiving preferences as a parameter.
+// Score is computed once per place — O(n) — instead of twice per comparison — O(n log n).
+// prefScore is internal only: it is never written to the output ItemRoteiro or DiaRoteiro.
 function scoreAndSortPool(
   places:      EnrichedPlace[],
   prefs:       Preferences,
   savedIds:    Set<string>,
 ): EnrichedPlace[] {
-  const saved  = places.filter((p) =>  savedIds.has(p.id));
-  const padded = places.filter((p) => !savedIds.has(p.id));
+  const stamped = places.map((p) => ({
+    ...p,
+    prefScore: compositePreferenceScore(p, prefs),
+  }));
+
+  const saved  = stamped.filter((p) =>  savedIds.has(p.id));
+  const padded = stamped.filter((p) => !savedIds.has(p.id));
   const byScore = (a: EnrichedPlace, b: EnrichedPlace) =>
-    compositePreferenceScore(b, prefs) - compositePreferenceScore(a, prefs);
+    (b.prefScore ?? 0) - (a.prefScore ?? 0);
   return [...saved.sort(byScore), ...padded.sort(byScore)];
 }
 
