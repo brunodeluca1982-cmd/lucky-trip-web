@@ -360,8 +360,8 @@ The API server handles all Stripe webhooks at `POST /api/stripe/webhook`. Withou
 **To register the webhook in the Stripe Dashboard:**
 1. Go to [https://dashboard.stripe.com/webhooks](https://dashboard.stripe.com/webhooks)
 2. Click "Add endpoint"
-3. URL: `https://<REPLIT_DEV_DOMAIN>/api/stripe/webhook`
-   - Find `REPLIT_DEV_DOMAIN` in the Replit workspace (shown in the browser URL bar when viewing the app)
+3. URL: `https://<YOUR_REPLIT_DEV_DOMAIN>/api/stripe/webhook`
+   - Find your domain in the Replit workspace URL bar (e.g. `abc123.replit.dev`) — this is the `REPLIT_DEV_DOMAIN` env var
 4. Select these events:
    - `checkout.session.completed`
    - `invoice.paid`
