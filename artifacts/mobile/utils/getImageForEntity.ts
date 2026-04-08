@@ -131,6 +131,18 @@ const CITY_LOCAL_ASSETS: Record<string, NeighborhoodImageSource> = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// URL upgrade rule — applied at Tier 1 (system-wide)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Ensures any Google Places Photo API URL uses maxwidth=800.
+// URLs cached in Supabase may have maxwidth=80 (thumbnail quality).
+// Non-Google-Places URLs are returned unchanged.
+function upgradePhotoUrl(url: string): string {
+  if (!url.includes("maps.googleapis.com/maps/api/place/photo")) return url;
+  return url.replace(/maxwidth=\d+/i, "maxwidth=800");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Public resolver
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -151,8 +163,9 @@ export function getImageForEntity(
   // ── Tier 1: Supabase/Wikipedia image — all platforms.
   // Supabase Storage URLs are direct HTTPS (upload.wikimedia.org too) — no
   // redirect chains, CORS-enabled. Safe to use on web and native alike.
+  // Google Places URLs are upgraded to maxwidth=800 here (system-wide rule).
   if (supabaseImageUrl && supabaseImageUrl.trim().length > 0) {
-    return { uri: supabaseImageUrl };
+    return { uri: upgradePhotoUrl(supabaseImageUrl.trim()) };
   }
 
   // ── Check module cache for tiers 2-4 ──────────────────────────────────────

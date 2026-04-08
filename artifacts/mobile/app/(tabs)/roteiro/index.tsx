@@ -2729,9 +2729,9 @@ const re = StyleSheet.create({
     color: "rgba(255,255,255,0.55)",
   },
   thumb: {
-    width: 60,
-    height: 60,
-    borderRadius: 12,
+    width: 88,
+    height: 56,
+    borderRadius: 10,
     overflow: "hidden",
     backgroundColor: "rgba(0,0,0,0.35)",
     flexShrink: 0,
