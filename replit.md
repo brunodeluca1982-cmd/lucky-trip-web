@@ -209,6 +209,26 @@ Called by `lucky.tsx` via direct fetch. Intent routing → Supabase table querie
 
 **FROZEN (never touch):** `create-checkout`, `stripe-webhook`, `stripe.ts`, `subscription.tsx`, `post-purchase.tsx`
 
+### Transport Guide — "Como chegar" (`transporte_rio`)
+
+- **Supabase table `transporte_rio`**: 9 transport options for Rio (GIG/SDU airports, Uber/99, taxi, BRT, metrô, VLT, ferry, car rental). Columns: `id, modo (enum), nome, descricao, custo_estimado, tempo_estimado, dica_lucky, disponibilidade, ordem, ativo`. RLS: public read enabled.
+- **Screen**: `app/comoChegar/[cityId].tsx` — dark premium design, groups by transport mode, gold dica_lucky tips. Registered in `_layout.tsx` as `comoChegar/[cityId]`.
+- **Hook**: `hooks/useTransporte.ts` — fetches `transporte_rio` from Supabase filtering `ativo = true`, ordered by `ordem`.
+- **Entry point**: "Como chegar" button in `cidade/[id].tsx` navigates to `/comoChegar/rio`.
+
+### Photo Enrichment
+
+- **`enrich-entity-photos` edge function**: batch enriches `photo_url` columns via Google Places API → caches to `place_photos` → writes back to entity tables. Coverage: 26/26 hotels, 20/22 lucky list, 42/42 activities, 33/35 restaurants.
+- **`v_stay_neighborhoods_with_hotels` view**: includes `photo_url`, `google_maps_url`, `lat`, `lng` in hotel JSON. `Hotel` type in `lib/supabase.ts` has `photo_url: string | null`.
+- **Photo priority chain**: entity `photo_url` → `place_photos` cache → Google Places API → neighborhood image fallback.
+- **`stay_hotels` IMPORTANT**: `slug_trigger` was DROPPED (broken). `active` column (not `ativo`).
+- **`ondeFicar/hotel/[hotelId].tsx`**: hero image now reads `hotel.photo_url` as primary source via `getImageForEntity` 4th param.
+
+### AI — Gemini 2.0 Flash
+
+- Both `lucky-concierge` and `generate-itinerary` edge functions use Gemini 2.0 Flash (model: `gemini-2.0-flash`). OpenAI fallback adapter retained in `lucky-concierge`.
+- `generate-itinerary` Step 3b: soft preference re-ranking using `inspirations`, `budget`, and `travelVibe` signals before final assembly.
+
 **Dead (not called by anyone):** `supabase/functions/lucky-trip-ai` — kept for reference, do not redeploy
 
 ---

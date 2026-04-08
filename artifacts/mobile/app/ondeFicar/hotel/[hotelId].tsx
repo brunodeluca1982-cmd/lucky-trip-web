@@ -45,9 +45,9 @@ export default function HotelDetailScreen() {
   const { hotel, loading, error } = useHotel(hotelId ?? "");
   const { save, unsave, isSaved } = useGuia();
 
-  // Hero image — hotel-specific via resolver (curated → neighborhood context → local asset)
+  // Hero image — Supabase photo_url first, then neighborhood fallback
   const heroImage = hotel
-    ? getImageForEntity("hotel", hotel.hotel_name, hotel.neighborhood.neighborhood_name)
+    ? getImageForEntity("hotel", hotel.hotel_name, hotel.neighborhood.neighborhood_name, (hotel as any).photo_url ?? null)
     : getImageForEntity("neighborhood", "Ipanema");
 
   return (

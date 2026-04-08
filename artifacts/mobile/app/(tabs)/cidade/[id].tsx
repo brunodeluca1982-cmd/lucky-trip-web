@@ -329,7 +329,10 @@ export default function CidadeScreen() {
           </GlassButton>
 
           {/* 7. Como chegar */}
-          <GlassButton style={s.btnStandard}>
+          <GlassButton
+            style={s.btnStandard}
+            onPress={() => router.push({ pathname: "/comoChegar/[cityId]", params: { cityId: destino?.id ?? "rio" } })}
+          >
             <View style={s.btnStandardInner}>
               <Feather name="map-pin" size={16} color="rgba(255,255,255,0.70)" />
               <Text style={s.btnStandardLabel}>Como chegar</Text>
