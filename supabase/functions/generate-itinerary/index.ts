@@ -287,8 +287,12 @@ async function fetchComplementaryContent(
   requestedDays:  number,
   vibe:           string,
   supa:           ReturnType<typeof createClient>,
+  preferences:    Preferences,
 ): Promise<EnrichedPlace[]> {
   const existingIds = new Set(existingPlaces.map((p) => p.id));
+  // Step C: zones of the user's saved places — used as proximity reference.
+  // Empty when no saved places exist; zoneProximityScore degrades gracefully.
+  const savedZones  = new Set(existingPlaces.map((p) => p.zone));
 
   const perDay       = VIBE_PER_DAY[vibe] ?? 4;
   // Target: (perDay-1) activities + 1 restaurant per day = comfortable density
@@ -306,12 +310,18 @@ async function fetchComplementaryContent(
   const complement: EnrichedPlace[] = [];
 
   // ── 1. Lucky List Rio — highest editorial priority ────────────────────────
+  // Step C: fetch 3× broader pool, build all candidates, score each by
+  // (compositePreferenceScore + zoneProximityScore), sort desc, slice top N.
+  // The score is a transient local value — never stored on EnrichedPlace.
+  // zoneProximityScore is a SOFT signal: -2 penalty never hard-excludes anything.
+  // A high-preference item in zone 5 or 6 can still win (no hard filtering).
   if (needActs > 0) {
     const { data: luckyRows } = await supa
       .from("lucky_list_rio")
       .select("id,nome,bairro,tipo,tags_ia,momento_ideal")
-      .limit(Math.min(20, needActs + 5));
+      .limit(Math.min(60, (needActs + 5) * 3));
 
+    const luckyCandidates: EnrichedPlace[] = [];
     for (const row of (luckyRows ?? []) as Record<string, unknown>[]) {
       const id = String(row.id ?? "");
       if (!id || existingIds.has(id)) continue;
@@ -324,7 +334,7 @@ async function fetchComplementaryContent(
       const tags = (row.tags_ia as string[]) ?? [];
       const momento = (row.momento_ideal as string[]) ?? [];
 
-      complement.push({
+      luckyCandidates.push({
         id,
         name:          (row.nome as string) || area,
         categoria:     "lucky",
@@ -336,13 +346,27 @@ async function fetchComplementaryContent(
         vibe_tags:     [],
         duracao:       "1-2h",
       });
-      existingIds.add(id);
+    }
 
-      if (complement.filter((p) => p.categoria !== "restaurante").length >= needActs) break;
+    // Score all candidates, sort descending, take top needActs.
+    // Soft ranking: nothing is removed — only ordered by relevance.
+    const luckySelected = luckyCandidates
+      .map((p) => ({
+        p,
+        score: compositePreferenceScore(p, preferences) + zoneProximityScore(p, savedZones),
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, needActs)
+      .map(({ p }) => p);
+
+    for (const p of luckySelected) {
+      complement.push(p);
+      existingIds.add(p.id);
     }
   }
 
   // ── 2. O que fazer Rio — core anchors & broader activities ───────────────
+  // Step C: same 3× pool pattern as the lucky block above.
   const stillNeedActs = Math.max(
     0, needActs - complement.filter((p) => p.categoria !== "restaurante").length,
   );
@@ -350,14 +374,15 @@ async function fetchComplementaryContent(
     const { data: oqRows } = await supa
       .from("o_que_fazer_rio")
       .select("id,nome,bairro,tags_ia,momento_ideal,vibe,energia,duracao_media")
-      .limit(Math.min(25, stillNeedActs + 8));
+      .limit(Math.min(75, (stillNeedActs + 8) * 3));
 
+    const oqCandidates: EnrichedPlace[] = [];
     for (const row of (oqRows ?? []) as Record<string, unknown>[]) {
       const id = String(row.id ?? "");
       if (!id || existingIds.has(id)) continue;
 
       const area = (row.bairro as string) || "Rio de Janeiro";
-      complement.push({
+      oqCandidates.push({
         id,
         name:          (row.nome as string) || area,
         categoria:     "oQueFazer",
@@ -369,25 +394,40 @@ async function fetchComplementaryContent(
         vibe_tags:     (row.vibe          as string[]) ?? [],
         duracao:       (row.duracao_media as string)   ?? "1-2h",
       });
-      existingIds.add(id);
+    }
+
+    const oqSelected = oqCandidates
+      .map((p) => ({
+        p,
+        score: compositePreferenceScore(p, preferences) + zoneProximityScore(p, savedZones),
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, stillNeedActs)
+      .map(({ p }) => p);
+
+    for (const p of oqSelected) {
+      complement.push(p);
+      existingIds.add(p.id);
     }
   }
 
   // ── 3. Restaurantes — 1 per day (for lunch/dinner anchors) ───────────────
+  // Step C: 3× pool, preco_nivel added to SELECT (enables structured budgetScore
+  // instead of text fallback), ordem_bairro removed (zone proximity replaces it).
   if (needRests > 0) {
     const { data: restRows } = await supa
       .from("restaurantes")
-      .select("id,nome,bairro,especialidade,perfil_publico")
+      .select("id,nome,bairro,especialidade,perfil_publico,preco_nivel")
       .eq("ativo", true)
-      .order("ordem_bairro")
-      .limit(Math.min(12, needRests + 3));
+      .limit(Math.min(35, (needRests + 3) * 3));
 
+    const restCandidates: EnrichedPlace[] = [];
     for (const row of (restRows ?? []) as Record<string, unknown>[]) {
       const id = String(row.id ?? "");
       if (!id || existingIds.has(id)) continue;
 
       const area = (row.bairro as string) || "Rio de Janeiro";
-      complement.push({
+      restCandidates.push({
         id,
         name:          (row.nome as string) || area,
         categoria:     "restaurante",
@@ -398,12 +438,24 @@ async function fetchComplementaryContent(
         tags:          [],
         vibe_tags:     [],
         duracao:       "1-2h",
-        especialidade: row.especialidade  as string | undefined,
+        especialidade:  row.especialidade  as string | undefined,
         perfil_publico: row.perfil_publico as string | undefined,
+        preco_nivel:    row.preco_nivel    as number | undefined,
       });
-      existingIds.add(id);
+    }
 
-      if (complement.filter((p) => p.categoria === "restaurante").length >= needRests) break;
+    const restSelected = restCandidates
+      .map((p) => ({
+        p,
+        score: compositePreferenceScore(p, preferences) + zoneProximityScore(p, savedZones),
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, needRests)
+      .map(({ p }) => p);
+
+    for (const p of restSelected) {
+      complement.push(p);
+      existingIds.add(p.id);
     }
   }
 
@@ -892,6 +944,27 @@ function compositePreferenceScore(p: EnrichedPlace, prefs: Preferences): number 
   );
 }
 
+// Zone proximity bonus/penalty for complement candidate selection (Step C).
+// This is a SOFT signal only — it never hard-excludes any candidate.
+// A -2 zone penalty is outweighed by +6 preference match on a relevant item.
+//
+// +3: item is in the same zone as at least one saved place
+// +1: item is in a zone adjacent (±1) to any saved-place zone
+//  0: neutral — Sul/Centro item, no saved-place zone nearby
+// -2: item is in Oeste (5) or Norte (6) and the user has NO saved places there
+//     This gently discourages unsolicited Barra/Tijuca days on short trips.
+//     Max combined score with -2 zone = compositePreferenceScore (can still win).
+//
+// Uses item.zone (already on EnrichedPlace). No new fields, no DB calls.
+function zoneProximityScore(item: EnrichedPlace, savedZones: Set<number>): number {
+  if (savedZones.has(item.zone)) return 3;
+  for (const sz of savedZones) {
+    if (Math.abs(item.zone - sz) === 1) return 1;
+  }
+  if ((item.zone === 5 || item.zone === 6) && !savedZones.has(item.zone)) return -2;
+  return 0;
+}
+
 // Re-rank: saved items before complementary; within each tier, sort by composite score.
 // Step B: stamps prefScore onto each place before sorting so that downstream
 // steps (Step 4 sortBucket) can use it without receiving preferences as a parameter.
@@ -1346,7 +1419,7 @@ serve(async (req) => {
     // Priority: saved items first, then lucky list, then o_que_fazer, then restaurants.
     // This pads out weak itineraries caused by too few saved items for the trip length.
     const complementaryPlaces = await fetchComplementaryContent(
-      savedPlaces, tripLength, vibe, supa,
+      savedPlaces, tripLength, vibe, supa, preferences,
     );
 
     // Merge: saved items always come first (preserved position in clustering)
