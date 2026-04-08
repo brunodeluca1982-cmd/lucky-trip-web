@@ -32,6 +32,9 @@ channel = "stable-25_05"
 [userenv]
 
 [userenv.shared]
-STRIPE_PRICE_ID = "price_1TJYjpGqZMbebHIjLdoi6H1b"
+STRIPE_PRICE_ID = "price_1TJcuTJ2w2OK6FGM5sQxfSEz"
+STRIPE_SECRET_KEY = "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"
+STRIPE_PRICE_ID_MONTHLY = "price_1TJcuTJ2w2OK6FGM5sQxfSEz"
+STRIPE_PRICE_ID_ANNUAL = "price_1TJcuaJ2w2OK6FGMeJnJX5QM"
 
 [userenv.development]

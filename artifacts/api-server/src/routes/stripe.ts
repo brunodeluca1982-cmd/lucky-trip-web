@@ -186,13 +186,39 @@ router.post(
         logger.info({ userId: req.user.id, customerId }, "Stripe customer created");
       }
 
-      const session = await stripeService.createCheckoutSession(
-        customerId,
-        priceId,
-        successUrl,
-        cancelUrl,
-        req.user.email,
-      );
+      // Create checkout session — if the stored customer doesn't exist in the current Stripe
+      // environment (e.g. test → live switch), create a fresh customer and retry once.
+      let session: Awaited<ReturnType<typeof stripeService.createCheckoutSession>>;
+      try {
+        session = await stripeService.createCheckoutSession(
+          customerId,
+          priceId,
+          successUrl,
+          cancelUrl,
+          req.user.email,
+        );
+      } catch (stripeErr: any) {
+        const isNoSuchCustomer =
+          stripeErr?.code === "resource_missing" &&
+          stripeErr?.message?.toLowerCase().includes("no such customer");
+
+        if (!isNoSuchCustomer) throw stripeErr;
+
+        logger.warn({ userId: req.user.id, oldCustomerId: customerId },
+          "Stripe customer not found in current environment — creating fresh customer");
+
+        const freshCustomer = await stripeService.createCustomer(req.user.email ?? "", req.user.id);
+        customerId = freshCustomer.id;
+        await storage.upsertUserSubscription(req.user.id, { stripe_customer_id: customerId });
+
+        session = await stripeService.createCheckoutSession(
+          customerId,
+          priceId,
+          successUrl,
+          cancelUrl,
+          req.user.email,
+        );
+      }
 
       logger.info({ userId: req.user.id, sessionId: session.id, priceId }, "Checkout session created");
       res.json({ url: session.url, session_id: session.id });
