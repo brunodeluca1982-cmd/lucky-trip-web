@@ -375,6 +375,8 @@ cd artifacts/api-server && node scripts/provision-user.mjs <supabase_user_id>
 ```
 This script writes `app_metadata.plan_type = "premium"` directly via the Supabase admin API.
 
+**Incident 2026-04-08:** User `brunomantuanohead@gmail.com` (ID: `d54a99d0-3e28-4db9-93f1-cd914fd34c16`) was provisioned manually via this script. Confirmed `app_metadata.plan_type = "premium"` set successfully.
+
 **Lucky List locking** (`app/(tabs)/luckyList/[id].tsx`):
 - `FREE_ITEMS = 3`: first 3 picks visible to all; items 4+ are locked for non-premium
 - Locked state: dimmed image (opacity 0.35), centered lock badge + "Toque para desbloquear"
