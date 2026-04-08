@@ -48,6 +48,7 @@ import {
 } from "@/utils/buildItinerary";
 import { PERIODO_LABEL, PERIODO_ICON } from "@/utils/buildRoteiro";
 import type { DiaRoteiro } from "@/utils/buildRoteiro";
+import { useInspirationPhotos, type InspirationPhotoMap } from "@/hooks/useInspirationPhotos";
 
 const C          = Colors.light;
 const GOLD       = "#D4AF37";
@@ -383,6 +384,7 @@ interface FlowPage2Props {
   budget: BudgetStyle;
   onBudgetChange: (b: BudgetStyle) => void;
   onBack: () => void;
+  inspirationPhotos?: InspirationPhotoMap;
 }
 
 function FlowPage2({
@@ -393,6 +395,7 @@ function FlowPage2({
   budget,
   onBudgetChange,
   onBack,
+  inspirationPhotos = {},
 }: FlowPage2Props) {
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === "web" ? 72 : insets.top + 20;
@@ -416,13 +419,15 @@ function FlowPage2({
       <View style={fp.insGrid}>
         {INSPIRATIONS_DATA.map((ins) => {
           const active = inspirations.includes(ins.id);
+          const photoUri = inspirationPhotos[ins.id];
+          const imgSrc = photoUri ? { uri: photoUri } : ins.image;
           return (
             <Pressable
               key={ins.id}
               style={[fp.insCard, active && fp.insCardActive]}
               onPress={() => onToggleInspiration(ins.id)}
             >
-              <Image source={ins.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
+              <Image source={imgSrc} style={StyleSheet.absoluteFill} resizeMode="cover" />
               <LinearGradient
                 colors={["rgba(0,0,0,0.06)", "rgba(0,0,0,0.68)"]}
                 locations={[0, 1]}
@@ -505,6 +510,7 @@ function StandardFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) =>
   const [travelVibe,    setTravelVibe]    = useState<TravelVibe>("amigos");
   const [inspirations,  setInspirations]  = useState<Inspiration[]>([]);
   const [budget,        setBudget]        = useState<BudgetStyle>("conforto");
+  const inspirationPhotos = useInspirationPhotos();
 
   function handleNext() { setPage(1); }
   function handleBack() { setPage(0); }
@@ -546,6 +552,7 @@ function StandardFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) =>
       budget={budget}
       onBudgetChange={handleBudgetAndGenerate}
       onBack={handleBack}
+      inspirationPhotos={inspirationPhotos}
     />
   );
 }
@@ -566,6 +573,7 @@ function ContextualFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) 
   const [travelVibe,    setTravelVibe]    = useState<TravelVibe | null>(null);
   const [inspirations,  setInspirations]  = useState<Inspiration[]>([]);
   const [budget,        setBudget]        = useState<BudgetStyle | null>(null);
+  const inspirationPhotos = useInspirationPhotos();
 
   function fmtDate(d: Date | null): string | null {
     if (!d) return null;
@@ -720,13 +728,15 @@ function ContextualFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) 
           <View style={fp.insGrid}>
             {INSPIRATIONS_DATA.map((ins) => {
               const active = inspirations.includes(ins.id);
+              const photoUri = inspirationPhotos[ins.id];
+              const imgSrc = photoUri ? { uri: photoUri } : ins.image;
               return (
                 <Pressable
                   key={ins.id}
                   style={[fp.insCard, active && fp.insCardActive]}
                   onPress={() => toggleInspiration(ins.id)}
                 >
-                  <Image source={ins.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                  <Image source={imgSrc} style={StyleSheet.absoluteFill} resizeMode="cover" />
                   <LinearGradient
                     colors={["transparent", "rgba(0,0,0,0.35)"]}
                     locations={[0.25, 1]}
