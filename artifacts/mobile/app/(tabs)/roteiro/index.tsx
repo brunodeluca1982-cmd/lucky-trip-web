@@ -3042,19 +3042,20 @@ export default function RoteiroScreen() {
           const roteiroItens = result.days.flatMap((dia) =>
             dia.periodos.flatMap((periodo, _pi) =>
               periodo.items.map((item, idx) => ({
-                roteiro_id:   itinerary.id,
-                name:         item.titulo,
-                day_index:    dia.numero - 1,
-                order_in_day: idx,
-                time_slot:    periodo.periodo,
-                source:       item.isExternal ? "external" : "saved",
-                ref_table:    item.isExternal ? "external" : null,
-                place_id:     item.isExternal ? (item.placeId ?? null) : null,
-                neighborhood: item.localizacao ?? dia.bairro,
-                address:      item.isExternal ? (item.address ?? null) : null,
-                city:         "Rio de Janeiro",
-                lat:          item.isExternal ? (item.lat ?? null) : null,
-                lng:          item.isExternal ? (item.lng ?? null) : null,
+                roteiro_id:        itinerary.id,
+                user_itinerary_id: itinerary.id,
+                name:              item.titulo,
+                day_index:         dia.numero - 1,
+                order_in_day:      idx,
+                time_slot:         periodo.periodo,
+                source:            item.isExternal ? "external" : "saved",
+                ref_table:         item.isExternal ? "external" : null,
+                place_id:          item.isExternal ? (item.placeId ?? null) : null,
+                neighborhood:      item.localizacao ?? dia.bairro,
+                address:           item.isExternal ? (item.address ?? null) : null,
+                city:              "Rio de Janeiro",
+                lat:               item.isExternal ? (item.lat ?? null) : null,
+                lng:               item.isExternal ? (item.lng ?? null) : null,
               }))
             )
           );
@@ -3166,19 +3167,20 @@ export default function RoteiroScreen() {
           const roteiroItens = result.days.flatMap((dia) =>
             dia.periodos.flatMap((periodo) =>
               periodo.items.map((item, idx) => ({
-                roteiro_id:   itinerary.id,
-                name:         item.titulo,
-                day_index:    dia.numero - 1,
-                order_in_day: idx,
-                time_slot:    periodo.periodo,
-                source:       item.isExternal ? "external" : "saved",
-                ref_table:    item.isExternal ? "external" : null,
-                place_id:     item.isExternal ? (item.placeId ?? null) : null,
-                neighborhood: item.localizacao ?? dia.bairro,
-                address:      item.isExternal ? (item.address ?? null) : null,
-                city:         "Rio de Janeiro",
-                lat:          item.isExternal ? (item.lat ?? null) : null,
-                lng:          item.isExternal ? (item.lng ?? null) : null,
+                roteiro_id:        itinerary.id,
+                user_itinerary_id: itinerary.id,
+                name:              item.titulo,
+                day_index:         dia.numero - 1,
+                order_in_day:      idx,
+                time_slot:         periodo.periodo,
+                source:            item.isExternal ? "external" : "saved",
+                ref_table:         item.isExternal ? "external" : null,
+                place_id:          item.isExternal ? (item.placeId ?? null) : null,
+                neighborhood:      item.localizacao ?? dia.bairro,
+                address:           item.isExternal ? (item.address ?? null) : null,
+                city:              "Rio de Janeiro",
+                lat:               item.isExternal ? (item.lat ?? null) : null,
+                lng:               item.isExternal ? (item.lng ?? null) : null,
               }))
             )
           );
