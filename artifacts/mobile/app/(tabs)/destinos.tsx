@@ -1,5 +1,6 @@
 import React, { memo, useCallback } from "react";
 import {
+  ActivityIndicator,
   Dimensions,
   Image,
   ImageSourcePropType,
@@ -15,7 +16,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
-import { destinos } from "@/data/mockData";
+import { useDestinos } from "@/hooks/useDestinos";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -103,11 +104,14 @@ const DestCard = memo(function DestCard({
 });
 
 // ── Screen ─────────────────────────────────────────────────────────────────────
+const RIO_BG = require("../../assets/images/hero-rio.png");
+
 export default function DestinosScreen() {
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === "web" ? 67 : insets.top + 12;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
+  const { destinos, loading } = useDestinos();
   const [query, setQuery] = React.useState("");
 
   const filtered = query.trim()
@@ -118,7 +122,7 @@ export default function DestinosScreen() {
       )
     : destinos;
 
-  const rows: (typeof destinos)[] = [];
+  const rows: typeof filtered[] = [];
   for (let i = 0; i < filtered.length; i += COLS) {
     rows.push(filtered.slice(i, i + COLS));
   }
@@ -128,7 +132,7 @@ export default function DestinosScreen() {
       {/* Full-screen atmospheric background */}
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
         <Image
-          source={destinos[0].image}
+          source={RIO_BG}
           style={s.bgImage}
           resizeMode="cover"
         />
@@ -179,7 +183,9 @@ export default function DestinosScreen() {
         </View>
 
         {/* 3-column grid */}
-        {rows.length > 0 ? (
+        {loading && destinos.length === 0 ? (
+          <ActivityIndicator color="rgba(212,175,55,0.7)" style={{ marginTop: 40 }} />
+        ) : rows.length > 0 ? (
           <View style={s.grid}>
             {rows.map((row, ri) => (
               <View key={ri} style={s.row}>

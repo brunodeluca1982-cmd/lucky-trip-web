@@ -26,11 +26,7 @@ import { PlaceCard } from "@/components/PlaceCard";
 import { RestauranteCard } from "@/components/RestauranteCard";
 import { SectionHeader } from "@/components/SectionHeader";
 import Colors from "@/constants/colors";
-import {
-  heroDestinos,
-  Roteiro,
-  roteiros,
-} from "@/data/mockData";
+import { heroDestinos } from "@/data/mockData";
 import { useGuia } from "@/context/GuiaContext";
 import { useLuckyList } from "@/hooks/useLuckyList";
 import { useOQueFazer } from "@/hooks/useOQueFazer";
@@ -117,37 +113,6 @@ function LuckyHighlight() {
         <Text style={s.luckyBtnText}>✦  Ver Lucky List completa</Text>
       </Pressable>
     </View>
-  );
-}
-
-// ── Roteiro card (2-col grid) ─────────────────────────────────────────────────
-function RoteiroCard({ roteiro }: { roteiro: Roteiro }) {
-  return (
-    <Pressable
-      style={({ pressed }) => [s.roteiroCard, pressed && { opacity: 0.90, transform: [{ scale: 0.97 }] }]}
-      onPress={() => router.push({ pathname: "/(tabs)/roteiro/[id]", params: { id: roteiro.id } })}
-    >
-      <Image source={roteiro.image} style={s.roteiroImage} resizeMode="cover" />
-      <LinearGradient
-        colors={["rgba(0,0,0,0.02)", "rgba(0,0,0,0.84)"]}
-        locations={[0.2, 1]}
-        style={StyleSheet.absoluteFill}
-      />
-      <View style={s.roteiroContent}>
-        <View style={s.roteiroDias}>
-          <Feather name="clock" size={10} color="rgba(255,255,255,0.65)" />
-          <Text style={s.roteiroDiasText}>{roteiro.dias}</Text>
-        </View>
-        <Text style={s.roteiroTitle}>{roteiro.titulo}</Text>
-        <View style={s.roteiroTagsRow}>
-          {roteiro.tags.map((tag) => (
-            <View key={tag} style={s.roteiroTag}>
-              <Text style={s.roteiroTagText}>{tag}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
-    </Pressable>
   );
 }
 
@@ -392,24 +357,7 @@ export default function HomeScreen() {
 
         <Divider />
 
-        {/* ── 8. ROTEIROS ── */}
-        <View style={s.section}>
-          <SectionHeader
-            title="Roteiros"
-            uppercase
-            subtitle="Crie o seu ou use os nossos."
-            dark
-          />
-          <View style={s.grid2}>
-            {roteiros.map((r) => (
-              <RoteiroCard key={r.id} roteiro={r} />
-            ))}
-          </View>
-        </View>
-
-        <Divider />
-
-        {/* ── 9. VIAJE COMO ELES — Supabase: friends ── */}
+        {/* ── 8. VIAJE COMO ELES — Supabase: friends ── */}
         <View style={s.section}>
           <SectionHeader
             title="Viaje como eles"
@@ -613,67 +561,6 @@ const s = StyleSheet.create({
     fontSize: 13,
     color: C.gold,
     letterSpacing: 0.3,
-  },
-
-  // ── Roteiro card ──
-  roteiroCard: {
-    width: CARD_W,
-    height: CARD_W * 1.35,
-    borderRadius: 18,
-    overflow: "hidden",
-    backgroundColor: "#1A1208",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-  roteiroImage: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "cover",
-  },
-  roteiroContent: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 14,
-  },
-  roteiroDias: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginBottom: 4,
-  },
-  roteiroDiasText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 10,
-    color: "rgba(255,255,255,0.60)",
-    letterSpacing: 0.3,
-  },
-  roteiroTitle: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 15,
-    color: C.white,
-    lineHeight: 20,
-    marginBottom: 8,
-  },
-  roteiroTagsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 4,
-  },
-  roteiroTag: {
-    backgroundColor: "rgba(255,255,255,0.12)",
-    borderRadius: 6,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-  },
-  roteiroTagText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 9,
-    color: "rgba(255,255,255,0.72)",
-    letterSpacing: 0.5,
   },
 
   // ── Influencer card ──
