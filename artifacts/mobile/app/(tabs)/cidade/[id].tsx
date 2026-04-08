@@ -128,6 +128,21 @@ const AGORA: Record<string, Record<Periodo, string>> = {
   },
 };
 
+// Editorial microcopy for non-launched destinations — shown in place of content modules
+const COMING_SOON_COPY: Record<string, string> = {
+  santorini:   "Santorini está sendo mapeada com o mesmo cuidado que merece o seu pôr-do-sol. Em breve, cada calçada branca e cada vinho local estará aqui.",
+  kyoto:       "Kyoto exige paciência — a mesma que os monges que varreram seus templos por séculos. Estamos preparando algo à altura da cidade.",
+  lisboa:      "Lisboa está quase pronta: os becos do Alfama, os pastéis de Belém e o fado que só se entende de perto.",
+  buenosaires: "Buenos Aires é urgente — tango, bifes e uma arquitectura que te faz parar a cada esquina. A nossa curadoria chega em breve.",
+  floripa:     "Florianópolis tem 42 praias. Estamos visitando cada uma delas antes de te recomendar qualquer coisa.",
+  paraty:      "Paraty é pequena e profunda. Estamos conversando com moradores, cozinheiras e barqueiros para te dar o que os guias convencionais nunca vão ter.",
+  gramado:     "Gramado tem o charme de um segredo de família. A nossa curadoria chega com chocolate, fondue e tudo o que a Serra Gaúcha guarda de melhor.",
+  miami:       "Miami vive fast — mas a nossa curadoria vai devagar, encontrando o que existe entre South Beach e Little Havana.",
+  paris:       "Paris não precisa de apresentação. Mas precisa de um guia que te tire dos caminhos óbvios. Em breve.",
+  bali:       "Bali é um estado de espírito antes de ser um destino. Estamos encontrando os templos, os rituais e os warungs que valem o voo longo.",
+  ilhabela:    "Ilhabela é cachoeira, vento e mar aberto. Estamos mapeando trilhas e ancoradouros que poucos conhecem.",
+};
+
 function GlassButton({
   onPress,
   children,
@@ -342,98 +357,117 @@ export default function CidadeScreen() {
 
         {/* ── Editorial content — cream section, scrolls naturally below ── */}
         <View style={s.editorial}>
-          {/* ── O que fazer — Supabase: o_que_fazer_rio ── */}
-          <View style={s.section}>
-            <SectionHeader
-              title="O que fazer"
-              subtitle={`Experiências imperdíveis em ${destino.cidade}.`}
-            />
-            {loadingAtiv ? (
-              <ActivityIndicator color="#C9A84C" style={{ marginVertical: 16 }} />
-            ) : (
-              <HorizontalScroll>
-                {atividades.slice(0, 8).map((item) => (
-                  <PlaceCard
-                    key={item.id}
-                    id={item.id}
-                    saveCategoria="oQueFazer"
-                    titulo={item.titulo}
-                    localizacao={item.localizacao}
-                    image={item.image}
-                    size="medium"
-                    onPress={() => router.push({
-                      pathname: "/lugar/[cityId]/[placeId]",
-                      params: { cityId: "rio", placeId: item.id, source_table: "o_que_fazer_rio" },
-                    })}
-                  />
-                ))}
-              </HorizontalScroll>
-            )}
-          </View>
-
-          <View style={s.divider} />
-
-          {/* ── Onde comer — Supabase: restaurantes ── */}
-          <View style={s.section}>
-            <SectionHeader
-              title="Onde comer"
-              subtitle={`Restaurantes com alma em ${destino.cidade}.`}
-            />
-            {loadingRestos ? (
-              <ActivityIndicator color="#C9A84C" style={{ marginVertical: 16 }} />
-            ) : (
-              <HorizontalScroll>
-                {restos.slice(0, 8).map((r) => (
-                  <RestauranteCard
-                    key={String(r.id)}
-                    id={String(r.id)}
-                    nome={r.nome}
-                    bairro={r.bairro}
-                    categoria={r.categoria}
-                    image={r.resolvedPhotoUri ? { uri: r.resolvedPhotoUri } : require("../../../assets/images/hero-rio.png")}
-                    onPress={() => router.push({
-                      pathname: "/lugar/[cityId]/[placeId]",
-                      params: { cityId: "rio", placeId: String(r.id), source_table: "restaurantes" },
-                    })}
-                  />
-                ))}
-              </HorizontalScroll>
-            )}
-          </View>
-
-          <View style={s.divider} />
-
-          {/* ── Onde ficar — Supabase: stay_hotels via stay_neighborhoods ── */}
-          {!loadingHoteis && allHotels.length > 0 && (
+          {isRio ? (
             <>
+              {/* ── O que fazer — Supabase: o_que_fazer_rio ── */}
               <View style={s.section}>
                 <SectionHeader
-                  title="Onde ficar"
-                  subtitle={`Hospedagem com personalidade em ${destino.cidade}.`}
+                  title="O que fazer"
+                  subtitle={`Experiências imperdíveis em ${destino.cidade}.`}
                 />
-                <HorizontalScroll>
-                  {allHotels.slice(0, 6).map((h) => (
-                    <HotelCard
-                      key={h.id}
-                      id={h.id}
-                      nome={h.hotel_name}
-                      localizacao={h.localizacao}
-                      tipo={h.hotel_category}
-                      image={
-                        h.photo_url
-                          ? { uri: h.photo_url }
-                          : getNeighborhoodImage(h.neighborhood_slug ?? h.localizacao)
-                      }
-                      onPress={() => router.push({
-                        pathname: "/lugar/[cityId]/[placeId]",
-                        params: { cityId: "rio", placeId: h.id, source_table: "stay_hotels" },
-                      })}
-                    />
-                  ))}
-                </HorizontalScroll>
+                {loadingAtiv ? (
+                  <ActivityIndicator color="#C9A84C" style={{ marginVertical: 16 }} />
+                ) : (
+                  <HorizontalScroll>
+                    {atividades.slice(0, 8).map((item) => (
+                      <PlaceCard
+                        key={item.id}
+                        id={item.id}
+                        saveCategoria="oQueFazer"
+                        titulo={item.titulo}
+                        localizacao={item.localizacao}
+                        image={item.image}
+                        size="medium"
+                        onPress={() => router.push({
+                          pathname: "/lugar/[cityId]/[placeId]",
+                          params: { cityId: "rio", placeId: item.id, source_table: "o_que_fazer_rio" },
+                        })}
+                      />
+                    ))}
+                  </HorizontalScroll>
+                )}
               </View>
+
               <View style={s.divider} />
+
+              {/* ── Onde comer — Supabase: restaurantes ── */}
+              <View style={s.section}>
+                <SectionHeader
+                  title="Onde comer"
+                  subtitle={`Restaurantes com alma em ${destino.cidade}.`}
+                />
+                {loadingRestos ? (
+                  <ActivityIndicator color="#C9A84C" style={{ marginVertical: 16 }} />
+                ) : (
+                  <HorizontalScroll>
+                    {restos.slice(0, 8).map((r) => (
+                      <RestauranteCard
+                        key={String(r.id)}
+                        id={String(r.id)}
+                        nome={r.nome}
+                        bairro={r.bairro}
+                        categoria={r.categoria}
+                        image={r.resolvedPhotoUri ? { uri: r.resolvedPhotoUri } : require("../../../assets/images/hero-rio.png")}
+                        onPress={() => router.push({
+                          pathname: "/lugar/[cityId]/[placeId]",
+                          params: { cityId: "rio", placeId: String(r.id), source_table: "restaurantes" },
+                        })}
+                      />
+                    ))}
+                  </HorizontalScroll>
+                )}
+              </View>
+
+              <View style={s.divider} />
+
+              {/* ── Onde ficar — Supabase: stay_hotels via stay_neighborhoods ── */}
+              {!loadingHoteis && allHotels.length > 0 && (
+                <>
+                  <View style={s.section}>
+                    <SectionHeader
+                      title="Onde ficar"
+                      subtitle={`Hospedagem com personalidade em ${destino.cidade}.`}
+                    />
+                    <HorizontalScroll>
+                      {allHotels.slice(0, 6).map((h) => (
+                        <HotelCard
+                          key={h.id}
+                          id={h.id}
+                          nome={h.hotel_name}
+                          localizacao={h.localizacao}
+                          tipo={h.hotel_category}
+                          image={
+                            h.photo_url
+                              ? { uri: h.photo_url }
+                              : getNeighborhoodImage(h.neighborhood_slug ?? h.localizacao)
+                          }
+                          onPress={() => router.push({
+                            pathname: "/lugar/[cityId]/[placeId]",
+                            params: { cityId: "rio", placeId: h.id, source_table: "stay_hotels" },
+                          })}
+                        />
+                      ))}
+                    </HorizontalScroll>
+                  </View>
+                  <View style={s.divider} />
+                </>
+              )}
             </>
+          ) : (
+            /* ── Em breve — destinos ainda não lançados ── */
+            <View style={s.comingSoonBlock}>
+              <Text style={s.comingSoonEyebrow}>Em breve</Text>
+              <Text style={s.comingSoonCopy}>
+                {COMING_SOON_COPY[destino.id] ?? `${destino.cidade} está sendo preparada com o cuidado que ela merece.`}
+              </Text>
+              <Pressable
+                style={s.comingSoonCta}
+                onPress={() => router.replace({ pathname: "/cidade/[id]", params: { id: "rio" } })}
+              >
+                <Text style={s.comingSoonCtaText}>Explorar o Rio agora</Text>
+                <Feather name="arrow-right" size={14} color="#C9A84C" />
+              </Pressable>
+            </View>
           )}
 
           <View style={s.footer}>
@@ -677,5 +711,39 @@ const s = StyleSheet.create({
     textAlign: "center",
     lineHeight: 20,
     maxWidth: 240,
+  },
+
+  // ── Em breve — non-launched destination placeholder block ──
+  comingSoonBlock: {
+    paddingHorizontal: 28,
+    paddingTop: 40,
+    paddingBottom: 16,
+    gap: 20,
+  },
+  comingSoonEyebrow: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 10,
+    letterSpacing: 2,
+    textTransform: "uppercase",
+    color: "rgba(201,168,76,0.72)",
+  },
+  comingSoonCopy: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 15,
+    color: "rgba(255,255,255,0.62)",
+    lineHeight: 24,
+    maxWidth: 340,
+  },
+  comingSoonCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingTop: 8,
+  },
+  comingSoonCtaText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    color: "#C9A84C",
+    letterSpacing: 0.2,
   },
 });

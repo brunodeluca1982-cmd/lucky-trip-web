@@ -72,6 +72,8 @@ interface EnrichedPlace {
   duracao:       string;          // "1-2h" | "2-4h" etc.
   especialidade?: string;         // restaurant specialty
   perfil_publico?: string;        // restaurant audience
+  preco_nivel?: number;           // 1-5 price level (from DB)
+  perfil_ideal?: string[];        // target audience tags (from DB)
   // ── Computed in Step 3
   best_periodo?: PeriodoDia;
   // ── Neighborhood metadata (attached in Step 2)
@@ -173,7 +175,7 @@ async function enrichPlaces(
   const [oqResult, luckyResult, restResult] = await Promise.all([
     oqIds.length > 0
       ? supa.from("o_que_fazer_rio")
-          .select("id,nome,bairro,categoria,tags_ia,momento_ideal,vibe,energia,duracao_media")
+          .select("id,nome,bairro,categoria,tags_ia,momento_ideal,vibe,energia,duracao_media,perfil_ideal")
           .in("id", oqIds)
       : Promise.resolve({ data: [] }),
     luckyIds.length > 0
@@ -183,7 +185,8 @@ async function enrichPlaces(
       : Promise.resolve({ data: [] }),
     restIds.length > 0
       ? supa.from("restaurantes")
-          .select("id,nome,bairro,categoria,especialidade,perfil_publico")
+          .select("id,nome,bairro,categoria,especialidade,perfil_publico,preco_nivel")
+          .eq("ativo", true)
           .in("id", restIds)
       : Promise.resolve({ data: [] }),
   ]);
@@ -210,13 +213,13 @@ async function enrichPlaces(
     if (s.categoria === "oQueFazer") {
       const row = oqMap.get(s.id);
       if (row) {
-        area      = (row.bairro        as string) || area;
-        name      = (row.nome          as string) || name;
+        area      = (row.bairro        as string)   || area;
+        name      = (row.nome          as string)   || name;
         tags      = (row.tags_ia       as string[]) ?? [];
         momento   = (row.momento_ideal as string[]) ?? [];
         vibe_tags = (row.vibe          as string[]) ?? [];
-        energia   = (row.energia       as string)  ?? "medium";
-        duracao   = (row.duracao_media as string)  ?? "1-2h";
+        energia   = (row.energia       as string)   ?? "medium";
+        duracao   = (row.duracao_media as string)   ?? "1-2h";
       }
     } else if (s.categoria === "lucky") {
       // Look up in lucky_list_rio — confirmed columns: id,nome,bairro,tipo,tags_ia,momento_ideal,photo_url
@@ -240,6 +243,15 @@ async function enrichPlaces(
       momento = ["lunch"];
     }
 
+    const oqRow       = s.categoria === "oQueFazer" ? oqMap.get(s.id) : undefined;
+    const perfil_ideal = oqRow
+      ? ((oqRow.perfil_ideal as string[] | null) ?? [])
+      : [];
+    const restRow     = s.categoria === "restaurante" ? restMap.get(Number(s.id)) : undefined;
+    const preco_nivel = restRow
+      ? ((restRow.preco_nivel as number | null) ?? undefined)
+      : undefined;
+
     places.push({
       id:            s.id,
       name,
@@ -253,6 +265,8 @@ async function enrichPlaces(
       duracao,
       especialidade,
       perfil_publico: perfil,
+      preco_nivel,
+      perfil_ideal,
     });
   }
 
@@ -783,6 +797,16 @@ const BUDGET_SIGNALS_ESSENCIAL   = ["popular", "barato", "rústico", "simples", 
 
 function budgetScore(p: EnrichedPlace, budget: string | null): number {
   if (!budget) return 0;
+
+  // preco_nivel from DB takes priority when available (1=muito barato, 5=muito caro)
+  const nivel = p.preco_nivel ?? null;
+  if (nivel !== null) {
+    if (budget === "sofisticado") return nivel >= 4 ? 3 : (nivel <= 2 ? -2 : 0);
+    if (budget === "essencial")   return nivel <= 2 ? 3 : (nivel >= 4 ? -2 : 0);
+    return 0; // "conforto" = neutral
+  }
+
+  // Fallback: text-signal matching when preco_nivel not available
   const text = [
     p.especialidade ?? "",
     p.perfil_publico ?? "",
@@ -814,6 +838,14 @@ function travelVibeScore(p: EnrichedPlace, travelVibe: string | null): number {
   if (!travelVibe) return 0;
   const signals = TRAVEL_VIBE_SIGNALS[travelVibe] ?? [];
   if (signals.length === 0) return 0;
+
+  // Check structured perfil_ideal array from DB first (higher confidence)
+  if (p.perfil_ideal && p.perfil_ideal.length > 0) {
+    const perfilText = p.perfil_ideal.join(" ").toLowerCase();
+    if (signals.some((s) => perfilText.includes(s))) return 3;
+  }
+
+  // Fallback: perfil_publico text field
   const text = (p.perfil_publico ?? "").toLowerCase();
   return signals.some((s) => text.includes(s)) ? 2 : 0;
 }
@@ -1061,13 +1093,18 @@ Return ONLY a valid JSON array with the same structure — no markdown, no expla
 }
 
 // ── STEP 7: Validation ────────────────────────────────────────────────────────
-// Re-attaches any places dropped during Gemini refinement.
-// Verifies day count integrity.
+// 7a. Re-attaches any places dropped during Gemini refinement.
+// 7b. Enforces temporal sanity rules — silently corrects absurd assignments
+//     that Gemini may have introduced during reordering:
+//       • sunset items → only tarde
+//       • pure nightlife items → not manha/almoco
+//       • restaurantes → not manha
 
 function validateAndFix(
   days:      DiaRoteiro[],
   allPlaces: EnrichedPlace[],
 ): DiaRoteiro[] {
+  // 7a. Re-attach any items dropped during Gemini refinement ─────────────────
   const usedIds = new Set<string>();
   for (const day of days) {
     for (const p of day.periodos) {
@@ -1081,12 +1118,70 @@ function validateAndFix(
     const tarde   = lastDay.periodos.find((p) => p.periodo === "tarde");
     const lostItems = lost.map((l) => ({
       id: l.id, titulo: l.name, categoria: l.categoria, localizacao: l.area,
+      source_table: categoriaToTable(l.categoria),
     }));
     if (tarde) {
       tarde.items.push(...lostItems);
     } else {
       lastDay.periodos.push({ periodo: "tarde", items: lostItems });
     }
+  }
+
+  // 7b. Temporal sanity pass — fix any invalid period assignments ─────────────
+  const placeById = new Map<string, EnrichedPlace>(allPlaces.map((p) => [p.id, p]));
+
+  for (const day of days) {
+    const evictions: Array<{ item: ItemRoteiro; to: PeriodoDia }> = [];
+
+    for (const periodoBlock of day.periodos) {
+      const keep: ItemRoteiro[] = [];
+
+      for (const item of periodoBlock.items) {
+        const place = placeById.get(item.id);
+        if (!place) { keep.push(item); continue; }
+
+        const momento = place.momento_ideal.map((m) => m.toLowerCase());
+        const tags    = place.tags.map((t) => t.toLowerCase());
+
+        // Rule 1: sunset → only tarde (pôr do sol nunca às 14h)
+        if (momento.includes("sunset") && periodoBlock.periodo !== "tarde") {
+          evictions.push({ item, to: "tarde" }); continue;
+        }
+
+        // Rule 2: restaurant → not manha
+        if (item.categoria === "restaurante" && periodoBlock.periodo === "manha") {
+          evictions.push({ item, to: "almoco" }); continue;
+        }
+
+        // Rule 3: pure nightlife (ONLY night/evening momento + nightlife tag) → not manha/almoco
+        const onlyNight = momento.length > 0 &&
+          momento.every((m) => ["night", "evening"].includes(m));
+        const isNightlife = tags.some((t) =>
+          ["balada", "nightlife", "clubbing"].some((k) => t.includes(k)));
+        if (onlyNight && isNightlife &&
+          (periodoBlock.periodo === "manha" || periodoBlock.periodo === "almoco")) {
+          evictions.push({ item, to: "noite" }); continue;
+        }
+
+        keep.push(item);
+      }
+      periodoBlock.items = keep;
+    }
+
+    // Re-insert evicted items into their correct target periods
+    for (const { item, to } of evictions) {
+      let target = day.periodos.find((p) => p.periodo === to);
+      if (!target) {
+        target = { periodo: to, items: [] };
+        day.periodos.push(target);
+      }
+      target.items.push(item);
+    }
+
+    // Re-sort periods into canonical order after any modifications
+    day.periodos = (PERIODO_ORDER
+      .map((po) => day.periodos.find((p) => p.periodo === po))
+      .filter(Boolean)) as DiaPeriodo[];
   }
 
   return days

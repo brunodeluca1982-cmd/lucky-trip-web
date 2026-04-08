@@ -34,6 +34,7 @@ interface DestCardProps {
   pais: string;
   image: ImageSourcePropType;
   selected: boolean;
+  lancado: boolean;
 }
 
 const DestCard = memo(function DestCard({
@@ -42,6 +43,7 @@ const DestCard = memo(function DestCard({
   pais,
   image,
   selected,
+  lancado,
 }: DestCardProps) {
   // Stable handler — created once per card id, never recreated on parent re-render
   const handlePress = useCallback(() => {
@@ -55,11 +57,16 @@ const DestCard = memo(function DestCard({
       style={({ pressed }) => [
         s.card,
         selected && s.cardSelected,
+        !lancado && s.cardComingSoon,
         pressed && { opacity: 0.88, transform: [{ scale: 0.97 }] },
       ]}
     >
       {/* Image fills card — identical pattern to DestinationCard.tsx */}
-      <Image source={image} style={s.cardImage} resizeMode="cover" />
+      <Image
+        source={image}
+        style={[s.cardImage, !lancado && { opacity: 0.72 }]}
+        resizeMode="cover"
+      />
 
       {/* Bottom-anchored gradient — does NOT obscure the image on load */}
       <LinearGradient
@@ -72,6 +79,13 @@ const DestCard = memo(function DestCard({
       {selected && (
         <View style={s.checkBadge}>
           <Feather name="check" size={10} color="#000000" />
+        </View>
+      )}
+
+      {/* Em breve badge */}
+      {!lancado && (
+        <View style={s.comingSoonBadge}>
+          <Text style={s.comingSoonText}>Em breve</Text>
         </View>
       )}
 
@@ -177,6 +191,7 @@ export default function DestinosScreen() {
                     pais={d.pais}
                     image={d.image}
                     selected={d.id === SELECTED_ID}
+                    lancado={d.lancado}
                   />
                 ))}
                 {/* Fill trailing empty slots */}
@@ -335,6 +350,29 @@ const s = StyleSheet.create({
     fontSize: 10,
     color: "rgba(255,255,255,0.68)",
     lineHeight: 14,
+  },
+
+  // Coming soon card variant
+  cardComingSoon: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+  },
+  comingSoonBadge: {
+    position: "absolute",
+    top: 7,
+    left: 7,
+    backgroundColor: "rgba(0,0,0,0.62)",
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+  },
+  comingSoonText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 8.5,
+    color: "rgba(255,255,255,0.72)",
+    letterSpacing: 0.4,
   },
 
   // Empty state

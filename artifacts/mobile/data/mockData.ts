@@ -7,6 +7,7 @@ export interface Destino {
   pais: string;
   descricao: string;
   image: any;
+  lancado: boolean;
 }
 
 export const destinos: Destino[] = [
@@ -16,6 +17,7 @@ export const destinos: Destino[] = [
     pais: "Brasil",
     descricao: "A cidade maravilhosa — praias douradas, florestas urbanas e o carnaval mais famoso do mundo.",
     image: require("../assets/images/hero-rio.png"),
+    lancado: true,
   },
   {
     id: "santorini",
@@ -23,6 +25,7 @@ export const destinos: Destino[] = [
     pais: "Grécia",
     descricao: "Ilhas brancas sobre o Mar Egeu — pôr-do-sol em Oia que não se esquece.",
     image: require("../assets/images/hero-santorini.png"),
+    lancado: false,
   },
   {
     id: "kyoto",
@@ -30,6 +33,7 @@ export const destinos: Destino[] = [
     pais: "Japão",
     descricao: "Templos milenares, cerejeiras em flor e a alma mais pura da cultura japonesa.",
     image: require("../assets/images/hero-kyoto.png"),
+    lancado: false,
   },
   {
     id: "lisboa",
@@ -37,6 +41,7 @@ export const destinos: Destino[] = [
     pais: "Portugal",
     descricao: "Fado, pastéis de nata e becos iluminados à beira do Tejo.",
     image: getImageForEntity("city", "Lisboa"),
+    lancado: false,
   },
   {
     id: "buenosaires",
@@ -44,6 +49,7 @@ export const destinos: Destino[] = [
     pais: "Argentina",
     descricao: "Tango, arquitetura europeia e os melhores cortes de carne do continente.",
     image: getImageForEntity("city", "Buenos Aires"),
+    lancado: false,
   },
   {
     id: "floripa",
@@ -51,6 +57,7 @@ export const destinos: Destino[] = [
     pais: "Brasil",
     descricao: "A ilha da magia — 42 praias para todos os estilos e humores.",
     image: getImageForEntity("city", "Florianópolis"),
+    lancado: false,
   },
   {
     id: "paraty",
@@ -58,6 +65,7 @@ export const destinos: Destino[] = [
     pais: "Brasil",
     descricao: "Centro histórico colonial à beira da Baía da Ilha Grande.",
     image: getImageForEntity("city", "Paraty"),
+    lancado: false,
   },
   {
     id: "gramado",
@@ -65,6 +73,7 @@ export const destinos: Destino[] = [
     pais: "Brasil",
     descricao: "Charme europeu encravado entre as montanhas gaúchas.",
     image: getImageForEntity("city", "Gramado"),
+    lancado: false,
   },
   {
     id: "miami",
@@ -72,6 +81,7 @@ export const destinos: Destino[] = [
     pais: "Estados Unidos",
     descricao: "Arte, design, sol e a energia única de South Beach.",
     image: getImageForEntity("city", "Miami"),
+    lancado: false,
   },
   {
     id: "paris",
@@ -79,6 +89,7 @@ export const destinos: Destino[] = [
     pais: "França",
     descricao: "A capital do romance, da moda e da gastronomia mais refinada do mundo.",
     image: getImageForEntity("city", "Paris"),
+    lancado: false,
   },
   {
     id: "bali",
@@ -86,6 +97,7 @@ export const destinos: Destino[] = [
     pais: "Indonésia",
     descricao: "Templos entre arrozais, ondas perfeitas e a espiritualidade do povo balinês.",
     image: getImageForEntity("city", "Bali"),
+    lancado: false,
   },
   {
     id: "ilhabela",
@@ -93,6 +105,7 @@ export const destinos: Destino[] = [
     pais: "Brasil",
     descricao: "Paraíso ecológico com cachoeiras, praias selvagens e ventos favoráveis.",
     image: getImageForEntity("city", "Ilhabela"),
+    lancado: false,
   },
 ];
 
