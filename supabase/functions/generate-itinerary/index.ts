@@ -743,6 +743,103 @@ function groupByGeography(
   return { dayGroups, dayRestaurants };
 }
 
+// ── STEP 3b: Preference-based scoring + pool re-ranking ──────────────────────
+//
+// inspirations, budget, and travelVibe arrive from the frontend but were
+// previously ignored after Step 3.  This pass re-weights the enriched pool
+// (saved + complementary) BEFORE geographic clustering (Step 4) so that
+// preference-relevant places tend to anchor the early, denser days.
+//
+// Design: soft scoring only — never hard-excludes — to avoid empty days.
+// Saved items always outrank complementary items within the same score tier.
+
+const INSPIRATION_TAGS: Record<string, string[]> = {
+  gastronomy: ["gastronomia", "restaurante", "food", "culinary", "comida", "fine_dining"],
+  culture:    ["cultura", "arte", "museu", "history", "teatro", "galeria", "historical"],
+  beach:      ["praia", "beach", "surf", "beach_life", "orla", "mar"],
+  adventure:  ["aventura", "trilha", "esporte", "outdoor", "natureza", "escalada"],
+  lucky:      ["lucky", "insider", "exclusivo", "secreto", "curadoria"],
+  natureza:   ["natureza", "parque", "floresta", "jardim", "vista", "ecológico"],
+  festa:      ["balada", "bar", "nightlife", "samba", "forró", "festa", "carnaval"],
+};
+
+function inspirationScore(p: EnrichedPlace, inspirations: string[]): number {
+  if (inspirations.length === 0) return 0;
+  const haystack = [...p.tags, ...p.vibe_tags, p.categoria].map((t) => t.toLowerCase());
+  let total = 0;
+  for (const ins of inspirations) {
+    const kws  = INSPIRATION_TAGS[ins] ?? [];
+    const hits = kws.filter((kw) => haystack.some((h) => h.includes(kw)));
+    total += hits.length * 2;
+    if (ins === "gastronomy" && p.categoria === "restaurante") total += 3;
+    if (ins === "beach"     && p.tags.some((t) => t.includes("beach") || t.includes("praia"))) total += 3;
+    if (ins === "lucky"     && p.categoria === "lucky") total += 4;
+  }
+  return total;
+}
+
+const BUDGET_SIGNALS_SOFISTICADO = ["fine dining", "exclusivo", "premium", "luxo", "alta", "especial"];
+const BUDGET_SIGNALS_ESSENCIAL   = ["popular", "barato", "rústico", "simples", "acessível", "boteco"];
+
+function budgetScore(p: EnrichedPlace, budget: string | null): number {
+  if (!budget) return 0;
+  const text = [
+    p.especialidade ?? "",
+    p.perfil_publico ?? "",
+    ...p.tags,
+    ...p.vibe_tags,
+  ].join(" ").toLowerCase();
+
+  if (budget === "sofisticado") {
+    const match    = BUDGET_SIGNALS_SOFISTICADO.some((s) => text.includes(s));
+    const mismatch = BUDGET_SIGNALS_ESSENCIAL.some((s) => text.includes(s));
+    return match ? 3 : (mismatch ? -2 : 0);
+  }
+  if (budget === "essencial") {
+    const match    = BUDGET_SIGNALS_ESSENCIAL.some((s) => text.includes(s));
+    const mismatch = BUDGET_SIGNALS_SOFISTICADO.some((s) => text.includes(s));
+    return match ? 3 : (mismatch ? -2 : 0);
+  }
+  return 0; // "conforto" = neutral
+}
+
+const TRAVEL_VIBE_SIGNALS: Record<string, string[]> = {
+  solo:     ["solo", "individual", "introspec", "single", "sozinha", "sozinho"],
+  casal:    ["casal", "couple", "romantic", "romântico", "intimidade", "namorado"],
+  amigos:   ["grupo", "amigos", "friends", "animado", "turma"],
+  família:  ["família", "family", "crianças", "kids", "infantil", "filhos"],
+};
+
+function travelVibeScore(p: EnrichedPlace, travelVibe: string | null): number {
+  if (!travelVibe) return 0;
+  const signals = TRAVEL_VIBE_SIGNALS[travelVibe] ?? [];
+  if (signals.length === 0) return 0;
+  const text = (p.perfil_publico ?? "").toLowerCase();
+  return signals.some((s) => text.includes(s)) ? 2 : 0;
+}
+
+function compositePreferenceScore(p: EnrichedPlace, prefs: Preferences): number {
+  return (
+    inspirationScore(p, prefs.inspirations ?? []) +
+    budgetScore(p, prefs.budget ?? null) +
+    travelVibeScore(p, prefs.travelVibe ?? null)
+  );
+}
+
+// Re-rank: saved items before complementary; within each tier, sort by composite score.
+// Stable for ties → insertion order preserved within each tier.
+function scoreAndSortPool(
+  places:      EnrichedPlace[],
+  prefs:       Preferences,
+  savedIds:    Set<string>,
+): EnrichedPlace[] {
+  const saved  = places.filter((p) =>  savedIds.has(p.id));
+  const padded = places.filter((p) => !savedIds.has(p.id));
+  const byScore = (a: EnrichedPlace, b: EnrichedPlace) =>
+    compositePreferenceScore(b, prefs) - compositePreferenceScore(a, prefs);
+  return [...saved.sort(byScore), ...padded.sort(byScore)];
+}
+
 // ── STEP 5: Build fully populated DiaRoteiro[] ────────────────────────────────
 //
 // For each day group:
@@ -910,7 +1007,7 @@ Return ONLY a valid JSON array with the same structure — no markdown, no expla
 
   try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
       {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
@@ -1065,6 +1162,12 @@ serve(async (req) => {
 
     // ── Step 3: Classify each place by best time-of-day ───────────────────────
     places = classifyAllPeriodos(places, vibe);
+
+    // ── Step 3b: Score + re-rank pool by user preferences ────────────────────
+    // inspirations, budget, travelVibe were received but previously ignored.
+    // Soft scoring only — never removes places. Saved items always rank first.
+    const savedIds = new Set(savedPlaces.map((p) => p.id));
+    places = scoreAndSortPool(places, preferences, savedIds);
 
     // ── Step 4: Macro-region clustering (oeste + norte isolated from centro + sul)
     const { dayGroups, dayRestaurants } = groupByGeography(places, tripLength, vibe);

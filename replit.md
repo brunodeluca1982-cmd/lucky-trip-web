@@ -180,6 +180,39 @@ Neighborhood map (defined in `data/neighborhoodImages.ts`):
 
 **CRITICAL**: Always use `select("*")` in mobile client for these tables — any explicit column that doesn't exist causes a 400 error that silently returns null (no data rendered). The edge function confirmed which columns exist.
 
+### AI Architecture — Canonical Rules
+
+**STRICT RULE: Supabase is the source of truth for all AI. Replit never "thinks" — it only orchestrates.**
+
+#### AI Provider
+- **Default**: Gemini 2.0 Flash (`GEMINI_API_KEY` in Supabase secrets)
+- **Fallback adapter**: OpenAI GPT-4o-mini (only if `GEMINI_API_KEY` absent)
+- **To switch**: Change `callAI()` in `lucky-concierge/index.ts` — all call sites unchanged
+
+#### Roteiro Planner (`supabase/functions/generate-itinerary`)
+Called by `roteiro/index.tsx` via `supabase.functions.invoke("generate-itinerary")`. Client-side fallback: `utils/buildItinerary.ts` + `utils/buildRoteiro.ts`.
+
+**7 pipeline steps:**
+1. **Enrich**: Read `o_que_fazer_rio`, `lucky_list_rio`, `restaurantes` from Supabase by saved item IDs
+2. **Neighborhood meta**: Attach `stay_neighborhoods` (walkable, safety_solo_woman, better_for)
+3. **Classify periodo**: Hard signals from `momento_ideal`, tags, energia, duracao — beach→tarde, restaurant→almoco, nightlife→noite, high-energy→manha
+4. **3b – Preference score**: `inspirations` × tag affinity; `budget` × especialidade/perfil_publico signals; `travelVibe` × perfil_publico — soft re-ranking before clustering (never hard-excludes)
+5. **Geographic cluster**: Sub-zones (sul_beach/sul_inland/sul_bridge/centro/oeste/norte) + travel minutes matrix
+6. **Build draft**: Slot assignments with morning load-balancer; nearest-neighbor proximity sort within periods
+7. **Gemini refinement**: Receives fully-built draft — may ONLY reorder within each período; cannot add/remove/move items
+8. **Validate**: Re-attach any dropped items
+
+**Preferences used (all four):** `vibe` (pace), `inspirations` (tag affinity), `budget` (sofisticado/essencial/conforto), `travelVibe` (companion type)
+
+#### Lucky Concierge (`supabase/functions/lucky-concierge`)
+Called by `lucky.tsx` via direct fetch. Intent routing → Supabase table queries → Gemini (no invented data).
+
+**FROZEN (never touch):** `create-checkout`, `stripe-webhook`, `stripe.ts`, `subscription.tsx`, `post-purchase.tsx`
+
+**Dead (not called by anyone):** `supabase/functions/lucky-trip-ai` — kept for reference, do not redeploy
+
+---
+
 ### Itinerary Generation (Gemini + Supabase)
 
 `POST /api/friend/generate-itinerary` — endpoint in `artifacts/api-server/src/routes/friend-itinerary.ts`

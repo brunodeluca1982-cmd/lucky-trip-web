@@ -232,13 +232,62 @@ async function fetchLuckyPicks(supa: ReturnType<typeof createClient>) {
   }));
 }
 
-// ── Gemini call ───────────────────────────────────────────────────────────────
+// ── AI Provider: Gemini (primary) + OpenAI (adapter fallback) ────────────────
+//
+// Primary:  Gemini 2.0 Flash — uses GEMINI_API_KEY
+// Fallback: OpenAI GPT-4o-mini — uses OPENAI_API_KEY (only if GEMINI_API_KEY absent)
+//
+// To switch providers in the future: change callAI() — all call sites stay the same.
 
-async function callAI(systemPrompt: string, allMessages: Message[]): Promise<string> {
-  const apiKey = Deno.env.get("OPENAI_API_KEY");
-  if (!apiKey) throw new Error("OPENAI_API_KEY not set");
+async function callGemini(
+  apiKey:       string,
+  systemPrompt: string,
+  allMessages:  Message[],
+): Promise<string> {
+  const history = allMessages.slice(0, -1);
+  const lastMsg = allMessages[allMessages.length - 1]?.content ?? "";
 
-  const openAiMessages = [
+  const contents = [
+    ...history.map((m) => ({
+      role:  m.role === "user" ? "user" : "model",
+      parts: [{ text: m.content }],
+    })),
+    { role: "user", parts: [{ text: lastMsg }] },
+  ];
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents,
+        generationConfig: { temperature: 0.65, maxOutputTokens: 600 },
+      }),
+    },
+  );
+
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error("[lucky-concierge] Gemini API error:", res.status, errText);
+    throw new Error(`Gemini error (${res.status}): ${errText}`);
+  }
+
+  const data = await res.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  if (!text) {
+    console.error("[lucky-concierge] Gemini returned empty text. Response:", JSON.stringify(data).slice(0, 300));
+  }
+  return text;
+}
+
+async function callOpenAIFallback(
+  apiKey:       string,
+  systemPrompt: string,
+  allMessages:  Message[],
+): Promise<string> {
+  const messages = [
     { role: "system", content: systemPrompt },
     ...allMessages.map((m) => ({
       role:    m.role === "user" ? "user" : "assistant",
@@ -246,32 +295,39 @@ async function callAI(systemPrompt: string, allMessages: Message[]): Promise<str
     })),
   ];
 
-  const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method:  "POST",
     headers: {
       "Content-Type":  "application/json",
       "Authorization": `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({
-      model:       "gpt-4o-mini",
-      messages:    openAiMessages,
-      temperature: 0.65,
-      max_tokens:  600,
-    }),
+    body: JSON.stringify({ model: "gpt-4o-mini", messages, temperature: 0.65, max_tokens: 600 }),
   });
 
-  if (!aiRes.ok) {
-    const errText = await aiRes.text();
-    console.error("[lucky-concierge] OpenAI API error:", aiRes.status, errText);
-    throw new Error(`OpenAI error (${aiRes.status}): ${errText}`);
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`OpenAI error (${res.status}): ${errText}`);
   }
 
-  const data = await aiRes.json();
-  const text = data.choices?.[0]?.message?.content ?? "";
-  if (!text) {
-    console.error("[lucky-concierge] OpenAI returned empty text. Full response:", JSON.stringify(data));
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content ?? "";
+}
+
+async function callAI(systemPrompt: string, allMessages: Message[]): Promise<string> {
+  const geminiKey  = Deno.env.get("GEMINI_API_KEY");
+  const openAiKey  = Deno.env.get("OPENAI_API_KEY");
+
+  if (geminiKey) {
+    console.log("[lucky-concierge] provider: Gemini 2.0 Flash");
+    return await callGemini(geminiKey, systemPrompt, allMessages);
   }
-  return text;
+
+  if (openAiKey) {
+    console.log("[lucky-concierge] provider: OpenAI GPT-4o-mini (fallback — set GEMINI_API_KEY to switch to Gemini)");
+    return await callOpenAIFallback(openAiKey, systemPrompt, allMessages);
+  }
+
+  throw new Error("No AI provider configured: set GEMINI_API_KEY (preferred) or OPENAI_API_KEY");
 }
 
 // ── Main handler ──────────────────────────────────────────────────────────────
@@ -440,7 +496,7 @@ ${noData
       { role: "user", content: query },
     ];
 
-    console.log("[lucky-concierge] Calling OpenAI gpt-4o-mini...");
+    console.log("[lucky-concierge] Calling AI provider...");
     const answer = await callAI(systemPrompt, allMessages);
     console.log("[lucky-concierge] AI answered:", answer.length > 0, "chars:", answer.length);
 
