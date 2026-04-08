@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { destinos as staticDestinos } from "@/data/mockData";
 import { getImageForEntity } from "@/utils/getImageForEntity";
 
 export interface Destino {
@@ -22,15 +21,16 @@ function destinoImage(slug: string, nome: string): any {
   return SLUG_IMAGE[slug] ?? getImageForEntity("city", nome);
 }
 
-const STATIC_COMING_SOON: Destino[] = staticDestinos.filter((d) => !d.lancado);
-const STATIC_RIO_FALLBACK: Destino = {
-  id:       "rio",
-  cidade:   "Rio de Janeiro",
-  pais:     "Brasil",
-  descricao: "A cidade maravilhosa — praias douradas, florestas urbanas e o carnaval mais famoso do mundo.",
-  image:    require("../assets/images/hero-rio.png"),
-  lancado:  true,
-};
+const STATIC_RIO_FALLBACK: Destino[] = [
+  {
+    id:        "rio",
+    cidade:    "Rio de Janeiro",
+    pais:      "Brasil",
+    descricao: "A cidade maravilhosa — praias douradas, florestas urbanas e o carnaval mais famoso do mundo.",
+    image:     require("../assets/images/hero-rio.png"),
+    lancado:   true,
+  },
+];
 
 export function useDestinos() {
   const [destinos, setDestinos] = useState<Destino[]>([]);
@@ -50,27 +50,20 @@ export function useDestinos() {
 
         if (err) throw err;
 
-        const supabaseRows: Destino[] = (data ?? []).map((row) => ({
-          id:       row.slug ?? String(row.id),
-          cidade:   row.nome,
-          pais:     row.pais,
+        const rows: Destino[] = (data ?? []).map((row) => ({
+          id:        row.slug ?? String(row.id),
+          cidade:    row.nome,
+          pais:      row.pais,
           descricao: row.descricao ?? "",
-          image:    destinoImage(row.slug ?? String(row.id), row.nome),
-          lancado:  row.lancado ?? false,
+          image:     destinoImage(row.slug ?? String(row.id), row.nome),
+          lancado:   row.lancado ?? false,
         }));
 
-        const launchedIds = new Set(supabaseRows.filter((d) => d.lancado).map((d) => d.id));
-        const comingSoon  = STATIC_COMING_SOON.filter((d) => !launchedIds.has(d.id));
-
-        const combined = supabaseRows.length > 0
-          ? [...supabaseRows, ...comingSoon]
-          : [STATIC_RIO_FALLBACK, ...comingSoon];
-
-        if (!cancelled) setDestinos(combined);
+        if (!cancelled) setDestinos(rows.length > 0 ? rows : STATIC_RIO_FALLBACK);
       } catch (e: any) {
         if (!cancelled) {
           setError(e.message ?? "Erro ao carregar destinos");
-          setDestinos([STATIC_RIO_FALLBACK, ...STATIC_COMING_SOON]);
+          setDestinos(STATIC_RIO_FALLBACK);
         }
       } finally {
         if (!cancelled) setLoading(false);
