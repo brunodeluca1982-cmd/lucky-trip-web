@@ -1219,6 +1219,29 @@ function validateAndFix(
           evictions.push({ item, to: "noite" }); continue;
         }
 
+        // Rule 4 (Step A.5): performance venue → not manha/almoco
+        //
+        // Performance venues (opera houses, concert halls, theaters) are visitable
+        // in the morning for architectural tours, so their DB momento_ideal correctly
+        // includes "morning". But their primary experience — the show itself — is
+        // always evening. The first-match classifyPeriodo logic picks "morning" when
+        // it appears first in the array, producing an impossible 09:00 show suggestion.
+        //
+        // Detection: tags_ia intersects with performance-context keywords.
+        // Action: evict to noite regardless of what classifyPeriodo assigned.
+        //
+        // This rule uses NO external data sources — Supabase tags_ia only.
+        // Do NOT expand this to cover opening hours or live schedules (future layer).
+        const PERFORMANCE_TAGS = [
+          "opera", "ballet", "show", "concerto", "espetáculo", "espetaculo", "performance",
+        ];
+        const isPerformanceVenue = tags.some((t) =>
+          PERFORMANCE_TAGS.some((k) => t.includes(k)));
+        if (isPerformanceVenue &&
+            (periodoBlock.periodo === "manha" || periodoBlock.periodo === "almoco")) {
+          evictions.push({ item, to: "noite" }); continue;
+        }
+
         keep.push(item);
       }
       periodoBlock.items = keep;
