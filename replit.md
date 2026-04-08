@@ -281,14 +281,19 @@ Map tap → navigate directly to bairro page (no floating card). Bairro pages ha
 
 ### Save + Trip System (Roteiro Base)
 
-**Data model** (local, AsyncStorage-backed):
-- `SavedItem` — `{ id, categoria, titulo, localizacao (=bairro), image }` — stored at `@luckytrip/saved_v1`
+**Data model**:
+- `SavedItem` — `{ id, categoria, titulo, localizacao (=bairro), image }` — stored at `@luckytrip/saved_v1` (AsyncStorage fast path)
+- `user_saved_places` — Supabase table; cross-device authoritative store. Columns: `id UUID PK, user_id UUID (→ auth.users), place_id TEXT, source_table TEXT, categoria TEXT, titulo TEXT, localizacao TEXT, image_url TEXT, saved_at TIMESTAMPTZ`. UNIQUE(user_id, place_id, source_table). RLS: each user can only read/write their own rows.
 - `Viagem` — `{ id, nome, destino, created_at }` — one auto-created default viagem per device
 - `ViagemItem` — `{ viagem_id, item_id, tipo, bairro }` — derived in-memory from saved list
 
-**Context**: `context/GuiaContext.tsx` — exposes `{ saved, save, unsave, isSaved, viagem, viagemItens, isPremium, deviceId, markPremium, paywallVisible, paywallType, showPaywall, hidePaywall }`. Persists `saved` to AsyncStorage on every change. Loads on mount. `isPremium` loaded from `@luckytrip/lucky_premium_v2` (AsyncStorage fast path) + Supabase `access_levels` table (authoritative).
+**Context**: `context/GuiaContext.tsx` — exposes `{ saved, save, unsave, isSaved, viagem, viagemItens, isPremium, markPremium, paywallVisible, paywallType, showPaywall, hidePaywall }`.
+- AsyncStorage (`@luckytrip/saved_v1`): instant local cache, persisted on every save change.
+- Supabase (`user_saved_places`): background upsert on `save()`, background delete on `unsave()`, merge-on-login (union strategy: items on either source are kept).
+- On login: server saves merged with local — items only on server added locally, items only locally uploaded in background. Stale-closure-safe via `savedRef`.
+- `isPremium` loaded from `@luckytrip/lucky_premium_v2` (AsyncStorage fast path) + Supabase `app_metadata` (authoritative).
 
-**Save gating**: non-premium users get 1 free save; 2nd+ attempt fires the depth paywall modal. The `save()` function returns `boolean` (false if gated).
+**Save gating**: authenticated users can save freely; unauthenticated users see auth prompt. The `save()` function returns `boolean` (false if gated).
 
 **Grouping logic**: `utils/buildRoteiro.ts` — pure `buildRoteiro(items: SavedItem[]): DiaRoteiro[]`
 - Groups by `localizacao` (bairro) → each bairro = one day

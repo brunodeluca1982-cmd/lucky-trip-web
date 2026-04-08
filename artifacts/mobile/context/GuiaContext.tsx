@@ -18,10 +18,11 @@
  *
  * PERSISTENCE
  * ───────────
- *   Saved items are persisted to AsyncStorage (key: @luckytrip/saved_v1).
- *   Images are stored as module IDs (numbers from require()) — stable within the
- *   same build. Viagem entity and ViagemItem rows are derived in-memory from the
- *   saved list; no separate storage needed until a Supabase backend is wired.
+ *   Saved items are persisted to AsyncStorage (key: @luckytrip/saved_v1) as the fast-path
+ *   local cache. For authenticated users, saves are also synced to Supabase (user_saved_places)
+ *   in the background — Supabase is the authoritative cross-device store.
+ *   On login, server saves are merged with local state (union strategy).
+ *   Images stored as `image_url` (URI string) in Supabase; local require() IDs used for display.
  *
  * ROTEIRO
  * ───────
@@ -146,6 +147,65 @@ export function tipoFromCategoria(
   return "atividade"; // oQueFazer + lucky → atividade
 }
 
+// ── Supabase sync helpers (module-level, no hooks) ────────────────────────────
+
+/**
+ * Extracts a portable URI string from a SavedItem's image field.
+ * Returns null for local require() module IDs (numbers) — those are not portable.
+ */
+function extractImageUrl(image: ImageSourcePropType): string | null {
+  if (
+    image !== null &&
+    image !== undefined &&
+    typeof image === "object" &&
+    !Array.isArray(image) &&
+    "uri" in (image as object)
+  ) {
+    const uri = (image as { uri?: string }).uri;
+    return uri && uri.length > 0 ? uri : null;
+  }
+  return null;
+}
+
+/**
+ * Upserts a saved item to user_saved_places for the authenticated user.
+ * Fire-and-forget — errors are logged but never surfaced to the user.
+ */
+function syncSaveToServer(userId: string, item: SavedItem): void {
+  supabase
+    .from("user_saved_places")
+    .upsert(
+      {
+        user_id:      userId,
+        place_id:     item.id,
+        source_table: item.source_table ?? sourceTableFromCategoria(item.categoria),
+        categoria:    item.categoria,
+        titulo:       item.titulo,
+        localizacao:  item.localizacao,
+        image_url:    extractImageUrl(item.image),
+      },
+      { onConflict: "user_id,place_id,source_table" }
+    )
+    .then(({ error }) => {
+      if (error) console.warn("[GuiaContext] syncSave error:", error.message);
+    });
+}
+
+/**
+ * Deletes a saved item from user_saved_places.
+ * Fire-and-forget — errors are logged but never surfaced to the user.
+ */
+function syncUnsaveFromServer(userId: string, itemId: string): void {
+  supabase
+    .from("user_saved_places")
+    .delete()
+    .eq("user_id", userId)
+    .eq("place_id", itemId)
+    .then(({ error }) => {
+      if (error) console.warn("[GuiaContext] syncUnsave error:", error.message);
+    });
+}
+
 // ── Context type ──────────────────────────────────────────────────────────────
 
 interface GuiaContextType {
@@ -153,8 +213,7 @@ interface GuiaContextType {
   /**
    * Save a place.
    * - Unauthenticated user → shows auth prompt, returns false.
-   * - Authenticated, non-premium, 2nd+ save → shows depth paywall, returns false.
-   * - Otherwise → saves and returns true.
+   * - Authenticated user → saves instantly (local) and syncs to Supabase in background.
    */
   save: (item: SavedItem) => boolean;
   unsave: (id: string) => void;
@@ -192,6 +251,10 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
   const [authPromptVisible, setAuthPromptVisible] = useState(false);
   const [paywallVisible,    setPaywallVisible]    = useState(false);
   const [paywallType,       setPaywallType]       = useState<PaywallType>("depth");
+
+  // Ref so async callbacks can read the current saved list without stale closures
+  const savedRef = useRef<SavedItem[]>([]);
+  useEffect(() => { savedRef.current = saved; }, [saved]);
 
   // ── Load saved places from AsyncStorage on mount ───────────────────────────
   useEffect(() => {
@@ -288,6 +351,64 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
   }, [saved, hydrated]);
 
+  // ── Merge server saves with local state after login ────────────────────────
+  // Fires once both local hydration and user auth are ready.
+  // Strategy: union — items present in either source are kept.
+  // Items only on server → added to local state.
+  // Items only locally → uploaded to server in background.
+  useEffect(() => {
+    if (!hydrated || !user) return;
+
+    const currentUser = user;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("user_saved_places")
+          .select("place_id, source_table, categoria, titulo, localizacao, image_url")
+          .eq("user_id", currentUser.id);
+
+        if (error) {
+          console.warn("[GuiaContext] mergeServerSaves fetch error:", error.message);
+          return;
+        }
+
+        const serverRows = data ?? [];
+        const localItems = savedRef.current;
+        const serverIds  = new Set(serverRows.map((r) => r.place_id));
+        const localIds   = new Set(localItems.map((s) => s.id));
+
+        // Items on server but not locally — add to local state
+        const toAdd: SavedItem[] = serverRows
+          .filter((row) => !localIds.has(row.place_id))
+          .map((row) => ({
+            id:           row.place_id,
+            categoria:    row.categoria as SavedCategory,
+            source_table: row.source_table as SourceTable,
+            titulo:       row.titulo ?? "",
+            localizacao:  row.localizacao ?? "",
+            image:        row.image_url ? { uri: row.image_url } : { uri: "" },
+          }));
+
+        if (toAdd.length > 0) {
+          setSaved((prev) => {
+            const existingIds = new Set(prev.map((s) => s.id));
+            const newItems = toAdd.filter((i) => !existingIds.has(i.id));
+            return newItems.length > 0 ? [...prev, ...newItems] : prev;
+          });
+        }
+
+        // Items local but not on server — upload in background
+        localItems
+          .filter((item) => !serverIds.has(item.id))
+          .forEach((item) => syncSaveToServer(currentUser.id, item));
+
+      } catch {
+        // Network error — local state unchanged
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, user]);
+
   // ── Save / unsave ──────────────────────────────────────────────────────────
 
   const save = useCallback((item: SavedItem): boolean => {
@@ -303,12 +424,21 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
       if (prev.some((s) => s.id === item.id)) return prev;
       return [...prev, item];
     });
+
+    // Background sync to Supabase (fire-and-forget)
+    syncSaveToServer(user.id, item);
+
     return true;
   }, [saved, user]);
 
   const unsave = useCallback((id: string) => {
     setSaved((prev) => prev.filter((s) => s.id !== id));
-  }, []);
+
+    // Background delete from Supabase (fire-and-forget)
+    if (user) {
+      syncUnsaveFromServer(user.id, id);
+    }
+  }, [user]);
 
   const isSaved = useCallback(
     (id: string) => saved.some((s) => s.id === id),
