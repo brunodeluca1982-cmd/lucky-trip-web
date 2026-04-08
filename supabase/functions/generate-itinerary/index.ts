@@ -619,8 +619,22 @@ function subZoneCompatibilityPenalty(szA: SubZone, szB: SubZone): number {
 
 // Sort a day's items to minimize total travel within the day.
 // Uses a greedy nearest-neighbor approach.
-function sortByProximity(items: EnrichedPlace[]): EnrichedPlace[] {
-  if (items.length <= 2) return items;
+//
+// Step A: accepts an optional `periodo` parameter. When `periodo === "tarde"`,
+// any items tagged with "sunset" in momento_ideal are moved to the end of the
+// result after proximity sorting. Sunset is a time-anchored event (~17:30-18:30)
+// and must always be the final item in the afternoon regardless of geography.
+// The `periodo` param has no effect for any other period value.
+function sortByProximity(items: EnrichedPlace[], periodo?: PeriodoDia): EnrichedPlace[] {
+  if (items.length <= 2) {
+    // Even with 1-2 items, still apply the sunset-last rule for tarde.
+    if (periodo === "tarde" && items.length === 2) {
+      const hasSunset0 = items[0].momento_ideal.includes("sunset");
+      const hasSunset1 = items[1].momento_ideal.includes("sunset");
+      if (hasSunset0 && !hasSunset1) return [items[1], items[0]];
+    }
+    return items;
+  }
   const result: EnrichedPlace[] = [items[0]];
   const remaining = items.slice(1);
   while (remaining.length > 0) {
@@ -634,6 +648,16 @@ function sortByProximity(items: EnrichedPlace[]): EnrichedPlace[] {
     result.push(remaining[bestIdx]);
     remaining.splice(bestIdx, 1);
   }
+
+  // Sunset-last rule (Step A): applies only to tarde period.
+  // All non-sunset items come first in proximity order; sunset items are
+  // appended at the end. This preserves the greedy ordering for all other items.
+  if (periodo === "tarde") {
+    const sunsetItems = result.filter((p) => p.momento_ideal.includes("sunset"));
+    const otherItems  = result.filter((p) => !p.momento_ideal.includes("sunset"));
+    return [...otherItems, ...sunsetItems];
+  }
+
   return result;
 }
 
@@ -883,7 +907,19 @@ function scoreAndSortPool(
 
 const PERIODO_ORDER: PeriodoDia[] = ["manha", "almoco", "tarde", "noite"];
 
-const MANHA_CAP: Record<string, number> = { tranquilo: 2, moderado: 2, intenso: 3 };
+const MANHA_CAP:  Record<string, number> = { tranquilo: 2, moderado: 2, intenso: 3 };
+
+// ── Step A slot caps ──────────────────────────────────────────────────────────
+// tarde and noite caps enforce a realistic daily rhythm.
+//
+// NOTE (Step A): Items that exceed these caps are DROPPED from the day rather
+// than redistributed to other days. This is intentional and temporary behaviour
+// for Step A only. A future step (complement scoring + geographic clustering)
+// will ensure the pool never generates this many same-day same-zone items in the
+// first place, making overflow redistribution unnecessary. Do NOT add
+// cross-day redistribution logic here.
+const TARDE_CAP:  Record<string, number> = { tranquilo: 2, moderado: 3, intenso: 4 };
+const NOITE_CAP:  Record<string, number> = { tranquilo: 1, moderado: 2, intenso: 2 };
 
 function categoriaToTable(cat: SavedCategory): string {
   switch (cat) {
@@ -942,13 +978,33 @@ function buildFullDraft(
       periodMap.get(p)!.push(r);
     });
 
+    // ── 5c-cap. Enforce tarde and noite slot caps (Step A) ────────────────────
+    // Items exceeding the cap are dropped from this day and not redistributed.
+    //
+    // NOTE (Step A — temporary behaviour): Overflow items are discarded here
+    // rather than moved to another day. This is intentional for Step A only.
+    // A future step will filter the complement pool by preference score and
+    // geographic proximity before assignment, so same-day overflow will not
+    // occur in the first place. Do NOT introduce cross-day redistribution
+    // logic in this block — that belongs to the complement-scoring step.
+    const tardeCap = TARDE_CAP[vibe] ?? 3;
+    const noiteCap = NOITE_CAP[vibe] ?? 2;
+    const tardeItems = periodMap.get("tarde");
+    if (tardeItems && tardeItems.length > tardeCap) {
+      periodMap.set("tarde", tardeItems.slice(0, tardeCap));
+    }
+    const noiteItems = periodMap.get("noite");
+    if (noiteItems && noiteItems.length > noiteCap) {
+      periodMap.set("noite", noiteItems.slice(0, noiteCap));
+    }
+
     // ── 5d. Within-period proximity sequencing ────────────────────────────────
     // Sort items inside each period by travel proximity (greedy nearest-neighbor).
     // This ensures the itinerary flows geographically within the day:
     //   e.g. morning: Parque Lage → Cosme Velho (Cristo) → Jardim Botânico
     //   not: Cristo → Jardim Botânico → Cristo area again
     for (const [periodo, items] of periodMap.entries()) {
-      periodMap.set(periodo, sortByProximity(items));
+      periodMap.set(periodo, sortByProximity(items, periodo));
     }
 
     // ── 5e. Build ordered periodos ────────────────────────────────────────────
