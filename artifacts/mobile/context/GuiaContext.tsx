@@ -13,7 +13,7 @@
  * ───────
  *   isPremium is read from Supabase access_levels using the authenticated user.id.
  *   AsyncStorage (PREMIUM_KEY) is used only as a fast-path cache — Supabase is authoritative.
- *   Access gates: save 2nd+ place, generate/edit itinerary, Lucky List locked items.
+ *   Access gates: generate/edit itinerary, Lucky List locked items (saving is free for all authenticated users).
  *   Global paywall is triggered via showPaywall(type) — rendered by PaywallModal in layout.
  *
  * PERSISTENCE
