@@ -902,6 +902,9 @@ function scoreAndSortPool(
   prefs:       Preferences,
   savedIds:    Set<string>,
 ): EnrichedPlace[] {
+  // Step B: stamp prefScore onto each place so downstream steps (Step 4 sortBucket)
+  // can use it without re-computing or receiving preferences as a parameter.
+  // Score is computed once here; all subsequent reads are O(1) field access.
   const stamped = places.map((p) => ({
     ...p,
     prefScore: compositePreferenceScore(p, prefs),
