@@ -1,0 +1,43 @@
+MODO CONGELAMENTO TOTAL DO CHECKOUT E PAGAMENTO.
+
+A partir de agora, o fluxo de compra/checkout que já está funcionando está CONGELADO e é ÁREA PROTEGIDA.
+
+ÁREA PROTEGIDA:
+- integração Stripe
+- rota de checkout
+- rota de webhook
+- secrets/env vars relacionadas a Stripe
+- lógica de assinatura/pagamento
+- qualquer arquivo, rota, config, deploy ou variável que possa afetar compra, cobrança, redirecionamento, webhook, subscription ou acesso premium
+
+ORDEM ABSOLUTA:
+NÃO MEXER EM NADA DESSA ÁREA EM HIPÓTESE ALGUMA sem minha autorização explícita por escrito.
+
+REGRAS OBRIGATÓRIAS:
+1. Não editar nenhum arquivo relacionado a checkout, Stripe, webhook, assinatura, cobrança ou premium.
+2. Não alterar nenhuma env var relacionada a Stripe.
+3. Não alterar rotas, nomes, endpoints, redirecionamentos, success_url, cancel_url ou webhook URL.
+4. Não refatorar, reorganizar, limpar, melhorar, otimizar ou “aproveitar para ajustar” nada dessa área.
+5. Não redeployar com mudanças nessa área sem minha aprovação explícita.
+6. Se qualquer tarefa futura tocar, mesmo indiretamente, na área de checkout/pagamento, pare imediatamente e me avise antes de fazer qualquer coisa.
+7. Antes de qualquer trabalho futuro, trate a área de checkout/pagamento como SISTEMA CRÍTICO CONGELADO.
+8. Se eu pedir algo em outra parte do app, preserve integralmente o fluxo de compra atual.
+9. Se houver dúvida se uma mudança pode ou não impactar checkout/pagamento, assuma que pode impactar e NÃO faça.
+10. Para qualquer tarefa futura, trabalhe com diff mínimo e exclua totalmente arquivos/rotas/env vars de pagamento do escopo.
+
+AÇÃO IMEDIATA:
+1. Criar um checkpoint/backup agora com um nome claro indicando que este é o estado funcional do checkout.
+2. Listar quais arquivos, rotas e env vars fazem parte da área protegida do pagamento.
+3. Confirmar por escrito que essa área está congelada e fora do escopo de mudanças futuras até nova ordem minha.
+
+FORMATO DA SUA RESPOSTA AGORA:
+- checkpoint criado:
+- arquivos protegidos:
+- rotas protegidas:
+- env vars protegidas:
+- confirmação de congelamento: sim/não
+
+PRIORIDADE MÁXIMA:
+NÃO QUEBRAR O CHECKOUT.
+NÃO ALTERAR PAGAMENTO.
+NÃO TOCAR NA ÁREA PROTEGIDA.
