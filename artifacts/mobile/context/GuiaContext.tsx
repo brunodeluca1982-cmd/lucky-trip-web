@@ -293,16 +293,9 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
   const save = useCallback((item: SavedItem): boolean => {
     if (saved.some((s) => s.id === item.id)) return true;
 
-    // Step 1 — auth gate: unauthenticated users see login prompt, not paywall
+    // Auth gate: unauthenticated users see login prompt
     if (!user) {
       setAuthPromptVisible(true);
-      return false;
-    }
-
-    // Step 2 — premium gate: logged-in non-premium users get paywall on 2nd+ save
-    if (!isPremium && saved.length >= 1) {
-      setPaywallType("depth");
-      setPaywallVisible(true);
       return false;
     }
 
@@ -311,7 +304,7 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
       return [...prev, item];
     });
     return true;
-  }, [saved, user, isPremium]);
+  }, [saved, user]);
 
   const unsave = useCallback((id: string) => {
     setSaved((prev) => prev.filter((s) => s.id !== id));
