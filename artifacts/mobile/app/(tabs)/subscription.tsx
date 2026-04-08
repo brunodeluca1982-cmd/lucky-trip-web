@@ -145,7 +145,8 @@ export default function SubscriptionScreen() {
         setRestoreMsg("Sessão expirada. Faça login novamente.");
         return;
       }
-      const apiBase = process.env.EXPO_PUBLIC_APP_ORIGIN || "";
+      const apiBase = process.env.EXPO_PUBLIC_APP_ORIGIN
+        || (process.env.EXPO_PUBLIC_DOMAIN ? `https://${process.env.EXPO_PUBLIC_DOMAIN}` : "");
       const res = await fetch(`${apiBase}/api/stripe/sync-subscription`, {
         headers: { Authorization: `Bearer ${currentSession.access_token}` },
       });

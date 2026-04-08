@@ -174,7 +174,7 @@ router.post(
           ? `https://${process.env["REPLIT_DOMAINS"]!.split(",")[0]}`
           : "https://example.com");
 
-      const isAbsolute = (u?: string) => typeof u === "string" && /^https?:\/\//i.test(u);
+      const isAbsolute = (u?: string) => typeof u === "string" && /^https:\/\//i.test(u);
 
       const successUrl = isAbsolute(success_url)
         ? success_url!
