@@ -1197,6 +1197,12 @@ async function refineWithGemini(
           zone:     full?.zone ?? 3,
           energia:  full?.energia ?? "medium",
           tags:     (full?.tags ?? []).slice(0, 5),
+          // Step E — editorial context for Gemini reordering only
+          momento:  (full?.momento_ideal ?? []).slice(0, 3),
+          duracao:  full?.duracao ?? "1-2h",
+          categoria: it.categoria,
+          vibe:     (full?.vibe_tags ?? []).slice(0, 3),
+          preco:    full?.preco_nivel ?? null,
         };
       }),
     })),
@@ -1207,7 +1213,7 @@ async function refineWithGemini(
 
 Your role is ONLY to improve the ORDER of items within each período for better geographic flow and realistic pacing.
 
-STRICT RULES:
+STRICT RULES — these are absolute and may never be violated for any reason:
 - Do NOT add new places
 - Do NOT remove places
 - Do NOT move items between different days
@@ -1215,11 +1221,23 @@ STRICT RULES:
 - Do NOT change the number of days
 - ONLY reorder items within each período
 - Return the EXACT same JSON structure
+- SUNSET ABSOLUTE CONSTRAINT: items with "sunset" in their "momento" field MUST always remain the final item in tarde — never move them earlier for any reason, no matter what other signals say
+- RESTAURANT ABSOLUTE CONSTRAINT: items with categoria "restaurante" are meal anchors — you may reorder restaurants relative to other restaurants in the same período, but you MUST NOT move a restaurant ahead of or behind non-restaurant items in a way that changes its meal-anchor role
 
-Use "zone" and "area" to group geographically close items together within each período.
-Use "energia" to order high-energy items early in the período.
-Pace: ${prefs.vibe ?? "moderado"} | Companion: ${prefs.travelVibe ?? "any"} | Budget: ${prefs.budget ?? "conforto"} | Inspirations: ${prefs.inspirations.join(", ") || "any"}
-Destination: ${dest}
+ORDERING SIGNALS — use all of these within the absolute constraints above:
+- "zone" + "area": group geographically close items together within each período
+- "energia": order high-energy activities early in the período (low energia items work better as openers or closers)
+- "momento": respect each item's ideal time slot; "sunset"-tagged items are fixed as final in tarde — no exceptions
+- "duracao": avoid stacking two items each with duracao longer than 2h consecutively in manha — space them with shorter items
+- "vibe": items with vibe tags matching the companion type should be placed as the emotional high-point of the período (e.g. "romântico" items near the end of tarde for couple travelers)
+- "preco": for budget "sofisticado", place the highest-preco restaurant last in noite as the editorial centerpiece; for "essencial", keep restaurant ordering geography-driven
+
+USER CONTEXT:
+- Pace: ${prefs.vibe ?? "moderado"}
+- Companion: ${prefs.travelVibe ?? "any"}
+- Budget: ${prefs.budget ?? "conforto"}
+- Inspirations: ${prefs.inspirations.join(", ") || "any"}
+- Destination: ${dest}
 
 DRAFT TO REFINE:
 ${JSON.stringify(compact)}
