@@ -1425,7 +1425,7 @@ serve(async (req) => {
     // influence this extraction.
     //
     // Multi-hotel selection (when >1 hotel saved) uses three deterministic tiers:
-    //   Tier 1 — budget zone match: luxury → prefer zones 1-2; moderate → zones 1-3
+    //   Tier 1 — budget zone match: sofisticado → zones 1-2; conforto → zones 1-3; essencial → neutral
     //   Tier 2 — zone proximity to dominant non-hotel saved-item zone
     //            (smoother gradient: score = max(0, 3 - |hz - domZ|))
     //   Tier 3 — stable alphabetical sort on item id (deterministic tiebreak)
@@ -1455,10 +1455,14 @@ serve(async (req) => {
         .sort((a, b) => Number(b[1]) - Number(a[1]))[0];
       const domZ = domZEntry ? Number(domZEntry[0]) : 0;
 
-      // Tier 1: budget preference → zone set (luxury = zones 1-2; moderate = 1-3; other = no bias)
+      // Tier 1: budget preference → preferred zone set.
+      // Values match the app's BudgetStyle type: "essencial" | "conforto" | "sofisticado".
+      // sofisticado → zones 1-2 (Ipanema/Leblon/Lagoa — premium Zona Sul)
+      // conforto    → zones 1-3 (broader Zona Sul — comfortable mid-range)
+      // essencial   → no zone bias (affordable options across all zones)
       const budgetZoneMap: Record<string, number[]> = {
-        luxury:   [1, 2],
-        moderate: [1, 2, 3],
+        sofisticado: [1, 2],
+        conforto:    [1, 2, 3],
       };
       const preferredBudgetZones = new Set(
         budgetZoneMap[preferences.budget ?? ""] ?? [],
