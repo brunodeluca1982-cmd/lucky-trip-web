@@ -196,7 +196,11 @@ async function enrichPlaces(
       : Promise.resolve({ data: [] }),
     restIds.length > 0
       ? supa.from("restaurantes")
-          .select("id,nome,bairro,categoria,especialidade,perfil_publico,preco_nivel,photo_url,meu_olhar,momento_ideal,tags_ia")
+          // NOTE: restaurantes does NOT have momento_ideal or tags_ia columns.
+          // Those fields are enriched via fallback logic below (["lunch"] and []).
+          // isBreakfastRestaurant() uses especialidade; isDinnerRestaurant() is
+          // inoperative until momento_ideal is added to the restaurantes schema.
+          .select("id,nome,bairro,categoria,especialidade,perfil_publico,preco_nivel,photo_url,meu_olhar")
           .eq("ativo", true)
           .in("id", restIds)
       : Promise.resolve({ data: [] }),
@@ -600,10 +604,12 @@ function classifyBeachPeriodo(p: EnrichedPlace, vibe: string): PeriodoDia {
 // All other restaurants default to almoco — existing behavior preserved.
 
 const BREAKFAST_MOMENTO = new Set(["morning", "brunch", "breakfast"]);
-const BREAKFAST_ESPECIALIDADE = new Set([
+// NOTE: especialidade values in the DB are compound ("Café da Manhã", "Pães e Cafés").
+// Use an array of substrings to match against; .has() exact match does not work.
+const BREAKFAST_ESPECIALIDADE_SUBS = [
   "padaria", "café", "cafe", "brunch", "bakery", "cafeteria", "pão", "pao",
-  "café e padaria", "cafe e padaria",
-]);
+  "café da manhã", "cafe da manha", "pães e cafés",
+];
 const BREAKFAST_TAGS = new Set([
   "café da manhã", "cafe da manha", "breakfast", "brunch", "padaria",
   "padaria artesanal", "café colonial", "cafe colonial",
@@ -611,7 +617,11 @@ const BREAKFAST_TAGS = new Set([
 
 function isBreakfastRestaurant(p: EnrichedPlace): boolean {
   if (p.momento_ideal.some((m) => BREAKFAST_MOMENTO.has(m.toLowerCase()))) return true;
-  if (p.especialidade && BREAKFAST_ESPECIALIDADE.has(p.especialidade.toLowerCase())) return true;
+  // Use substring matching — especialidade values are compound ("Café da Manhã", "Pães e Cafés")
+  if (p.especialidade) {
+    const esp = p.especialidade.toLowerCase();
+    if (BREAKFAST_ESPECIALIDADE_SUBS.some((sub) => esp.includes(sub))) return true;
+  }
   if (p.tags.some((t) => BREAKFAST_TAGS.has(t.toLowerCase()))) return true;
   return false;
 }
@@ -1197,9 +1207,10 @@ function buildFullDraft(
     // Second+ restaurant → noite if isDinnerRestaurant(), otherwise almoco.
     // Previously all subsequent restaurants were hardcoded to noite — this
     // caused lunch-focused complement restaurants to appear at dinner time.
-    // isDinnerRestaurant() uses the momento_ideal + tags fields now fetched
-    // from restaurantes (see enrichPlaces fix). Restaurants without explicit
-    // dinner signals stay in almoco; only true dinner-only places go to noite.
+    // NOTE: restaurantes table has no momento_ideal column, so isDinnerRestaurant()
+    // always returns false for current DB restaurants (they all get momento=["lunch"]).
+    // All second+ restaurants correctly go to almoco. This logic is future-proof:
+    // if momento_ideal is added to restaurantes, dinner items will auto-route to noite.
     rests.forEach((r, i) => {
       const p: PeriodoDia = i === 0 ? "almoco" : (isDinnerRestaurant(r) ? "noite" : "almoco");
       if (!periodMap.has(p)) periodMap.set(p, []);
@@ -1409,7 +1420,7 @@ Return ONLY a valid JSON array with the same structure — no markdown, no expla
 //   Rule 5 — Dinner-only restaurants in almoco or tarde → evicted to noite.
 //   Rule 3 — Nightlife venues (tag-authoritative): nightlife tag + any night/evening momento
 //             → not manha/almoco. Updated from exclusive-night to tag-authoritative check.
-//   Rule 6 — Breakfast restaurants in tarde or noite → evicted to manha.
+//   Rule 6 — Breakfast restaurants in almoco, tarde, or noite → evicted to manha (full coverage).
 //   Rule 4 — Performance venues → not manha/almoco.
 
 function validateAndFix(
@@ -1469,7 +1480,11 @@ function validateAndFix(
         const tags    = place.tags.map((t) => t.toLowerCase());
 
         // Rule 1: sunset → only tarde (pôr do sol nunca às 14h)
-        if (momento.includes("sunset") && periodoBlock.periodo !== "tarde") {
+        // o_que_fazer_rio uses English "sunset"; lucky_list_rio uses Portuguese "por_do_sol".
+        // Both must map to tarde. The MOMENTO_TO_PERIODO map handles classification,
+        // but validateAndFix needs its own bilingual check for the correction pass.
+        const isSunset = momento.includes("sunset") || momento.includes("por_do_sol");
+        if (isSunset && periodoBlock.periodo !== "tarde") {
           evictions.push({ item, to: "tarde" }); continue;
         }
 
@@ -1502,7 +1517,8 @@ function validateAndFix(
         // sufficient to evict from manha/almoco. The nightlife tag is the semantic
         // authority; presence of "morning" in momento_ideal does not override it.
         // A venue with nightlife tags that works at night belongs in noite.
-        const hasNightMomento = momento.some((m) => ["night", "evening"].includes(m));
+        // o_que_fazer_rio uses English "night"/"evening"; lucky_list_rio uses Portuguese "noite".
+        const hasNightMomento = momento.some((m) => ["night", "evening", "noite"].includes(m));
         const isNightlife = tags.some((t) =>
           ["balada", "nightlife", "clubbing"].some((k) => t.includes(k)));
         if (hasNightMomento && isNightlife &&
@@ -1510,13 +1526,15 @@ function validateAndFix(
           evictions.push({ item, to: "noite" }); continue;
         }
 
-        // Rule 6: breakfast restaurant → not tarde or noite
-        // isBreakfastRestaurant() is already used in Rule 2 to allow breakfast
-        // restaurants to stay in manha. This complementary rule evicts them back
-        // to manha if validateAndFix 7a re-attached them to a wrong period.
+        // Rule 6: breakfast restaurant → only manha
+        // Coverage: almoco, tarde, noite → all must evict to manha.
+        // buildFullDraft hardcodes first restaurant to almoco regardless of subtype,
+        // and Gemini may also move breakfast items to almoco. This rule is the
+        // authoritative fallback that enforces manha placement unconditionally.
+        // Rule 2 (above) already handles the manha case (keeps breakfast in manha).
         if (item.categoria === "restaurante" &&
             isBreakfastRestaurant(place) &&
-            (periodoBlock.periodo === "tarde" || periodoBlock.periodo === "noite")) {
+            periodoBlock.periodo !== "manha") {
           evictions.push({ item, to: "manha" }); continue;
         }
 
