@@ -1580,6 +1580,57 @@ function validateAndFix(
     day.periodos = (PERIODO_ORDER
       .map((po) => day.periodos.find((p) => p.periodo === po))
       .filter(Boolean)) as DiaPeriodo[];
+
+    // ── Recalculate day.bairro from final item positions ──────────────────────
+    // This must run AFTER re-sort so it reflects the true final item set:
+    //   • Gemini may have reordered items (changing first-item bairro)
+    //   • 7a may have re-attached complement items from new bairros
+    //   • 7b may have evicted items to different periods (changing the bairro mix)
+    // Previous bairro was set by buildFullDraft (modal of acts+rests only, pre-complement)
+    // and may have been echoed back verbatim by Gemini regardless of item moves.
+    //
+    // Algorithm:
+    //   1. Count occurrences of each item.localizacao across all periods
+    //   2. Select the most frequent bairro (modal)
+    //   3. Tiebreaker: prefer the bairro of the item with the longest duration
+    //   4. Final fallback: first item after canonical period ordering
+    const allFinalItems = day.periodos.flatMap((p) => p.items);
+    if (allFinalItems.length > 0) {
+      // Step 1 — frequency map
+      const freq = new Map<string, number>();
+      for (const it of allFinalItems) {
+        const loc = it.localizacao || placeById.get(it.id)?.area || "";
+        if (loc) freq.set(loc, (freq.get(loc) ?? 0) + 1);
+      }
+      if (freq.size > 0) {
+        const maxFreq = Math.max(...freq.values());
+        const tied    = new Set(
+          [...freq.entries()].filter(([, c]) => c === maxFreq).map(([b]) => b),
+        );
+
+        if (tied.size === 1) {
+          day.bairro = [...tied][0];
+        } else {
+          // Step 3 — tiebreaker: longest-duration item among the tied bairros
+          // Duration strings: "1-2h" | "2h" | "3h+" — extract first integer.
+          const parseDur = (d?: string): number => {
+            if (!d) return 0;
+            const m = d.match(/(\d+)/);
+            return m ? parseInt(m[1], 10) : 0;
+          };
+          let winner  = "";
+          let bestDur = -1;
+          for (const it of allFinalItems) {
+            const loc = it.localizacao || placeById.get(it.id)?.area || "";
+            if (!tied.has(loc)) continue;
+            const dur = parseDur(placeById.get(it.id)?.duracao);
+            if (dur > bestDur) { bestDur = dur; winner = loc; }
+          }
+          // Step 4 — fallback: first item's bairro (allFinalItems is in canonical order)
+          day.bairro = winner || allFinalItems[0].localizacao || day.bairro;
+        }
+      }
+    }
   }
 
   return days
