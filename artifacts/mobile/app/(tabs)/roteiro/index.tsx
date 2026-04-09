@@ -92,6 +92,75 @@ const PERIODO_TIME: Record<string, number> = {
   noite:      19 * 60 + 30,
 };
 
+// ─── Rio de Janeiro fixed time anchors ────────────────────────────────────────
+// Average year-round approximations (winter ~17:30, summer ~18:30 → midpoint 18:00).
+// Future: replace with live weather/astronomy API without changing anchor logic.
+const RIO_SUNSET_MINUTES  = 18 * 60; // 18:00
+const RIO_SUNRISE_MINUTES =  6 * 60; // 06:00
+
+// ─── Item signal detectors ────────────────────────────────────────────────────
+// Title-based matching only — momento_ideal and tags_ia are not on the client
+// type. Detection is conservative: only exact cultural phrases are matched.
+
+function _isSunsetItem(t: string): boolean {
+  return t.includes("pôr do sol") || t.includes("por do sol") ||
+         t.includes("pôr-do-sol") || t.includes("sunset");
+}
+
+function _isSunriseItem(t: string): boolean {
+  return t.includes("nascer do sol") || t.includes("nascer-do-sol") ||
+         t.includes("amanhecer")     || t.includes("sunrise");
+}
+
+function _isTheaterItem(t: string): boolean {
+  return t.includes("teatro")     || t.includes("show")      ||
+         t.includes("concerto")   || t.includes("espetáculo") ||
+         t.includes("espetaculo") || t.includes("ópera")     ||
+         t.includes("opera")      || t.includes("ballet")    ||
+         t.includes("peça");
+}
+
+function _isNightlifeBar(t: string, categoria: string): boolean {
+  return t.includes("samba")   || t.includes("pagode")  ||
+         t.includes("chorinho") || t.includes("baile")  ||
+         t.includes("balada")   || t.includes("clube noturno") ||
+         (t.includes(" bar ")   && categoria !== "restaurante");
+}
+
+// ─── Anchor time resolver ──────────────────────────────────────────────────────
+// Returns a pinned time in minutes when the item matches a real-world anchor,
+// or null when the item has no anchor (→ cumulative offset from base applies).
+//
+// Priority order:
+//   1. Sunset    → sunset − 60 min  (only in "tarde")
+//   2. Sunrise   → sunrise − 30 min (only in "manha")
+//   3. Restaurant → 12:30 almoco / 20:00 noite
+//   4. Theater   → 19:30 noite
+//   5. Nightlife bar → 21:00 noite, ONLY when first item in the period
+
+function _getAnchorTime(
+  item:    { titulo: string; categoria: string },
+  periodo: string,
+  isFirst: boolean,
+): number | null {
+  const t = item.titulo.toLowerCase();
+  if (_isSunsetItem(t)  && periodo === "tarde")  return RIO_SUNSET_MINUTES  - 60;
+  if (_isSunriseItem(t) && periodo === "manha")  return RIO_SUNRISE_MINUTES - 30;
+  if (item.categoria === "restaurante") {
+    if (periodo === "almoco") return 12 * 60 + 30;
+    if (periodo === "noite")  return 20 * 60;
+  }
+  if (_isTheaterItem(t)             && periodo === "noite") return 19 * 60 + 30;
+  if (_isNightlifeBar(t, item.categoria) && periodo === "noite" && isFirst) return 21 * 60;
+  return null;
+}
+
+function _fmt(total: number): string {
+  const h = Math.floor(total / 60) % 24;
+  const m = total % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
 // Parse duracao strings from Step F enrichment into minutes.
 // Engine returns values like "30min", "45min", "1-2h", "2-3h", "3h+", "4h+".
 function parseDuracao(dur: string | undefined | null): number {
@@ -108,17 +177,39 @@ function parseDuracao(dur: string | undefined | null): number {
 }
 
 // Returns the display time string for the idx-th item in a period block.
-// Uses cumulative duration from all preceding items in the same period.
+//
+// Priority order:
+//   1. Anchor-based override  — item matches a real-world time signal
+//   2. Cumulative duration    — offset from the last anchor (or period base)
+//
+// "Sliding reference" pattern:
+//   When an anchor is found at position k < idx, subsequent items accumulate
+//   their durations from that anchor's START time + anchor's own duration.
+//   This gives correct sequencing for arcs like:
+//     Teatro 19:30 (anchor) → Samba 21:00 (19:30 + 90 min)
+//   instead of a collision at 19:30 for both.
 function getItemTime(periodo: string, items: SavedItem[], idx: number): string {
-  const base = PERIODO_TIME[periodo] ?? 9 * 60;
+  let refMinutes = PERIODO_TIME[periodo] ?? 9 * 60;
+  let refIdx     = -1;
+
+  for (let i = 0; i <= idx; i++) {
+    const anchor = _getAnchorTime(items[i], periodo, i === 0);
+    if (anchor !== null) {
+      if (i === idx) return _fmt(anchor);
+      refMinutes = anchor;
+      refIdx     = i;
+    }
+  }
+
+  // Elapsed = anchor item's own duration (if any) + durations of items between
+  // the anchor and the current item.
   let elapsed = 0;
-  for (let i = 0; i < idx; i++) {
+  if (refIdx >= 0) elapsed += parseDuracao(items[refIdx].duracao);
+  for (let i = Math.max(refIdx + 1, 0); i < idx; i++) {
     elapsed += parseDuracao(items[i].duracao);
   }
-  const total = base + elapsed;
-  const h = Math.floor(total / 60) % 24;
-  const m = total % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+
+  return _fmt(refMinutes + elapsed);
 }
 
 type WeatherIcon = "sun" | "cloud" | "wind";
