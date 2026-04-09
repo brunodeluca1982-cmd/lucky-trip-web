@@ -31,7 +31,8 @@ export type PeriodoDia =
   | "almoco"
   | "tarde"
   | "jantar"
-  | "late_night";
+  | "late_night"
+  | "noite";
 
 export const PERIODO_LABEL: Record<PeriodoDia, string> = {
   manha:      "Manhã",
@@ -39,6 +40,7 @@ export const PERIODO_LABEL: Record<PeriodoDia, string> = {
   tarde:      "Tarde",
   jantar:     "Jantar",
   late_night: "Noite",
+  noite:      "Noite",
 };
 
 export const PERIODO_ICON: Record<PeriodoDia, string> = {
@@ -47,6 +49,7 @@ export const PERIODO_ICON: Record<PeriodoDia, string> = {
   tarde:      "cloud",
   jantar:     "moon",
   late_night: "star",
+  noite:      "moon",
 };
 
 export interface DiaPeriodo {

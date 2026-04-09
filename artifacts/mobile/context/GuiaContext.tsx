@@ -108,6 +108,13 @@ export interface SavedItem {
   lng?: number;
   /** Full formatted address from Google Places */
   address?: string;
+  // ── Step F enrichment fields — set by the itinerary engine, absent on bare SavedItems ──
+  /** Google Places or Supabase photo URL from engine enrichment */
+  photo_url?: string | null;
+  /** Editorial note (meu_olhar) from the DB, set by engine Step F */
+  descricao?: string | null;
+  /** Average visit duration from DB (e.g. "45min", "1-2h", "3h+") */
+  duracao?: string;
 }
 
 // ── Viagem entity ─────────────────────────────────────────────────────────────

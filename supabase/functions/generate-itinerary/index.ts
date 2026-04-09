@@ -531,12 +531,22 @@ async function attachNeighborhoodMeta(
 //   7. default                             → manha
 
 const MOMENTO_TO_PERIODO: Record<string, PeriodoDia> = {
-  morning:   "manha",
-  lunch:     "almoco",
-  afternoon: "tarde",
-  sunset:    "tarde",
-  evening:   "noite",
-  night:     "noite",
+  // English (o_que_fazer_rio)
+  morning:      "manha",
+  lunch:        "almoco",
+  afternoon:    "tarde",
+  sunset:       "tarde",
+  evening:      "noite",
+  night:        "noite",
+  // Portuguese (lucky_list_rio)
+  manha:        "manha",
+  brunch:       "manha",
+  almoco:       "almoco",
+  tarde:        "tarde",
+  fim_de_tarde: "tarde",
+  por_do_sol:   "tarde",
+  noite:        "noite",
+  // day-context tags (dia_de_sol, fim_de_semana, etc.) intentionally absent — no time-of-day implied
 };
 
 // Whether a place's DB data allows it to move to a different period.

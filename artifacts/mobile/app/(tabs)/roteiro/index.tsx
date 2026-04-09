@@ -89,11 +89,33 @@ const PERIODO_TIME: Record<string, number> = {
   tarde:      14 * 60,
   jantar:     19 * 60 + 30,
   late_night: 21 * 60,
+  noite:      19 * 60 + 30,
 };
 
-function getItemTime(periodo: string, idx: number): string {
+// Parse duracao strings from Step F enrichment into minutes.
+// Engine returns values like "30min", "45min", "1-2h", "2-3h", "3h+", "4h+".
+function parseDuracao(dur: string | undefined | null): number {
+  if (!dur) return 90;
+  const s = dur.toLowerCase().trim();
+  if (s.startsWith("30")) return 30;
+  if (s.startsWith("45")) return 45;
+  if (s.startsWith("1h") || s.startsWith("1-") || s === "1h") return 75;
+  if (s.startsWith("1"))  return 60;
+  if (s.startsWith("2h") || s.startsWith("2-")) return 135;
+  if (s.startsWith("2"))  return 120;
+  if (s.startsWith("3") || s.startsWith("4") || s.startsWith("5")) return 180;
+  return 90;
+}
+
+// Returns the display time string for the idx-th item in a period block.
+// Uses cumulative duration from all preceding items in the same period.
+function getItemTime(periodo: string, items: SavedItem[], idx: number): string {
   const base = PERIODO_TIME[periodo] ?? 9 * 60;
-  const total = base + idx * 90;
+  let elapsed = 0;
+  for (let i = 0; i < idx; i++) {
+    elapsed += parseDuracao(items[i].duracao);
+  }
+  const total = base + elapsed;
   const h = Math.floor(total / 60) % 24;
   const m = total % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
@@ -2041,7 +2063,7 @@ function ResultDayCard({
 }) {
   const weather = getDayWeather(dia.numero);
   const allItems = dia.periodos.flatMap((p) => p.items);
-  const travelMinTotal = Math.max(25, allItems.length * 16);
+  const travelMinTotal = allItems.reduce((sum, it) => sum + parseDuracao(it.duracao), 0) || 90;
   const [collapsed, setCollapsed] = React.useState(false);
 
   function handleDayMap() {
@@ -2103,7 +2125,7 @@ function ResultDayCard({
 
               {/* Items */}
               {periodo.items.map((item, idx) => {
-                const timeStr = getItemTime(periodo.periodo, idx);
+                const timeStr = getItemTime(periodo.periodo, periodo.items, idx);
                 const travelMin = 10 + ((dia.numero * 7 + idx * 5) % 22);
                 const travelKm  = (1.8 + (dia.numero + idx) * 1.3).toFixed(1);
 
@@ -3007,18 +3029,41 @@ export default function RoteiroScreen() {
           ...p,
           items: p.items.map((item) => {
             const found = savedMap.get(item.id);
-            // Always prefer the saved copy — it has source_table and image already set
-            if (found) return found;
-            // AI introduced an item not in saved list:
-            // Use the AI-provided categoria if valid, fall back to "oQueFazer"
+            if (found) {
+              // Merge: engine data takes priority for display + classification.
+              // Saved item provides routing fields (source_table, isExternal, placeId, lat, lng, address)
+              // that the engine output does not carry.
+              const engineCat   = (item.categoria as SavedCategory | undefined) ?? found.categoria;
+              const edgeSrcTbl  = (item as any).source_table as SourceTable | undefined;
+              const enginePhoto = (item as any).photo_url as string | null | undefined;
+              return {
+                ...found,
+                // Engine-enriched classification — overrides save-time value
+                categoria:    engineCat,
+                // DB bairro preferred; fall back to saved value
+                localizacao:  item.localizacao || found.localizacao,
+                // Save-time source_table is authoritative for routing; engine value is fallback
+                source_table: found.source_table ?? edgeSrcTbl ?? sourceTableFromCategoria(engineCat),
+                // Real photo from Step F when available; fall back to saved image
+                image:        enginePhoto ? { uri: enginePhoto } : found.image,
+                // Step F enrichment fields — additive, not in SavedItem schema before this merge
+                ...(enginePhoto              != null && { photo_url: enginePhoto }),
+                ...((item as any).descricao  != null && { descricao: (item as any).descricao }),
+                ...((item as any).duracao    != null && { duracao:   (item as any).duracao   }),
+              } as SavedItem;
+            }
+            // Engine introduced a complement item not in the saved list.
+            // Use engine categoria + source_table; assign fallback image.
             const cat = (item.categoria as SavedCategory | undefined) ?? "oQueFazer";
-            // Prefer source_table from edge function; fall back to derived value
             const edgeSourceTable = (item as any).source_table as string | undefined;
             return {
               ...item,
               image:        getItemFallbackImage(cat),
               source_table: (edgeSourceTable as SourceTable | undefined) ?? sourceTableFromCategoria(cat),
-            };
+              ...(((item as any).photo_url)  != null && { photo_url: (item as any).photo_url }),
+              ...(((item as any).descricao)  != null && { descricao: (item as any).descricao }),
+              ...(((item as any).duracao)    != null && { duracao:   (item as any).duracao   }),
+            } as SavedItem;
           }).filter(Boolean),
         })),
       }));
