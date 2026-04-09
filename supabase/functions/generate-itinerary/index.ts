@@ -743,6 +743,7 @@ function groupByGeography(
   places:     EnrichedPlace[],
   tripLength: number,
   vibe:       string,
+  hotelZone?: number,
 ): { dayGroups: EnrichedPlace[][]; dayRestaurants: EnrichedPlace[][] } {
   const activities  = places.filter((p) => p.categoria !== "restaurante");
   const restaurants = places.filter((p) => p.categoria === "restaurante");
@@ -770,6 +771,30 @@ function groupByGeography(
   const oesteItems = sortBucket(bySubZone.oeste);
   const norteItems = sortBucket(bySubZone.norte);
 
+  // ── Step D: soft hotel-zone bias for intra-zone ordering within centralItems ─
+  // hotelBias is a SOFT signal. Zone is ALWAYS the primary sort key.
+  // This only changes which item appears first within the same zone —
+  // it cannot move a zone-4 item before a zone-1 item, ever.
+  //
+  // +3: item is in the hotel zone
+  // +1: item is in an adjacent zone (±1 from hotel zone)
+  //  0: otherwise (also when hotelZone = 0 / no hotel saved)
+  const hotelBias = (item: EnrichedPlace): number => {
+    if (!hotelZone) return 0;
+    if (item.zone === hotelZone) return 3;
+    if (Math.abs(item.zone - hotelZone) === 1) return 1;
+    return 0;
+  };
+
+  if (hotelZone) {
+    centralItems.sort((a, b) => {
+      if (a.zone !== b.zone) return a.zone - b.zone;          // zone ALWAYS primary
+      const sa = (a.prefScore ?? 0) + hotelBias(a);
+      const sb = (b.prefScore ?? 0) + hotelBias(b);
+      return sb !== sa ? sb - sa : a.area.localeCompare(b.area);
+    });
+  }
+
   const totalActs = activities.length;
   if (totalActs === 0) {
     const dayGroups: EnrichedPlace[][] = Array.from({ length: tripLength }, () => []);
@@ -796,6 +821,20 @@ function groupByGeography(
     ...chunkInto(norteItems,   norteDays),
   ];
   while (dayGroups.length < tripLength) dayGroups.push([]);
+
+  // ── Step D: reorder day clusters so the cluster most adjacent to the hotel
+  // zone becomes Day 1. This is a SOFT sort — existing cluster composition is
+  // 100% preserved; only the array order changes.
+  // CRITICAL placement: this runs BEFORE dayRestaurants assignment (line below)
+  // so that dayRestaurants[i] aligns correctly to the reordered dayGroups.
+  if (hotelZone) {
+    const dayHotelScore = (acts: EnrichedPlace[]): number => {
+      const matches = acts.filter((p) => p.zone === hotelZone).length;
+      const adj     = acts.filter((p) => Math.abs(p.zone - hotelZone) === 1).length;
+      return matches * 2 + adj;
+    };
+    dayGroups.sort((a, b) => dayHotelScore(b) - dayHotelScore(a));
+  }
 
   // ── 4e. Restaurant matching using sub-zone affinity + travel penalty ──────
   // For each restaurant, score every day by:
@@ -1380,6 +1419,68 @@ serve(async (req) => {
       departureDate,
     } = body;
 
+    // ── Step D: determine hotel zone anchor ───────────────────────────────────
+    // Source: raw savedItems where categoria === "hotel" (enrichPlaces skips hotels).
+    // ONLY hotel items contribute to hotelZone — no non-hotel item can ever
+    // influence this extraction.
+    //
+    // Multi-hotel selection (when >1 hotel saved) uses three deterministic tiers:
+    //   Tier 1 — budget zone match: luxury → prefer zones 1-2; moderate → zones 1-3
+    //   Tier 2 — zone proximity to dominant non-hotel saved-item zone
+    //            (smoother gradient: score = max(0, 3 - |hz - domZ|))
+    //   Tier 3 — stable alphabetical sort on item id (deterministic tiebreak)
+    //
+    // hotelZone = 0 when no hotel is saved; all hotel-aware branches guard on
+    // `if (hotelZone)` which is falsy for 0 → zero behavioral change for users
+    // with no saved hotel.  DO NOT add hotel auto-recommendation here (Step D.5).
+    type RawItem = { categoria?: string; localizacao?: string; id?: string };
+    const rawItems  = savedItems as RawItem[];
+    const hotelItems = rawItems.filter((s) => s.categoria === "hotel");
+
+    let hotelZone = 0;
+
+    if (hotelItems.length === 1) {
+      // Single hotel — use it directly, no scoring needed
+      hotelZone = getZone(hotelItems[0].localizacao ?? "");
+
+    } else if (hotelItems.length > 1) {
+      // Tier 2 input: dominant zone from non-hotel saved items
+      const nonHotelRaw = rawItems.filter((s) => s.categoria !== "hotel");
+      const zoneCounts: Record<number, number> = {};
+      for (const item of nonHotelRaw) {
+        const z = getZone(item.localizacao ?? "");
+        if (z > 0) zoneCounts[z] = (zoneCounts[z] ?? 0) + 1;
+      }
+      const domZEntry = Object.entries(zoneCounts)
+        .sort((a, b) => Number(b[1]) - Number(a[1]))[0];
+      const domZ = domZEntry ? Number(domZEntry[0]) : 0;
+
+      // Tier 1: budget preference → zone set (luxury = zones 1-2; moderate = 1-3; other = no bias)
+      const budgetZoneMap: Record<string, number[]> = {
+        luxury:   [1, 2],
+        moderate: [1, 2, 3],
+      };
+      const preferredBudgetZones = new Set(
+        budgetZoneMap[preferences.budget ?? ""] ?? [],
+      );
+
+      // Score each hotel candidate on two tiers; stable id sort as Tier 3
+      const scored = hotelItems.map((h) => {
+        const hz = getZone(h.localizacao ?? "");
+        const t1  = preferredBudgetZones.size > 0 && preferredBudgetZones.has(hz) ? 2 : 0;
+        const t2  = domZ > 0 ? Math.max(0, 3 - Math.abs(hz - domZ)) : 0;
+        return { h, hz, score: t1 + t2 };
+      });
+
+      scored.sort((a, b) =>
+        b.score !== a.score
+          ? b.score - a.score
+          : String(a.h.id ?? "").localeCompare(String(b.h.id ?? "")),
+      );
+
+      hotelZone = scored[0]!.hz;
+    }
+
     const supa = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
@@ -1438,7 +1539,7 @@ serve(async (req) => {
     places = scoreAndSortPool(places, preferences, savedIds);
 
     // ── Step 4: Macro-region clustering (oeste + norte isolated from centro + sul)
-    const { dayGroups, dayRestaurants } = groupByGeography(places, tripLength, vibe);
+    const { dayGroups, dayRestaurants } = groupByGeography(places, tripLength, vibe, hotelZone);
 
     // ── Step 5: Build fully populated DiaRoteiro[] with morning load balancing
     let days = buildFullDraft(dayGroups, dayRestaurants, vibe);
