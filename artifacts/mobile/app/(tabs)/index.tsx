@@ -12,8 +12,9 @@ import {
   Text,
   View,
 } from "react-native";
-import { Image as ExpoImage } from "expo-image";
 import { notifyHeroReady } from "@/lib/splashGate";
+import { RotatingBackground } from "@/components/RotatingBackground";
+
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -62,7 +63,13 @@ const C = Colors.light;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CARD_W = (SCREEN_WIDTH - 48 - 12) / 2;
 
-const BG_IMAGE = require("../../assets/images/hero-rio.png");
+const HOME_BG_POOL = [
+  require("../../assets/images/rio-aerial-clean.png"),
+  require("../../assets/images/ipanema.png"),
+  require("../../assets/images/hotel1.png"),
+  require("../../assets/images/secret1.png"),
+  require("../../assets/images/map-rio-portrait.png"),
+];
 
 // ── Thin hairline between sections ───────────────────────────────────────────
 function Divider() {
@@ -231,15 +238,13 @@ export default function HomeScreen() {
 
   return (
     <View style={s.root}>
-      {/* ── expo-image: warm amber placeholder → actual image crossfade ── */}
-      {/* backgroundColor on the Image itself shows in the same frame as mount */}
-      <ExpoImage
-        source={BG_IMAGE}
-        style={[s.bgImage, { backgroundColor: "#1A0E04" }]}
-        contentFit="cover"
-        transition={{ duration: 500, effect: "cross-dissolve" }}
-        onDisplay={handleHeroDisplay}
-      />
+      {/* ── Rotating background — editorial Rio pool ── */}
+      <View style={[s.bgImage, { backgroundColor: "#1A0E04" }]} pointerEvents="none">
+        <RotatingBackground
+          pool={HOME_BG_POOL}
+          onFirstImageDisplay={handleHeroDisplay}
+        />
+      </View>
       {/* Editorial overlay fades in WITH the image — never darkens a black canvas */}
       <Animated.View
         style={[StyleSheet.absoluteFill, { opacity: overlayAnim }]}

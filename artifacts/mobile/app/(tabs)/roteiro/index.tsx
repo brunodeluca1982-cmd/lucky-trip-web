@@ -14,6 +14,7 @@
  */
 
 import React, { useEffect, useRef, useState } from "react";
+import { RotatingBackground } from "@/components/RotatingBackground";
 import {
   Alert,
   Animated,
@@ -3236,15 +3237,23 @@ export default function RoteiroScreen() {
   const phase: "journey" | "loading" | "result" =
     generating ? "loading" : result ? "result" : "journey";
 
-  // Hero image for cinematic result background — prefer hotel image, fall back to editorial hero
-  const heroImg = hotelItem?.image ?? require("@/assets/images/hero-rio.png");
+  const ROTEIRO_BG_POOL = [
+    require("@/assets/images/hero-rio.png"),
+    require("@/assets/images/lapa.png"),
+    require("@/assets/images/pao-acucar.png"),
+    require("@/assets/images/map-rio-portrait.png"),
+    require("@/assets/images/cristo.png"),
+  ];
 
   return (
     <View style={sc.root}>
 
-      {/* ── Cinematic background — image visible at top, dark toward content ── */}
+      {/* ── Cinematic background — rotating pool, hotel image pinned as first if saved ── */}
       <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}>
-        <Image source={heroImg} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        <RotatingBackground
+          pool={ROTEIRO_BG_POOL}
+          firstSource={hotelItem?.image ?? null}
+        />
         <LinearGradient
           colors={["rgba(0,0,0,0.05)", "rgba(0,0,0,0.28)", "rgba(0,0,0,0.60)"]}
           locations={[0, 0.35, 1]}

@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useDestinos } from "@/hooks/useDestinos";
+import { RotatingBackground } from "@/components/RotatingBackground";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -104,7 +105,13 @@ const DestCard = memo(function DestCard({
 });
 
 // ── Screen ─────────────────────────────────────────────────────────────────────
-const RIO_BG = require("../../assets/images/hero-rio.png");
+const DESTINOS_BG_POOL = [
+  require("../../assets/images/hero-santorini.png"),
+  require("../../assets/images/hero-kyoto.png"),
+  require("../../assets/images/rio-aerial-clean.png"),
+  require("../../assets/images/secret2.png"),
+  require("../../assets/images/hotel2.png"),
+];
 
 export default function DestinosScreen() {
   const insets = useSafeAreaInsets();
@@ -131,11 +138,7 @@ export default function DestinosScreen() {
     <View style={s.root}>
       {/* Full-screen atmospheric background */}
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        <Image
-          source={RIO_BG}
-          style={s.bgImage}
-          resizeMode="cover"
-        />
+        <RotatingBackground pool={DESTINOS_BG_POOL} />
         <LinearGradient
           colors={["rgba(0,0,0,0.74)", "rgba(0,0,0,0.66)", "rgba(0,0,0,0.86)"]}
           locations={[0, 0.5, 1]}

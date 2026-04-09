@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
-  ImageBackground,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -14,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { router } from "expo-router";
+import { RotatingBackground } from "@/components/RotatingBackground";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -25,6 +25,14 @@ const C    = Colors.light;
 const GOLD = "#D4AF37";
 
 const LOGO_MARK = require("@/assets/images/logo-symbol.png");
+
+const LUCKY_BG_POOL = [
+  require("@/assets/images/lapa.png"),
+  require("@/assets/images/secret1.png"),
+  require("@/assets/images/secret2.png"),
+  require("@/assets/images/hotel2.png"),
+  require("@/assets/images/rio-aerial-clean.png"),
+];
 
 const FREE_LIMIT         = 2;
 const RESPONSES_USED_KEY = "@luckytrip/lucky_responses_v2";
@@ -217,11 +225,8 @@ export default function LuckyScreen() {
   const hasMessages = messages.length > 0;
 
   return (
-    <ImageBackground
-      source={require("@/assets/images/lapa.png")}
-      style={styles.bg}
-      resizeMode="cover"
-    >
+    <View style={styles.bg}>
+      <RotatingBackground pool={LUCKY_BG_POOL} />
       <View style={styles.overlay}>
         <KeyboardAvoidingView
           style={{ flex: 1 }}
@@ -404,7 +409,7 @@ export default function LuckyScreen() {
           )}
         </KeyboardAvoidingView>
       </View>
-    </ImageBackground>
+    </View>
   );
 }
 
