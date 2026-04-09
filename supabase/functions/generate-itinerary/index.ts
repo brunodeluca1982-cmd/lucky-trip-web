@@ -1193,8 +1193,15 @@ function buildFullDraft(
     }
 
     // ── 5c. Restaurants ───────────────────────────────────────────────────────
+    // First restaurant → almoco (always).
+    // Second+ restaurant → noite if isDinnerRestaurant(), otherwise almoco.
+    // Previously all subsequent restaurants were hardcoded to noite — this
+    // caused lunch-focused complement restaurants to appear at dinner time.
+    // isDinnerRestaurant() uses the momento_ideal + tags fields now fetched
+    // from restaurantes (see enrichPlaces fix). Restaurants without explicit
+    // dinner signals stay in almoco; only true dinner-only places go to noite.
     rests.forEach((r, i) => {
-      const p: PeriodoDia = i === 0 ? "almoco" : "noite";
+      const p: PeriodoDia = i === 0 ? "almoco" : (isDinnerRestaurant(r) ? "noite" : "almoco");
       if (!periodMap.has(p)) periodMap.set(p, []);
       periodMap.get(p)!.push(r);
     });
@@ -1399,9 +1406,11 @@ Return ONLY a valid JSON array with the same structure — no markdown, no expla
 //   Rule 1 — Sunset items → only tarde.
 //   Rule 2 — Restaurant subtype-aware: breakfast/brunch valid in manha; dinner evicted to noite;
 //             all others evicted from manha to almoco.
-//   Rule 3 — Pure nightlife → not manha/almoco.
+//   Rule 5 — Dinner-only restaurants in almoco or tarde → evicted to noite.
+//   Rule 3 — Nightlife venues (tag-authoritative): nightlife tag + any night/evening momento
+//             → not manha/almoco. Updated from exclusive-night to tag-authoritative check.
+//   Rule 6 — Breakfast restaurants in tarde or noite → evicted to manha.
 //   Rule 4 — Performance venues → not manha/almoco.
-//   Rule 5 — Dinner-only restaurants misplaced in almoco → evicted to noite.
 
 function validateAndFix(
   days:      DiaRoteiro[],
@@ -1474,22 +1483,41 @@ function validateAndFix(
           evictions.push({ item, to: "almoco" }); continue;
         }
 
-        // Rule 5: dinner-only restaurant → not noite-adjacent misplacement in almoco
-        // (Dinner restaurants classified as almoco by legacy fallback are corrected here)
+        // Rule 5: dinner-only restaurant → not almoco or tarde
+        // Extended from almoco-only to also cover tarde: a dinner-only restaurant
+        // can land in tarde via validateAndFix 7a re-attachment. Both are wrong.
         if (item.categoria === "restaurante" &&
-            periodoBlock.periodo === "almoco" &&
+            (periodoBlock.periodo === "almoco" || periodoBlock.periodo === "tarde") &&
             isDinnerRestaurant(place)) {
           evictions.push({ item, to: "noite" }); continue;
         }
 
-        // Rule 3: pure nightlife (ONLY night/evening momento + nightlife tag) → not manha/almoco
-        const onlyNight = momento.length > 0 &&
-          momento.every((m) => ["night", "evening"].includes(m));
+        // Rule 3: nightlife venue → not manha/almoco
+        //
+        // Original condition required momento.every(["night","evening"]) — this
+        // excluded venues with mixed momento_ideal like ["morning","night"] that
+        // are legitimately nightlife but also offer morning experiences (tours, etc.).
+        //
+        // Updated: tag-authoritative — nightlife tag + ANY night/evening momento is
+        // sufficient to evict from manha/almoco. The nightlife tag is the semantic
+        // authority; presence of "morning" in momento_ideal does not override it.
+        // A venue with nightlife tags that works at night belongs in noite.
+        const hasNightMomento = momento.some((m) => ["night", "evening"].includes(m));
         const isNightlife = tags.some((t) =>
           ["balada", "nightlife", "clubbing"].some((k) => t.includes(k)));
-        if (onlyNight && isNightlife &&
+        if (hasNightMomento && isNightlife &&
           (periodoBlock.periodo === "manha" || periodoBlock.periodo === "almoco")) {
           evictions.push({ item, to: "noite" }); continue;
+        }
+
+        // Rule 6: breakfast restaurant → not tarde or noite
+        // isBreakfastRestaurant() is already used in Rule 2 to allow breakfast
+        // restaurants to stay in manha. This complementary rule evicts them back
+        // to manha if validateAndFix 7a re-attached them to a wrong period.
+        if (item.categoria === "restaurante" &&
+            isBreakfastRestaurant(place) &&
+            (periodoBlock.periodo === "tarde" || periodoBlock.periodo === "noite")) {
+          evictions.push({ item, to: "manha" }); continue;
         }
 
         // Rule 4 (Step A.5): performance venue → not manha/almoco

@@ -3144,14 +3144,17 @@ export default function RoteiroScreen() {
               } as SavedItem;
             }
             // Engine introduced a complement item not in the saved list.
-            // Use engine categoria + source_table; assign fallback image.
+            // Use engine categoria + source_table; use real Supabase photo when available.
             const cat = (item.categoria as SavedCategory | undefined) ?? "oQueFazer";
             const edgeSourceTable = (item as any).source_table as string | undefined;
+            const compPhoto = (item as any).photo_url as string | null | undefined;
             return {
               ...item,
-              image:        getItemFallbackImage(cat),
+              // Real Supabase photo wins; fall back to category static PNG.
+              // Same priority rule as Path A (saved items) — never discard a real photo.
+              image:        compPhoto ? { uri: compPhoto } : getItemFallbackImage(cat),
               source_table: (edgeSourceTable as SourceTable | undefined) ?? sourceTableFromCategoria(cat),
-              ...(((item as any).photo_url)  != null && { photo_url: (item as any).photo_url }),
+              ...(compPhoto != null && { photo_url: compPhoto }),
               ...(((item as any).descricao)  != null && { descricao: (item as any).descricao }),
               ...(((item as any).duracao)    != null && { duracao:   (item as any).duracao   }),
             } as SavedItem;
