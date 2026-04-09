@@ -196,7 +196,7 @@ async function enrichPlaces(
       : Promise.resolve({ data: [] }),
     restIds.length > 0
       ? supa.from("restaurantes")
-          .select("id,nome,bairro,categoria,especialidade,perfil_publico,preco_nivel,photo_url,meu_olhar")
+          .select("id,nome,bairro,categoria,especialidade,perfil_publico,preco_nivel,photo_url,meu_olhar,momento_ideal,tags_ia")
           .eq("ativo", true)
           .in("id", restIds)
       : Promise.resolve({ data: [] }),
@@ -253,14 +253,20 @@ async function enrichPlaces(
     } else if (s.categoria === "restaurante") {
       const row = restMap.get(Number(s.id));
       if (row) {
-        area          = (row.bairro        as string) || area;
-        name          = (row.nome          as string) || name;
+        area          = (row.bairro        as string)   || area;
+        name          = (row.nome          as string)   || name;
         especialidade = row.especialidade  as string | undefined;
         perfil        = row.perfil_publico as string | undefined;
         photo_url     = (row.photo_url     as string | null) ?? null;
         meu_olhar     = (row.meu_olhar     as string | null) ?? null;
+        // Use DB momento_ideal if present; fall back to ["lunch"] so existing
+        // behavior is preserved for restaurants that have no momento_ideal set.
+        const dbMomento = (row.momento_ideal as string[] | null) ?? [];
+        momento = dbMomento.length > 0 ? dbMomento : ["lunch"];
+        tags    = (row.tags_ia as string[] | null) ?? [];
+      } else {
+        momento = ["lunch"];
       }
-      momento = ["lunch"];
     }
 
     const oqRow       = s.categoria === "oQueFazer" ? oqMap.get(s.id) : undefined;
@@ -576,8 +582,56 @@ function classifyBeachPeriodo(p: EnrichedPlace, vibe: string): PeriodoDia {
   return "tarde";
 }
 
+// ── Restaurant subtype helpers ─────────────────────────────────────────────────
+//
+// Classification uses only Supabase-sourced fields: momento_ideal, tags, especialidade.
+// No external data. No name-matching heuristics. Fully deterministic.
+//
+// BREAKFAST signals (from restaurantes.momento_ideal / tags_ia / especialidade):
+//   momento_ideal: "morning" | "brunch" | "breakfast"
+//   especialidade: "padaria" | "café" | "cafe" | "brunch" | "bakery" | "cafeteria" | "pão" | "pao"
+//   tags_ia:       "café da manhã" | "breakfast" | "brunch" | "padaria" | "padaria artesanal"
+//
+// DINNER signals:
+//   momento_ideal: "dinner" | "evening" | "noite"
+//   AND NOT:       "morning" | "brunch" | "lunch"
+//   (If a place is valid for both lunch and dinner, it stays with almoco as default.)
+//
+// All other restaurants default to almoco — existing behavior preserved.
+
+const BREAKFAST_MOMENTO = new Set(["morning", "brunch", "breakfast"]);
+const BREAKFAST_ESPECIALIDADE = new Set([
+  "padaria", "café", "cafe", "brunch", "bakery", "cafeteria", "pão", "pao",
+  "café e padaria", "cafe e padaria",
+]);
+const BREAKFAST_TAGS = new Set([
+  "café da manhã", "cafe da manha", "breakfast", "brunch", "padaria",
+  "padaria artesanal", "café colonial", "cafe colonial",
+]);
+
+function isBreakfastRestaurant(p: EnrichedPlace): boolean {
+  if (p.momento_ideal.some((m) => BREAKFAST_MOMENTO.has(m.toLowerCase()))) return true;
+  if (p.especialidade && BREAKFAST_ESPECIALIDADE.has(p.especialidade.toLowerCase())) return true;
+  if (p.tags.some((t) => BREAKFAST_TAGS.has(t.toLowerCase()))) return true;
+  return false;
+}
+
+const DINNER_MOMENTO = new Set(["dinner", "evening", "noite"]);
+const DINNER_EXCLUDE = new Set(["morning", "brunch", "lunch"]);
+
+function isDinnerRestaurant(p: EnrichedPlace): boolean {
+  const hasDinner = p.momento_ideal.some((m) => DINNER_MOMENTO.has(m.toLowerCase()));
+  if (!hasDinner) return false;
+  const hasLunchOrBreakfast = p.momento_ideal.some((m) => DINNER_EXCLUDE.has(m.toLowerCase()));
+  return !hasLunchOrBreakfast;
+}
+
 function classifyPeriodo(p: EnrichedPlace, vibe: string): PeriodoDia {
-  if (p.categoria === "restaurante") return "almoco";
+  if (p.categoria === "restaurante") {
+    if (isBreakfastRestaurant(p)) return "manha";
+    if (isDinnerRestaurant(p))    return "noite";
+    return "almoco";
+  }
 
   // Beach items: vibe + context-aware (overrides DB momento_ideal)
   if (isBeachItem(p)) return classifyBeachPeriodo(p, vibe);
@@ -1340,11 +1394,14 @@ Return ONLY a valid JSON array with the same structure — no markdown, no expla
 
 // ── STEP 7: Validation ────────────────────────────────────────────────────────
 // 7a. Re-attaches any places dropped during Gemini refinement.
-// 7b. Enforces temporal sanity rules — silently corrects absurd assignments
-//     that Gemini may have introduced during reordering:
-//       • sunset items → only tarde
-//       • pure nightlife items → not manha/almoco
-//       • restaurantes → not manha
+// 7b. Enforces temporal sanity + source-of-truth rules:
+//   Rule 0 — Source-of-truth strip: items not in allPlaces (Supabase registry) are dropped.
+//   Rule 1 — Sunset items → only tarde.
+//   Rule 2 — Restaurant subtype-aware: breakfast/brunch valid in manha; dinner evicted to noite;
+//             all others evicted from manha to almoco.
+//   Rule 3 — Pure nightlife → not manha/almoco.
+//   Rule 4 — Performance venues → not manha/almoco.
+//   Rule 5 — Dinner-only restaurants misplaced in almoco → evicted to noite.
 
 function validateAndFix(
   days:      DiaRoteiro[],
@@ -1392,7 +1449,12 @@ function validateAndFix(
 
       for (const item of periodoBlock.items) {
         const place = placeById.get(item.id);
-        if (!place) { keep.push(item); continue; }
+
+        // Rule 0 — Source-of-truth strip
+        // Any item whose id is not present in allPlaces (the Supabase-sourced registry)
+        // is an unauthorized item — hallucinated by Gemini or otherwise orphaned.
+        // Drop it unconditionally. Never silently keep unknown items.
+        if (!place) { continue; }
 
         const momento = place.momento_ideal.map((m) => m.toLowerCase());
         const tags    = place.tags.map((t) => t.toLowerCase());
@@ -1402,9 +1464,22 @@ function validateAndFix(
           evictions.push({ item, to: "tarde" }); continue;
         }
 
-        // Rule 2: restaurant → not manha
+        // Rule 2: restaurant temporal placement — subtype-aware
+        // Breakfast restaurants (padaria, café, brunch) are valid in manha.
+        // Dinner-only restaurants are evicted from manha to noite.
+        // All other restaurants are evicted from manha to almoco.
         if (item.categoria === "restaurante" && periodoBlock.periodo === "manha") {
+          if (isBreakfastRestaurant(place))      { keep.push(item); continue; }
+          if (isDinnerRestaurant(place))         { evictions.push({ item, to: "noite" }); continue; }
           evictions.push({ item, to: "almoco" }); continue;
+        }
+
+        // Rule 5: dinner-only restaurant → not noite-adjacent misplacement in almoco
+        // (Dinner restaurants classified as almoco by legacy fallback are corrected here)
+        if (item.categoria === "restaurante" &&
+            periodoBlock.periodo === "almoco" &&
+            isDinnerRestaurant(place)) {
+          evictions.push({ item, to: "noite" }); continue;
         }
 
         // Rule 3: pure nightlife (ONLY night/evening momento + nightlife tag) → not manha/almoco
