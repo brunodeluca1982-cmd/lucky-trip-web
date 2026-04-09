@@ -74,6 +74,9 @@ interface EnrichedPlace {
   perfil_publico?: string;        // restaurant audience
   preco_nivel?: number;           // 1-5 price level (from DB)
   perfil_ideal?: string[];        // target audience tags (from DB)
+  // ── Output enrichment fields (Step F — additive only, never affect engine logic)
+  photo_url?: string | null;      // Supabase photo_url — passed through to ItemRoteiro.image
+  meu_olhar?: string | null;      // Lucky Trip editorial note — passed through to ItemRoteiro.descricao
   // ── Computed in Step 3
   best_periodo?: PeriodoDia;
   // ── Neighborhood metadata (attached in Step 2)
@@ -97,6 +100,10 @@ interface ItemRoteiro {
   localizacao:  string;
   source_table: string;
   image?:       unknown;
+  // Step F — additive enrichment fields (optional, backward compatible)
+  photo_url?:   string | null;   // Supabase photo_url; null if not available
+  descricao?:   string | null;   // meu_olhar editorial note; null if not available
+  duracao?:     string;          // average visit duration e.g. "1-2h"
 }
 
 interface DiaPeriodo {
@@ -179,17 +186,17 @@ async function enrichPlaces(
   const [oqResult, luckyResult, restResult] = await Promise.all([
     oqIds.length > 0
       ? supa.from("o_que_fazer_rio")
-          .select("id,nome,bairro,categoria,tags_ia,momento_ideal,vibe,energia,duracao_media,perfil_ideal")
+          .select("id,nome,bairro,categoria,tags_ia,momento_ideal,vibe,energia,duracao_media,perfil_ideal,photo_url,meu_olhar")
           .in("id", oqIds)
       : Promise.resolve({ data: [] }),
     luckyIds.length > 0
       ? supa.from("lucky_list_rio")
-          .select("id,nome,bairro,tipo,tags_ia,momento_ideal,photo_url")
+          .select("id,nome,bairro,tipo,tags_ia,momento_ideal,photo_url,meu_olhar")
           .in("id", luckyIds)
       : Promise.resolve({ data: [] }),
     restIds.length > 0
       ? supa.from("restaurantes")
-          .select("id,nome,bairro,categoria,especialidade,perfil_publico,preco_nivel")
+          .select("id,nome,bairro,categoria,especialidade,perfil_publico,preco_nivel,photo_url,meu_olhar")
           .eq("ativo", true)
           .in("id", restIds)
       : Promise.resolve({ data: [] }),
@@ -213,6 +220,9 @@ async function enrichPlaces(
     let duracao                = "1-2h";
     let especialidade: string | undefined;
     let perfil:        string | undefined;
+    // Step F — output enrichment (read-only, never used in engine logic)
+    let photo_url: string | null = null;
+    let meu_olhar: string | null = null;
 
     if (s.categoria === "oQueFazer") {
       const row = oqMap.get(s.id);
@@ -224,9 +234,11 @@ async function enrichPlaces(
         vibe_tags = (row.vibe          as string[]) ?? [];
         energia   = (row.energia       as string)   ?? "medium";
         duracao   = (row.duracao_media as string)   ?? "1-2h";
+        photo_url = (row.photo_url     as string | null) ?? null;
+        meu_olhar = (row.meu_olhar     as string | null) ?? null;
       }
     } else if (s.categoria === "lucky") {
-      // Look up in lucky_list_rio — confirmed columns: id,nome,bairro,tipo,tags_ia,momento_ideal,photo_url
+      // Look up in lucky_list_rio — confirmed columns: id,nome,bairro,tipo,tags_ia,momento_ideal,photo_url,meu_olhar
       const row = luckyMap.get(s.id);
       if (row) {
         area      = (row.bairro        as string)   || area;
@@ -235,6 +247,8 @@ async function enrichPlaces(
         momento   = (row.momento_ideal as string[]) ?? [];
         vibe_tags = [];
         energia   = "medium";
+        photo_url = (row.photo_url     as string | null) ?? null;
+        meu_olhar = (row.meu_olhar     as string | null) ?? null;
       }
     } else if (s.categoria === "restaurante") {
       const row = restMap.get(Number(s.id));
@@ -243,6 +257,8 @@ async function enrichPlaces(
         name          = (row.nome          as string) || name;
         especialidade = row.especialidade  as string | undefined;
         perfil        = row.perfil_publico as string | undefined;
+        photo_url     = (row.photo_url     as string | null) ?? null;
+        meu_olhar     = (row.meu_olhar     as string | null) ?? null;
       }
       momento = ["lunch"];
     }
@@ -271,6 +287,8 @@ async function enrichPlaces(
       perfil_publico: perfil,
       preco_nivel,
       perfil_ideal,
+      photo_url,
+      meu_olhar,
     });
   }
 
@@ -318,7 +336,7 @@ async function fetchComplementaryContent(
   if (needActs > 0) {
     const { data: luckyRows } = await supa
       .from("lucky_list_rio")
-      .select("id,nome,bairro,tipo,tags_ia,momento_ideal")
+      .select("id,nome,bairro,tipo,tags_ia,momento_ideal,photo_url,meu_olhar")
       .limit(Math.min(60, (needActs + 5) * 3));
 
     const luckyCandidates: EnrichedPlace[] = [];
@@ -345,6 +363,8 @@ async function fetchComplementaryContent(
         tags:          Array.isArray(tags) ? tags : [],
         vibe_tags:     [],
         duracao:       "1-2h",
+        photo_url:     (row.photo_url as string | null) ?? null,
+        meu_olhar:     (row.meu_olhar as string | null) ?? null,
       });
     }
 
@@ -373,7 +393,7 @@ async function fetchComplementaryContent(
   if (stillNeedActs > 0) {
     const { data: oqRows } = await supa
       .from("o_que_fazer_rio")
-      .select("id,nome,bairro,tags_ia,momento_ideal,vibe,energia,duracao_media")
+      .select("id,nome,bairro,tags_ia,momento_ideal,vibe,energia,duracao_media,photo_url,meu_olhar")
       .limit(Math.min(75, (stillNeedActs + 8) * 3));
 
     const oqCandidates: EnrichedPlace[] = [];
@@ -393,6 +413,8 @@ async function fetchComplementaryContent(
         tags:          (row.tags_ia       as string[]) ?? [],
         vibe_tags:     (row.vibe          as string[]) ?? [],
         duracao:       (row.duracao_media as string)   ?? "1-2h",
+        photo_url:     (row.photo_url     as string | null) ?? null,
+        meu_olhar:     (row.meu_olhar     as string | null) ?? null,
       });
     }
 
@@ -417,7 +439,7 @@ async function fetchComplementaryContent(
   if (needRests > 0) {
     const { data: restRows } = await supa
       .from("restaurantes")
-      .select("id,nome,bairro,especialidade,perfil_publico,preco_nivel")
+      .select("id,nome,bairro,especialidade,perfil_publico,preco_nivel,photo_url,meu_olhar")
       .eq("ativo", true)
       .limit(Math.min(35, (needRests + 3) * 3));
 
@@ -441,6 +463,8 @@ async function fetchComplementaryContent(
         especialidade:  row.especialidade  as string | undefined,
         perfil_publico: row.perfil_publico as string | undefined,
         preco_nivel:    row.preco_nivel    as number | undefined,
+        photo_url:      (row.photo_url     as string | null) ?? null,
+        meu_olhar:      (row.meu_olhar     as string | null) ?? null,
       });
     }
 
@@ -1151,6 +1175,11 @@ function buildFullDraft(
           categoria:    a.categoria,
           localizacao:  a.area,
           source_table: categoriaToTable(a.categoria),
+          // Step F — additive enrichment fields
+          image:        a.photo_url ? { uri: a.photo_url } : undefined,
+          photo_url:    a.photo_url ?? null,
+          descricao:    a.meu_olhar ?? null,
+          duracao:      a.duracao,
         })),
       }));
 
@@ -1324,8 +1353,16 @@ function validateAndFix(
     const lastDay = days[days.length - 1];
     const tarde   = lastDay.periodos.find((p) => p.periodo === "tarde");
     const lostItems = lost.map((l) => ({
-      id: l.id, titulo: l.name, categoria: l.categoria, localizacao: l.area,
+      id:           l.id,
+      titulo:       l.name,
+      categoria:    l.categoria,
+      localizacao:  l.area,
       source_table: categoriaToTable(l.categoria),
+      // Step F — additive enrichment fields (same pattern as buildFullDraft)
+      image:        l.photo_url ? { uri: l.photo_url } : undefined,
+      photo_url:    l.photo_url ?? null,
+      descricao:    l.meu_olhar ?? null,
+      duracao:      l.duracao,
     }));
     if (tarde) {
       tarde.items.push(...lostItems);
