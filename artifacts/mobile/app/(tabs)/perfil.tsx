@@ -1379,14 +1379,14 @@ const s = StyleSheet.create({
   },
   profileHeroOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.22)",
+    backgroundColor: "transparent",
   },
   profileHeroGradient: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    height: 140,
+    height: 90,
   },
   avatar: {
     width: 72,
