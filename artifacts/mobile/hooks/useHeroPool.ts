@@ -31,8 +31,7 @@ export function useHeroPool(): ImageSourcePropType[] {
         const remote = data
           .map((row) => {
             if (!row.video_url) return null;
-            const path = (row.video_url as string).replace("https://", "");
-            return { uri: `${CLOUD}/${path}` };
+            return { uri: `${CLOUD}/${encodeURIComponent(row.video_url as string)}` };
           })
           .filter(Boolean) as ImageSourcePropType[];
 
