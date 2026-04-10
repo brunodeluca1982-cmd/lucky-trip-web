@@ -64,11 +64,9 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CARD_W = (SCREEN_WIDTH - 48 - 12) / 2;
 
 const HOME_BG_POOL = [
-  require("../../assets/images/rio-aerial-clean.png"),
   require("../../assets/images/ipanema.png"),
   require("../../assets/images/hotel1.png"),
   require("../../assets/images/secret1.png"),
-  require("../../assets/images/map-rio-portrait.png"),
 ];
 
 // ── Thin hairline between sections ───────────────────────────────────────────

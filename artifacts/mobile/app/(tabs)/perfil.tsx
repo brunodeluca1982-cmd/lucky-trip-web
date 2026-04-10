@@ -51,7 +51,6 @@ const LOGO      = require("@/assets/images/logo-symbol.png");
 
 // Hero images for rotating background (login screen only)
 const HERO_IMAGES = [
-  require("@/assets/images/rio-aerial-clean.png"),
   require("@/assets/images/ipanema.png"),
   require("@/assets/images/cristo.png"),
   require("@/assets/images/pao-acucar.png"),
@@ -788,7 +787,6 @@ function EmailSentState({
 // Images: Rio de Janeiro only. Same crossfade pattern as the auth hero.
 
 const PROFILE_HERO_IMAGES = [
-  require("@/assets/images/rio-aerial-clean.png"),
   require("@/assets/images/ipanema.png"),
   require("@/assets/images/hero-rio.png"),
   require("@/assets/images/pao-acucar.png"),
