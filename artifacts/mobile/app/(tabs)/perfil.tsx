@@ -36,6 +36,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useAuth } from "@/hooks/useAuth";
 import { useGuia } from "@/context/GuiaContext";
+import { useHeroPool } from "@/hooks/useHeroPool";
 import type { User } from "@supabase/supabase-js";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -783,19 +784,11 @@ function EmailSentState({
 }
 
 // ── PROFILE HERO BACKGROUND ───────────────────────────────────────────────────
-// Uses local assets already bundled — no network requests, stable, MVP-safe.
-// Images: Rio de Janeiro only. Same crossfade pattern as the auth hero.
-
-const PROFILE_HERO_IMAGES = [
-  require("@/assets/images/ipanema.png"),
-  require("@/assets/images/hero-rio.png"),
-  require("@/assets/images/pao-acucar.png"),
-  require("@/assets/images/lapa.png"),
-];
 
 const PROFILE_HERO_INTERVAL = 10_000;
 
 function ProfileHeroBg() {
+  const pool        = useHeroPool();
   const [currentIdx, setCurrentIdx] = useState(0);
   const [nextIdx,    setNextIdx]    = useState(1);
   const nextOpacity = useRef(new Animated.Value(0)).current;
@@ -810,8 +803,8 @@ function ProfileHeroBg() {
       }).start(({ finished }) => {
         if (!finished) return;
         setCurrentIdx((c) => {
-          setNextIdx((c + 2) % PROFILE_HERO_IMAGES.length);
-          return (c + 1) % PROFILE_HERO_IMAGES.length;
+          setNextIdx((c + 2) % pool.length);
+          return (c + 1) % pool.length;
         });
         nextOpacity.setValue(0);
       });
@@ -825,13 +818,13 @@ function ProfileHeroBg() {
   return (
     <>
       <Image
-        source={PROFILE_HERO_IMAGES[currentIdx]}
+        source={pool[currentIdx]}
         style={StyleSheet.absoluteFill}
         resizeMode="cover"
         pointerEvents="none"
       />
       <Animated.Image
-        source={PROFILE_HERO_IMAGES[nextIdx]}
+        source={pool[nextIdx]}
         style={[StyleSheet.absoluteFill, { opacity: nextOpacity }]}
         resizeMode="cover"
         pointerEvents="none"

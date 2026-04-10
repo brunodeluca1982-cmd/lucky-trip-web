@@ -18,6 +18,7 @@ import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useDestinos } from "@/hooks/useDestinos";
 import { RotatingBackground } from "@/components/RotatingBackground";
+import { useHeroPool } from "@/hooks/useHeroPool";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -105,19 +106,12 @@ const DestCard = memo(function DestCard({
 });
 
 // ── Screen ─────────────────────────────────────────────────────────────────────
-const DESTINOS_BG_POOL = [
-  require("../../assets/images/hero-santorini.png"),
-  require("../../assets/images/hero-kyoto.png"),
-  require("../../assets/images/rio-aerial-clean.png"),
-  require("../../assets/images/secret2.png"),
-  require("../../assets/images/hotel2.png"),
-];
-
 export default function DestinosScreen() {
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === "web" ? 67 : insets.top + 12;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
+  const heroPool = useHeroPool();
   const { destinos, loading } = useDestinos();
   const [query, setQuery] = React.useState("");
 
@@ -138,7 +132,7 @@ export default function DestinosScreen() {
     <View style={s.root}>
       {/* Full-screen atmospheric background */}
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        <RotatingBackground pool={DESTINOS_BG_POOL} />
+        <RotatingBackground pool={heroPool} />
         <LinearGradient
           colors={["rgba(0,0,0,0.74)", "rgba(0,0,0,0.66)", "rgba(0,0,0,0.86)"]}
           locations={[0, 0.5, 1]}

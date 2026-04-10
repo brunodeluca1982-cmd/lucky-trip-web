@@ -33,6 +33,7 @@ import { useLuckyList } from "@/hooks/useLuckyList";
 import { useOQueFazer } from "@/hooks/useOQueFazer";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import { useFriends, type FriendCard } from "@/hooks/useFriends";
+import { useHeroPool } from "@/hooks/useHeroPool";
 
 // ── Context-aware "O que fazer agora" title ───────────────────────────────────
 // Prepositions for known destinations (Portuguese grammar)
@@ -62,12 +63,6 @@ function getAgoraTitle(tripDestino?: string): string {
 const C = Colors.light;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CARD_W = (SCREEN_WIDTH - 48 - 12) / 2;
-
-const HOME_BG_POOL = [
-  require("../../assets/images/ipanema.png"),
-  require("../../assets/images/hotel1.png"),
-  require("../../assets/images/secret1.png"),
-];
 
 // ── Thin hairline between sections ───────────────────────────────────────────
 function Divider() {
@@ -204,6 +199,7 @@ function getCurrentMomento(): MomentoTab {
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const heroPool = useHeroPool();
   const { viagem } = useGuia();
   const agoraTitle = getAgoraTitle(viagem.destino || undefined);
   const { lugares: atividades, loading: loadingAtividades } = useOQueFazer();
@@ -239,7 +235,7 @@ export default function HomeScreen() {
       {/* ── Rotating background — editorial Rio pool ── */}
       <View style={[s.bgImage, { backgroundColor: "#1A0E04" }]} pointerEvents="none">
         <RotatingBackground
-          pool={HOME_BG_POOL}
+          pool={heroPool}
           onFirstImageDisplay={handleHeroDisplay}
         />
       </View>
