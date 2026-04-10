@@ -152,6 +152,15 @@ export const heroDestinos = [
     image: require("../assets/images/hero-kyoto.png"),
     cityId: "kyoto",
   },
+  {
+    id: "f1",
+    cidade: "Carolina Dieckmann",
+    pais: "Amigo da Lucky Trip",
+    badge: "Roteiros curados",
+    image: require("../assets/images/carol-dieckmann.jpg"),
+    cityId: "rio",
+    route: "/friend/carolina-dieckmann",
+  },
 ];
 
 export type DestaqueType = "oQueFazer" | "restaurante" | "hotel" | "lucky";
