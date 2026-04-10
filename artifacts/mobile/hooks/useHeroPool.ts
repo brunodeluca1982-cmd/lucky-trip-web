@@ -27,7 +27,7 @@ export function useHeroPool(): ImageSourcePropType[] {
 
         if (error || !data || data.length === 0) return;
 
-        const CLOUD = "https://res.cloudinary.com/dufxamwaf/video/upload/so_1,w_1200,f_jpg";
+        const CLOUD = "https://res.cloudinary.com/dufxamwaf/video/upload/so_1,w_1080,h_1920,c_fill,g_auto,q_80,f_jpg";
         const remote = data
           .map((row) => {
             if (!row.video_url) return null;
