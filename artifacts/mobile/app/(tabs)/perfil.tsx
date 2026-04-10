@@ -833,8 +833,8 @@ function ProfileHeroBg() {
       <View style={s.profileHeroOverlay} pointerEvents="none" />
       {/* Bottom gradient — fades into the dark card area below */}
       <LinearGradient
-        colors={["transparent", "rgba(13,13,13,0.70)", "#0D0D0D"]}
-        locations={[0.35, 0.72, 1]}
+        colors={["transparent", "rgba(13,13,13,0.48)", "rgba(13,13,13,0.90)"]}
+        locations={[0.50, 0.82, 1]}
         style={s.profileHeroGradient}
         pointerEvents="none"
       />
@@ -1375,18 +1375,18 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 36,
     overflow: "hidden",
-    minHeight: 240,
+    minHeight: 340,
   },
   profileHeroOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.48)",
+    backgroundColor: "rgba(0,0,0,0.22)",
   },
   profileHeroGradient: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    height: 100,
+    height: 140,
   },
   avatar: {
     width: 72,
