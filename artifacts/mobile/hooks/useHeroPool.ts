@@ -19,16 +19,21 @@ export function useHeroPool(): ImageSourcePropType[] {
       try {
         const { data, error } = await supabase
           .from("home_hero_items")
-          .select("thumbnail_url")
+          .select("video_url")
           .eq("is_active", true)
-          .eq("destination_slug", "rio")
+          .eq("destination_slug", "rio-de-janeiro")
           .order("sort_order", { ascending: true })
           .limit(8);
 
         if (error || !data || data.length === 0) return;
 
+        const CLOUD = "https://res.cloudinary.com/dufxamwaf/video/upload/so_1,w_1200,f_jpg";
         const remote = data
-          .map((row) => (row.thumbnail_url ? { uri: row.thumbnail_url as string } : null))
+          .map((row) => {
+            if (!row.video_url) return null;
+            const path = (row.video_url as string).replace("https://", "");
+            return { uri: `${CLOUD}/${path}` };
+          })
           .filter(Boolean) as ImageSourcePropType[];
 
         if (!cancelled && remote.length > 0) setPool(remote);
