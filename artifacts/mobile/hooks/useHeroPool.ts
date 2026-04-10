@@ -27,11 +27,11 @@ export function useHeroPool(): ImageSourcePropType[] {
 
         if (error || !data || data.length === 0) return;
 
-        const CLOUD = "https://res.cloudinary.com/dufxamwaf/video/upload/so_1,w_1080,h_1920,c_fill,g_auto,q_80,f_jpg";
+        const CLOUD = "https://res.cloudinary.com/dufxamwaf/video/fetch/so_1,w_1080,h_1920,c_fill,g_auto,q_80,f_jpg";
         const remote = data
           .map((row) => {
             if (!row.video_url) return null;
-            return { uri: `${CLOUD}/${encodeURIComponent(row.video_url as string)}` };
+            return { uri: `${CLOUD}/${row.video_url as string}` };
           })
           .filter(Boolean) as ImageSourcePropType[];
 
