@@ -60,12 +60,10 @@ const DestCard = memo(function DestCard({
     router.push({ pathname: "/cidade/[id]", params: { id } });
   }, [id]);
 
-  // Priority: hero_image_url → Unsplash smart fallback → local asset
+  // Priority: hero_image_url (Supabase) → local bundled asset (always safe)
   const imgSource: ImageSourcePropType = heroImageUrl
     ? { uri: heroImageUrl }
-    : {
-        uri: `https://source.unsplash.com/featured/800x1200/?${encodeURIComponent(cidade)},${encodeURIComponent(pais)}`,
-      };
+    : image;
 
   return (
     <Pressable
