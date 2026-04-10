@@ -1,4 +1,5 @@
 import { getUncachableStripeClient } from "./stripeClient.js";
+import { logger } from "./lib/logger.js";
 
 /**
  * StripeService — thin wrapper around the Stripe API for write operations.
@@ -18,7 +19,7 @@ export class StripeService {
     customerEmail?: string,
   ) {
     const stripe = await getUncachableStripeClient();
-    return stripe.checkout.sessions.create({
+    const payload = {
       customer: customerId,
       payment_method_types: ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
@@ -27,7 +28,9 @@ export class StripeService {
       success_url: successUrl,
       cancel_url: cancelUrl,
       ...(customerEmail && !customerId ? { customer_email: customerEmail } : {}),
-    });
+    };
+    logger.info({ payload }, "createCheckoutSession payload");
+    return stripe.checkout.sessions.create(payload);
   }
 
   async createCheckoutSessionForNewCustomer(
