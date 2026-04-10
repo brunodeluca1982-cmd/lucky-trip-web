@@ -1,6 +1,5 @@
-import React, { memo, useCallback } from "react";
+import React, { memo, useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Dimensions,
   Image,
   ImageSourcePropType,
@@ -19,23 +18,31 @@ import { Feather } from "@expo/vector-icons";
 import { useDestinos } from "@/hooks/useDestinos";
 import { RotatingBackground } from "@/components/RotatingBackground";
 import { useHeroPool } from "@/hooks/useHeroPool";
+import { supabase } from "@/lib/supabase";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 const H_PAD = 14;
-const GAP = 8;
-const COLS = 3;
+const GAP = 10;
+const COLS = 2;
 const CARD_W = (SCREEN_WIDTH - H_PAD * 2 - GAP * (COLS - 1)) / COLS;
-const CARD_H = Math.round(CARD_W * 1.18);
+const CARD_H = Math.round(CARD_W * 1.55); // portrait ratio
 
 const SELECTED_ID = "rio";
+const MAX_ITEMS = 20;
 
-// ── Memoized card: does not re-render when parent query state changes ──────────
+// ── Skeleton placeholder ────────────────────────────────────────────────────────
+function SkeletonCard() {
+  return <View style={[s.card, s.skeleton]} />;
+}
+
+// ── Memoized card ──────────────────────────────────────────────────────────────
 interface DestCardProps {
   id: string;
   cidade: string;
   pais: string;
   image: ImageSourcePropType;
+  heroImageUrl?: string | null;
   selected: boolean;
   lancado: boolean;
 }
@@ -45,17 +52,23 @@ const DestCard = memo(function DestCard({
   cidade,
   pais,
   image,
+  heroImageUrl,
   selected,
   lancado,
 }: DestCardProps) {
-  // Stable handler — created once per card id, never recreated on parent re-render
   const handlePress = useCallback(() => {
     router.push({ pathname: "/cidade/[id]", params: { id } });
   }, [id]);
 
+  // Priority: hero_image_url → Unsplash smart fallback → local asset
+  const imgSource: ImageSourcePropType = heroImageUrl
+    ? { uri: heroImageUrl }
+    : {
+        uri: `https://source.unsplash.com/featured/800x1200/?${encodeURIComponent(cidade)},${encodeURIComponent(pais)}`,
+      };
+
   return (
     <Pressable
-      key={id}
       onPress={handlePress}
       style={({ pressed }) => [
         s.card,
@@ -64,21 +77,20 @@ const DestCard = memo(function DestCard({
         pressed && { opacity: 0.88, transform: [{ scale: 0.97 }] },
       ]}
     >
-      {/* Image fills card — identical pattern to DestinationCard.tsx */}
       <Image
-        source={image}
-        style={[s.cardImage, !lancado && { opacity: 0.72 }]}
+        source={imgSource}
+        style={[s.cardImage, !lancado && { opacity: 0.68 }]}
         resizeMode="cover"
       />
 
-      {/* Bottom-anchored gradient — does NOT obscure the image on load */}
+      {/* Bottom gradient — bottom 45% only */}
       <LinearGradient
-        colors={["transparent", "rgba(0,0,0,0.20)", "rgba(0,0,0,0.82)"]}
-        locations={[0.25, 0.55, 1]}
+        colors={["transparent", "rgba(0,0,0,0.28)", "rgba(0,0,0,0.88)"]}
+        locations={[0.40, 0.68, 1]}
         style={s.cardGradient}
       />
 
-      {/* Selected checkmark badge */}
+      {/* Selected badge */}
       {selected && (
         <View style={s.checkBadge}>
           <Feather name="check" size={10} color="#000000" />
@@ -92,9 +104,9 @@ const DestCard = memo(function DestCard({
         </View>
       )}
 
-      {/* Labels */}
+      {/* Labels — bottom-left */}
       <View style={s.cardInfo}>
-        <Text style={s.cardCidade} numberOfLines={1}>
+        <Text style={s.cardCidade} numberOfLines={2}>
           {cidade}
         </Text>
         <Text style={s.cardPais} numberOfLines={1}>
@@ -115,18 +127,42 @@ export default function DestinosScreen() {
   const { destinos, loading } = useDestinos();
   const [query, setQuery] = React.useState("");
 
-  const filtered = query.trim()
-    ? destinos.filter(
-        (d) =>
-          d.cidade.toLowerCase().includes(query.toLowerCase()) ||
-          d.pais.toLowerCase().includes(query.toLowerCase())
-      )
-    : destinos;
+  // Fetch hero_image_url for each destino (keyed by slug)
+  const [heroImages, setHeroImages] = useState<Record<string, string | null>>({});
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from("destinos")
+      .select("slug, hero_image_url")
+      .not("slug", "is", null)
+      .limit(MAX_ITEMS)
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        const map: Record<string, string | null> = {};
+        for (const row of data) {
+          if (row.slug) map[row.slug as string] = (row as any).hero_image_url ?? null;
+        }
+        setHeroImages(map);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const filtered = (
+    query.trim()
+      ? destinos.filter(
+          (d) =>
+            d.cidade.toLowerCase().includes(query.toLowerCase()) ||
+            d.pais.toLowerCase().includes(query.toLowerCase())
+        )
+      : destinos
+  ).slice(0, MAX_ITEMS);
 
   const rows: typeof filtered[] = [];
   for (let i = 0; i < filtered.length; i += COLS) {
     rows.push(filtered.slice(i, i + COLS));
   }
+
+  const showSkeleton = loading && destinos.length === 0;
 
   return (
     <View style={s.root}>
@@ -179,9 +215,16 @@ export default function DestinosScreen() {
           )}
         </View>
 
-        {/* 3-column grid */}
-        {loading && destinos.length === 0 ? (
-          <ActivityIndicator color="rgba(212,175,55,0.7)" style={{ marginTop: 40 }} />
+        {/* Grid */}
+        {showSkeleton ? (
+          <View style={s.grid}>
+            {[0, 1].map((ri) => (
+              <View key={ri} style={s.row}>
+                <SkeletonCard />
+                <SkeletonCard />
+              </View>
+            ))}
+          </View>
         ) : rows.length > 0 ? (
           <View style={s.grid}>
             {rows.map((row, ri) => (
@@ -193,11 +236,12 @@ export default function DestinosScreen() {
                     cidade={d.cidade}
                     pais={d.pais}
                     image={d.image}
+                    heroImageUrl={heroImages[d.id] ?? null}
                     selected={d.id === SELECTED_ID}
                     lancado={d.lancado}
                   />
                 ))}
-                {/* Fill trailing empty slots */}
+                {/* Fill trailing empty slot in last row */}
                 {row.length < COLS &&
                   Array.from({ length: COLS - row.length }).map((_, i) => (
                     <View key={`fill-${i}`} style={{ width: CARD_W }} />
@@ -220,11 +264,6 @@ const s = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: "#000000",
-  },
-  bgImage: {
-    width: "100%",
-    height: "100%",
-    opacity: 0.55,
   },
   scroll: {
     paddingHorizontal: H_PAD,
@@ -288,7 +327,7 @@ const s = StyleSheet.create({
     padding: 0,
   },
 
-  // Grid
+  // Grid — 2 columns
   grid: {
     gap: GAP,
   },
@@ -297,13 +336,21 @@ const s = StyleSheet.create({
     gap: GAP,
   },
 
-  // Card — mirrors DestinationCard.tsx pattern exactly
+  // Card
   card: {
     width: CARD_W,
     height: CARD_H,
     borderRadius: 18,
     overflow: "hidden",
-    backgroundColor: "#000000",
+    backgroundColor: "#111111",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  skeleton: {
+    backgroundColor: "rgba(255,255,255,0.07)",
   },
   cardSelected: {
     borderWidth: 2,
@@ -313,21 +360,20 @@ const s = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
-  // Bottom-anchored: image top half is never covered
   cardGradient: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    height: "70%",
+    height: "55%",
   },
   checkBadge: {
     position: "absolute",
-    top: 8,
-    right: 8,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    top: 10,
+    right: 10,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
@@ -337,43 +383,43 @@ const s = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: 9,
-    paddingBottom: 10,
-    gap: 2,
+    paddingHorizontal: 12,
+    paddingBottom: 14,
+    gap: 3,
   },
   cardCidade: {
     fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 12,
+    fontSize: 16,
     color: "#FFFFFF",
-    lineHeight: 16,
-    letterSpacing: -0.1,
+    lineHeight: 20,
+    letterSpacing: -0.2,
   },
   cardPais: {
     fontFamily: "Inter_400Regular",
-    fontSize: 10,
-    color: "rgba(255,255,255,0.68)",
-    lineHeight: 14,
+    fontSize: 11,
+    color: "rgba(255,255,255,0.65)",
+    lineHeight: 15,
   },
 
-  // Coming soon card variant
+  // Coming soon
   cardComingSoon: {
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.18)",
   },
   comingSoonBadge: {
     position: "absolute",
-    top: 7,
-    left: 7,
+    top: 9,
+    left: 9,
     backgroundColor: "rgba(0,0,0,0.62)",
     borderRadius: 6,
-    paddingHorizontal: 6,
+    paddingHorizontal: 7,
     paddingVertical: 3,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.22)",
   },
   comingSoonText: {
     fontFamily: "Inter_400Regular",
-    fontSize: 8.5,
+    fontSize: 9,
     color: "rgba(255,255,255,0.72)",
     letterSpacing: 0.4,
   },
