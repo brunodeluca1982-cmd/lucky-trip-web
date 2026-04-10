@@ -23,6 +23,7 @@ export class StripeService {
       payment_method_types: ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
       mode: "subscription",
+      allow_promotion_codes: true,
       success_url: successUrl,
       cancel_url: cancelUrl,
       ...(customerEmail && !customerId ? { customer_email: customerEmail } : {}),
@@ -41,6 +42,7 @@ export class StripeService {
       payment_method_types: ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
       mode: "subscription",
+      allow_promotion_codes: true,
       success_url: successUrl,
       cancel_url: cancelUrl,
     });
