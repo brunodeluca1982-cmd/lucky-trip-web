@@ -46,8 +46,8 @@ export function useDestinos() {
           .from("destinos")
           .select("id, nome, pais, lancado, descricao, slug")
           .not("slug", "is", null)
-          .order("lancado", { ascending: false })
-          .order("nome");
+          .order("priority", { ascending: false })
+          .order("nome", { ascending: true });
 
         if (err) throw err;
 
