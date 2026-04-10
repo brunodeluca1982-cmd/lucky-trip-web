@@ -636,10 +636,32 @@ function isDinnerRestaurant(p: EnrichedPlace): boolean {
   return !hasLunchOrBreakfast;
 }
 
+// Bar/nightlife detection via especialidade + tags_ia.
+// Used because restaurantes table has no momento_ideal column, so isDinnerRestaurant()
+// cannot fire for bars — this compensates by reading fields that ARE present in the DB.
+const BAR_ESPECIALIDADE_SUBS = [
+  "bar", "boteco", "pub", "drinks", "cocktail", "cervejaria",
+  "speakeasy", "caipirinharia", "coquetelaria", "lounge",
+];
+const BAR_TAGS = new Set([
+  "bar", "boteco", "pub", "drinks", "cocktail", "cervejaria",
+  "nightlife", "balada", "dj", "speakeasy", "caipirinharia",
+  "coquetelaria", "lounge", "drinks and music", "happy hour",
+]);
+
+function isBarRestaurant(p: EnrichedPlace): boolean {
+  if (p.especialidade) {
+    const esp = p.especialidade.toLowerCase();
+    if (BAR_ESPECIALIDADE_SUBS.some((sub) => esp.includes(sub))) return true;
+  }
+  if (p.tags.some((t) => BAR_TAGS.has(t.toLowerCase()))) return true;
+  return false;
+}
+
 function classifyPeriodo(p: EnrichedPlace, vibe: string): PeriodoDia {
   if (p.categoria === "restaurante") {
-    if (isBreakfastRestaurant(p)) return "manha";
-    if (isDinnerRestaurant(p))    return "noite";
+    if (isBreakfastRestaurant(p))                  return "manha";
+    if (isDinnerRestaurant(p) || isBarRestaurant(p)) return "noite";
     return "almoco";
   }
 
@@ -652,8 +674,9 @@ function classifyPeriodo(p: EnrichedPlace, vibe: string): PeriodoDia {
     if (mapped && mapped !== "almoco") return mapped;
   }
 
-  // Tag-based rules
-  if (p.tags.some((t) => t.includes("bar") || t.includes("nightlife"))) return "noite";
+  // Expanded nightlife tag detection for oQueFazer + lucky items
+  const NIGHTLIFE_KW = ["bar", "nightlife", "boteco", "drinks", "cocktail", "pub", "balada", "cervejaria", "speakeasy", "lounge"];
+  if (p.tags.some((t) => NIGHTLIFE_KW.some((kw) => t.toLowerCase().includes(kw)))) return "noite";
 
   // Energia
   if (p.energia === "high") return "manha";
@@ -1203,16 +1226,21 @@ function buildFullDraft(
     }
 
     // ── 5c. Restaurants ───────────────────────────────────────────────────────
-    // First restaurant → almoco (always).
-    // Second+ restaurant → noite if isDinnerRestaurant(), otherwise almoco.
-    // Previously all subsequent restaurants were hardcoded to noite — this
-    // caused lunch-focused complement restaurants to appear at dinner time.
+    // Bars/nightlife (via isBarRestaurant) → noite regardless of position.
+    // Breakfast places (via isBreakfastRestaurant) → manha regardless of position.
+    // First non-bar, non-breakfast restaurant → almoco.
+    // Second+ non-bar → almoco (all restaurants default to lunch in the DB).
     // NOTE: restaurantes table has no momento_ideal column, so isDinnerRestaurant()
-    // always returns false for current DB restaurants (they all get momento=["lunch"]).
-    // All second+ restaurants correctly go to almoco. This logic is future-proof:
-    // if momento_ideal is added to restaurantes, dinner items will auto-route to noite.
+    // always returns false. isBarRestaurant() compensates via especialidade + tags_ia.
     rests.forEach((r, i) => {
-      const p: PeriodoDia = i === 0 ? "almoco" : (isDinnerRestaurant(r) ? "noite" : "almoco");
+      let p: PeriodoDia;
+      if (isBreakfastRestaurant(r)) {
+        p = "manha";
+      } else if (isDinnerRestaurant(r) || isBarRestaurant(r)) {
+        p = "noite";
+      } else {
+        p = i === 0 ? "almoco" : "almoco";
+      }
       if (!periodMap.has(p)) periodMap.set(p, []);
       periodMap.get(p)!.push(r);
     });
@@ -1251,18 +1279,28 @@ function buildFullDraft(
       .filter((p) => (periodMap.get(p) ?? []).length > 0)
       .map((p) => ({
         periodo: p,
-        items:   periodMap.get(p)!.map((a) => ({
-          id:           a.id,
-          titulo:       a.name,
-          categoria:    a.categoria,
-          localizacao:  a.area,
-          source_table: categoriaToTable(a.categoria),
-          // Step F — additive enrichment fields
-          image:        a.photo_url ? { uri: a.photo_url } : undefined,
-          photo_url:    a.photo_url ?? null,
-          descricao:    a.meu_olhar ?? null,
-          duracao:      a.duracao,
-        })),
+        items:   periodMap.get(p)!.map((a) => {
+          // Step F — photo resolution:
+          // 1st priority: Supabase photo_url (authoritative, editorial-approved)
+          // 2nd priority: Unsplash web fallback using place name + location
+          // Never null in the output — the mobile app uses this for the card image.
+          const finalPhoto: string | null = a.photo_url
+            ? a.photo_url
+            : `https://source.unsplash.com/featured/600x400/?${encodeURIComponent(a.name + " " + a.area + " brazil")}`;
+
+          return {
+            id:           a.id,
+            titulo:       a.name,
+            categoria:    a.categoria,
+            localizacao:  a.area,
+            source_table: categoriaToTable(a.categoria),
+            // Step F — additive enrichment fields
+            image:        { uri: finalPhoto },
+            photo_url:    finalPhoto,
+            descricao:    a.meu_olhar ?? null,
+            duracao:      a.duracao,
+          };
+        }),
       }));
 
     if (periodos.length === 0) return;
