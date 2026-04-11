@@ -122,7 +122,7 @@ export default function LuckyListScreen() {
           </View>
           <Text style={s.heroHeadline}>{editorial.headline}</Text>
           {editorial.paras.map((para, i) => (
-            <Text key={i} style={s.heroPara}>{para}</Text>
+            <Text key={`para-${i}`} style={s.heroPara}>{para}</Text>
           ))}
           <View style={s.curatorBadge}>
             <View style={s.curatorDot} />

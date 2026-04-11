@@ -86,13 +86,15 @@ export function HeroCarousel({ items, onIndexChange }: HeroCarouselProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const autoplayRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const onIndexChangeRef = useRef(onIndexChange);
+  onIndexChangeRef.current = onIndexChange;
 
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       if (viewableItems.length > 0 && viewableItems[0].index !== null) {
         const idx = viewableItems[0].index;
         setActiveIndex(idx);
-        onIndexChange?.(idx);
+        onIndexChangeRef.current?.(idx);
       }
     }
   ).current;
@@ -100,11 +102,12 @@ export function HeroCarousel({ items, onIndexChange }: HeroCarouselProps) {
   const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
 
   useEffect(() => {
+    const len = items.length;
     autoplayRef.current = setInterval(() => {
       setActiveIndex((prev) => {
-        const next = (prev + 1) % items.length;
+        const next = (prev + 1) % len;
         flatListRef.current?.scrollToIndex({ index: next, animated: true });
-        onIndexChange?.(next);
+        onIndexChangeRef.current?.(next);
         return next;
       });
     }, 4000);
@@ -133,9 +136,9 @@ export function HeroCarousel({ items, onIndexChange }: HeroCarouselProps) {
         })}
       />
       <View style={styles.dots}>
-        {items.map((_, i) => (
+        {items.map((item, i) => (
           <View
-            key={i}
+            key={item.id}
             style={[styles.dot, i === activeIndex && styles.dotActive]}
           />
         ))}

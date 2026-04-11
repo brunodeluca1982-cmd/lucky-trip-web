@@ -137,7 +137,7 @@ export default function ComerBemScreen() {
           <Text style={s.listLabel}>Restaurantes selecionados</Text>
 
           {descricao.slice(1).map((para, i) => (
-            <Text key={i} style={s.descPara}>{para}</Text>
+            <Text key={`para-${i}`} style={s.descPara}>{para}</Text>
           ))}
 
           {loading && (

@@ -169,7 +169,7 @@ export default function LuckyListBairroScreen() {
               .split("\n")
               .map((p, i) =>
                 p.trim() ? (
-                  <Text key={i} style={s.bodyText}>{p.trim()}</Text>
+                  <Text key={`para-${i}`} style={s.bodyText}>{p.trim()}</Text>
                 ) : null,
               )}
 
@@ -180,7 +180,7 @@ export default function LuckyListBairroScreen() {
                   <View style={s.sectionLine} />
                 </View>
                 {supabaseNeighborhood.how_to_live.map((tip, i) => (
-                  <View key={i} style={s.tipRow}>
+                  <View key={`tip-${i}`} style={s.tipRow}>
                     <Text style={s.tipMark}>✦</Text>
                     <Text style={s.tipText}>{tip}</Text>
                   </View>

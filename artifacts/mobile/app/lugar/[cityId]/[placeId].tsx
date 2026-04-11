@@ -456,7 +456,7 @@ export default function LugarDetailScreen() {
       >
         {images.map((src, i) => (
           <Image
-            key={i}
+            key={`img-${i}`}
             source={src}
             style={s.carouselImage}
             resizeMode="cover"
@@ -506,7 +506,7 @@ export default function LugarDetailScreen() {
       <View style={[s.dotsRow, { top: HERO_HEIGHT - 48 }]}>
         {images.map((_, i) => (
           <Pressable
-            key={i}
+            key={`dot-${i}`}
             hitSlop={8}
             onPress={() => {
               setImgIndex(i);

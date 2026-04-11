@@ -164,7 +164,7 @@ export default function ComerBemBairroScreen() {
               .split("\n")
               .map((p, i) =>
                 p.trim() ? (
-                  <Text key={i} style={s.bodyText}>{p.trim()}</Text>
+                  <Text key={`para-${i}`} style={s.bodyText}>{p.trim()}</Text>
                 ) : null,
               )}
 
@@ -172,7 +172,7 @@ export default function ComerBemBairroScreen() {
               <>
                 <Text style={[s.sectionLabel, { marginTop: 24 }]}>Como viver o bairro</Text>
                 {supabaseNeighborhood.how_to_live.map((tip, i) => (
-                  <View key={i} style={s.tipRow}>
+                  <View key={`tip-${i}`} style={s.tipRow}>
                     <View style={s.tipDot} />
                     <Text style={s.tipText}>{tip}</Text>
                   </View>

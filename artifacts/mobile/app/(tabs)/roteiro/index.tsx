@@ -319,18 +319,18 @@ function InlineCalendar({
         </Pressable>
       </View>
       <View style={fp.calWeek}>
-        {DAY_PT.map((d, i) => (
-          <Text key={i} style={fp.calWeekDay}>{d}</Text>
+        {DAY_PT.map((d) => (
+          <Text key={d} style={fp.calWeekDay}>{d}</Text>
         ))}
       </View>
       <View style={fp.calGrid}>
         {days.map((d, i) => {
-          if (!d) return <View key={i} style={fp.calCell} />;
+          if (!d) return <View key={`empty-${i}`} style={fp.calCell} />;
           const selected = value ? isSameDay(d, value) : false;
           const past = isBeforeDay(d, min) && !isSameDay(d, min);
           return (
             <Pressable
-              key={i}
+              key={d.toISOString()}
               style={[fp.calCell, selected && fp.calCellActive, past && fp.calCellPast]}
               onPress={() => !past && onSelect(d)}
               disabled={past}
@@ -743,9 +743,9 @@ function ContextualFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) 
     >
       {/* ── Progress indicators ── */}
       <View style={cf.stepRow}>
-        {STEP_LABELS.map((_, i) => (
+        {STEP_LABELS.map((label, i) => (
           <View
-            key={i}
+            key={label}
             style={[cf.stepDot, i === step && cf.stepDotActive, i < step && cf.stepDotDone]}
           >
             {i < step ? (
@@ -1245,7 +1245,11 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
   const [isConfirming, setIsConfirming] = useState(false);
   const [searchQuery,  setSearchQuery]  = useState("");
 
-  useEffect(() => { fetchSuggestions(); }, [item.id]);
+  useEffect(() => {
+    let cancelled = false;
+    fetchSuggestions(cancelled).then(() => {}).catch(() => {});
+    return () => { cancelled = true; };
+  }, [item.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Cross-category internal DB search — fires at 2+ chars, finds ANY place in the DB
   useEffect(() => {
@@ -1295,7 +1299,7 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
   }, [searchQuery]);
 
 
-  async function fetchSuggestions() {
+  async function fetchSuggestions(cancelled: boolean) {
     setLoading(true);
     try {
       let rows: Suggestion[] = [];
@@ -1345,14 +1349,15 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
         }));
       }
 
+      if (cancelled) return;
       // Exclude the current item; prefer same bairro
       const same  = rows.filter((r) => r.localizacao === item.localizacao && r.id !== item.id);
       const other = rows.filter((r) => r.localizacao !== item.localizacao && r.id !== item.id);
       setSuggestions([...same, ...other]);
     } catch {
-      setSuggestions([]);
+      if (!cancelled) setSuggestions([]);
     } finally {
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     }
   }
 
@@ -1405,7 +1410,9 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
         disabled={isConfirming}
       >
         <View style={rs.sugThumb}>
-          <Image source={sug.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          {sug.image != null && (
+            <Image source={sug.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          )}
           <LinearGradient
             colors={["transparent", "rgba(0,0,0,0.35)"]}
             style={StyleSheet.absoluteFill}
@@ -1833,7 +1840,7 @@ function LoadingPhase() {
       <Text style={sc.loadingSubText}>Selecionando as melhores experiências para você</Text>
       <View style={sc.loadingDots}>
         {dots.map((dot, i) => (
-          <Animated.View key={i} style={[sc.loadingDot, { opacity: dot }]} />
+          <Animated.View key={`dot-${i}`} style={[sc.loadingDot, { opacity: dot }]} />
         ))}
       </View>
     </View>

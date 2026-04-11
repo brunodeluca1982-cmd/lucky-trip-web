@@ -153,7 +153,7 @@ export default function HotelDetailScreen() {
               .split("\n")
               .map((p, i) =>
                 p.trim() ? (
-                  <Text key={i} style={s.bodyText}>{p.trim()}</Text>
+                  <Text key={`para-${i}`} style={s.bodyText}>{p.trim()}</Text>
                 ) : null,
               )}
           </View>
@@ -163,7 +163,7 @@ export default function HotelDetailScreen() {
             <View style={s.section}>
               <Text style={s.sectionLabel}>Como aproveitar</Text>
               {hotel.how_to_enjoy.map((tip, i) => (
-                <View key={i} style={s.tipRow}>
+                <View key={`tip-${i}`} style={s.tipRow}>
                   <View style={s.tipDot} />
                   <Text style={s.tipText}>{tip}</Text>
                 </View>

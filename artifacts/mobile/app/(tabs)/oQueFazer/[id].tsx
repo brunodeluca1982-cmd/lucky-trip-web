@@ -131,7 +131,7 @@ export default function OQueFazerScreen() {
           <Text style={s.listLabel}>Experiências selecionadas</Text>
 
           {descricao.slice(1).map((para, i) => (
-            <Text key={i} style={s.descPara}>{para}</Text>
+            <Text key={`para-${i}`} style={s.descPara}>{para}</Text>
           ))}
 
           {allLugares.map((place, index) => (

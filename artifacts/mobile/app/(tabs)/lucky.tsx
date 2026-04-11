@@ -284,7 +284,7 @@ export default function LuckyScreen() {
 
             {/* ── Message thread ── */}
             {messages.map((msg, i) => (
-              <View key={i} style={styles.messageBlock}>
+              <View key={`msg-${i}`} style={styles.messageBlock}>
                 {msg.role === "user" ? (
                   <View style={styles.userBubbleRow}>
                     <View style={styles.userBubble}>

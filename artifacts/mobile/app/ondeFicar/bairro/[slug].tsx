@@ -162,7 +162,7 @@ export default function BairroDetailScreen() {
                 {[neighborhood.best_for_1, neighborhood.best_for_2, neighborhood.best_for_3]
                   .filter(Boolean)
                   .map((b, i) => (
-                    <View key={i} style={s.tag}>
+                    <View key={`tag-${i}`} style={s.tag}>
                       <Text style={s.tagText}>{b}</Text>
                     </View>
                   ))}
@@ -208,7 +208,7 @@ export default function BairroDetailScreen() {
                 .split("\n")
                 .map((p, i) =>
                   p.trim() ? (
-                    <Text key={i} style={s.bodyText}>{p.trim()}</Text>
+                    <Text key={`para-${i}`} style={s.bodyText}>{p.trim()}</Text>
                   ) : null,
                 )}
 
@@ -216,7 +216,7 @@ export default function BairroDetailScreen() {
                 <>
                   <Text style={[s.sectionLabel, { marginTop: 24 }]}>Como viver o bairro</Text>
                   {neighborhood.how_to_live.map((tip, i) => (
-                    <View key={i} style={s.tipRow}>
+                    <View key={`tip-${i}`} style={s.tipRow}>
                       <View style={s.tipDot} />
                       <Text style={s.tipText}>{tip}</Text>
                     </View>

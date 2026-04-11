@@ -222,8 +222,8 @@ export default function AgoraNoRioScreen() {
                 <Text style={s.maisSectionLabel}>Destaque principal</Text>
               </View>
               <View style={s.destaqueGrid}>
-                {destaques.map((pick, i) => (
-                  <DestaqueCard key={i} pick={pick} />
+                {destaques.map((pick) => (
+                  <DestaqueCard key={pick.titulo} pick={pick} />
                 ))}
               </View>
             </View>
