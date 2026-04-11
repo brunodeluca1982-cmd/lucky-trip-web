@@ -1,7 +1,7 @@
 /**
  * useOQueFazer.ts — Fetches activities from Supabase `o_que_fazer_rio` table.
  * Returns LugarPlace-compatible objects for use in O que fazer screens.
- * Photos: Supabase photo_url first, then Wikipedia image search (background, non-blocking).
+ * Photos: Supabase photo_url only. Falls back to local bundled neighborhood asset.
  */
 
 import { useEffect, useState } from "react";

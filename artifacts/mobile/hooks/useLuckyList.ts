@@ -1,7 +1,7 @@
 /**
  * useLuckyList.ts — Fetches lucky picks from Supabase `lucky_list_rio` table.
  * Returns LugarPlace-compatible objects for use in Lucky List screens.
- * Photos: Supabase photo_url first, then Wikipedia (background, non-blocking).
+ * Photos: Supabase photo_url only. Falls back to local bundled neighborhood asset.
  */
 
 import { useEffect, useState } from "react";
