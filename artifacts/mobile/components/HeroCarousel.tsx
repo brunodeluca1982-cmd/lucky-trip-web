@@ -40,7 +40,9 @@ function HeroSlide({ item }: { item: HeroItem }) {
   // For all other slides, fall back to the item's own static image.
   const { pool, currentIdx } = useBackground();
   const imageSource: ImageSourcePropType =
-    item.cityId === "rio" && pool.length > 0 ? pool[currentIdx] : item.image;
+    item.cityId === "rio" && !item.route && pool.length > 0
+      ? pool[currentIdx]
+      : item.image;
 
   return (
     <Pressable
