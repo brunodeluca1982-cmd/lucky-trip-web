@@ -67,8 +67,19 @@ function getDeploymentDomain() {
     return stripProtocol(process.env.EXPO_PUBLIC_DOMAIN);
   }
 
+  // Netlify provides several URL env vars — use whichever is available
+  const netlifyUrl =
+    process.env.URL ||
+    process.env.DEPLOY_PRIME_URL ||
+    process.env.DEPLOY_URL ||
+    process.env.NETLIFY_URL;
+
+  if (netlifyUrl) {
+    return stripProtocol(netlifyUrl);
+  }
+
   console.error(
-    "ERROR: No deployment domain found. Set REPLIT_INTERNAL_APP_DOMAIN, REPLIT_DEV_DOMAIN, or EXPO_PUBLIC_DOMAIN",
+    "ERROR: No deployment domain found. Set REPLIT_INTERNAL_APP_DOMAIN, REPLIT_DEV_DOMAIN, EXPO_PUBLIC_DOMAIN, or the Netlify URL env var.",
   );
   process.exit(1);
 }
