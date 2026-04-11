@@ -390,21 +390,37 @@ async function fetchComplementaryContent(
   const savedZones = new Set(existingPlaces.map((p) => p.zone));
 
   const perDay = VIBE_PER_DAY[vibe] ?? 4;
-  // Target: (perDay-1) activities + 1 restaurant per day = comfortable density
+  // Target: (perDay-1) activities per day; 3 restaurant slots per day (breakfast/lunch/dinner)
   const targetActs = requestedDays * (perDay - 1);
-  const targetRests = requestedDays;
 
   const currentActs = existingPlaces.filter(
     (p) => p.categoria !== "restaurante",
   ).length;
-  const currentRests = existingPlaces.filter(
-    (p) => p.categoria === "restaurante",
+
+  // Count saved restaurants by subtype so we know exactly what's missing per slot
+  const currentBreakfast = existingPlaces.filter(
+    (p) => p.categoria === "restaurante" && isBreakfastRestaurant(p),
+  ).length;
+  const currentDinner = existingPlaces.filter(
+    (p) =>
+      p.categoria === "restaurante" &&
+      (isBarRestaurant(p) || isDinnerRestaurant(p)),
+  ).length;
+  const currentLunch = existingPlaces.filter(
+    (p) =>
+      p.categoria === "restaurante" &&
+      !isBreakfastRestaurant(p) &&
+      !isBarRestaurant(p) &&
+      !isDinnerRestaurant(p),
   ).length;
 
   const needActs = Math.max(0, targetActs - currentActs);
-  const needRests = Math.max(0, targetRests - currentRests);
+  const needBreakfast = Math.max(0, requestedDays - currentBreakfast);
+  const needDinner = Math.max(0, requestedDays - currentDinner);
+  const needLunch = Math.max(0, requestedDays - currentLunch);
+  const totalRestNeeded = needBreakfast + needDinner + needLunch;
 
-  if (needActs === 0 && needRests === 0) return [];
+  if (needActs === 0 && totalRestNeeded === 0) return [];
 
   const complement: EnrichedPlace[] = [];
 
@@ -526,33 +542,37 @@ async function fetchComplementaryContent(
     }
   }
 
-  // ── 3. Restaurantes — 1 per day (for lunch/dinner anchors) ───────────────
-  // Step C: 3× pool, preco_nivel added to SELECT (enables structured budgetScore
-  // instead of text fallback), ordem_bairro removed (zone proximity replaces it).
-  if (needRests > 0) {
+  // ── 3. Restaurantes — 1 breakfast + 1 lunch + 1 dinner/bar per day ─────────
+  // Fetches a broad pool, classifies into 3 slots, scores + picks independently.
+  // Guarantees noite always has a bar/dinner anchor and manha always has breakfast.
+  if (totalRestNeeded > 0) {
     const { data: restRows } = await supa
       .from("restaurantes")
       .select(
-        "id,nome,bairro,especialidade,perfil_publico,preco_nivel,photo_url,meu_olhar",
+        "id,nome,bairro,especialidade,perfil_publico,preco_nivel,tags_ia,momento_ideal,photo_url,meu_olhar",
       )
       .eq("ativo", true)
-      .limit(Math.min(35, (needRests + 3) * 3));
+      .limit(Math.min(150, totalRestNeeded * 6 + 30));
 
-    const restCandidates: EnrichedPlace[] = [];
+    const breakfastPool: EnrichedPlace[] = [];
+    const dinnerPool: EnrichedPlace[] = [];
+    const lunchPool: EnrichedPlace[] = [];
+
     for (const row of (restRows ?? []) as Record<string, unknown>[]) {
       const id = String(row.id ?? "");
       if (!id || existingIds.has(id)) continue;
 
       const area = (row.bairro as string) || "Rio de Janeiro";
-      restCandidates.push({
+      const dbMomento = (row.momento_ideal as string[] | null) ?? [];
+      const p: EnrichedPlace = {
         id,
         name: (row.nome as string) || area,
         categoria: "restaurante",
         area,
         zone: getZone(area),
-        momento_ideal: ["lunch"],
+        momento_ideal: dbMomento.length > 0 ? dbMomento : ["lunch"],
         energia: "low",
-        tags: [],
+        tags: (row.tags_ia as string[] | null) ?? [],
         vibe_tags: [],
         duracao: "1-2h",
         especialidade: row.especialidade as string | undefined,
@@ -560,21 +580,35 @@ async function fetchComplementaryContent(
         preco_nivel: row.preco_nivel as number | undefined,
         photo_url: (row.photo_url as string | null) ?? null,
         meu_olhar: (row.meu_olhar as string | null) ?? null,
-      });
+      };
+
+      // Classify into exactly one bucket — mutually exclusive
+      if (isBreakfastRestaurant(p)) breakfastPool.push(p);
+      else if (isBarRestaurant(p) || isDinnerRestaurant(p)) dinnerPool.push(p);
+      else lunchPool.push(p);
     }
 
-    const restSelected = restCandidates
-      .map((p) => ({
-        p,
-        score:
-          compositePreferenceScore(p, preferences) +
-          zoneProximityScore(p, savedZones),
-      }))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, needRests)
-      .map(({ p }) => p);
+    const scoreAndPick = (pool: EnrichedPlace[], n: number): EnrichedPlace[] =>
+      pool
+        .map((p) => ({
+          p,
+          score:
+            compositePreferenceScore(p, preferences) +
+            zoneProximityScore(p, savedZones),
+        }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, n)
+        .map(({ p }) => p);
 
-    for (const p of restSelected) {
+    for (const p of scoreAndPick(breakfastPool, needBreakfast)) {
+      complement.push(p);
+      existingIds.add(p.id);
+    }
+    for (const p of scoreAndPick(dinnerPool, needDinner)) {
+      complement.push(p);
+      existingIds.add(p.id);
+    }
+    for (const p of scoreAndPick(lunchPool, needLunch)) {
       complement.push(p);
       existingIds.add(p.id);
     }
@@ -1054,6 +1088,50 @@ function sortByProximity(
   }
 
   return result;
+}
+
+// ── Flow sort: human-concierge ordering within each period ────────────────────
+//
+// Runs BEFORE proximity sort. Anchors the most time-critical item first,
+// then sorts the rest by energia/type so proximity sort has a correct starting
+// node. Gemini step 6 can still reorder within the result.
+//
+// manha:  breakfast restaurant → high-energia activities → medium → low
+// almoco: lunch restaurant → other activities
+// tarde:  handled by sortByProximity (sunset-last rule already applied)
+// noite:  dinner restaurant → bars → other nightlife
+function sortByDayFlow(
+  items: EnrichedPlace[],
+  periodo: PeriodoDia,
+): EnrichedPlace[] {
+  if (items.length <= 1) return items;
+
+  function flowPriority(p: EnrichedPlace): number {
+    if (periodo === "manha") {
+      if (p.categoria === "restaurante" && isBreakfastRestaurant(p)) return 0;
+      if (p.energia === "high") return 1;
+      if (p.energia === "medium") return 2;
+      return 3;
+    }
+    if (periodo === "almoco") {
+      if (p.categoria === "restaurante") return 0;
+      return 1;
+    }
+    if (periodo === "noite") {
+      if (p.categoria === "restaurante" && !isBarRestaurant(p)) return 0;
+      if (p.categoria === "restaurante" && isBarRestaurant(p)) return 1;
+      return 2;
+    }
+    return 0; // tarde: no change — sortByProximity + sunset-last handles it
+  }
+
+  return [...items].sort((a, b) => {
+    const fa = flowPriority(a);
+    const fb = flowPriority(b);
+    if (fa !== fb) return fa - fb;
+    // Within the same flow group, use zone proximity as tiebreaker
+    return a.zone - b.zone;
+  });
 }
 
 // Chunk a sorted array into `n` groups (sequential slices)
@@ -1577,13 +1655,16 @@ function buildFullDraft(
       periodMap.set("noite", noiteItems.slice(0, noiteCap));
     }
 
-    // ── 5d. Within-period proximity sequencing ────────────────────────────────
-    // Sort items inside each period by travel proximity (greedy nearest-neighbor).
-    // This ensures the itinerary flows geographically within the day:
-    //   e.g. morning: Parque Lage → Cosme Velho (Cristo) → Jardim Botânico
-    //   not: Cristo → Jardim Botânico → Cristo area again
+    // ── 5d. Within-period flow + proximity sequencing ────────────────────────
+    // First: flow sort anchors the time-critical item (breakfast, dinner, sunset)
+    // at the correct position within the period. Then: proximity sort minimizes
+    // travel starting from that anchor.
     for (const [periodo, items] of periodMap.entries()) {
-      periodMap.set(periodo, sortByProximity(items, periodo));
+      const flowed =
+        periodo === "tarde"
+          ? items // tarde: sortByProximity handles sunset-last; skip flow pre-sort
+          : sortByDayFlow(items, periodo);
+      periodMap.set(periodo, sortByProximity(flowed, periodo));
     }
 
     // ── 5e. Build ordered periodos ────────────────────────────────────────────
@@ -1593,12 +1674,9 @@ function buildFullDraft(
       periodo: p,
       items: periodMap.get(p)!.map((a) => {
         // Step F — photo resolution:
-        // 1st priority: Supabase photo_url (authoritative, editorial-approved)
-        // 2nd priority: Unsplash web fallback using place name + location
-        // Never null in the output — the mobile app uses this for the card image.
-        const finalPhoto: string | null = a.photo_url
-          ? a.photo_url
-          : `https://source.unsplash.com/featured/600x400/?${encodeURIComponent(a.name + " " + a.area + " brazil")}`;
+        // Only Supabase photo_url is used. No external fallback.
+        // Null is a valid output — the mobile app handles missing images locally.
+        const finalPhoto: string | null = a.photo_url ?? null;
 
         return {
           id: a.id,
@@ -1607,7 +1685,7 @@ function buildFullDraft(
           localizacao: a.area,
           source_table: categoriaToTable(a.categoria),
           // Step F — additive enrichment fields
-          image: { uri: finalPhoto },
+          image: finalPhoto ? { uri: finalPhoto } : undefined,
           photo_url: finalPhoto,
           descricao: a.meu_olhar ?? null,
           duracao: a.duracao,
@@ -1759,26 +1837,54 @@ function validateAndFix(
     }
   }
 
+  // Guard: also catch same-ID items that appear more than once across days
+  // (e.g. if Gemini duplicated an item). Strip all but first occurrence.
+  const globalSeenIds = new Set<string>();
+  for (const day of days) {
+    for (const p of day.periodos) {
+      p.items = p.items.filter((it) => {
+        if (globalSeenIds.has(it.id)) return false;
+        globalSeenIds.add(it.id);
+        return true;
+      });
+    }
+  }
+  // Rebuild usedIds from the deduplicated day set
+  usedIds.clear();
+  for (const day of days) {
+    for (const p of day.periodos) {
+      for (const it of p.items) usedIds.add(it.id);
+    }
+  }
+
   const lost = allPlaces.filter((p) => !usedIds.has(p.id));
   if (lost.length > 0 && days.length > 0) {
     const lastDay = days[days.length - 1];
     const tarde = lastDay.periodos.find((p) => p.periodo === "tarde");
-    const lostItems = lost.map((l) => ({
-      id: l.id,
-      titulo: l.name,
-      categoria: l.categoria,
-      localizacao: l.area,
-      source_table: categoriaToTable(l.categoria),
-      // Step F — additive enrichment fields (same pattern as buildFullDraft)
-      image: l.photo_url ? { uri: l.photo_url } : undefined,
-      photo_url: l.photo_url ?? null,
-      descricao: l.meu_olhar ?? null,
-      duracao: l.duracao,
-    }));
-    if (tarde) {
-      tarde.items.push(...lostItems);
-    } else {
-      lastDay.periodos.push({ periodo: "tarde", items: lostItems });
+    // Only attach items not already present anywhere (belt-and-suspenders)
+    const lostItems = lost
+      .filter((l) => !usedIds.has(l.id))
+      .map((l) => {
+        usedIds.add(l.id);
+        return {
+          id: l.id,
+          titulo: l.name,
+          categoria: l.categoria,
+          localizacao: l.area,
+          source_table: categoriaToTable(l.categoria),
+          // Step F — Supabase photo_url only; no external fallback
+          image: l.photo_url ? { uri: l.photo_url } : undefined,
+          photo_url: l.photo_url ?? null,
+          descricao: l.meu_olhar ?? null,
+          duracao: l.duracao,
+        };
+      });
+    if (lostItems.length > 0) {
+      if (tarde) {
+        tarde.items.push(...lostItems);
+      } else {
+        lastDay.periodos.push({ periodo: "tarde", items: lostItems });
+      }
     }
   }
 
@@ -2149,7 +2255,15 @@ serve(async (req) => {
     );
 
     // Merge: saved items always come first (preserved position in clustering)
-    let places = [...savedPlaces, ...complementaryPlaces];
+    // Dedup: remove any place that appears more than once (by ID).
+    // Saved items win over complementary — the filter preserves first occurrence.
+    const _mergedRaw = [...savedPlaces, ...complementaryPlaces];
+    const _seenMerge = new Set<string>();
+    let places = _mergedRaw.filter((p) => {
+      if (_seenMerge.has(p.id)) return false;
+      _seenMerge.add(p.id);
+      return true;
+    });
 
     // Attach neighborhood metadata to the full pool (saved + complementary)
     places = await attachNeighborhoodMeta(places, supa);
