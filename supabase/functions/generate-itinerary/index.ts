@@ -306,6 +306,7 @@ async function enrichPlaces(
         duracao = (row.duracao_media as string) ?? "1-2h";
         photo_url = (row.photo_url as string | null) ?? null;
         meu_olhar = (row.meu_olhar as string | null) ?? null;
+        console.log("PHOTO IN PIPELINE [oQueFazer]:", photo_url);
       }
     } else if (s.categoria === "lucky") {
       // Look up in lucky_list_rio — confirmed columns: id,nome,bairro,tipo,tags_ia,momento_ideal,photo_url,meu_olhar
@@ -319,6 +320,7 @@ async function enrichPlaces(
         energia = "medium";
         photo_url = (row.photo_url as string | null) ?? null;
         meu_olhar = (row.meu_olhar as string | null) ?? null;
+        console.log("PHOTO IN PIPELINE [lucky]:", photo_url);
       }
     } else if (s.categoria === "restaurante") {
       const row = restMap.get(Number(s.id));
@@ -329,6 +331,7 @@ async function enrichPlaces(
         perfil = row.perfil_publico as string | undefined;
         photo_url = (row.photo_url as string | null) ?? null;
         meu_olhar = (row.meu_olhar as string | null) ?? null;
+        console.log("PHOTO IN PIPELINE [restaurante]:", photo_url);
         // Use DB momento_ideal if present; fall back to ["lunch"] so existing
         // behavior is preserved for restaurants that have no momento_ideal set.
         const dbMomento = (row.momento_ideal as string[] | null) ?? [];
@@ -2378,6 +2381,27 @@ function validateAndFix(
           }
           // Step 4 — fallback: first item's bairro (allFinalItems is in canonical order)
           day.bairro = winner || allFinalItems[0].localizacao || day.bairro;
+        }
+      }
+    }
+  }
+
+  // ── Step 7c: Re-hydrate enrichment fields from Supabase registry ─────────────
+  // Gemini may omit photo_url, image, and descricao from its refined output —
+  // it only needs to reorder items, so non-identity fields are often stripped.
+  // This pass unconditionally restores them from the authoritative allPlaces
+  // registry before the response is serialized. photo_url is never null when
+  // the Supabase row has a value; descricao is only overwritten when absent.
+  for (const day of days) {
+    for (const periodo of day.periodos) {
+      for (const item of periodo.items) {
+        const place = placeById.get(item.id);
+        if (place) {
+          item.photo_url = place.photo_url ?? null;
+          item.image = place.photo_url ? { uri: place.photo_url } : undefined;
+          item.descricao = item.descricao ?? place.meu_olhar ?? null;
+          item.duracao = item.duracao ?? place.duracao;
+          console.log("PHOTO IN PIPELINE:", item.photo_url);
         }
       }
     }
