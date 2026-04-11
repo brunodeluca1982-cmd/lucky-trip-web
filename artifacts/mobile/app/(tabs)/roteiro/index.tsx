@@ -319,8 +319,8 @@ function InlineCalendar({
         </Pressable>
       </View>
       <View style={fp.calWeek}>
-        {DAY_PT.map((d) => (
-          <Text key={d} style={fp.calWeekDay}>{d}</Text>
+        {DAY_PT.map((d, index) => (
+          <Text key={`${d}_${index}`} style={fp.calWeekDay}>{d}</Text>
         ))}
       </View>
       <View style={fp.calGrid}>
@@ -1406,7 +1406,7 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
   function renderSugCard(sug: Suggestion) {
     return (
       <Pressable
-        key={sug.id}
+        key={`${sug.source_table ?? sug.categoria}_${sug.id}`}
         style={({ pressed }) => [rs.sugCard, (pressed || isConfirming) && { opacity: 0.75 }]}
         onPress={() => confirmReplace(sug)}
         disabled={isConfirming}
@@ -2223,7 +2223,7 @@ function ResultDayCard({
                 const travelKm  = (1.8 + (dia.numero + idx) * 1.3).toFixed(1);
 
                 return (
-                  <React.Fragment key={item.id}>
+                  <React.Fragment key={`${item.source_table ?? item.categoria}_${item.id}`}>
                     <Pressable
                       style={({ pressed }) => [re.itemRow, pressed && { opacity: 0.80 }]}
                       onPress={() => {

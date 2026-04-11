@@ -378,7 +378,7 @@ function SavedSection({
         decelerationRate="fast"
       >
         {saved.map((item) => (
-          <SavedCard key={item.id} item={item} onRemove={onRemove} />
+          <SavedCard key={`${item.source_table ?? item.categoria}_${item.id}`} item={item} onRemove={onRemove} />
         ))}
       </ScrollView>
     </View>
@@ -499,7 +499,7 @@ function PeriodoBlock({ periodo, items }: DiaPeriodo) {
         <Text style={rot.periodoLabel}>{label}</Text>
       </View>
       {items.map((item) => (
-        <View key={item.id} style={rot.itemRow}>
+        <View key={`${item.source_table ?? item.categoria}_${item.id}`} style={rot.itemRow}>
           <View style={rot.itemDot} />
           <Text style={rot.itemNome} numberOfLines={1}>{item.titulo}</Text>
         </View>
@@ -534,7 +534,7 @@ function RoteiroSection({ dias }: { dias: DiaRoteiro[] }) {
         </View>
       </View>
       {dias.map((dia) => (
-        <DiaCard key={dia.bairro} dia={dia} />
+        <DiaCard key={`dia-${dia.numero}`} dia={dia} />
       ))}
     </View>
   );
