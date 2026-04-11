@@ -427,25 +427,42 @@ async function fetchComplementaryContent(
 
   const complement: EnrichedPlace[] = [];
 
-  // ── 1. Lucky List Rio — highest editorial priority ────────────────────────
-  // Step C: fetch 3× broader pool, build all candidates, score each by
-  // (compositePreferenceScore + zoneProximityScore), sort desc, slice top N.
-  // The score is a transient local value — never stored on EnrichedPlace.
-  // zoneProximityScore is a SOFT signal: -2 penalty never hard-excludes anything.
-  // A high-preference item in zone 5 or 6 can still win (no hard filtering).
+  // ── 1 + 2. Lucky List Rio + O que fazer Rio — fetched in parallel ─────────
+  //
+  // CRITICAL: Both tables must ALWAYS be queried together and merged into a
+  // single candidate pool before scoring. The previous sequential design
+  // (lucky fills needActs → if still needed, fetch o_que_fazer) caused one
+  // table to completely starve the other: when lucky_list_rio had enough items
+  // it consumed all needActs slots and o_que_fazer_rio was never fetched; when
+  // lucky had zero non-restaurant items it contributed nothing.
+  //
+  // Fix: fetch both in parallel unconditionally, merge candidates, score the
+  // combined pool, take top needActs. Both tables always reach the scoring stage.
   if (needActs > 0) {
-    const { data: luckyRows } = await supa
-      .from("lucky_list_rio")
-      .select("id,nome,bairro,tipo,tags_ia,momento_ideal,photo_url,meu_olhar")
-      .limit(Math.min(60, (needActs + 5) * 3));
+    const fetchLimit = Math.min(80, needActs * 3 + 15);
 
-    const luckyCandidates: EnrichedPlace[] = [];
-    for (const row of (luckyRows ?? []) as Record<string, unknown>[]) {
+    const [luckyResult, oqResult] = await Promise.all([
+      supa
+        .from("lucky_list_rio")
+        .select("id,nome,bairro,tipo,tags_ia,momento_ideal,photo_url,meu_olhar")
+        .limit(fetchLimit),
+      supa
+        .from("o_que_fazer_rio")
+        .select(
+          "id,nome,bairro,tags_ia,momento_ideal,vibe,energia,duracao_media,photo_url,meu_olhar",
+        )
+        .limit(fetchLimit),
+    ]);
+
+    const actCandidates: EnrichedPlace[] = [];
+
+    // Build lucky candidates
+    for (const row of (luckyResult.data ?? []) as Record<string, unknown>[]) {
       const id = String(row.id ?? "");
       if (!id || existingIds.has(id)) continue;
 
       const tipo = ((row.tipo as string) ?? "").toLowerCase();
-      // Skip lucky items that are restaurants (handled separately)
+      // Skip lucky items that are food/drink venues (handled in restaurant block)
       if (
         tipo.includes("restaurante") ||
         tipo.includes("bar") ||
@@ -457,7 +474,7 @@ async function fetchComplementaryContent(
       const tags = (row.tags_ia as string[]) ?? [];
       const momento = (row.momento_ideal as string[]) ?? [];
 
-      luckyCandidates.push({
+      actCandidates.push({
         id,
         name: (row.nome as string) || area,
         categoria: "lucky",
@@ -473,46 +490,13 @@ async function fetchComplementaryContent(
       });
     }
 
-    // Score all candidates, sort descending, take top needActs.
-    // Soft ranking: nothing is removed — only ordered by relevance.
-    const luckySelected = luckyCandidates
-      .map((p) => ({
-        p,
-        score:
-          compositePreferenceScore(p, preferences) +
-          zoneProximityScore(p, savedZones),
-      }))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, needActs)
-      .map(({ p }) => p);
-
-    for (const p of luckySelected) {
-      complement.push(p);
-      existingIds.add(p.id);
-    }
-  }
-
-  // ── 2. O que fazer Rio — core anchors & broader activities ───────────────
-  // Step C: same 3× pool pattern as the lucky block above.
-  const stillNeedActs = Math.max(
-    0,
-    needActs - complement.filter((p) => p.categoria !== "restaurante").length,
-  );
-  if (stillNeedActs > 0) {
-    const { data: oqRows } = await supa
-      .from("o_que_fazer_rio")
-      .select(
-        "id,nome,bairro,tags_ia,momento_ideal,vibe,energia,duracao_media,photo_url,meu_olhar",
-      )
-      .limit(Math.min(75, (stillNeedActs + 8) * 3));
-
-    const oqCandidates: EnrichedPlace[] = [];
-    for (const row of (oqRows ?? []) as Record<string, unknown>[]) {
+    // Build o_que_fazer candidates
+    for (const row of (oqResult.data ?? []) as Record<string, unknown>[]) {
       const id = String(row.id ?? "");
       if (!id || existingIds.has(id)) continue;
 
       const area = (row.bairro as string) || "Rio de Janeiro";
-      oqCandidates.push({
+      actCandidates.push({
         id,
         name: (row.nome as string) || area,
         categoria: "oQueFazer",
@@ -528,18 +512,23 @@ async function fetchComplementaryContent(
       });
     }
 
-    const oqSelected = oqCandidates
+    // Score the merged pool, sort descending, take top needActs.
+    // Lucky items receive an editorial priority boost (+1) so they appear
+    // slightly more often than equivalent-scored oQueFazer items — maintaining
+    // the original "lucky first" intent without starving o_que_fazer_rio.
+    const actSelected = actCandidates
       .map((p) => ({
         p,
         score:
           compositePreferenceScore(p, preferences) +
-          zoneProximityScore(p, savedZones),
+          zoneProximityScore(p, savedZones) +
+          (p.categoria === "lucky" ? 1 : 0),
       }))
       .sort((a, b) => b.score - a.score)
-      .slice(0, stillNeedActs)
+      .slice(0, needActs)
       .map(({ p }) => p);
 
-    for (const p of oqSelected) {
+    for (const p of actSelected) {
       complement.push(p);
       existingIds.add(p.id);
     }
