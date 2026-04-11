@@ -2083,6 +2083,42 @@ async function refineWithGemini(
       }
     }
 
+    // ── Re-hydrate fields Gemini strips during response formatting ────────────
+    // Gemini only reorders items; it does NOT preserve non-identity fields
+    // (source_table, photo_url, image, descricao, duracao).
+    // Build a lookup from the ORIGINAL draft so every field is restored before
+    // the response leaves this function. Without source_table, the composite
+    // key lookup in validateAndFix Step 7c resolves to "undefined_<id>" and
+    // the photo_url re-hydration silently fails.
+    const origItemByKey = new Map<string, ItemRoteiro>();
+    for (const day of draft) {
+      for (const p of day.periodos) {
+        for (const it of p.items) {
+          origItemByKey.set(`${it.source_table}_${it.id}`, it);
+          // also index by bare id as a fallback when source_table was stripped
+          if (!origItemByKey.has(it.id)) origItemByKey.set(it.id, it);
+        }
+      }
+    }
+
+    for (const day of parsed) {
+      for (const p of day.periodos ?? []) {
+        for (const item of p.items ?? []) {
+          const orig =
+            origItemByKey.get(`${item.source_table}_${item.id}`) ??
+            origItemByKey.get(item.id);
+          if (orig) {
+            item.source_table = orig.source_table;
+            item.photo_url = orig.photo_url ?? null;
+            item.image = orig.image;
+            item.descricao = item.descricao ?? orig.descricao ?? null;
+            item.duracao = item.duracao ?? orig.duracao;
+          }
+          console.log("PHOTO AFTER REHYDRATION:", item.photo_url);
+        }
+      }
+    }
+
     return parsed as DiaRoteiro[];
   } catch (_) {
     return draft;
