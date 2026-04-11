@@ -50,7 +50,6 @@ import {
 import { PERIODO_LABEL, PERIODO_ICON } from "@/utils/buildRoteiro";
 import type { DiaRoteiro } from "@/utils/buildRoteiro";
 import { useInspirationPhotos, type InspirationPhotoMap } from "@/hooks/useInspirationPhotos";
-import { useHeroPool } from "@/hooks/useHeroPool";
 
 const C          = Colors.light;
 const GOLD       = "#D4AF37";
@@ -2818,7 +2817,6 @@ export default function RoteiroScreen() {
   const params      = useLocalSearchParams<{ contextual?: string }>();
   const isContextual = params.contextual === "1";
 
-  const heroPool    = useHeroPool();
   const { saved, user } = useGuia();
 
   const [result,            setResult]            = useState<ItineraryResult | null>(null);
@@ -3245,10 +3243,7 @@ export default function RoteiroScreen() {
 
       {/* ── Cinematic background — rotating pool, hotel image pinned as first if saved ── */}
       <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}>
-        <RotatingBackground
-          pool={heroPool}
-          firstSource={hotelItem?.image ?? null}
-        />
+        <RotatingBackground />
         <LinearGradient
           colors={["rgba(0,0,0,0.05)", "rgba(0,0,0,0.28)", "rgba(0,0,0,0.60)"]}
           locations={[0, 0.35, 1]}

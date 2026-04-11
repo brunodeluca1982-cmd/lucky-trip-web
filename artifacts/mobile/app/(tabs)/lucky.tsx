@@ -20,7 +20,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "@/lib/supabase";
 import Colors from "@/constants/colors";
 import { getDeviceId } from "@/utils/deviceId";
-import { useHeroPool } from "@/hooks/useHeroPool";
 
 const C    = Colors.light;
 const GOLD = "#D4AF37";
@@ -51,8 +50,6 @@ export default function LuckyScreen() {
   const insets    = useSafeAreaInsets();
   const topPad    = Platform.OS === "web" ? 67 : insets.top + 16;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
-  const heroPool  = useHeroPool();
-
   const scrollRef = useRef<ScrollView>(null);
 
   const [messages,         setMessages]         = useState<Message[]>([]);
@@ -220,7 +217,7 @@ export default function LuckyScreen() {
 
   return (
     <View style={styles.bg}>
-      <RotatingBackground pool={heroPool} />
+      <RotatingBackground />
       <View style={styles.overlay}>
         <KeyboardAvoidingView
           style={{ flex: 1 }}

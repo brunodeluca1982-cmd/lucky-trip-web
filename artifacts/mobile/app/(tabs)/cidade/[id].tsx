@@ -18,6 +18,7 @@ import Colors from "@/constants/colors";
 import { HorizontalScroll } from "@/components/HorizontalScroll";
 import { PlaceCard } from "@/components/PlaceCard";
 import { SectionHeader } from "@/components/SectionHeader";
+import { RotatingBackground } from "@/components/RotatingBackground";
 import {
   destinos,
   detectPeriodo,
@@ -198,8 +199,14 @@ export default function CidadeScreen() {
     <View style={s.root}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* ── Fullscreen background image — fixed behind everything ── */}
-      <Image source={destino.image} style={s.bgImage} resizeMode="cover" />
+      {/* ── Fullscreen background — Rio: global rotating pool; others: static image ── */}
+      {isRio ? (
+        <View style={s.bgImage} pointerEvents="none">
+          <RotatingBackground />
+        </View>
+      ) : (
+        <Image source={destino.image} style={s.bgImage} resizeMode="cover" />
+      )}
 
       {/* ── Cinematic gradient overlay — full screen, fixed ──
           Designed in three zones:

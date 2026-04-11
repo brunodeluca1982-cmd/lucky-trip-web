@@ -17,7 +17,6 @@ import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useDestinos } from "@/hooks/useDestinos";
 import { RotatingBackground } from "@/components/RotatingBackground";
-import { useHeroPool } from "@/hooks/useHeroPool";
 import { supabase } from "@/lib/supabase";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -121,7 +120,6 @@ export default function DestinosScreen() {
   const topPad = Platform.OS === "web" ? 67 : insets.top + 12;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
-  const heroPool = useHeroPool();
   const { destinos, loading } = useDestinos();
   const [query, setQuery] = React.useState("");
 
@@ -166,7 +164,7 @@ export default function DestinosScreen() {
     <View style={s.root}>
       {/* Full-screen atmospheric background */}
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        <RotatingBackground pool={heroPool} />
+        <RotatingBackground />
         <LinearGradient
           colors={["rgba(0,0,0,0.74)", "rgba(0,0,0,0.66)", "rgba(0,0,0,0.86)"]}
           locations={[0, 0.5, 1]}

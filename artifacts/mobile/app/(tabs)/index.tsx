@@ -12,7 +12,6 @@ import {
   Text,
   View,
 } from "react-native";
-import { notifyHeroReady } from "@/lib/splashGate";
 import { RotatingBackground } from "@/components/RotatingBackground";
 
 import { LinearGradient } from "expo-linear-gradient";
@@ -33,7 +32,6 @@ import { useLuckyList } from "@/hooks/useLuckyList";
 import { useOQueFazer } from "@/hooks/useOQueFazer";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import { useFriends, type FriendCard } from "@/hooks/useFriends";
-import { useHeroPool } from "@/hooks/useHeroPool";
 
 // ── Context-aware "O que fazer agora" title ───────────────────────────────────
 // Prepositions for known destinations (Portuguese grammar)
@@ -199,7 +197,6 @@ function getCurrentMomento(): MomentoTab {
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
-  const heroPool = useHeroPool();
   const { viagem } = useGuia();
   const agoraTitle = getAgoraTitle(viagem.destino || undefined);
   const { lugares: atividades, loading: loadingAtividades } = useOQueFazer();
@@ -222,7 +219,6 @@ export default function HomeScreen() {
   const overlayAnim = useRef(new Animated.Value(0)).current;
 
   function handleHeroDisplay() {
-    notifyHeroReady();                         // release the splash gate
     Animated.timing(overlayAnim, {
       toValue: 1,
       duration: 500,
@@ -235,7 +231,6 @@ export default function HomeScreen() {
       {/* ── Rotating background — editorial Rio pool ── */}
       <View style={[s.bgImage, { backgroundColor: "#1A0E04" }]} pointerEvents="none">
         <RotatingBackground
-          pool={heroPool}
           onFirstImageDisplay={handleHeroDisplay}
         />
       </View>

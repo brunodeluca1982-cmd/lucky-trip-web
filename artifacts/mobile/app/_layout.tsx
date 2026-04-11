@@ -17,12 +17,13 @@ import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
 import React, { useEffect } from "react";
 import { Platform, StyleSheet, View } from "react-native";
-import { notifyFontsReady } from "@/lib/splashGate";
+import { notifyFontsReady, notifyHeroReady } from "@/lib/splashGate";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { BackgroundProvider } from "@/context/BackgroundContext";
 import { GuiaProvider } from "@/context/GuiaContext";
 import { SplashOverlay } from "@/components/SplashOverlay";
 
@@ -127,17 +128,19 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider style={{ backgroundColor: ROOT_BG }}>
       <ErrorBoundary>
-        <GuiaProvider>
-          <QueryClientProvider client={queryClient}>
-            <GestureHandlerRootView style={{ flex: 1, backgroundColor: ROOT_BG }}>
-              <KeyboardProvider>
-                <RootLayoutNav />
-              </KeyboardProvider>
-              {/* Branded session splash — covers everything on first launch only */}
-              <SplashOverlay />
-            </GestureHandlerRootView>
-          </QueryClientProvider>
-        </GuiaProvider>
+        <BackgroundProvider onFirstImage={notifyHeroReady}>
+          <GuiaProvider>
+            <QueryClientProvider client={queryClient}>
+              <GestureHandlerRootView style={{ flex: 1, backgroundColor: ROOT_BG }}>
+                <KeyboardProvider>
+                  <RootLayoutNav />
+                </KeyboardProvider>
+                {/* Branded session splash — covers everything on first launch only */}
+                <SplashOverlay />
+              </GestureHandlerRootView>
+            </QueryClientProvider>
+          </GuiaProvider>
+        </BackgroundProvider>
       </ErrorBoundary>
     </SafeAreaProvider>
   );

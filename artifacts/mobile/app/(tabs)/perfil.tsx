@@ -36,7 +36,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useAuth } from "@/hooks/useAuth";
 import { useGuia } from "@/context/GuiaContext";
-import { useHeroPool } from "@/hooks/useHeroPool";
+import { useBackground } from "@/context/BackgroundContext";
 import type { User } from "@supabase/supabase-js";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -784,40 +784,17 @@ function EmailSentState({
 }
 
 // ── PROFILE HERO BACKGROUND ───────────────────────────────────────────────────
-
-const PROFILE_HERO_INTERVAL = 10_000;
+// Reads from the global BackgroundContext — same pool, same index, same timer
+// as every other screen. Navigation to/from Perfil never resets the rotation.
 
 function ProfileHeroBg() {
-  const pool        = useHeroPool();
-  const [currentIdx, setCurrentIdx] = useState(0);
-  const [nextIdx,    setNextIdx]    = useState(1);
-  const nextOpacity = useRef(new Animated.Value(0)).current;
-  const timerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { pool, currentIdx, nextIdx, nextOpacity } = useBackground();
 
-  useEffect(() => {
-    timerRef.current = setInterval(() => {
-      Animated.timing(nextOpacity, {
-        toValue: 1,
-        duration: 1800,
-        useNativeDriver: true,
-      }).start(({ finished }) => {
-        if (!finished) return;
-        setCurrentIdx((c) => {
-          setNextIdx((c + 2) % pool.length);
-          return (c + 1) % pool.length;
-        });
-        nextOpacity.setValue(0);
-      });
-    }, PROFILE_HERO_INTERVAL);
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!pool.length) return null;
 
   return (
     <>
-      <Image
+      <Animated.Image
         source={pool[currentIdx]}
         style={StyleSheet.absoluteFill}
         resizeMode="cover"
