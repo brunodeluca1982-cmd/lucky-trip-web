@@ -16,75 +16,76 @@
  *  Step 7 — Validate: re-attach any places dropped during refinement.
  */
 
-import { serve }        from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin":  "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type SavedCategory = "oQueFazer" | "restaurante" | "hotel" | "lucky";
-type PeriodoDia    = "manha" | "almoco" | "tarde" | "noite";
+type PeriodoDia = "manha" | "almoco" | "tarde" | "noite";
 
 interface SavedItemInput {
-  id:           string;
-  titulo:       string;
-  categoria:    SavedCategory;
+  id: string;
+  titulo: string;
+  categoria: SavedCategory;
   localizacao?: string;
 }
 
 interface Preferences {
   inspirations: string[];
-  vibe:         string | null;   // pace: tranquilo / moderado / intenso
-  travelVibe?:  string | null;   // companion: solo / casal / amigos / família
-  budget?:      string | null;   // essencial / conforto / sofisticado
+  vibe: string | null; // pace: tranquilo / moderado / intenso
+  travelVibe?: string | null; // companion: solo / casal / amigos / família
+  budget?: string | null; // essencial / conforto / sofisticado
 }
 
 interface RequestBody {
-  savedItems:     SavedItemInput[];
-  destination?:   string;
-  preferences?:   Preferences;
+  savedItems: SavedItemInput[];
+  destination?: string;
+  preferences?: Preferences;
   requestedDays?: number;
-  arrivalDate?:   string;        // ISO date string "YYYY-MM-DD"
-  departureDate?: string;        // ISO date string "YYYY-MM-DD"
+  arrivalDate?: string; // ISO date string "YYYY-MM-DD"
+  departureDate?: string; // ISO date string "YYYY-MM-DD"
 }
 
 /** Fully enriched place — unified source of truth for all 5 deterministic steps */
 interface EnrichedPlace {
   // ── Identity
-  id:            string;
-  name:          string;
-  categoria:     SavedCategory;
+  id: string;
+  name: string;
+  categoria: SavedCategory;
   // ── Location
-  area:          string;          // bairro name
-  zone:          number;          // 1-6, South → North
+  area: string; // bairro name
+  zone: number; // 1-6, South → North
   // ── Time metadata (from DB)
-  momento_ideal: string[];        // ["morning","afternoon","sunset"]
-  energia:       string;          // "low" | "medium" | "high"
+  momento_ideal: string[]; // ["morning","afternoon","sunset"]
+  energia: string; // "low" | "medium" | "high"
   // ── Content metadata (from DB)
-  tags:          string[];        // tags_ia from o_que_fazer_rio
-  vibe_tags:     string[];        // vibe from o_que_fazer_rio
-  duracao:       string;          // "1-2h" | "2-4h" etc.
-  especialidade?: string;         // restaurant specialty
-  perfil_publico?: string;        // restaurant audience
-  preco_nivel?: number;           // 1-5 price level (from DB)
-  perfil_ideal?: string[];        // target audience tags (from DB)
+  tags: string[]; // tags_ia from o_que_fazer_rio
+  vibe_tags: string[]; // vibe from o_que_fazer_rio
+  duracao: string; // "1-2h" | "2-4h" etc.
+  especialidade?: string; // restaurant specialty
+  perfil_publico?: string; // restaurant audience
+  preco_nivel?: number; // 1-5 price level (from DB)
+  perfil_ideal?: string[]; // target audience tags (from DB)
   // ── Output enrichment fields (Step F — additive only, never affect engine logic)
-  photo_url?: string | null;      // Supabase photo_url — passed through to ItemRoteiro.image
-  meu_olhar?: string | null;      // Lucky Trip editorial note — passed through to ItemRoteiro.descricao
+  photo_url?: string | null; // Supabase photo_url — passed through to ItemRoteiro.image
+  meu_olhar?: string | null; // Lucky Trip editorial note — passed through to ItemRoteiro.descricao
   // ── Computed in Step 3
   best_periodo?: PeriodoDia;
   // ── Neighborhood metadata (attached in Step 2)
   neighborhood?: {
-    walkable:           string;
-    better_for:         string;
-    best_for_1:         string;
-    safety_solo_woman:  string;
+    walkable: string;
+    better_for: string;
+    best_for_1: string;
+    safety_solo_woman: string;
   };
   // ── Computed in Step 3b, consumed by Step 4 only (internal, never serialized)
   // Stamped by scoreAndSortPool; read by sortBucket for intra-zone ordering.
@@ -94,35 +95,35 @@ interface EnrichedPlace {
 
 /** Output types — must stay compatible with the existing DiaRoteiro UI shape */
 interface ItemRoteiro {
-  id:           string;
-  titulo:       string;
-  categoria:    SavedCategory;
-  localizacao:  string;
+  id: string;
+  titulo: string;
+  categoria: SavedCategory;
+  localizacao: string;
   source_table: string;
-  image?:       unknown;
+  image?: unknown;
   // Step F — additive enrichment fields (optional, backward compatible)
-  photo_url?:   string | null;   // Supabase photo_url; null if not available
-  descricao?:   string | null;   // meu_olhar editorial note; null if not available
-  duracao?:     string;          // average visit duration e.g. "1-2h"
+  photo_url?: string | null; // Supabase photo_url; null if not available
+  descricao?: string | null; // meu_olhar editorial note; null if not available
+  duracao?: string; // average visit duration e.g. "1-2h"
 }
 
 interface DiaPeriodo {
   periodo: PeriodoDia;
-  items:   ItemRoteiro[];
+  items: ItemRoteiro[];
 }
 
 interface DiaRoteiro {
-  numero:   number;
-  bairro:   string;
+  numero: number;
+  bairro: string;
   periodos: DiaPeriodo[];
 }
 
 interface ItineraryResult {
   destination: string;
-  source:      string;
+  source: string;
   preferences: Preferences;
-  summary:     { totalDays: number; totalItems: number };
-  days:        DiaRoteiro[];
+  summary: { totalDays: number; totalItems: number };
+  days: DiaRoteiro[];
 }
 
 // ── Geographic zone map ───────────────────────────────────────────────────────
@@ -130,21 +131,48 @@ interface ItineraryResult {
 
 const ZONE_MAP: Record<string, number> = {
   // Zone 1 — Zona Sul beach strip
-  "Ipanema": 1, "Leblon": 1, "Copacabana": 1, "Arpoador": 1, "Leme": 1,
+  Ipanema: 1,
+  Leblon: 1,
+  Copacabana: 1,
+  Arpoador: 1,
+  Leme: 1,
   // Zone 2 — Zona Sul inland
-  "Lagoa": 2, "Jardim Botânico": 2, "Gávea": 2, "Cosme Velho": 2,
-  "Humaitá": 2, "Alto da Boa Vista": 2,
+  Lagoa: 2,
+  "Jardim Botânico": 2,
+  Gávea: 2,
+  "Cosme Velho": 2,
+  Humaitá: 2,
+  "Alto da Boa Vista": 2,
   // Zone 3 — Botafogo / Flamengo / Urca
-  "Botafogo": 3, "Urca": 3, "Flamengo": 3, "Catete": 3, "Laranjeiras": 3, "Glória": 3,
+  Botafogo: 3,
+  Urca: 3,
+  Flamengo: 3,
+  Catete: 3,
+  Laranjeiras: 3,
+  Glória: 3,
   // Zone 4 — Centro / Santa Teresa / Lapa
-  "Centro": 4, "Santa Teresa": 4, "Lapa": 4, "Porto Maravilha": 4,
-  "Saúde": 4, "Gamboa": 4, "Santo Cristo": 4,
+  Centro: 4,
+  "Santa Teresa": 4,
+  Lapa: 4,
+  "Porto Maravilha": 4,
+  Saúde: 4,
+  Gamboa: 4,
+  "Santo Cristo": 4,
   // Zone 5 — Zona Oeste
-  "Barra da Tijuca": 5, "Recreio": 5, "Prainha": 5, "Grumari": 5,
-  "Joá": 5, "Guaratiba": 5,
+  "Barra da Tijuca": 5,
+  Recreio: 5,
+  Prainha: 5,
+  Grumari: 5,
+  Joá: 5,
+  Guaratiba: 5,
   // Zone 6 — Zona Norte
-  "Tijuca": 6, "Maracanã": 6, "São Cristóvão": 6, "Penha": 6,
-  "Méier": 6, "Madureira": 6, "Ramos": 6,
+  Tijuca: 6,
+  Maracanã: 6,
+  "São Cristóvão": 6,
+  Penha: 6,
+  Méier: 6,
+  Madureira: 6,
+  Ramos: 6,
 };
 
 function getZone(bairro?: string): number {
@@ -157,9 +185,17 @@ function getZone(bairro?: string): number {
 
 // ── Vibe → items per day ──────────────────────────────────────────────────────
 
-const VIBE_PER_DAY: Record<string, number> = { tranquilo: 3, moderado: 4, intenso: 6 };
+const VIBE_PER_DAY: Record<string, number> = {
+  tranquilo: 3,
+  moderado: 4,
+  intenso: 6,
+};
 
-function computeTripLength(count: number, vibe: string, requestedDays?: number): number {
+function computeTripLength(
+  count: number,
+  vibe: string,
+  requestedDays?: number,
+): number {
   if (requestedDays && requestedDays >= 1) return requestedDays;
   const perDay = VIBE_PER_DAY[vibe] ?? 4;
   return Math.max(1, Math.ceil(count / perDay));
@@ -176,54 +212,84 @@ function computeTripLength(count: number, vibe: string, requestedDays?: number):
 
 async function enrichPlaces(
   saved: SavedItemInput[],
-  supa:  ReturnType<typeof createClient>,
+  supa: ReturnType<typeof createClient>,
 ): Promise<EnrichedPlace[]> {
-  const oqIds    = saved.filter((s) => s.categoria === "oQueFazer").map((s) => s.id);
-  const luckyIds = saved.filter((s) => s.categoria === "lucky").map((s) => s.id);
-  const restIds  = saved.filter((s) => s.categoria === "restaurante").map((s) => Number(s.id));
+  const oqIds = saved
+    .filter((s) => s.categoria === "oQueFazer")
+    .map((s) => s.id);
+  const luckyIds = saved
+    .filter((s) => s.categoria === "lucky")
+    .map((s) => s.id);
+  const restIds = saved
+    .filter((s) => s.categoria === "restaurante")
+    .map((s) => Number(s.id));
 
   // Parallel fetch from all three sources
   const [oqResult, luckyResult, restResult] = await Promise.all([
     oqIds.length > 0
-      ? supa.from("o_que_fazer_rio")
-          .select("id,nome,bairro,categoria,tags_ia,momento_ideal,vibe,energia,duracao_media,photo_url,meu_olhar")
+      ? supa
+          .from("o_que_fazer_rio")
+          .select(
+            "id,nome,bairro,categoria,tags_ia,momento_ideal,vibe,energia,duracao_media,photo_url,meu_olhar",
+          )
           .in("id", oqIds)
       : Promise.resolve({ data: [] }),
     luckyIds.length > 0
-      ? supa.from("lucky_list_rio")
-          .select("id,nome,bairro,tipo,tags_ia,momento_ideal,photo_url,meu_olhar")
+      ? supa
+          .from("lucky_list_rio")
+          .select(
+            "id,nome,bairro,tipo,tags_ia,momento_ideal,photo_url,meu_olhar",
+          )
           .in("id", luckyIds)
       : Promise.resolve({ data: [] }),
     restIds.length > 0
-      ? supa.from("restaurantes")
+      ? supa
+          .from("restaurantes")
           // NOTE: restaurantes does NOT have momento_ideal or tags_ia columns.
           // Those fields are enriched via fallback logic below (["lunch"] and []).
           // isBreakfastRestaurant() uses especialidade; isDinnerRestaurant() is
           // inoperative until momento_ideal is added to the restaurantes schema.
-          .select("id,nome,bairro,categoria,especialidade,perfil_publico,preco_nivel,photo_url,meu_olhar")
+          .select(
+            "id,nome,bairro,categoria,especialidade,perfil_publico,preco_nivel,photo_url,meu_olhar",
+          )
           .eq("ativo", true)
           .in("id", restIds)
       : Promise.resolve({ data: [] }),
   ]);
 
-  const oqMap    = new Map((oqResult.data    ?? []).map((r: Record<string, unknown>) => [String(r.id),  r]));
-  const luckyMap = new Map((luckyResult.data ?? []).map((r: Record<string, unknown>) => [String(r.id),  r]));
-  const restMap  = new Map((restResult.data  ?? []).map((r: Record<string, unknown>) => [Number(r.id), r]));
+  const oqMap = new Map(
+    (oqResult.data ?? []).map((r: Record<string, unknown>) => [
+      String(r.id),
+      r,
+    ]),
+  );
+  const luckyMap = new Map(
+    (luckyResult.data ?? []).map((r: Record<string, unknown>) => [
+      String(r.id),
+      r,
+    ]),
+  );
+  const restMap = new Map(
+    (restResult.data ?? []).map((r: Record<string, unknown>) => [
+      Number(r.id),
+      r,
+    ]),
+  );
 
   const places: EnrichedPlace[] = [];
 
   for (const s of saved) {
     if (s.categoria === "hotel") continue;
 
-    let area:        string   = s.localizacao ?? "";
-    let name:        string   = s.titulo;
-    let tags:        string[] = [];
-    let momento:     string[] = [];
-    let vibe_tags:   string[] = [];
-    let energia                = "medium";
-    let duracao                = "1-2h";
+    let area: string = s.localizacao ?? "";
+    let name: string = s.titulo;
+    let tags: string[] = [];
+    let momento: string[] = [];
+    let vibe_tags: string[] = [];
+    let energia = "medium";
+    let duracao = "1-2h";
     let especialidade: string | undefined;
-    let perfil:        string | undefined;
+    let perfil: string | undefined;
     // Step F — output enrichment (read-only, never used in engine logic)
     let photo_url: string | null = null;
     let meu_olhar: string | null = null;
@@ -231,63 +297,64 @@ async function enrichPlaces(
     if (s.categoria === "oQueFazer") {
       const row = oqMap.get(s.id);
       if (row) {
-        area      = (row.bairro        as string)   || area;
-        name      = (row.nome          as string)   || name;
-        tags      = (row.tags_ia       as string[]) ?? [];
-        momento   = (row.momento_ideal as string[]) ?? [];
-        vibe_tags = (row.vibe          as string[]) ?? [];
-        energia   = (row.energia       as string)   ?? "medium";
-        duracao   = (row.duracao_media as string)   ?? "1-2h";
-        photo_url = (row.photo_url     as string | null) ?? null;
-        meu_olhar = (row.meu_olhar     as string | null) ?? null;
+        area = (row.bairro as string) || area;
+        name = (row.nome as string) || name;
+        tags = (row.tags_ia as string[]) ?? [];
+        momento = (row.momento_ideal as string[]) ?? [];
+        vibe_tags = (row.vibe as string[]) ?? [];
+        energia = (row.energia as string) ?? "medium";
+        duracao = (row.duracao_media as string) ?? "1-2h";
+        photo_url = (row.photo_url as string | null) ?? null;
+        meu_olhar = (row.meu_olhar as string | null) ?? null;
       }
     } else if (s.categoria === "lucky") {
       // Look up in lucky_list_rio — confirmed columns: id,nome,bairro,tipo,tags_ia,momento_ideal,photo_url,meu_olhar
       const row = luckyMap.get(s.id);
       if (row) {
-        area      = (row.bairro        as string)   || area;
-        name      = (row.nome          as string)   || name;
-        tags      = (row.tags_ia       as string[]) ?? [];
-        momento   = (row.momento_ideal as string[]) ?? [];
+        area = (row.bairro as string) || area;
+        name = (row.nome as string) || name;
+        tags = (row.tags_ia as string[]) ?? [];
+        momento = (row.momento_ideal as string[]) ?? [];
         vibe_tags = [];
-        energia   = "medium";
-        photo_url = (row.photo_url     as string | null) ?? null;
-        meu_olhar = (row.meu_olhar     as string | null) ?? null;
+        energia = "medium";
+        photo_url = (row.photo_url as string | null) ?? null;
+        meu_olhar = (row.meu_olhar as string | null) ?? null;
       }
     } else if (s.categoria === "restaurante") {
       const row = restMap.get(Number(s.id));
       if (row) {
-        area          = (row.bairro        as string)   || area;
-        name          = (row.nome          as string)   || name;
-        especialidade = row.especialidade  as string | undefined;
-        perfil        = row.perfil_publico as string | undefined;
-        photo_url     = (row.photo_url     as string | null) ?? null;
-        meu_olhar     = (row.meu_olhar     as string | null) ?? null;
+        area = (row.bairro as string) || area;
+        name = (row.nome as string) || name;
+        especialidade = row.especialidade as string | undefined;
+        perfil = row.perfil_publico as string | undefined;
+        photo_url = (row.photo_url as string | null) ?? null;
+        meu_olhar = (row.meu_olhar as string | null) ?? null;
         // Use DB momento_ideal if present; fall back to ["lunch"] so existing
         // behavior is preserved for restaurants that have no momento_ideal set.
         const dbMomento = (row.momento_ideal as string[] | null) ?? [];
         momento = dbMomento.length > 0 ? dbMomento : ["lunch"];
-        tags    = (row.tags_ia as string[] | null) ?? [];
+        tags = (row.tags_ia as string[] | null) ?? [];
       } else {
         momento = ["lunch"];
       }
     }
 
-    const oqRow       = s.categoria === "oQueFazer" ? oqMap.get(s.id) : undefined;
+    const oqRow = s.categoria === "oQueFazer" ? oqMap.get(s.id) : undefined;
     const perfil_ideal = oqRow
       ? ((oqRow.perfil_ideal as string[] | null) ?? [])
       : [];
-    const restRow     = s.categoria === "restaurante" ? restMap.get(Number(s.id)) : undefined;
+    const restRow =
+      s.categoria === "restaurante" ? restMap.get(Number(s.id)) : undefined;
     const preco_nivel = restRow
       ? ((restRow.preco_nivel as number | null) ?? undefined)
       : undefined;
 
     places.push({
-      id:            s.id,
+      id: s.id,
       name,
-      categoria:     s.categoria,
-      area:          area || "Rio de Janeiro",
-      zone:          getZone(area),
+      categoria: s.categoria,
+      area: area || "Rio de Janeiro",
+      zone: getZone(area),
       momento_ideal: momento,
       energia,
       tags,
@@ -312,25 +379,29 @@ async function enrichPlaces(
 
 async function fetchComplementaryContent(
   existingPlaces: EnrichedPlace[],
-  requestedDays:  number,
-  vibe:           string,
-  supa:           ReturnType<typeof createClient>,
-  preferences:    Preferences,
+  requestedDays: number,
+  vibe: string,
+  supa: ReturnType<typeof createClient>,
+  preferences: Preferences,
 ): Promise<EnrichedPlace[]> {
   const existingIds = new Set(existingPlaces.map((p) => p.id));
   // Step C: zones of the user's saved places — used as proximity reference.
   // Empty when no saved places exist; zoneProximityScore degrades gracefully.
-  const savedZones  = new Set(existingPlaces.map((p) => p.zone));
+  const savedZones = new Set(existingPlaces.map((p) => p.zone));
 
-  const perDay       = VIBE_PER_DAY[vibe] ?? 4;
+  const perDay = VIBE_PER_DAY[vibe] ?? 4;
   // Target: (perDay-1) activities + 1 restaurant per day = comfortable density
-  const targetActs   = requestedDays * (perDay - 1);
-  const targetRests  = requestedDays;
+  const targetActs = requestedDays * (perDay - 1);
+  const targetRests = requestedDays;
 
-  const currentActs  = existingPlaces.filter((p) => p.categoria !== "restaurante").length;
-  const currentRests = existingPlaces.filter((p) => p.categoria === "restaurante").length;
+  const currentActs = existingPlaces.filter(
+    (p) => p.categoria !== "restaurante",
+  ).length;
+  const currentRests = existingPlaces.filter(
+    (p) => p.categoria === "restaurante",
+  ).length;
 
-  const needActs  = Math.max(0, targetActs  - currentActs);
+  const needActs = Math.max(0, targetActs - currentActs);
   const needRests = Math.max(0, targetRests - currentRests);
 
   if (needActs === 0 && needRests === 0) return [];
@@ -354,9 +425,14 @@ async function fetchComplementaryContent(
       const id = String(row.id ?? "");
       if (!id || existingIds.has(id)) continue;
 
-      const tipo = (row.tipo as string ?? "").toLowerCase();
+      const tipo = ((row.tipo as string) ?? "").toLowerCase();
       // Skip lucky items that are restaurants (handled separately)
-      if (tipo.includes("restaurante") || tipo.includes("bar") || tipo.includes("café")) continue;
+      if (
+        tipo.includes("restaurante") ||
+        tipo.includes("bar") ||
+        tipo.includes("café")
+      )
+        continue;
 
       const area = (row.bairro as string) || "Rio de Janeiro";
       const tags = (row.tags_ia as string[]) ?? [];
@@ -364,17 +440,17 @@ async function fetchComplementaryContent(
 
       luckyCandidates.push({
         id,
-        name:          (row.nome as string) || area,
-        categoria:     "lucky",
+        name: (row.nome as string) || area,
+        categoria: "lucky",
         area,
-        zone:          getZone(area),
+        zone: getZone(area),
         momento_ideal: Array.isArray(momento) ? momento : [],
-        energia:       "medium",
-        tags:          Array.isArray(tags) ? tags : [],
-        vibe_tags:     [],
-        duracao:       "1-2h",
-        photo_url:     (row.photo_url as string | null) ?? null,
-        meu_olhar:     (row.meu_olhar as string | null) ?? null,
+        energia: "medium",
+        tags: Array.isArray(tags) ? tags : [],
+        vibe_tags: [],
+        duracao: "1-2h",
+        photo_url: (row.photo_url as string | null) ?? null,
+        meu_olhar: (row.meu_olhar as string | null) ?? null,
       });
     }
 
@@ -383,7 +459,9 @@ async function fetchComplementaryContent(
     const luckySelected = luckyCandidates
       .map((p) => ({
         p,
-        score: compositePreferenceScore(p, preferences) + zoneProximityScore(p, savedZones),
+        score:
+          compositePreferenceScore(p, preferences) +
+          zoneProximityScore(p, savedZones),
       }))
       .sort((a, b) => b.score - a.score)
       .slice(0, needActs)
@@ -398,12 +476,15 @@ async function fetchComplementaryContent(
   // ── 2. O que fazer Rio — core anchors & broader activities ───────────────
   // Step C: same 3× pool pattern as the lucky block above.
   const stillNeedActs = Math.max(
-    0, needActs - complement.filter((p) => p.categoria !== "restaurante").length,
+    0,
+    needActs - complement.filter((p) => p.categoria !== "restaurante").length,
   );
   if (stillNeedActs > 0) {
     const { data: oqRows } = await supa
       .from("o_que_fazer_rio")
-      .select("id,nome,bairro,tags_ia,momento_ideal,vibe,energia,duracao_media,photo_url,meu_olhar")
+      .select(
+        "id,nome,bairro,tags_ia,momento_ideal,vibe,energia,duracao_media,photo_url,meu_olhar",
+      )
       .limit(Math.min(75, (stillNeedActs + 8) * 3));
 
     const oqCandidates: EnrichedPlace[] = [];
@@ -414,24 +495,26 @@ async function fetchComplementaryContent(
       const area = (row.bairro as string) || "Rio de Janeiro";
       oqCandidates.push({
         id,
-        name:          (row.nome as string) || area,
-        categoria:     "oQueFazer",
+        name: (row.nome as string) || area,
+        categoria: "oQueFazer",
         area,
-        zone:          getZone(area),
+        zone: getZone(area),
         momento_ideal: (row.momento_ideal as string[]) ?? [],
-        energia:       (row.energia       as string)   ?? "medium",
-        tags:          (row.tags_ia       as string[]) ?? [],
-        vibe_tags:     (row.vibe          as string[]) ?? [],
-        duracao:       (row.duracao_media as string)   ?? "1-2h",
-        photo_url:     (row.photo_url     as string | null) ?? null,
-        meu_olhar:     (row.meu_olhar     as string | null) ?? null,
+        energia: (row.energia as string) ?? "medium",
+        tags: (row.tags_ia as string[]) ?? [],
+        vibe_tags: (row.vibe as string[]) ?? [],
+        duracao: (row.duracao_media as string) ?? "1-2h",
+        photo_url: (row.photo_url as string | null) ?? null,
+        meu_olhar: (row.meu_olhar as string | null) ?? null,
       });
     }
 
     const oqSelected = oqCandidates
       .map((p) => ({
         p,
-        score: compositePreferenceScore(p, preferences) + zoneProximityScore(p, savedZones),
+        score:
+          compositePreferenceScore(p, preferences) +
+          zoneProximityScore(p, savedZones),
       }))
       .sort((a, b) => b.score - a.score)
       .slice(0, stillNeedActs)
@@ -449,7 +532,9 @@ async function fetchComplementaryContent(
   if (needRests > 0) {
     const { data: restRows } = await supa
       .from("restaurantes")
-      .select("id,nome,bairro,especialidade,perfil_publico,preco_nivel,photo_url,meu_olhar")
+      .select(
+        "id,nome,bairro,especialidade,perfil_publico,preco_nivel,photo_url,meu_olhar",
+      )
       .eq("ativo", true)
       .limit(Math.min(35, (needRests + 3) * 3));
 
@@ -461,27 +546,29 @@ async function fetchComplementaryContent(
       const area = (row.bairro as string) || "Rio de Janeiro";
       restCandidates.push({
         id,
-        name:           (row.nome as string) || area,
-        categoria:      "restaurante",
+        name: (row.nome as string) || area,
+        categoria: "restaurante",
         area,
-        zone:           getZone(area),
-        momento_ideal:  ["lunch"],
-        energia:        "low",
-        tags:           [],
-        vibe_tags:      [],
-        duracao:        "1-2h",
-        especialidade:  row.especialidade  as string | undefined,
+        zone: getZone(area),
+        momento_ideal: ["lunch"],
+        energia: "low",
+        tags: [],
+        vibe_tags: [],
+        duracao: "1-2h",
+        especialidade: row.especialidade as string | undefined,
         perfil_publico: row.perfil_publico as string | undefined,
-        preco_nivel:    row.preco_nivel    as number | undefined,
-        photo_url:      (row.photo_url     as string | null) ?? null,
-        meu_olhar:      (row.meu_olhar     as string | null) ?? null,
+        preco_nivel: row.preco_nivel as number | undefined,
+        photo_url: (row.photo_url as string | null) ?? null,
+        meu_olhar: (row.meu_olhar as string | null) ?? null,
       });
     }
 
     const restSelected = restCandidates
       .map((p) => ({
         p,
-        score: compositePreferenceScore(p, preferences) + zoneProximityScore(p, savedZones),
+        score:
+          compositePreferenceScore(p, preferences) +
+          zoneProximityScore(p, savedZones),
       }))
       .sort((a, b) => b.score - a.score)
       .slice(0, needRests)
@@ -500,14 +587,16 @@ async function fetchComplementaryContent(
 
 async function attachNeighborhoodMeta(
   places: EnrichedPlace[],
-  supa:   ReturnType<typeof createClient>,
+  supa: ReturnType<typeof createClient>,
 ): Promise<EnrichedPlace[]> {
   const bairros = [...new Set(places.map((p) => p.area).filter(Boolean))];
   if (bairros.length === 0) return places;
 
   const { data } = await supa
     .from("stay_neighborhoods")
-    .select("neighborhood_name,walkable,better_for,best_for_1,safety_solo_woman")
+    .select(
+      "neighborhood_name,walkable,better_for,best_for_1,safety_solo_woman",
+    )
     .in("neighborhood_name", bairros);
 
   const nbMap = new Map(
@@ -520,9 +609,9 @@ async function attachNeighborhoodMeta(
     return {
       ...p,
       neighborhood: {
-        walkable:          nb.walkable          ?? "",
-        better_for:        nb.better_for        ?? "",
-        best_for_1:        nb.best_for_1        ?? "",
+        walkable: nb.walkable ?? "",
+        better_for: nb.better_for ?? "",
+        best_for_1: nb.best_for_1 ?? "",
         safety_solo_woman: nb.safety_solo_woman ?? "",
       },
     };
@@ -542,20 +631,20 @@ async function attachNeighborhoodMeta(
 
 const MOMENTO_TO_PERIODO: Record<string, PeriodoDia> = {
   // English (o_que_fazer_rio)
-  morning:      "manha",
-  lunch:        "almoco",
-  afternoon:    "tarde",
-  sunset:       "tarde",
-  evening:      "noite",
-  night:        "noite",
+  morning: "manha",
+  lunch: "almoco",
+  afternoon: "tarde",
+  sunset: "tarde",
+  evening: "noite",
+  night: "noite",
   // Portuguese (lucky_list_rio)
-  manha:        "manha",
-  brunch:       "manha",
-  almoco:       "almoco",
-  tarde:        "tarde",
+  manha: "manha",
+  brunch: "manha",
+  almoco: "almoco",
+  tarde: "tarde",
   fim_de_tarde: "tarde",
-  por_do_sol:   "tarde",
-  noite:        "noite",
+  por_do_sol: "tarde",
+  noite: "noite",
   // day-context tags (dia_de_sol, fim_de_semana, etc.) intentionally absent — no time-of-day implied
 };
 
@@ -571,7 +660,10 @@ function isFlexible(p: EnrichedPlace): boolean {
 }
 
 function isBeachItem(p: EnrichedPlace): boolean {
-  return p.tags.some((t) => t.includes("beach") || t.includes("praia") || t.includes("beach_life"));
+  return p.tags.some(
+    (t) =>
+      t.includes("beach") || t.includes("praia") || t.includes("beach_life"),
+  );
 }
 
 // Beach classification is vibe-aware:
@@ -582,7 +674,7 @@ function isBeachItem(p: EnrichedPlace): boolean {
 // Only intenso + high-energy overrides to morning.
 function classifyBeachPeriodo(p: EnrichedPlace, vibe: string): PeriodoDia {
   if (vibe === "intenso" && p.energia === "high") return "manha";
-  if (p.momento_ideal.includes("sunset"))          return "tarde"; // Ipanema sunset
+  if (p.momento_ideal.includes("sunset")) return "tarde"; // Ipanema sunset
   return "tarde";
 }
 
@@ -607,20 +699,37 @@ const BREAKFAST_MOMENTO = new Set(["morning", "brunch", "breakfast"]);
 // NOTE: especialidade values in the DB are compound ("Café da Manhã", "Pães e Cafés").
 // Use an array of substrings to match against; .has() exact match does not work.
 const BREAKFAST_ESPECIALIDADE_SUBS = [
-  "padaria", "café", "cafe", "brunch", "bakery", "cafeteria", "pão", "pao",
-  "café da manhã", "cafe da manha", "pães e cafés",
+  "padaria",
+  "café",
+  "cafe",
+  "brunch",
+  "bakery",
+  "cafeteria",
+  "pão",
+  "pao",
+  "café da manhã",
+  "cafe da manha",
+  "pães e cafés",
 ];
 const BREAKFAST_TAGS = new Set([
-  "café da manhã", "cafe da manha", "breakfast", "brunch", "padaria",
-  "padaria artesanal", "café colonial", "cafe colonial",
+  "café da manhã",
+  "cafe da manha",
+  "breakfast",
+  "brunch",
+  "padaria",
+  "padaria artesanal",
+  "café colonial",
+  "cafe colonial",
 ]);
 
 function isBreakfastRestaurant(p: EnrichedPlace): boolean {
-  if (p.momento_ideal.some((m) => BREAKFAST_MOMENTO.has(m.toLowerCase()))) return true;
+  if (p.momento_ideal.some((m) => BREAKFAST_MOMENTO.has(m.toLowerCase())))
+    return true;
   // Use substring matching — especialidade values are compound ("Café da Manhã", "Pães e Cafés")
   if (p.especialidade) {
     const esp = p.especialidade.toLowerCase();
-    if (BREAKFAST_ESPECIALIDADE_SUBS.some((sub) => esp.includes(sub))) return true;
+    if (BREAKFAST_ESPECIALIDADE_SUBS.some((sub) => esp.includes(sub)))
+      return true;
   }
   if (p.tags.some((t) => BREAKFAST_TAGS.has(t.toLowerCase()))) return true;
   return false;
@@ -630,9 +739,13 @@ const DINNER_MOMENTO = new Set(["dinner", "evening", "noite"]);
 const DINNER_EXCLUDE = new Set(["morning", "brunch", "lunch"]);
 
 function isDinnerRestaurant(p: EnrichedPlace): boolean {
-  const hasDinner = p.momento_ideal.some((m) => DINNER_MOMENTO.has(m.toLowerCase()));
+  const hasDinner = p.momento_ideal.some((m) =>
+    DINNER_MOMENTO.has(m.toLowerCase()),
+  );
   if (!hasDinner) return false;
-  const hasLunchOrBreakfast = p.momento_ideal.some((m) => DINNER_EXCLUDE.has(m.toLowerCase()));
+  const hasLunchOrBreakfast = p.momento_ideal.some((m) =>
+    DINNER_EXCLUDE.has(m.toLowerCase()),
+  );
   return !hasLunchOrBreakfast;
 }
 
@@ -640,13 +753,33 @@ function isDinnerRestaurant(p: EnrichedPlace): boolean {
 // Used because restaurantes table has no momento_ideal column, so isDinnerRestaurant()
 // cannot fire for bars — this compensates by reading fields that ARE present in the DB.
 const BAR_ESPECIALIDADE_SUBS = [
-  "bar", "boteco", "pub", "drinks", "cocktail", "cervejaria",
-  "speakeasy", "caipirinharia", "coquetelaria", "lounge",
+  "bar",
+  "boteco",
+  "pub",
+  "drinks",
+  "cocktail",
+  "cervejaria",
+  "speakeasy",
+  "caipirinharia",
+  "coquetelaria",
+  "lounge",
 ];
 const BAR_TAGS = new Set([
-  "bar", "boteco", "pub", "drinks", "cocktail", "cervejaria",
-  "nightlife", "balada", "dj", "speakeasy", "caipirinharia",
-  "coquetelaria", "lounge", "drinks and music", "happy hour",
+  "bar",
+  "boteco",
+  "pub",
+  "drinks",
+  "cocktail",
+  "cervejaria",
+  "nightlife",
+  "balada",
+  "dj",
+  "speakeasy",
+  "caipirinharia",
+  "coquetelaria",
+  "lounge",
+  "drinks and music",
+  "happy hour",
 ]);
 
 function isBarRestaurant(p: EnrichedPlace): boolean {
@@ -660,7 +793,7 @@ function isBarRestaurant(p: EnrichedPlace): boolean {
 
 function classifyPeriodo(p: EnrichedPlace, vibe: string): PeriodoDia {
   if (p.categoria === "restaurante") {
-    if (isBreakfastRestaurant(p))                  return "manha";
+    if (isBreakfastRestaurant(p)) return "manha";
     if (isDinnerRestaurant(p) || isBarRestaurant(p)) return "noite";
     return "almoco";
   }
@@ -675,19 +808,41 @@ function classifyPeriodo(p: EnrichedPlace, vibe: string): PeriodoDia {
   }
 
   // Expanded nightlife tag detection for oQueFazer + lucky items
-  const NIGHTLIFE_KW = ["bar", "nightlife", "boteco", "drinks", "cocktail", "pub", "balada", "cervejaria", "speakeasy", "lounge"];
-  if (p.tags.some((t) => NIGHTLIFE_KW.some((kw) => t.toLowerCase().includes(kw)))) return "noite";
+  const NIGHTLIFE_KW = [
+    "bar",
+    "nightlife",
+    "boteco",
+    "drinks",
+    "cocktail",
+    "pub",
+    "balada",
+    "cervejaria",
+    "speakeasy",
+    "lounge",
+  ];
+  if (
+    p.tags.some((t) => NIGHTLIFE_KW.some((kw) => t.toLowerCase().includes(kw)))
+  )
+    return "noite";
 
   // Energia
   if (p.energia === "high") return "manha";
 
   // Long-duration experiences → tarde
-  if (p.duracao.startsWith("3") || p.duracao.startsWith("4") || p.duracao.startsWith("5")) return "tarde";
+  if (
+    p.duracao.startsWith("3") ||
+    p.duracao.startsWith("4") ||
+    p.duracao.startsWith("5")
+  )
+    return "tarde";
 
   return "manha";
 }
 
-function classifyAllPeriodos(places: EnrichedPlace[], vibe: string): EnrichedPlace[] {
+function classifyAllPeriodos(
+  places: EnrichedPlace[],
+  vibe: string,
+): EnrichedPlace[] {
   return places.map((p) => ({ ...p, best_periodo: classifyPeriodo(p, vibe) }));
 }
 
@@ -713,7 +868,13 @@ function classifyAllPeriodos(places: EnrichedPlace[], vibe: string): EnrichedPla
 //   oeste      (zone 5)  Barra da Tijuca, Recreio, Guaratiba  — ISOLATED
 //   norte      (zone 6)  Tijuca, Maracanã, São Cristóvão      — ISOLATED
 
-type SubZone = "sul_beach" | "sul_inland" | "sul_bridge" | "centro" | "oeste" | "norte";
+type SubZone =
+  | "sul_beach"
+  | "sul_inland"
+  | "sul_bridge"
+  | "centro"
+  | "oeste"
+  | "norte";
 type MacroRegion = "sul" | "centro" | "oeste" | "norte";
 
 const ZONE_TO_SUBZONE: Record<number, SubZone> = {
@@ -726,14 +887,20 @@ const ZONE_TO_SUBZONE: Record<number, SubZone> = {
 };
 
 const ZONE_TO_MACRO: Record<number, MacroRegion> = {
-  1: "sul", 2: "sul", 3: "sul",
+  1: "sul",
+  2: "sul",
+  3: "sul",
   4: "centro",
   5: "oeste",
   6: "norte",
 };
 
-function getSubZone(zone: number): SubZone  { return ZONE_TO_SUBZONE[zone] ?? "sul_bridge"; }
-function getMacro(zone: number): MacroRegion { return ZONE_TO_MACRO[zone]   ?? "sul"; }
+function getSubZone(zone: number): SubZone {
+  return ZONE_TO_SUBZONE[zone] ?? "sul_bridge";
+}
+function getMacro(zone: number): MacroRegion {
+  return ZONE_TO_MACRO[zone] ?? "sul";
+}
 
 // ── Travel penalty matrix ──────────────────────────────────────────────────────
 // Realistic Uber travel times (minutes) between zone pairs in Rio.
@@ -745,22 +912,42 @@ function getMacro(zone: number): MacroRegion { return ZONE_TO_MACRO[zone]   ?? "
 //   • Within-day item sequencing (sort items to minimize total travel)
 
 const TRAVEL_MINUTES: Record<string, number> = {
-  "1,1":  0,  "2,2":  0,  "3,3":  0,  "4,4":  0,  "5,5":  0,  "6,6":  0,
-  "1,2": 10,  "2,1": 10,  // Ipanema ↔ Lagoa/Jardim Botânico
-  "1,3": 12,  "3,1": 12,  // Ipanema ↔ Botafogo/Flamengo
-  "2,3":  8,  "3,2":  8,  // Lagoa ↔ Botafogo
-  "3,4": 12,  "4,3": 12,  // Botafogo/Flamengo ↔ Centro (via Aterro)
-  "2,4": 20,  "4,2": 20,  // Jardim Botânico ↔ Centro (longer route)
-  "1,4": 28,  "4,1": 28,  // Ipanema ↔ Centro (the longest Sul→Centro leg)
-  "4,6": 20,  "6,4": 20,  // Centro ↔ Tijuca/Norte
-  "3,6": 22,  "6,3": 22,  // Botafogo ↔ Tijuca
-  "1,5": 45,  "5,1": 45,  // Ipanema ↔ Barra (the famous long ride)
-  "3,5": 40,  "5,3": 40,  // Botafogo ↔ Barra
-  "4,5": 38,  "5,4": 38,  // Centro ↔ Barra
-  "5,6": 55,  "6,5": 55,  // Barra ↔ Norte (cross-city)
-  "1,6": 35,  "6,1": 35,  // Ipanema ↔ Norte
-  "2,5": 42,  "5,2": 42,
-  "2,6": 30,  "6,2": 30,
+  "1,1": 0,
+  "2,2": 0,
+  "3,3": 0,
+  "4,4": 0,
+  "5,5": 0,
+  "6,6": 0,
+  "1,2": 10,
+  "2,1": 10, // Ipanema ↔ Lagoa/Jardim Botânico
+  "1,3": 12,
+  "3,1": 12, // Ipanema ↔ Botafogo/Flamengo
+  "2,3": 8,
+  "3,2": 8, // Lagoa ↔ Botafogo
+  "3,4": 12,
+  "4,3": 12, // Botafogo/Flamengo ↔ Centro (via Aterro)
+  "2,4": 20,
+  "4,2": 20, // Jardim Botânico ↔ Centro (longer route)
+  "1,4": 28,
+  "4,1": 28, // Ipanema ↔ Centro (the longest Sul→Centro leg)
+  "4,6": 20,
+  "6,4": 20, // Centro ↔ Tijuca/Norte
+  "3,6": 22,
+  "6,3": 22, // Botafogo ↔ Tijuca
+  "1,5": 45,
+  "5,1": 45, // Ipanema ↔ Barra (the famous long ride)
+  "3,5": 40,
+  "5,3": 40, // Botafogo ↔ Barra
+  "4,5": 38,
+  "5,4": 38, // Centro ↔ Barra
+  "5,6": 55,
+  "6,5": 55, // Barra ↔ Norte (cross-city)
+  "1,6": 35,
+  "6,1": 35, // Ipanema ↔ Norte
+  "2,5": 42,
+  "5,2": 42,
+  "2,6": 30,
+  "6,2": 30,
 };
 
 function travelMinutes(zA: number, zB: number): number {
@@ -775,22 +962,38 @@ function travelMinutes(zA: number, zB: number): number {
 function subZoneCompatibilityPenalty(szA: SubZone, szB: SubZone): number {
   if (szA === szB) return 0;
   // Beach strip ↔ Centro: acceptable but not ideal (25-30min ride)
-  if ((szA === "sul_beach" && szB === "centro") ||
-      (szA === "centro" && szB === "sul_beach")) return 20;
+  if (
+    (szA === "sul_beach" && szB === "centro") ||
+    (szA === "centro" && szB === "sul_beach")
+  )
+    return 20;
   // Beach strip ↔ inland: natural (Lagoa is walkable from Ipanema)
-  if ((szA === "sul_beach" && szB === "sul_inland") ||
-      (szA === "sul_inland" && szB === "sul_beach")) return 5;
+  if (
+    (szA === "sul_beach" && szB === "sul_inland") ||
+    (szA === "sul_inland" && szB === "sul_beach")
+  )
+    return 5;
   // Inland ↔ bridge: adjacent
-  if ((szA === "sul_inland" && szB === "sul_bridge") ||
-      (szA === "sul_bridge" && szB === "sul_inland")) return 5;
+  if (
+    (szA === "sul_inland" && szB === "sul_bridge") ||
+    (szA === "sul_bridge" && szB === "sul_inland")
+  )
+    return 5;
   // Bridge ↔ Centro: the natural corridor
-  if ((szA === "sul_bridge" && szB === "centro") ||
-      (szA === "centro" && szB === "sul_bridge")) return 8;
+  if (
+    (szA === "sul_bridge" && szB === "centro") ||
+    (szA === "centro" && szB === "sul_bridge")
+  )
+    return 8;
   // Beach ↔ bridge: fine (Copacabana → Botafogo is short)
-  if ((szA === "sul_beach" && szB === "sul_bridge") ||
-      (szA === "sul_bridge" && szB === "sul_beach")) return 8;
+  if (
+    (szA === "sul_beach" && szB === "sul_bridge") ||
+    (szA === "sul_bridge" && szB === "sul_beach")
+  )
+    return 8;
   // Isolated regions: massive penalty
-  if (szA === "oeste" || szB === "oeste" || szA === "norte" || szB === "norte") return 100;
+  if (szA === "oeste" || szB === "oeste" || szA === "norte" || szB === "norte")
+    return 100;
   return 10;
 }
 
@@ -802,7 +1005,10 @@ function subZoneCompatibilityPenalty(szA: SubZone, szB: SubZone): number {
 // result after proximity sorting. Sunset is a time-anchored event (~17:30-18:30)
 // and must always be the final item in the afternoon regardless of geography.
 // The `periodo` param has no effect for any other period value.
-function sortByProximity(items: EnrichedPlace[], periodo?: PeriodoDia): EnrichedPlace[] {
+function sortByProximity(
+  items: EnrichedPlace[],
+  periodo?: PeriodoDia,
+): EnrichedPlace[] {
   if (items.length <= 2) {
     // Even with 1-2 items, still apply the sunset-last rule for tarde.
     if (periodo === "tarde" && items.length === 2) {
@@ -819,8 +1025,16 @@ function sortByProximity(items: EnrichedPlace[], periodo?: PeriodoDia): Enriched
     let bestIdx = 0;
     let bestDist = Infinity;
     remaining.forEach((item, i) => {
-      const dist = travelMinutes(last.zone, item.zone) + subZoneCompatibilityPenalty(getSubZone(last.zone), getSubZone(item.zone));
-      if (dist < bestDist) { bestDist = dist; bestIdx = i; }
+      const dist =
+        travelMinutes(last.zone, item.zone) +
+        subZoneCompatibilityPenalty(
+          getSubZone(last.zone),
+          getSubZone(item.zone),
+        );
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestIdx = i;
+      }
     });
     result.push(remaining[bestIdx]);
     remaining.splice(bestIdx, 1);
@@ -830,8 +1044,12 @@ function sortByProximity(items: EnrichedPlace[], periodo?: PeriodoDia): Enriched
   // All non-sunset items come first in proximity order; sunset items are
   // appended at the end. This preserves the greedy ordering for all other items.
   if (periodo === "tarde") {
-    const sunsetItems = result.filter((p) => p.momento_ideal.includes("sunset"));
-    const otherItems  = result.filter((p) => !p.momento_ideal.includes("sunset"));
+    const sunsetItems = result.filter((p) =>
+      p.momento_ideal.includes("sunset"),
+    );
+    const otherItems = result.filter(
+      (p) => !p.momento_ideal.includes("sunset"),
+    );
     return [...otherItems, ...sunsetItems];
   }
 
@@ -842,9 +1060,9 @@ function sortByProximity(items: EnrichedPlace[], periodo?: PeriodoDia): Enriched
 function chunkInto(items: EnrichedPlace[], n: number): EnrichedPlace[][] {
   if (n <= 0 || items.length === 0) return [];
   const size = Math.ceil(items.length / n);
-  return Array.from({ length: n }, (_, i) => items.slice(i * size, (i + 1) * size)).filter(
-    (g) => g.length > 0,
-  );
+  return Array.from({ length: n }, (_, i) =>
+    items.slice(i * size, (i + 1) * size),
+  ).filter((g) => g.length > 0);
 }
 
 // Sort a bucket by zone (primary), then by preference score descending within
@@ -861,17 +1079,22 @@ function sortBucket(items: EnrichedPlace[]): EnrichedPlace[] {
 }
 
 function groupByGeography(
-  places:     EnrichedPlace[],
+  places: EnrichedPlace[],
   tripLength: number,
-  vibe:       string,
+  vibe: string,
   hotelZone?: number,
 ): { dayGroups: EnrichedPlace[][]; dayRestaurants: EnrichedPlace[][] } {
-  const activities  = places.filter((p) => p.categoria !== "restaurante");
+  const activities = places.filter((p) => p.categoria !== "restaurante");
   const restaurants = places.filter((p) => p.categoria === "restaurante");
 
   // ── 4a. Separate into sub-zone buckets ───────────────────────────────────
   const bySubZone: Record<SubZone, EnrichedPlace[]> = {
-    sul_beach: [], sul_inland: [], sul_bridge: [], centro: [], oeste: [], norte: [],
+    sul_beach: [],
+    sul_inland: [],
+    sul_bridge: [],
+    centro: [],
+    oeste: [],
+    norte: [],
   };
   for (const act of activities) bySubZone[getSubZone(act.zone)].push(act);
 
@@ -909,7 +1132,7 @@ function groupByGeography(
 
   if (hotelZone) {
     centralItems.sort((a, b) => {
-      if (a.zone !== b.zone) return a.zone - b.zone;          // zone ALWAYS primary
+      if (a.zone !== b.zone) return a.zone - b.zone; // zone ALWAYS primary
       const sa = (a.prefScore ?? 0) + hotelBias(a);
       const sb = (b.prefScore ?? 0) + hotelBias(b);
       return sb !== sa ? sb - sa : a.area.localeCompare(b.area);
@@ -918,16 +1141,31 @@ function groupByGeography(
 
   const totalActs = activities.length;
   if (totalActs === 0) {
-    const dayGroups: EnrichedPlace[][] = Array.from({ length: tripLength }, () => []);
-    const dayRestaurants: EnrichedPlace[][] = Array.from({ length: tripLength }, () => []);
+    const dayGroups: EnrichedPlace[][] = Array.from(
+      { length: tripLength },
+      () => [],
+    );
+    const dayRestaurants: EnrichedPlace[][] = Array.from(
+      { length: tripLength },
+      () => [],
+    );
     restaurants.forEach((r, i) => dayRestaurants[i % tripLength].push(r));
     return { dayGroups, dayRestaurants };
   }
 
   // ── 4c. Proportional day allocation per pool ──────────────────────────────
-  let centralDays = centralItems.length > 0 ? Math.max(1, Math.round((centralItems.length / totalActs) * tripLength)) : 0;
-  let oesteDays   = oesteItems.length   > 0 ? Math.max(1, Math.round((oesteItems.length   / totalActs) * tripLength)) : 0;
-  let norteDays   = norteItems.length   > 0 ? Math.max(1, Math.round((norteItems.length   / totalActs) * tripLength)) : 0;
+  let centralDays =
+    centralItems.length > 0
+      ? Math.max(1, Math.round((centralItems.length / totalActs) * tripLength))
+      : 0;
+  let oesteDays =
+    oesteItems.length > 0
+      ? Math.max(1, Math.round((oesteItems.length / totalActs) * tripLength))
+      : 0;
+  let norteDays =
+    norteItems.length > 0
+      ? Math.max(1, Math.round((norteItems.length / totalActs) * tripLength))
+      : 0;
 
   // Fix sum to tripLength by adjusting the central pool (most flexible)
   const delta = tripLength - (centralDays + oesteDays + norteDays);
@@ -938,8 +1176,8 @@ function groupByGeography(
   // a 2-day central split naturally produces Day A (beach) and Day B (centro).
   const dayGroups: EnrichedPlace[][] = [
     ...chunkInto(centralItems, centralDays),
-    ...chunkInto(oesteItems,   oesteDays),
-    ...chunkInto(norteItems,   norteDays),
+    ...chunkInto(oesteItems, oesteDays),
+    ...chunkInto(norteItems, norteDays),
   ];
   while (dayGroups.length < tripLength) dayGroups.push([]);
 
@@ -951,7 +1189,7 @@ function groupByGeography(
   if (hotelZone) {
     const dayHotelScore = (acts: EnrichedPlace[]): number => {
       const matches = acts.filter((p) => p.zone === hotelZone).length;
-      const adj     = acts.filter((p) => Math.abs(p.zone - hotelZone) === 1).length;
+      const adj = acts.filter((p) => Math.abs(p.zone - hotelZone) === 1).length;
       return matches * 2 + adj;
     };
     dayGroups.sort((a, b) => dayHotelScore(b) - dayHotelScore(a));
@@ -972,29 +1210,36 @@ function groupByGeography(
   function dayDominantSubZone(acts: EnrichedPlace[]): SubZone {
     if (acts.length === 0) return "sul_bridge";
     const counts: Partial<Record<SubZone, number>> = {};
-    for (const a of acts) counts[getSubZone(a.zone)] = (counts[getSubZone(a.zone)] ?? 0) + 1;
-    return (Object.entries(counts).sort((a, b) => b[1] - a[1])[0]![0]) as SubZone;
+    for (const a of acts)
+      counts[getSubZone(a.zone)] = (counts[getSubZone(a.zone)] ?? 0) + 1;
+    return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]![0] as SubZone;
   }
 
-  const dayRestaurants: EnrichedPlace[][] = Array.from({ length: dayGroups.length }, () => []);
+  const dayRestaurants: EnrichedPlace[][] = Array.from(
+    { length: dayGroups.length },
+    () => [],
+  );
   for (const rest of restaurants) {
-    const restSZ  = getSubZone(rest.zone);
-    let bestDay   = 0;
+    const restSZ = getSubZone(rest.zone);
+    let bestDay = 0;
     let bestScore = Infinity;
 
     dayGroups.forEach((acts, di) => {
-      const daySZ   = dayDominantSubZone(acts);
+      const daySZ = dayDominantSubZone(acts);
       const dayZone = dayMedianZone(acts);
 
       // Sub-zone compatibility (main signal)
       const szPenalty = subZoneCompatibilityPenalty(restSZ, daySZ);
       // Travel penalty from restaurant to day center
-      const travel    = travelMinutes(rest.zone, dayZone);
+      const travel = travelMinutes(rest.zone, dayZone);
       // Load balancing
-      const load      = dayRestaurants[di].length * 5;
+      const load = dayRestaurants[di].length * 5;
 
       const score = szPenalty + travel * 0.5 + load;
-      if (score < bestScore) { bestScore = score; bestDay = di; }
+      if (score < bestScore) {
+        bestScore = score;
+        bestDay = di;
+      }
     });
 
     dayRestaurants[bestDay].push(rest);
@@ -1014,32 +1259,74 @@ function groupByGeography(
 // Saved items always outrank complementary items within the same score tier.
 
 const INSPIRATION_TAGS: Record<string, string[]> = {
-  gastronomy: ["gastronomia", "restaurante", "food", "culinary", "comida", "fine_dining"],
-  culture:    ["cultura", "arte", "museu", "history", "teatro", "galeria", "historical"],
-  beach:      ["praia", "beach", "surf", "beach_life", "orla", "mar"],
-  adventure:  ["aventura", "trilha", "esporte", "outdoor", "natureza", "escalada"],
-  lucky:      ["lucky", "insider", "exclusivo", "secreto", "curadoria"],
-  natureza:   ["natureza", "parque", "floresta", "jardim", "vista", "ecológico"],
-  festa:      ["balada", "bar", "nightlife", "samba", "forró", "festa", "carnaval"],
+  gastronomy: [
+    "gastronomia",
+    "restaurante",
+    "food",
+    "culinary",
+    "comida",
+    "fine_dining",
+  ],
+  culture: [
+    "cultura",
+    "arte",
+    "museu",
+    "history",
+    "teatro",
+    "galeria",
+    "historical",
+  ],
+  beach: ["praia", "beach", "surf", "beach_life", "orla", "mar"],
+  adventure: [
+    "aventura",
+    "trilha",
+    "esporte",
+    "outdoor",
+    "natureza",
+    "escalada",
+  ],
+  lucky: ["lucky", "insider", "exclusivo", "secreto", "curadoria"],
+  natureza: ["natureza", "parque", "floresta", "jardim", "vista", "ecológico"],
+  festa: ["balada", "bar", "nightlife", "samba", "forró", "festa", "carnaval"],
 };
 
 function inspirationScore(p: EnrichedPlace, inspirations: string[]): number {
   if (inspirations.length === 0) return 0;
-  const haystack = [...p.tags, ...p.vibe_tags, p.categoria].map((t) => t.toLowerCase());
+  const haystack = [...p.tags, ...p.vibe_tags, p.categoria].map((t) =>
+    t.toLowerCase(),
+  );
   let total = 0;
   for (const ins of inspirations) {
-    const kws  = INSPIRATION_TAGS[ins] ?? [];
+    const kws = INSPIRATION_TAGS[ins] ?? [];
     const hits = kws.filter((kw) => haystack.some((h) => h.includes(kw)));
     total += hits.length * 2;
     if (ins === "gastronomy" && p.categoria === "restaurante") total += 3;
-    if (ins === "beach"     && p.tags.some((t) => t.includes("beach") || t.includes("praia"))) total += 3;
-    if (ins === "lucky"     && p.categoria === "lucky") total += 4;
+    if (
+      ins === "beach" &&
+      p.tags.some((t) => t.includes("beach") || t.includes("praia"))
+    )
+      total += 3;
+    if (ins === "lucky" && p.categoria === "lucky") total += 4;
   }
   return total;
 }
 
-const BUDGET_SIGNALS_SOFISTICADO = ["fine dining", "exclusivo", "premium", "luxo", "alta", "especial"];
-const BUDGET_SIGNALS_ESSENCIAL   = ["popular", "barato", "rústico", "simples", "acessível", "boteco"];
+const BUDGET_SIGNALS_SOFISTICADO = [
+  "fine dining",
+  "exclusivo",
+  "premium",
+  "luxo",
+  "alta",
+  "especial",
+];
+const BUDGET_SIGNALS_ESSENCIAL = [
+  "popular",
+  "barato",
+  "rústico",
+  "simples",
+  "acessível",
+  "boteco",
+];
 
 function budgetScore(p: EnrichedPlace, budget: string | null): number {
   if (!budget) return 0;
@@ -1047,8 +1334,8 @@ function budgetScore(p: EnrichedPlace, budget: string | null): number {
   // preco_nivel from DB takes priority when available (1=muito barato, 5=muito caro)
   const nivel = p.preco_nivel ?? null;
   if (nivel !== null) {
-    if (budget === "sofisticado") return nivel >= 4 ? 3 : (nivel <= 2 ? -2 : 0);
-    if (budget === "essencial")   return nivel <= 2 ? 3 : (nivel >= 4 ? -2 : 0);
+    if (budget === "sofisticado") return nivel >= 4 ? 3 : nivel <= 2 ? -2 : 0;
+    if (budget === "essencial") return nivel <= 2 ? 3 : nivel >= 4 ? -2 : 0;
     return 0; // "conforto" = neutral
   }
 
@@ -1058,26 +1345,28 @@ function budgetScore(p: EnrichedPlace, budget: string | null): number {
     p.perfil_publico ?? "",
     ...p.tags,
     ...p.vibe_tags,
-  ].join(" ").toLowerCase();
+  ]
+    .join(" ")
+    .toLowerCase();
 
   if (budget === "sofisticado") {
-    const match    = BUDGET_SIGNALS_SOFISTICADO.some((s) => text.includes(s));
+    const match = BUDGET_SIGNALS_SOFISTICADO.some((s) => text.includes(s));
     const mismatch = BUDGET_SIGNALS_ESSENCIAL.some((s) => text.includes(s));
-    return match ? 3 : (mismatch ? -2 : 0);
+    return match ? 3 : mismatch ? -2 : 0;
   }
   if (budget === "essencial") {
-    const match    = BUDGET_SIGNALS_ESSENCIAL.some((s) => text.includes(s));
+    const match = BUDGET_SIGNALS_ESSENCIAL.some((s) => text.includes(s));
     const mismatch = BUDGET_SIGNALS_SOFISTICADO.some((s) => text.includes(s));
-    return match ? 3 : (mismatch ? -2 : 0);
+    return match ? 3 : mismatch ? -2 : 0;
   }
   return 0; // "conforto" = neutral
 }
 
 const TRAVEL_VIBE_SIGNALS: Record<string, string[]> = {
-  solo:     ["solo", "individual", "introspec", "single", "sozinha", "sozinho"],
-  casal:    ["casal", "couple", "romantic", "romântico", "intimidade", "namorado"],
-  amigos:   ["grupo", "amigos", "friends", "animado", "turma"],
-  família:  ["família", "family", "crianças", "kids", "infantil", "filhos"],
+  solo: ["solo", "individual", "introspec", "single", "sozinha", "sozinho"],
+  casal: ["casal", "couple", "romantic", "romântico", "intimidade", "namorado"],
+  amigos: ["grupo", "amigos", "friends", "animado", "turma"],
+  família: ["família", "family", "crianças", "kids", "infantil", "filhos"],
 };
 
 function travelVibeScore(p: EnrichedPlace, travelVibe: string | null): number {
@@ -1096,7 +1385,10 @@ function travelVibeScore(p: EnrichedPlace, travelVibe: string | null): number {
   return signals.some((s) => text.includes(s)) ? 2 : 0;
 }
 
-function compositePreferenceScore(p: EnrichedPlace, prefs: Preferences): number {
+function compositePreferenceScore(
+  p: EnrichedPlace,
+  prefs: Preferences,
+): number {
   return (
     inspirationScore(p, prefs.inspirations ?? []) +
     budgetScore(p, prefs.budget ?? null) +
@@ -1116,12 +1408,16 @@ function compositePreferenceScore(p: EnrichedPlace, prefs: Preferences): number 
 //     Max combined score with -2 zone = compositePreferenceScore (can still win).
 //
 // Uses item.zone (already on EnrichedPlace). No new fields, no DB calls.
-function zoneProximityScore(item: EnrichedPlace, savedZones: Set<number>): number {
+function zoneProximityScore(
+  item: EnrichedPlace,
+  savedZones: Set<number>,
+): number {
   if (savedZones.has(item.zone)) return 3;
   for (const sz of savedZones) {
     if (Math.abs(item.zone - sz) === 1) return 1;
   }
-  if ((item.zone === 5 || item.zone === 6) && !savedZones.has(item.zone)) return -2;
+  if ((item.zone === 5 || item.zone === 6) && !savedZones.has(item.zone))
+    return -2;
   return 0;
 }
 
@@ -1131,9 +1427,9 @@ function zoneProximityScore(item: EnrichedPlace, savedZones: Set<number>): numbe
 // Score is computed once per place — O(n) — instead of twice per comparison — O(n log n).
 // prefScore is internal only: it is never written to the output ItemRoteiro or DiaRoteiro.
 function scoreAndSortPool(
-  places:      EnrichedPlace[],
-  prefs:       Preferences,
-  savedIds:    Set<string>,
+  places: EnrichedPlace[],
+  prefs: Preferences,
+  savedIds: Set<string>,
 ): EnrichedPlace[] {
   // Step B: stamp prefScore onto each place so downstream steps (Step 4 sortBucket)
   // can use it without re-computing or receiving preferences as a parameter.
@@ -1143,7 +1439,7 @@ function scoreAndSortPool(
     prefScore: compositePreferenceScore(p, prefs),
   }));
 
-  const saved  = stamped.filter((p) =>  savedIds.has(p.id));
+  const saved = stamped.filter((p) => savedIds.has(p.id));
   const padded = stamped.filter((p) => !savedIds.has(p.id));
   const byScore = (a: EnrichedPlace, b: EnrichedPlace) =>
     (b.prefScore ?? 0) - (a.prefScore ?? 0);
@@ -1161,7 +1457,11 @@ function scoreAndSortPool(
 
 const PERIODO_ORDER: PeriodoDia[] = ["manha", "almoco", "tarde", "noite"];
 
-const MANHA_CAP:  Record<string, number> = { tranquilo: 2, moderado: 2, intenso: 3 };
+const MANHA_CAP: Record<string, number> = {
+  tranquilo: 2,
+  moderado: 2,
+  intenso: 3,
+};
 
 // ── Step A slot caps ──────────────────────────────────────────────────────────
 // tarde and noite caps enforce a realistic daily rhythm.
@@ -1172,22 +1472,34 @@ const MANHA_CAP:  Record<string, number> = { tranquilo: 2, moderado: 2, intenso:
 // will ensure the pool never generates this many same-day same-zone items in the
 // first place, making overflow redistribution unnecessary. Do NOT add
 // cross-day redistribution logic here.
-const TARDE_CAP:  Record<string, number> = { tranquilo: 2, moderado: 3, intenso: 4 };
-const NOITE_CAP:  Record<string, number> = { tranquilo: 1, moderado: 2, intenso: 2 };
+const TARDE_CAP: Record<string, number> = {
+  tranquilo: 2,
+  moderado: 3,
+  intenso: 4,
+};
+const NOITE_CAP: Record<string, number> = {
+  tranquilo: 1,
+  moderado: 2,
+  intenso: 2,
+};
 
 function categoriaToTable(cat: SavedCategory): string {
   switch (cat) {
-    case "restaurante": return "restaurantes";
-    case "hotel":       return "stay_hotels";
-    case "oQueFazer":   return "o_que_fazer_rio";
-    case "lucky":       return "lucky_list_rio";
+    case "restaurante":
+      return "restaurantes";
+    case "hotel":
+      return "stay_hotels";
+    case "oQueFazer":
+      return "o_que_fazer_rio";
+    case "lucky":
+      return "lucky_list_rio";
   }
 }
 
 function buildFullDraft(
-  dayGroups:      EnrichedPlace[][],
+  dayGroups: EnrichedPlace[][],
   dayRestaurants: EnrichedPlace[][],
-  vibe:           string,
+  vibe: string,
 ): DiaRoteiro[] {
   const manhaCap = MANHA_CAP[vibe] ?? 2;
   const days: DiaRoteiro[] = [];
@@ -1207,8 +1519,8 @@ function buildFullDraft(
     // ── 5b. Morning load balancing ────────────────────────────────────────────
     const manha = periodMap.get("manha") ?? [];
     if (manha.length > manhaCap) {
-      const locked   = manha.filter((p) => !isFlexible(p));
-      const flexible = manha.filter((p) =>  isFlexible(p));
+      const locked = manha.filter((p) => !isFlexible(p));
+      const flexible = manha.filter((p) => isFlexible(p));
 
       const inManha: EnrichedPlace[] = locked.slice(0, manhaCap);
       const slots = manhaCap - inManha.length;
@@ -1275,41 +1587,44 @@ function buildFullDraft(
     }
 
     // ── 5e. Build ordered periodos ────────────────────────────────────────────
-    const periodos: DiaPeriodo[] = PERIODO_ORDER
-      .filter((p) => (periodMap.get(p) ?? []).length > 0)
-      .map((p) => ({
-        periodo: p,
-        items:   periodMap.get(p)!.map((a) => {
-          // Step F — photo resolution:
-          // 1st priority: Supabase photo_url (authoritative, editorial-approved)
-          // 2nd priority: Unsplash web fallback using place name + location
-          // Never null in the output — the mobile app uses this for the card image.
-          const finalPhoto: string | null = a.photo_url
-            ? a.photo_url
-            : `https://source.unsplash.com/featured/600x400/?${encodeURIComponent(a.name + " " + a.area + " brazil")}`;
+    const periodos: DiaPeriodo[] = PERIODO_ORDER.filter(
+      (p) => (periodMap.get(p) ?? []).length > 0,
+    ).map((p) => ({
+      periodo: p,
+      items: periodMap.get(p)!.map((a) => {
+        // Step F — photo resolution:
+        // 1st priority: Supabase photo_url (authoritative, editorial-approved)
+        // 2nd priority: Unsplash web fallback using place name + location
+        // Never null in the output — the mobile app uses this for the card image.
+        const finalPhoto: string | null = a.photo_url
+          ? a.photo_url
+          : `https://source.unsplash.com/featured/600x400/?${encodeURIComponent(a.name + " " + a.area + " brazil")}`;
 
-          return {
-            id:           a.id,
-            titulo:       a.name,
-            categoria:    a.categoria,
-            localizacao:  a.area,
-            source_table: categoriaToTable(a.categoria),
-            // Step F — additive enrichment fields
-            image:        { uri: finalPhoto },
-            photo_url:    finalPhoto,
-            descricao:    a.meu_olhar ?? null,
-            duracao:      a.duracao,
-          };
-        }),
-      }));
+        return {
+          id: a.id,
+          titulo: a.name,
+          categoria: a.categoria,
+          localizacao: a.area,
+          source_table: categoriaToTable(a.categoria),
+          // Step F — additive enrichment fields
+          image: { uri: finalPhoto },
+          photo_url: finalPhoto,
+          descricao: a.meu_olhar ?? null,
+          duracao: a.duracao,
+        };
+      }),
+    }));
 
     if (periodos.length === 0) return;
 
     // ── 5f. Day label = modal neighborhood ────────────────────────────────────
-    const allItems    = [...acts, ...rests];
+    const allItems = [...acts, ...rests];
     const bairroCount = new Map<string, number>();
-    for (const item of allItems) bairroCount.set(item.area, (bairroCount.get(item.area) ?? 0) + 1);
-    const bairro = [...bairroCount.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "Rio de Janeiro";
+    for (const item of allItems)
+      bairroCount.set(item.area, (bairroCount.get(item.area) ?? 0) + 1);
+    const bairro =
+      [...bairroCount.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ??
+      "Rio de Janeiro";
 
     days.push({ numero: di + 1, bairro, periodos });
   });
@@ -1323,126 +1638,97 @@ function buildFullDraft(
 // It cannot: change day count, move items between days, move between períodos, add/remove.
 
 async function refineWithGemini(
-  draft:   DiaRoteiro[],
-  dest:    string,
-  prefs:   Preferences,
+  draft: DiaRoteiro[],
+  dest: string,
+  prefs: Preferences,
   allPlaces: EnrichedPlace[],
 ): Promise<DiaRoteiro[]> {
   const apiKey = Deno.env.get("GEMINI_API_KEY");
   if (!apiKey || !draft.length) return draft;
 
-  // Compact representation — only what Gemini needs to decide order
-  const compact = draft.map((day) => ({
-    day:      day.numero,
-    area:     day.bairro,
-    periodos: day.periodos.map((p) => ({
-      periodo: p.periodo,
-      items:   p.items.map((it) => {
-        const full = allPlaces.find((pl) => pl.id === it.id);
-        return {
-          id:       it.id,
-          name:     it.titulo,
-          area:     it.localizacao,
-          zone:     full?.zone ?? 3,
-          energia:  full?.energia ?? "medium",
-          tags:     (full?.tags ?? []).slice(0, 5),
-          // Step E — editorial context for Gemini reordering only
-          momento:  (full?.momento_ideal ?? []).slice(0, 3),
-          duracao:  full?.duracao ?? "1-2h",
-          categoria: it.categoria,
-          vibe:     (full?.vibe_tags ?? []).slice(0, 3),
-          preco:    full?.preco_nivel ?? null,
-        };
-      }),
-    })),
-  }));
+  // 🔥 NOVO: trava total — não deixa Gemini bagunçar nada crítico
+  const lockedStructure = JSON.stringify(draft);
 
-  const prompt =
-`You are a Rio de Janeiro travel expert. You received a fully structured itinerary built from real Supabase data.
+  const prompt = `You are a STRICT itinerary optimizer.
 
-Your role is ONLY to improve the ORDER of items within each período for better geographic flow and realistic pacing.
+You will receive a JSON itinerary.
 
-STRICT RULES — these are absolute and may never be violated for any reason:
-- Do NOT add new places
-- Do NOT remove places
-- Do NOT move items between different days
-- Do NOT move items between different períodos (manha/almoco/tarde/noite)
-- Do NOT change the number of days
-- ONLY reorder items within each período
-- Return the EXACT same JSON structure
-- SUNSET ABSOLUTE CONSTRAINT: items with "sunset" in their "momento" field MUST always remain the final item in tarde — never move them earlier for any reason, no matter what other signals say
-- RESTAURANT ABSOLUTE CONSTRAINT: items with categoria "restaurante" are meal anchors — you may reorder restaurants relative to other restaurants in the same período, but you MUST NOT move a restaurant ahead of or behind non-restaurant items in a way that changes its meal-anchor role
+Your ONLY job:
+- Reorder items WITHIN each período
 
-ORDERING SIGNALS — use all of these within the absolute constraints above:
-- "zone" + "area": group geographically close items together within each período
-- "energia": order high-energy activities early in the período (low energia items work better as openers or closers)
-- "momento": respect each item's ideal time slot; "sunset"-tagged items are fixed as final in tarde — no exceptions
-- "duracao": avoid stacking two items each with duracao longer than 2h consecutively in manha — space them with shorter items
-- "vibe": items with vibe tags matching the companion type should be placed as the emotional high-point of the período (e.g. "romântico" items near the end of tarde for couple travelers)
-- "preco": for budget "sofisticado", place the highest-preco restaurant last in noite as the editorial centerpiece; for "essencial", keep restaurant ordering geography-driven
+ABSOLUTE RULES (never break):
+- Do NOT add items
+- Do NOT remove items
+- Do NOT change IDs
+- Do NOT move items across períodos
+- Do NOT move items across days
+- Keep EXACT same structure
+- Keep EXACT same number of days
+- Keep EXACT same number of items per período
 
-USER CONTEXT:
-- Pace: ${prefs.vibe ?? "moderado"}
-- Companion: ${prefs.travelVibe ?? "any"}
-- Budget: ${prefs.budget ?? "conforto"}
-- Inspirations: ${prefs.inspirations.join(", ") || "any"}
-- Destination: ${dest}
+CRITICAL:
+- You MUST return the SAME JSON structure, only changing order of items
 
-DRAFT TO REFINE:
-${JSON.stringify(compact)}
+If you are unsure, RETURN THE INPUT EXACTLY.
 
-Return ONLY a valid JSON array with the same structure — no markdown, no explanation.`;
+INPUT:
+${lockedStructure}
+
+OUTPUT:
+Return ONLY valid JSON.`;
 
   try {
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
       {
-        method:  "POST",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents:         [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0 },
         }),
       },
     );
+
     if (!res.ok) return draft;
 
-    const data  = await res.json();
-    const raw   = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-    const clean = raw.replace(/```json\n?/gi, "").replace(/```\n?/g, "").trim();
+    const data = await res.json();
+    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
-    const refined = JSON.parse(clean) as typeof compact;
+    const clean = raw
+      .replace(/```json/gi, "")
+      .replace(/```/g, "")
+      .trim();
 
-    // Hard checks: same day count and same item counts per período
-    if (!Array.isArray(refined) || refined.length !== draft.length) return draft;
-    for (let i = 0; i < refined.length; i++) {
-      const orig = draft[i];
-      const ref  = refined[i];
-      if (!ref.periodos || ref.periodos.length !== orig.periodos.length) return draft;
-      for (let j = 0; j < orig.periodos.length; j++) {
-        if ((ref.periodos[j]?.items?.length ?? 0) !== orig.periodos[j].items.length) return draft;
+    const parsed = JSON.parse(clean);
+
+    // 🔥 VALIDAÇÃO PESADA (anti-bug / anti-Gemini louco)
+    if (!Array.isArray(parsed) || parsed.length !== draft.length) {
+      return draft;
+    }
+
+    for (let i = 0; i < parsed.length; i++) {
+      const original = draft[i];
+      const refined = parsed[i];
+
+      if (
+        !refined.periodos ||
+        refined.periodos.length !== original.periodos.length
+      ) {
+        return draft;
+      }
+
+      for (let j = 0; j < original.periodos.length; j++) {
+        if (
+          !refined.periodos[j]?.items ||
+          refined.periodos[j].items.length !== original.periodos[j].items.length
+        ) {
+          return draft;
+        }
       }
     }
 
-    // Re-attach full ItemRoteiro objects from the original draft (Gemini only had compact view)
-    const itemById = new Map<string, ItemRoteiro>();
-    for (const day of draft) {
-      for (const p of day.periodos) {
-        for (const it of p.items) itemById.set(it.id, it);
-      }
-    }
-
-    return refined.map((rDay, i) => ({
-      numero:   i + 1,
-      bairro:   rDay.area || draft[i].bairro,
-      periodos: rDay.periodos.map((rp, j) => ({
-        periodo: rp.periodo as PeriodoDia,
-        items:   (rp.items as Array<{ id: string }>)
-          .map((ri) => itemById.get(ri.id))
-          .filter(Boolean) as ItemRoteiro[],
-      })).filter((p) => p.items.length > 0),
-    })).filter((d) => d.periodos.length > 0);
-
+    return parsed as DiaRoteiro[];
   } catch (_) {
     return draft;
   }
@@ -1462,7 +1748,7 @@ Return ONLY a valid JSON array with the same structure — no markdown, no expla
 //   Rule 4 — Performance venues → not manha/almoco.
 
 function validateAndFix(
-  days:      DiaRoteiro[],
+  days: DiaRoteiro[],
   allPlaces: EnrichedPlace[],
 ): DiaRoteiro[] {
   // 7a. Re-attach any items dropped during Gemini refinement ─────────────────
@@ -1476,18 +1762,18 @@ function validateAndFix(
   const lost = allPlaces.filter((p) => !usedIds.has(p.id));
   if (lost.length > 0 && days.length > 0) {
     const lastDay = days[days.length - 1];
-    const tarde   = lastDay.periodos.find((p) => p.periodo === "tarde");
+    const tarde = lastDay.periodos.find((p) => p.periodo === "tarde");
     const lostItems = lost.map((l) => ({
-      id:           l.id,
-      titulo:       l.name,
-      categoria:    l.categoria,
-      localizacao:  l.area,
+      id: l.id,
+      titulo: l.name,
+      categoria: l.categoria,
+      localizacao: l.area,
       source_table: categoriaToTable(l.categoria),
       // Step F — additive enrichment fields (same pattern as buildFullDraft)
-      image:        l.photo_url ? { uri: l.photo_url } : undefined,
-      photo_url:    l.photo_url ?? null,
-      descricao:    l.meu_olhar ?? null,
-      duracao:      l.duracao,
+      image: l.photo_url ? { uri: l.photo_url } : undefined,
+      photo_url: l.photo_url ?? null,
+      descricao: l.meu_olhar ?? null,
+      duracao: l.duracao,
     }));
     if (tarde) {
       tarde.items.push(...lostItems);
@@ -1497,7 +1783,9 @@ function validateAndFix(
   }
 
   // 7b. Temporal sanity pass — fix any invalid period assignments ─────────────
-  const placeById = new Map<string, EnrichedPlace>(allPlaces.map((p) => [p.id, p]));
+  const placeById = new Map<string, EnrichedPlace>(
+    allPlaces.map((p) => [p.id, p]),
+  );
 
   for (const day of days) {
     const evictions: Array<{ item: ItemRoteiro; to: PeriodoDia }> = [];
@@ -1512,37 +1800,55 @@ function validateAndFix(
         // Any item whose id is not present in allPlaces (the Supabase-sourced registry)
         // is an unauthorized item — hallucinated by Gemini or otherwise orphaned.
         // Drop it unconditionally. Never silently keep unknown items.
-        if (!place) { continue; }
+        if (!place) {
+          continue;
+        }
 
         const momento = place.momento_ideal.map((m) => m.toLowerCase());
-        const tags    = place.tags.map((t) => t.toLowerCase());
+        const tags = place.tags.map((t) => t.toLowerCase());
 
         // Rule 1: sunset → only tarde (pôr do sol nunca às 14h)
         // o_que_fazer_rio uses English "sunset"; lucky_list_rio uses Portuguese "por_do_sol".
         // Both must map to tarde. The MOMENTO_TO_PERIODO map handles classification,
         // but validateAndFix needs its own bilingual check for the correction pass.
-        const isSunset = momento.includes("sunset") || momento.includes("por_do_sol");
+        const isSunset =
+          momento.includes("sunset") || momento.includes("por_do_sol");
         if (isSunset && periodoBlock.periodo !== "tarde") {
-          evictions.push({ item, to: "tarde" }); continue;
+          evictions.push({ item, to: "tarde" });
+          continue;
         }
 
         // Rule 2: restaurant temporal placement — subtype-aware
         // Breakfast restaurants (padaria, café, brunch) are valid in manha.
         // Dinner-only restaurants are evicted from manha to noite.
         // All other restaurants are evicted from manha to almoco.
-        if (item.categoria === "restaurante" && periodoBlock.periodo === "manha") {
-          if (isBreakfastRestaurant(place))      { keep.push(item); continue; }
-          if (isDinnerRestaurant(place))         { evictions.push({ item, to: "noite" }); continue; }
-          evictions.push({ item, to: "almoco" }); continue;
+        if (
+          item.categoria === "restaurante" &&
+          periodoBlock.periodo === "manha"
+        ) {
+          if (isBreakfastRestaurant(place)) {
+            keep.push(item);
+            continue;
+          }
+          if (isDinnerRestaurant(place)) {
+            evictions.push({ item, to: "noite" });
+            continue;
+          }
+          evictions.push({ item, to: "almoco" });
+          continue;
         }
 
         // Rule 5: dinner-only restaurant → not almoco or tarde
         // Extended from almoco-only to also cover tarde: a dinner-only restaurant
         // can land in tarde via validateAndFix 7a re-attachment. Both are wrong.
-        if (item.categoria === "restaurante" &&
-            (periodoBlock.periodo === "almoco" || periodoBlock.periodo === "tarde") &&
-            isDinnerRestaurant(place)) {
-          evictions.push({ item, to: "noite" }); continue;
+        if (
+          item.categoria === "restaurante" &&
+          (periodoBlock.periodo === "almoco" ||
+            periodoBlock.periodo === "tarde") &&
+          isDinnerRestaurant(place)
+        ) {
+          evictions.push({ item, to: "noite" });
+          continue;
         }
 
         // Rule 3: nightlife venue → not manha/almoco
@@ -1556,12 +1862,20 @@ function validateAndFix(
         // authority; presence of "morning" in momento_ideal does not override it.
         // A venue with nightlife tags that works at night belongs in noite.
         // o_que_fazer_rio uses English "night"/"evening"; lucky_list_rio uses Portuguese "noite".
-        const hasNightMomento = momento.some((m) => ["night", "evening", "noite"].includes(m));
+        const hasNightMomento = momento.some((m) =>
+          ["night", "evening", "noite"].includes(m),
+        );
         const isNightlife = tags.some((t) =>
-          ["balada", "nightlife", "clubbing"].some((k) => t.includes(k)));
-        if (hasNightMomento && isNightlife &&
-          (periodoBlock.periodo === "manha" || periodoBlock.periodo === "almoco")) {
-          evictions.push({ item, to: "noite" }); continue;
+          ["balada", "nightlife", "clubbing"].some((k) => t.includes(k)),
+        );
+        if (
+          hasNightMomento &&
+          isNightlife &&
+          (periodoBlock.periodo === "manha" ||
+            periodoBlock.periodo === "almoco")
+        ) {
+          evictions.push({ item, to: "noite" });
+          continue;
         }
 
         // Rule 6: breakfast restaurant → only manha
@@ -1570,10 +1884,13 @@ function validateAndFix(
         // and Gemini may also move breakfast items to almoco. This rule is the
         // authoritative fallback that enforces manha placement unconditionally.
         // Rule 2 (above) already handles the manha case (keeps breakfast in manha).
-        if (item.categoria === "restaurante" &&
-            isBreakfastRestaurant(place) &&
-            periodoBlock.periodo !== "manha") {
-          evictions.push({ item, to: "manha" }); continue;
+        if (
+          item.categoria === "restaurante" &&
+          isBreakfastRestaurant(place) &&
+          periodoBlock.periodo !== "manha"
+        ) {
+          evictions.push({ item, to: "manha" });
+          continue;
         }
 
         // Rule 4 (Step A.5): performance venue → not manha/almoco
@@ -1590,13 +1907,24 @@ function validateAndFix(
         // This rule uses NO external data sources — Supabase tags_ia only.
         // Do NOT expand this to cover opening hours or live schedules (future layer).
         const PERFORMANCE_TAGS = [
-          "opera", "ballet", "show", "concerto", "espetáculo", "espetaculo", "performance",
+          "opera",
+          "ballet",
+          "show",
+          "concerto",
+          "espetáculo",
+          "espetaculo",
+          "performance",
         ];
         const isPerformanceVenue = tags.some((t) =>
-          PERFORMANCE_TAGS.some((k) => t.includes(k)));
-        if (isPerformanceVenue &&
-            (periodoBlock.periodo === "manha" || periodoBlock.periodo === "almoco")) {
-          evictions.push({ item, to: "noite" }); continue;
+          PERFORMANCE_TAGS.some((k) => t.includes(k)),
+        );
+        if (
+          isPerformanceVenue &&
+          (periodoBlock.periodo === "manha" ||
+            periodoBlock.periodo === "almoco")
+        ) {
+          evictions.push({ item, to: "noite" });
+          continue;
         }
 
         keep.push(item);
@@ -1615,9 +1943,9 @@ function validateAndFix(
     }
 
     // Re-sort periods into canonical order after any modifications
-    day.periodos = (PERIODO_ORDER
-      .map((po) => day.periodos.find((p) => p.periodo === po))
-      .filter(Boolean)) as DiaPeriodo[];
+    day.periodos = PERIODO_ORDER.map((po) =>
+      day.periodos.find((p) => p.periodo === po),
+    ).filter(Boolean) as DiaPeriodo[];
 
     // ── Recalculate day.bairro from final item positions ──────────────────────
     // This must run AFTER re-sort so it reflects the true final item set:
@@ -1642,7 +1970,7 @@ function validateAndFix(
       }
       if (freq.size > 0) {
         const maxFreq = Math.max(...freq.values());
-        const tied    = new Set(
+        const tied = new Set(
           [...freq.entries()].filter(([, c]) => c === maxFreq).map(([b]) => b),
         );
 
@@ -1656,13 +1984,16 @@ function validateAndFix(
             const m = d.match(/(\d+)/);
             return m ? parseInt(m[1], 10) : 0;
           };
-          let winner  = "";
+          let winner = "";
           let bestDur = -1;
           for (const it of allFinalItems) {
             const loc = it.localizacao || placeById.get(it.id)?.area || "";
             if (!tied.has(loc)) continue;
             const dur = parseDur(placeById.get(it.id)?.duracao);
-            if (dur > bestDur) { bestDur = dur; winner = loc; }
+            if (dur > bestDur) {
+              bestDur = dur;
+              winner = loc;
+            }
           }
           // Step 4 — fallback: first item's bairro (allFinalItems is in canonical order)
           day.bairro = winner || allFinalItems[0].localizacao || day.bairro;
@@ -1686,9 +2017,9 @@ serve(async (req) => {
   try {
     const body: RequestBody = await req.json();
     const {
-      savedItems    = [],
-      destination   = "Rio de Janeiro",
-      preferences   = { inspirations: [], vibe: "moderado" },
+      savedItems = [],
+      destination = "Rio de Janeiro",
+      preferences = { inspirations: [], vibe: "moderado" },
       requestedDays,
       arrivalDate,
       departureDate,
@@ -1709,7 +2040,7 @@ serve(async (req) => {
     // `if (hotelZone)` which is falsy for 0 → zero behavioral change for users
     // with no saved hotel.  DO NOT add hotel auto-recommendation here (Step D.5).
     type RawItem = { categoria?: string; localizacao?: string; id?: string };
-    const rawItems  = savedItems as RawItem[];
+    const rawItems = savedItems as RawItem[];
     const hotelItems = rawItems.filter((s) => s.categoria === "hotel");
 
     let hotelZone = 0;
@@ -1717,7 +2048,6 @@ serve(async (req) => {
     if (hotelItems.length === 1) {
       // Single hotel — use it directly, no scoring needed
       hotelZone = getZone(hotelItems[0].localizacao ?? "");
-
     } else if (hotelItems.length > 1) {
       // Tier 2 input: dominant zone from non-hotel saved items
       const nonHotelRaw = rawItems.filter((s) => s.categoria !== "hotel");
@@ -1726,8 +2056,9 @@ serve(async (req) => {
         const z = getZone(item.localizacao ?? "");
         if (z > 0) zoneCounts[z] = (zoneCounts[z] ?? 0) + 1;
       }
-      const domZEntry = Object.entries(zoneCounts)
-        .sort((a, b) => Number(b[1]) - Number(a[1]))[0];
+      const domZEntry = Object.entries(zoneCounts).sort(
+        (a, b) => Number(b[1]) - Number(a[1]),
+      )[0];
       const domZ = domZEntry ? Number(domZEntry[0]) : 0;
 
       // Tier 1: budget preference → preferred zone set.
@@ -1737,7 +2068,7 @@ serve(async (req) => {
       // essencial   → no zone bias (affordable options across all zones)
       const budgetZoneMap: Record<string, number[]> = {
         sofisticado: [1, 2],
-        conforto:    [1, 2, 3],
+        conforto: [1, 2, 3],
       };
       const preferredBudgetZones = new Set(
         budgetZoneMap[preferences.budget ?? ""] ?? [],
@@ -1746,8 +2077,9 @@ serve(async (req) => {
       // Score each hotel candidate on two tiers; stable id sort as Tier 3
       const scored = hotelItems.map((h) => {
         const hz = getZone(h.localizacao ?? "");
-        const t1  = preferredBudgetZones.size > 0 && preferredBudgetZones.has(hz) ? 2 : 0;
-        const t2  = domZ > 0 ? Math.max(0, 3 - Math.abs(hz - domZ)) : 0;
+        const t1 =
+          preferredBudgetZones.size > 0 && preferredBudgetZones.has(hz) ? 2 : 0;
+        const t2 = domZ > 0 ? Math.max(0, 3 - Math.abs(hz - domZ)) : 0;
         return { h, hz, score: t1 + t2 };
       });
 
@@ -1765,10 +2097,10 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
-    const dest       = destination || "Rio de Janeiro";
-    const vibe       = preferences.vibe       ?? "moderado";
+    const dest = destination || "Rio de Janeiro";
+    const vibe = preferences.vibe ?? "moderado";
     const travelVibe = preferences.travelVibe ?? null;
-    const budget     = preferences.budget     ?? null;
+    const budget = preferences.budget ?? null;
 
     // Compute requested days: priority order —
     //   1. Explicit requestedDays from frontend (derived from arrival/departure dates)
@@ -1776,7 +2108,8 @@ serve(async (req) => {
     //   3. Fall through to computeTripLength item-based estimate
     let resolvedDays: number | undefined = requestedDays;
     if (!resolvedDays && arrivalDate && departureDate) {
-      const ms = new Date(departureDate).getTime() - new Date(arrivalDate).getTime();
+      const ms =
+        new Date(departureDate).getTime() - new Date(arrivalDate).getTime();
       const diff = Math.round(ms / 86_400_000); // ms → days
       if (diff >= 1) resolvedDays = diff;
     }
@@ -1785,13 +2118,22 @@ serve(async (req) => {
     let savedPlaces = await enrichPlaces(savedItems, supa);
 
     // ── Trip length is locked early — determines how much complement we need ──
-    const tripLength = computeTripLength(savedPlaces.length, vibe, resolvedDays);
+    const tripLength = computeTripLength(
+      savedPlaces.length,
+      vibe,
+      resolvedDays,
+    );
 
     // Only block if there's nothing to work with AND no trip dates were given
     if (savedPlaces.length === 0 && tripLength === 0) {
       return new Response(
-        JSON.stringify({ error: "No actionable saved places and no trip dates provided" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 },
+        JSON.stringify({
+          error: "No actionable saved places and no trip dates provided",
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        },
       );
     }
 
@@ -1799,7 +2141,11 @@ serve(async (req) => {
     // Priority: saved items first, then lucky list, then o_que_fazer, then restaurants.
     // This pads out weak itineraries caused by too few saved items for the trip length.
     const complementaryPlaces = await fetchComplementaryContent(
-      savedPlaces, tripLength, vibe, supa, preferences,
+      savedPlaces,
+      tripLength,
+      vibe,
+      supa,
+      preferences,
     );
 
     // Merge: saved items always come first (preserved position in clustering)
@@ -1818,7 +2164,12 @@ serve(async (req) => {
     places = scoreAndSortPool(places, preferences, savedIds);
 
     // ── Step 4: Macro-region clustering (oeste + norte isolated from centro + sul)
-    const { dayGroups, dayRestaurants } = groupByGeography(places, tripLength, vibe, hotelZone);
+    const { dayGroups, dayRestaurants } = groupByGeography(
+      places,
+      tripLength,
+      vibe,
+      hotelZone,
+    );
 
     // ── Step 5: Build fully populated DiaRoteiro[] with morning load balancing
     let days = buildFullDraft(dayGroups, dayRestaurants, vibe);
@@ -1831,7 +2182,7 @@ serve(async (req) => {
 
     const result: ItineraryResult = {
       destination: dest,
-      source:      "trip_saved_places",
+      source: "trip_saved_places",
       preferences,
       summary: { totalDays: days.length, totalItems: places.length },
       days,
@@ -1839,13 +2190,12 @@ serve(async (req) => {
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status:  200,
+      status: 200,
     });
-
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: (err as Error).message }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 },
-    );
+    return new Response(JSON.stringify({ error: (err as Error).message }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 400,
+    });
   }
 });
