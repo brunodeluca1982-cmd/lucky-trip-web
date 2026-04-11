@@ -1,49 +1,25 @@
-import { useEffect, useState } from "react";
+/**
+ * @deprecated
+ *
+ * useHeroPool is no longer used anywhere in the app.
+ *
+ * Background state is now managed globally by BackgroundContext
+ * (context/BackgroundContext.tsx). All screens consume the shared pool,
+ * index, and timer via `useBackground()` or the `<RotatingBackground />`
+ * component, which reads from context automatically.
+ *
+ * DO NOT re-import this hook. Using it alongside BackgroundContext would
+ * create duplicate Supabase fetches and independent rotation timers,
+ * breaking the global synchronization guarantee.
+ *
+ * To access the pool: import { useBackground } from "@/context/BackgroundContext"
+ * To render the background: import { RotatingBackground } from "@/components/RotatingBackground"
+ */
+
 import { ImageSourcePropType } from "react-native";
-import { supabase } from "@/lib/supabase";
+import { useBackground } from "@/context/BackgroundContext";
 
-const LOCAL_FALLBACK: ImageSourcePropType[] = [
-  require("@/assets/images/ipanema.png"),
-  require("@/assets/images/lapa.png"),
-  require("@/assets/images/pao-acucar.png"),
-  require("@/assets/images/cristo.png"),
-];
-
+/** @deprecated Use `useBackground()` from BackgroundContext instead. */
 export function useHeroPool(): ImageSourcePropType[] {
-  const [pool, setPool] = useState<ImageSourcePropType[]>(LOCAL_FALLBACK);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      try {
-        const { data, error } = await supabase
-          .from("home_hero_items")
-          .select("video_url")
-          .eq("is_active", true)
-          .eq("destination_slug", "rio-de-janeiro")
-          .order("sort_order", { ascending: true })
-          .limit(8);
-
-        if (error || !data || data.length === 0) return;
-
-        const CLOUD = "https://res.cloudinary.com/dufxamwaf/video/fetch/so_1,w_1080,h_1920,c_fill,g_auto,q_80,f_jpg";
-        const remote = data
-          .map((row) => {
-            if (!row.video_url) return null;
-            return { uri: `${CLOUD}/${row.video_url as string}` };
-          })
-          .filter(Boolean) as ImageSourcePropType[];
-
-        if (!cancelled && remote.length > 0) setPool(remote);
-      } catch {
-        // keep LOCAL_FALLBACK already set as initial state
-      }
-    }
-
-    load();
-    return () => { cancelled = true; };
-  }, []);
-
-  return pool;
+  return useBackground().pool;
 }

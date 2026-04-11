@@ -3241,7 +3241,7 @@ export default function RoteiroScreen() {
   return (
     <View style={sc.root}>
 
-      {/* ── Cinematic background — rotating pool, hotel image pinned as first if saved ── */}
+      {/* ── Cinematic background — global rotating pool (shared with all screens) ── */}
       <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}>
         <RotatingBackground />
         <LinearGradient
