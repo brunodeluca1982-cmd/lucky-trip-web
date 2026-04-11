@@ -123,20 +123,30 @@ export default function DestinosScreen() {
   const { destinos, loading } = useDestinos();
   const [query, setQuery] = React.useState("");
 
-  // Fetch hero_image_url for each destino (keyed by slug)
+  // Fetch hero images for each destino (keyed by slug).
+  // Prefers mobile_hero_image_url on mobile, falls back to hero_image_url.
+  // Stored as a single resolved string per slug to keep DestCard simple.
   const [heroImages, setHeroImages] = useState<Record<string, string | null>>({});
   useEffect(() => {
     let cancelled = false;
     supabase
       .from("destinos")
-      .select("slug, hero_image_url")
+      .select("slug, hero_image_url, mobile_hero_image_url")
       .not("slug", "is", null)
       .limit(MAX_ITEMS)
       .then(({ data }) => {
         if (cancelled || !data) return;
         const map: Record<string, string | null> = {};
         for (const row of data) {
-          if (row.slug) map[row.slug as string] = (row as any).hero_image_url ?? null;
+          if (!row.slug) continue;
+          const mobile = (row as any).mobile_hero_image_url as string | null | undefined;
+          const hero   = (row as any).hero_image_url as string | null | undefined;
+          // On mobile: prefer mobile_hero_image_url → hero_image_url → null
+          // On web:    prefer hero_image_url (mobile URLs may not be needed)
+          map[row.slug as string] =
+            (Platform.OS !== "web" && mobile) ? mobile :
+            hero                              ? hero   :
+            null;
         }
         setHeroImages(map);
       });
