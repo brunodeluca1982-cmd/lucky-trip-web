@@ -228,7 +228,7 @@ async function enrichPlaces(
   const [oqResult, luckyResult, restResult] = await Promise.all([
     oqIds.length > 0
       ? supa
-          .from("o_que_fazer_rio")
+          .from("o_que_fazer_rio_v2")
           .select(
             "id,nome,bairro,categoria,tags_ia,momento_ideal,vibe,energia,duracao_media,photo_url,meu_olhar",
           )
@@ -236,7 +236,7 @@ async function enrichPlaces(
       : Promise.resolve({ data: [] }),
     luckyIds.length > 0
       ? supa
-          .from("lucky_list_rio")
+          .from("lucky_list_rio_v2")
           .select(
             "id,nome,bairro,tipo,tags_ia,momento_ideal,photo_url,meu_olhar",
           )
@@ -443,14 +443,16 @@ async function fetchComplementaryContent(
 
     const [luckyResult, oqResult] = await Promise.all([
       supa
-        .from("lucky_list_rio")
+        .from("lucky_list_rio_v2")
         .select("id,nome,bairro,tipo,tags_ia,momento_ideal,photo_url,meu_olhar")
+        .eq("ativo", true)
         .limit(fetchLimit),
       supa
-        .from("o_que_fazer_rio")
+        .from("o_que_fazer_rio_v2")
         .select(
           "id,nome,bairro,tags_ia,momento_ideal,vibe,energia,duracao_media,photo_url,meu_olhar",
         )
+        .eq("ativo", true)
         .limit(fetchLimit),
     ]);
 
@@ -1655,9 +1657,9 @@ function categoriaToTable(cat: SavedCategory): string {
     case "hotel":
       return "stay_hotels";
     case "oQueFazer":
-      return "o_que_fazer_rio";
+      return "o_que_fazer_rio_v2";
     case "lucky":
-      return "lucky_list_rio";
+      return "lucky_list_rio_v2";
   }
 }
 

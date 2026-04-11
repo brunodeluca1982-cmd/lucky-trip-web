@@ -63,26 +63,26 @@ export type SavedCategory = "oQueFazer" | "restaurante" | "hotel" | "lucky";
 export type SourceTable =
   | "restaurantes"
   | "stay_hotels"
-  | "o_que_fazer_rio"
-  | "lucky_list_rio";
+  | "o_que_fazer_rio_v2"
+  | "lucky_list_rio_v2";
 
 /** Maps UI category to the Supabase source table. */
 export function sourceTableFromCategoria(categoria: SavedCategory): SourceTable {
   switch (categoria) {
     case "restaurante": return "restaurantes";
     case "hotel":       return "stay_hotels";
-    case "oQueFazer":   return "o_que_fazer_rio";
-    case "lucky":       return "lucky_list_rio";
+    case "oQueFazer":   return "o_que_fazer_rio_v2";
+    case "lucky":       return "lucky_list_rio_v2";
   }
 }
 
 /** Maps Supabase source table back to UI category. */
 export function categoriaFromSourceTable(table: SourceTable): SavedCategory {
   switch (table) {
-    case "restaurantes":    return "restaurante";
-    case "stay_hotels":     return "hotel";
-    case "o_que_fazer_rio": return "oQueFazer";
-    case "lucky_list_rio":  return "lucky";
+    case "restaurantes":       return "restaurante";
+    case "stay_hotels":        return "hotel";
+    case "o_que_fazer_rio_v2": return "oQueFazer";
+    case "lucky_list_rio_v2":  return "lucky";
   }
 }
 

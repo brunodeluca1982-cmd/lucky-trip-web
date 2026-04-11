@@ -10,7 +10,7 @@
  * subsequent batches so the loop always terminates.
  *
  * POST body:
- *   table?:        "stay_hotels" | "lucky_list_rio" | "restaurantes" | "o_que_fazer_rio"
+ *   table?:        "stay_hotels" | "lucky_list_rio_v2" | "restaurantes" | "o_que_fazer_rio_v2"
  *                   (default: all four)
  *   batch_size?:   number  (default 20, max 50)
  *   force?:        boolean (default false — skip rows that already have photo_url)
@@ -31,9 +31,7 @@ const CORS = {
 //
 // activeCol: column used to filter active rows.
 //   - null means the table has no active/ativo column → no filter applied.
-//   - o_que_fazer_rio and lucky_list_rio have NO ativo column; applying
-//     `.eq("ativo", true)` on them returns a PostgREST "column not found"
-//     error and silently skips enrichment for those tables entirely.
+//   - v2 tables (o_que_fazer_rio_v2, lucky_list_rio_v2) have an `ativo` column.
 
 interface TableConfig {
   nameCol:         string;
@@ -42,10 +40,10 @@ interface TableConfig {
 }
 
 const TABLE_CONFIGS: Record<string, TableConfig> = {
-  restaurantes:    { nameCol: "nome",       neighborhoodCol: "bairro",            activeCol: "ativo"  },
-  stay_hotels:     { nameCol: "hotel_name", neighborhoodCol: "neighborhood_slug", activeCol: "active" },
-  o_que_fazer_rio: { nameCol: "nome",       neighborhoodCol: "bairro",            activeCol: null     },
-  lucky_list_rio:  { nameCol: "nome",       neighborhoodCol: "bairro",            activeCol: null     },
+  restaurantes:       { nameCol: "nome",       neighborhoodCol: "bairro",            activeCol: "ativo"  },
+  stay_hotels:        { nameCol: "hotel_name", neighborhoodCol: "neighborhood_slug", activeCol: "active" },
+  o_que_fazer_rio_v2: { nameCol: "nome",       neighborhoodCol: "bairro",            activeCol: "ativo"  },
+  lucky_list_rio_v2:  { nameCol: "nome",       neighborhoodCol: "bairro",            activeCol: "ativo"  },
 };
 
 // ── Google Places helpers ─────────────────────────────────────────────────────

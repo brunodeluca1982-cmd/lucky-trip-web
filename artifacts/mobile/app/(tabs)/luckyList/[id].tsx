@@ -152,7 +152,7 @@ export default function LuckyListScreen() {
                   }
                   router.push({
                     pathname: "/lugar/[cityId]/[placeId]",
-                    params: { cityId: destino.id, placeId: place.id, source_table: "lucky_list_rio" },
+                    params: { cityId: destino.id, placeId: place.id, source_table: "lucky_list_rio_v2" },
                   });
                 }}
               >
@@ -223,7 +223,7 @@ export default function LuckyListScreen() {
                           e.stopPropagation?.();
                           router.push({
                             pathname: "/lugar/[cityId]/[placeId]",
-                            params: { cityId: destino.id, placeId: place.id, source_table: "lucky_list_rio", showMap: "true" },
+                            params: { cityId: destino.id, placeId: place.id, source_table: "lucky_list_rio_v2", showMap: "true" },
                           });
                         }}
                       >
@@ -240,7 +240,7 @@ export default function LuckyListScreen() {
                             save({
                               id:           place.id,
                               categoria:    "lucky",
-                              source_table: "lucky_list_rio",
+                              source_table: "lucky_list_rio_v2",
                               titulo:       place.titulo,
                               localizacao:  place.localizacao,
                               image:        place.image,

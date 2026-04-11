@@ -46,7 +46,7 @@ function ClassicoCard({ item }: { item: LugarPlace }) {
       ]}
       onPress={() => router.push({
         pathname: "/lugar/[cityId]/[placeId]",
-        params: { cityId: "rio", placeId: item.id, source_table: "o_que_fazer_rio" },
+        params: { cityId: "rio", placeId: item.id, source_table: "o_que_fazer_rio_v2" },
       })}
     >
       <Image source={item.image} style={s.classicoImage} resizeMode="cover" />
@@ -84,7 +84,7 @@ function LuckyCard({
       ]}
       onPress={() => router.push({
         pathname: "/lugar/[cityId]/[placeId]",
-        params: { cityId, placeId: item.id, source_table: "lucky_list_rio" },
+        params: { cityId, placeId: item.id, source_table: "lucky_list_rio_v2" },
       })}
     >
       {/* Image */}

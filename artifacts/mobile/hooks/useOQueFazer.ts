@@ -1,5 +1,5 @@
 /**
- * useOQueFazer.ts — Fetches activities from Supabase `o_que_fazer_rio` table.
+ * useOQueFazer.ts — Fetches activities from Supabase `o_que_fazer_rio_v2` table.
  * Returns LugarPlace-compatible objects for use in O que fazer screens.
  * Photos: Supabase photo_url only. Returns null when no Supabase image exists.
  */
@@ -28,8 +28,9 @@ export function useOQueFazer(): State {
       setError(null);
 
       const { data, error: err } = await supabase
-        .from("o_que_fazer_rio")
+        .from("o_que_fazer_rio_v2")
         .select("*")
+        .eq("ativo", true)
         .order("nome");
 
       if (cancelled) return;

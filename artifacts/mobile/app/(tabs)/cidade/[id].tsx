@@ -386,7 +386,7 @@ export default function CidadeScreen() {
                         size="medium"
                         onPress={() => router.push({
                           pathname: "/lugar/[cityId]/[placeId]",
-                          params: { cityId: "rio", placeId: item.id, source_table: "o_que_fazer_rio" },
+                          params: { cityId: "rio", placeId: item.id, source_table: "o_que_fazer_rio_v2" },
                         })}
                       />
                     ))}

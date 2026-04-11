@@ -1260,8 +1260,8 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
       try {
         const [r1, r2, r3, r4] = await Promise.all([
           supabase.from("restaurantes").select("id,nome,bairro,especialidade,photo_url").ilike("nome", `%${q}%`).limit(6),
-          supabase.from("o_que_fazer_rio").select("id,nome,bairro,categoria,photo_url").ilike("nome", `%${q}%`).limit(6),
-          supabase.from("lucky_list_rio").select("id,nome,bairro,tipo,photo_url").ilike("nome", `%${q}%`).limit(4),
+          supabase.from("o_que_fazer_rio_v2").select("id,nome,bairro,categoria,photo_url").eq("ativo", true).ilike("nome", `%${q}%`).limit(6),
+          supabase.from("lucky_list_rio_v2").select("id,nome,bairro,tipo,photo_url").eq("ativo", true).ilike("nome", `%${q}%`).limit(4),
           supabase.from("stay_hotels").select("id,nome,bairro,categoria,photo_url").ilike("nome", `%${q}%`).limit(4),
         ]);
         const rows: Suggestion[] = [
@@ -1275,13 +1275,13 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
           ...(r2.data ?? []).map((r: Record<string, unknown>) => ({
             id: String(r.id), titulo: (r.nome as string) || "", localizacao: (r.bairro as string) || "",
             image: (r.photo_url as string | null) ? { uri: r.photo_url as string } : null, categoria: "oQueFazer" as SavedCategory,
-            source_table: "o_que_fazer_rio" as SourceTable,
+            source_table: "o_que_fazer_rio_v2" as SourceTable,
             subtitle: (r.categoria as string) ?? "O que fazer",
           })),
           ...(r3.data ?? []).map((r: Record<string, unknown>) => ({
             id: String(r.id), titulo: (r.nome as string) || "", localizacao: (r.bairro as string) || "",
             image: (r.photo_url as string | null) ? { uri: r.photo_url as string } : null, categoria: "lucky" as SavedCategory,
-            source_table: "lucky_list_rio" as SourceTable,
+            source_table: "lucky_list_rio_v2" as SourceTable,
             subtitle: (r.tipo as string) ?? "Lucky",
           })),
           ...(r4.data ?? []).map((r: Record<string, unknown>) => ({
@@ -1321,8 +1321,9 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
         }));
       } else if (item.categoria === "lucky") {
         const { data } = await supabase
-          .from("lucky_list_rio")
+          .from("lucky_list_rio_v2")
           .select("id, nome, bairro, tipo, photo_url")
+          .eq("ativo", true)
           .limit(14);
         rows = (data ?? []).map((r: Record<string, unknown>) => ({
           id:           String(r.id),
@@ -1330,13 +1331,14 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
           localizacao:  (r.bairro as string) || "",
           image:        (r.photo_url as string | null) ? { uri: r.photo_url as string } : null,
           categoria:    "lucky" as SavedCategory,
-          source_table: "lucky_list_rio" as SourceTable,
+          source_table: "lucky_list_rio_v2" as SourceTable,
           subtitle:     (r.tipo as string) ?? undefined,
         }));
       } else {
         const { data } = await supabase
-          .from("o_que_fazer_rio")
+          .from("o_que_fazer_rio_v2")
           .select("id, nome, bairro, categoria, photo_url")
+          .eq("ativo", true)
           .limit(14);
         rows = (data ?? []).map((r: Record<string, unknown>) => ({
           id:           String(r.id),
@@ -1344,7 +1346,7 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
           localizacao:  (r.bairro as string) || "",
           image:        (r.photo_url as string | null) ? { uri: r.photo_url as string } : null,
           categoria:    "oQueFazer" as SavedCategory,
-          source_table: "o_que_fazer_rio" as SourceTable,
+          source_table: "o_que_fazer_rio_v2" as SourceTable,
           subtitle:     (r.categoria as string) ?? undefined,
         }));
       }

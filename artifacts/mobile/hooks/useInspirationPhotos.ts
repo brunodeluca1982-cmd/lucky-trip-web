@@ -5,12 +5,12 @@ import type { Inspiration } from "@/utils/buildItinerary";
 export type InspirationPhotoMap = Partial<Record<Inspiration, string>>;
 
 async function fetchPhoto(
-  table: "o_que_fazer_rio" | "restaurantes",
+  table: "o_que_fazer_rio_v2" | "restaurantes",
   filters: { column: string; value: string }[],
   tagFilter?: string,
 ): Promise<string | null> {
   try {
-    let q = supabase.from(table).select("photo_url").not("photo_url", "is", null);
+    let q = supabase.from(table).select("photo_url").not("photo_url", "is", null).eq("ativo", true);
 
     for (const f of filters) {
       q = (q as any).eq(f.column, f.value);
@@ -37,12 +37,12 @@ export function useInspirationPhotos(): InspirationPhotoMap {
 
     async function load() {
       const [gastro, natureza, culture, adventure, beach, festa] = await Promise.all([
-        fetchPhoto("restaurantes", [{ column: "ativo", value: "true" }]),
-        fetchPhoto("o_que_fazer_rio", [{ column: "categoria", value: "natureza" }]),
-        fetchPhoto("o_que_fazer_rio", [{ column: "categoria", value: "cultura" }]),
-        fetchPhoto("o_que_fazer_rio", [{ column: "categoria", value: "trilha" }]),
-        fetchPhoto("o_que_fazer_rio", [{ column: "categoria", value: "praia" }]),
-        fetchPhoto("o_que_fazer_rio", [], "samba"),
+        fetchPhoto("restaurantes", []),
+        fetchPhoto("o_que_fazer_rio_v2", [{ column: "categoria", value: "natureza" }]),
+        fetchPhoto("o_que_fazer_rio_v2", [{ column: "categoria", value: "cultura" }]),
+        fetchPhoto("o_que_fazer_rio_v2", [{ column: "categoria", value: "trilha" }]),
+        fetchPhoto("o_que_fazer_rio_v2", [{ column: "categoria", value: "praia" }]),
+        fetchPhoto("o_que_fazer_rio_v2", [], "samba"),
       ]);
 
       if (!cancelled) {

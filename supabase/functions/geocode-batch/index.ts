@@ -5,7 +5,7 @@
  * Reuses GOOGLE_MAPS_API_KEY + SUPABASE_SERVICE_ROLE_KEY secrets already
  * present in this project (shared with google-places / autopilot_geocode).
  *
- * Tables: restaurantes · stay_hotels · o_que_fazer_rio · lucky_list_rio
+ * Tables: restaurantes · stay_hotels · o_que_fazer_rio_v2 · lucky_list_rio_v2
  *
  * Confidence (Jaccard similarity on normalised name tokens):
  *   ≥ 0.80  HIGH   → write place_id, lat, lng, formatted_address, google_maps_url
@@ -27,10 +27,10 @@ const CORS = {
 };
 
 const TABLE_CONFIGS = {
-  restaurantes:    { nameCol: "nome",       neighborhoodCol: "bairro" },
-  stay_hotels:     { nameCol: "hotel_name", neighborhoodCol: "neighborhood_slug" },
-  o_que_fazer_rio: { nameCol: "nome",       neighborhoodCol: "bairro" },
-  lucky_list_rio:  { nameCol: "nome",       neighborhoodCol: "bairro" },
+  restaurantes:       { nameCol: "nome",       neighborhoodCol: "bairro" },
+  stay_hotels:        { nameCol: "hotel_name", neighborhoodCol: "neighborhood_slug" },
+  o_que_fazer_rio_v2: { nameCol: "nome",       neighborhoodCol: "bairro" },
+  lucky_list_rio_v2:  { nameCol: "nome",       neighborhoodCol: "bairro" },
 };
 
 // ── Jaccard similarity on normalised tokens ───────────────────────────────────

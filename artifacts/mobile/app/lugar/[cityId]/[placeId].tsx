@@ -57,8 +57,8 @@ function resolveSaveCategory(
   // Preferred: derive from source_table (authoritative)
   if (source_table === "restaurantes")    return "restaurante";
   if (source_table === "stay_hotels")     return "hotel";
-  if (source_table === "o_que_fazer_rio") return "oQueFazer";
-  if (source_table === "lucky_list_rio")  return "lucky";
+  if (source_table === "o_que_fazer_rio_v2") return "oQueFazer";
+  if (source_table === "lucky_list_rio_v2")  return "lucky";
   // Legacy: categoria param from older navigation paths
   if (categoria === "restaurante") return "restaurante";
   if (categoria === "hotel")       return "hotel";
@@ -98,8 +98,8 @@ function useSupabaseLugar(
     source_table ??
     (categoria === "restaurante" ? "restaurantes"
       : categoria === "hotel"    ? "stay_hotels"
-      : categoria === "oQueFazer" ? "o_que_fazer_rio"
-      : categoria === "lucky"    ? "lucky_list_rio"
+      : categoria === "oQueFazer" ? "o_que_fazer_rio_v2"
+      : categoria === "lucky"    ? "lucky_list_rio_v2"
       : undefined);
 
   useEffect(() => {
@@ -151,13 +151,13 @@ function useSupabaseLugar(
             };
           }
           } // closes the `else { // numId valid }` block
-        } else if (effectiveTable === "o_que_fazer_rio") {
+        } else if (effectiveTable === "o_que_fazer_rio_v2") {
           const { data, error: err } = await supabase
-            .from("o_que_fazer_rio")
+            .from("o_que_fazer_rio_v2")
             .select("*")
             .eq("id", placeId)
             .maybeSingle();
-          if (err) console.warn("[useSupabaseLugar] o_que_fazer_rio error:", err.message);
+          if (err) console.warn("[useSupabaseLugar] o_que_fazer_rio_v2 error:", err.message);
           if (data) {
             const pin = resolvePin("rio", (data as any).bairro ?? "", 0);
             // photo_url IS present in o_que_fazer_rio — always use it when available
@@ -177,17 +177,16 @@ function useSupabaseLugar(
               google_maps_url: (data as any).google_maps_url ?? null,
             };
           }
-        } else if (effectiveTable === "lucky_list_rio") {
-          // Confirmed columns from edge function enrichment
+        } else if (effectiveTable === "lucky_list_rio_v2") {
           const { data, error: err } = await supabase
-            .from("lucky_list_rio")
+            .from("lucky_list_rio_v2")
             .select("*")
             .eq("id", placeId)
             .maybeSingle();
-          if (err) console.warn("[useSupabaseLugar] lucky_list_rio error:", err.message);
+          if (err) console.warn("[useSupabaseLugar] lucky_list_rio_v2 error:", err.message);
           if (data) {
             const pin = resolvePin("rio", (data as any).bairro ?? "", 0);
-            // photo_url IS present in lucky_list_rio — always use it when available
+            // photo_url IS present in lucky_list_rio_v2 — always use it when available
             const photoUri  = (data as any).photo_url as string | null ?? null;
             const meuOlhar  = (data as any).meu_olhar as string | null;
             const descricao = meuOlhar ?? "Um dos achados especiais da Lucky List — lugares que só quem sabe, sabe.";

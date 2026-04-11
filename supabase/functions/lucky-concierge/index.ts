@@ -168,8 +168,9 @@ async function fetchRestaurants(supa: ReturnType<typeof createClient>) {
 
 async function fetchActivities(supa: ReturnType<typeof createClient>) {
   const { data } = await supa
-    .from("o_que_fazer_rio")
+    .from("o_que_fazer_rio_v2")
     .select("id, nome, bairro, categoria, meu_olhar, vibe, momento_ideal")
+    .eq("ativo", true)
     .limit(30);
   return (data ?? []).map((a: Record<string, unknown>) => ({
     id:        String(a.id),
@@ -219,8 +220,9 @@ async function fetchNeighborhoods(supa: ReturnType<typeof createClient>) {
 
 async function fetchLuckyPicks(supa: ReturnType<typeof createClient>) {
   const { data } = await supa
-    .from("lucky_list_rio")
+    .from("lucky_list_rio_v2")
     .select("id, nome, bairro, tipo_item, meu_olhar, destaque_lucky")
+    .eq("ativo", true)
     .limit(20);
   return (data ?? []).map((l: Record<string, unknown>) => ({
     id:        String(l.id),

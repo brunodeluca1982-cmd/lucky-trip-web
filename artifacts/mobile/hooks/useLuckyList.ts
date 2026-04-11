@@ -1,5 +1,5 @@
 /**
- * useLuckyList.ts — Fetches lucky picks from Supabase `lucky_list_rio` table.
+ * useLuckyList.ts — Fetches lucky picks from Supabase `lucky_list_rio_v2` table.
  * Returns LugarPlace-compatible objects for use in Lucky List screens.
  * Photos: Supabase photo_url only. Returns null when no Supabase image exists.
  */
@@ -28,8 +28,9 @@ export function useLuckyList(): State {
       setError(null);
 
       const { data, error: err } = await supabase
-        .from("lucky_list_rio")
+        .from("lucky_list_rio_v2")
         .select("*")
+        .eq("ativo", true)
         .order("nome");
 
       if (cancelled) return;

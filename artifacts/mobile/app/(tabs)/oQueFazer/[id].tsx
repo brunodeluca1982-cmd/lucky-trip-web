@@ -141,7 +141,7 @@ export default function OQueFazerScreen() {
               onPress={() =>
                 router.push({
                   pathname: "/lugar/[cityId]/[placeId]",
-                  params: { cityId: destino.id, placeId: place.id, source_table: "o_que_fazer_rio" },
+                  params: { cityId: destino.id, placeId: place.id, source_table: "o_que_fazer_rio_v2" },
                 })
               }
             >
@@ -163,7 +163,7 @@ export default function OQueFazerScreen() {
                       save({
                         id:           place.id,
                         categoria:    "oQueFazer",
-                        source_table: "o_que_fazer_rio",
+                        source_table: "o_que_fazer_rio_v2",
                         titulo:       place.titulo,
                         localizacao:  place.localizacao,
                         image:        place.image,
@@ -203,7 +203,7 @@ export default function OQueFazerScreen() {
                     e.stopPropagation?.();
                     router.push({
                       pathname: "/lugar/[cityId]/[placeId]",
-                      params: { cityId: destino.id, placeId: place.id, source_table: "o_que_fazer_rio", showMap: "true" },
+                      params: { cityId: destino.id, placeId: place.id, source_table: "o_que_fazer_rio_v2", showMap: "true" },
                     });
                   }}
                 >
