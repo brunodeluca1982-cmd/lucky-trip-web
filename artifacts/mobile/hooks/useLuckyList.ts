@@ -48,6 +48,7 @@ export function useLuckyList(): State {
         const bairro    = (row.bairro as string | null) ?? "";
         const pin       = resolvePin("rio", bairro, idx % 6);
         const supaPhoto = (row as any).photo_url as string | null ?? null;
+        console.log("PHOTO_URL:", row.photo_url);
         const tipoItem  = (row as any).tipo_item as string | null;
         const entityType =
           tipoItem === "restaurante" ? "restaurant" :
