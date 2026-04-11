@@ -25,7 +25,6 @@ import Colors from "@/constants/colors";
 import { destinos } from "@/data/mockData";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import RioMapView from "@/components/RioMapView";
-import { getImageForEntity } from "@/utils/getImageForEntity";
 import { useGuia } from "@/context/GuiaContext";
 
 const C = Colors.light;
@@ -155,7 +154,7 @@ export default function ComerBemScreen() {
           )}
 
           {!loading && !error && allRestaurantes.map((r, index) => {
-            const imageSource = getImageForEntity("restaurant", r.nome, r.bairro, r.resolvedPhotoUri);
+            const imageSource = r.resolvedPhotoUri ? { uri: r.resolvedPhotoUri } : null;
 
             return (
               <Pressable

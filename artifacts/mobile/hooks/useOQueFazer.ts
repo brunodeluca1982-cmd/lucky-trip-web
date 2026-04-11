@@ -8,7 +8,6 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { LugarPlace } from "@/data/lugares";
 import { resolvePin } from "@/data/lugares";
-import { getImageForEntity } from "@/utils/getImageForEntity";
 
 type State = {
   lugares: LugarPlace[];
@@ -54,7 +53,7 @@ export function useOQueFazer(): State {
           localizacao:   bairro                                         || "Rio de Janeiro",
           categoria:     ((row.categoria as string | null)?.toUpperCase()) ?? "EXPERIÊNCIA",
           descricao:     "Uma das experiências selecionadas para o Rio de Janeiro.",
-          image:         getImageForEntity("activity", row.nome ?? "", bairro, supaPhoto),
+          image:         supaPhoto ? { uri: supaPhoto } : null,
           xPct:          pin.xPct,
           yPct:          pin.yPct,
           tipo_item:     "experiencia",

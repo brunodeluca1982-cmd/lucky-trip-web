@@ -32,7 +32,6 @@ import { destinos } from "@/data/mockData";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import { useNeighborhoods } from "@/hooks/useNeighborhoods";
 import { getNeighborhoodHero } from "@/utils/neighborhoodHero";
-import { getImageForEntity } from "@/utils/getImageForEntity";
 import { useGuia } from "@/context/GuiaContext";
 
 const C = Colors.light;
@@ -238,7 +237,7 @@ export default function ComerBemBairroScreen() {
           )}
 
           {!loading && !error && filtered.map((r, index) => {
-            const imageSource = getImageForEntity("restaurant", r.nome, r.bairro, r.resolvedPhotoUri);
+            const imageSource = r.resolvedPhotoUri ? { uri: r.resolvedPhotoUri } : null;
 
             return (
               <Pressable

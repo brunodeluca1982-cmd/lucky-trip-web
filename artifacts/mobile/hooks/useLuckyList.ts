@@ -8,7 +8,6 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { LugarPlace } from "@/data/lugares";
 import { resolvePin } from "@/data/lugares";
-import { getImageForEntity } from "@/utils/getImageForEntity";
 
 type State = {
   lugares: LugarPlace[];
@@ -64,7 +63,7 @@ export function useLuckyList(): State {
           localizacao: bairro                          || "Rio de Janeiro",
           categoria:   "LUCKY LIST",
           descricao:   "Um dos achados especiais da Lucky List — lugares que só quem sabe, sabe.",
-          image:       getImageForEntity(entityType, row.nome ?? "", bairro, supaPhoto),
+          image:       supaPhoto ? { uri: supaPhoto } : null,
           xPct:        pin.xPct,
           yPct:        pin.yPct,
           tipo_item:   resolvedTipo,

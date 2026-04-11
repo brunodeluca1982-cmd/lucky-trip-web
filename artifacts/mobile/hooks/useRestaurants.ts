@@ -2,10 +2,7 @@
  * useRestaurants.ts
  *
  * Fetches restaurants from Supabase `restaurantes` table.
- * Image resolution strategy:
- *   1. restaurantes.photo_url  (already present in most rows)
- *   2. place_photos.photo_url  (fallback: item_type='restaurantes', item_id=String(id))
- *   3. null                    (caller renders a neutral placeholder)
+ * Image: restaurantes.photo_url directly → null when absent.
  */
 
 import { useEffect, useState } from "react";
@@ -49,33 +46,12 @@ export function useRestaurants(cidadeId?: string): State {
 
       const rawRows = (rows ?? []) as Omit<Restaurante, "resolvedPhotoUri">[];
 
-      // ── 2. Fetch place_photos fallbacks for rows missing photo_url ────────
-      const missingIds = rawRows
-        .filter((r) => !r.photo_url)
-        .map((r) => String(r.id));
-
-      let photoMap: Record<string, string> = {};
-
-      if (missingIds.length > 0) {
-        const { data: photos } = await supabase
-          .from("place_photos")
-          .select("item_id, photo_url")
-          .eq("item_type", "restaurantes")
-          .in("item_id", missingIds);
-
-        if (!cancelled && photos) {
-          for (const p of photos) {
-            if (p.photo_url) photoMap[p.item_id] = p.photo_url;
-          }
-        }
-      }
-
       if (cancelled) return;
 
-      // ── 3. Render immediately with Supabase / place_photos ────────────────
+      // ── 2. Map photo_url directly ─────────────────────────────────────────
       const merged: Restaurante[] = rawRows.map((r) => ({
         ...r,
-        resolvedPhotoUri: r.photo_url ?? photoMap[String(r.id)] ?? null,
+        resolvedPhotoUri: r.photo_url ?? null,
       }));
 
       setRestaurantes(merged);
