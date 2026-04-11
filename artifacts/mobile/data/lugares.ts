@@ -22,6 +22,8 @@ export interface LugarPlace {
   localizacao: string; // bairro — used to look up zone
   categoria: string;
   descricao: string;
+  /** Raw Supabase photo URL — use directly in <Image source={{ uri: photo_url }} /> */
+  photo_url?: string | null;
   image: ImageSourcePropType | null;
   images?: ImageSourcePropType[]; // optional multi-image carousel; falls back to [image]
   preco?: string;

@@ -55,6 +55,7 @@ export function useOQueFazer(): State {
           localizacao:   bairro                                         || "Rio de Janeiro",
           categoria:     ((row.categoria as string | null)?.toUpperCase()) ?? "EXPERIÊNCIA",
           descricao:     "Uma das experiências selecionadas para o Rio de Janeiro.",
+          photo_url:     supaPhoto,
           image:         supaPhoto ? { uri: supaPhoto } : null,
           xPct:          pin.xPct,
           yPct:          pin.yPct,

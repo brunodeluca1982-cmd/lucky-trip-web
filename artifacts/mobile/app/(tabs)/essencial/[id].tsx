@@ -49,7 +49,11 @@ function ClassicoCard({ item }: { item: LugarPlace }) {
         params: { cityId: "rio", placeId: item.id, source_table: "o_que_fazer_rio_v2" },
       })}
     >
-      <Image source={item.image} style={s.classicoImage} resizeMode="cover" />
+      {item.photo_url ? (
+        <Image source={{ uri: item.photo_url }} style={s.classicoImage} resizeMode="cover" />
+      ) : (
+        <View style={[s.classicoImage, { backgroundColor: "#1A0E04" }]} />
+      )}
       <LinearGradient
         colors={["rgba(0,0,0,0.02)", "rgba(0,0,0,0.82)"]}
         locations={[0.25, 1]}
@@ -89,7 +93,11 @@ function LuckyCard({
     >
       {/* Image */}
       <View style={s.luckyImageWrap}>
-        <Image source={item.image} style={s.luckyImage} resizeMode="cover" />
+        {item.photo_url ? (
+          <Image source={{ uri: item.photo_url }} style={s.luckyImage} resizeMode="cover" />
+        ) : (
+          <View style={[s.luckyImage, { backgroundColor: "#1A0E04" }]} />
+        )}
         <LinearGradient
           colors={["rgba(0,0,0,0.06)", "rgba(0,0,0,0.55)"]}
           locations={[0.2, 1]}

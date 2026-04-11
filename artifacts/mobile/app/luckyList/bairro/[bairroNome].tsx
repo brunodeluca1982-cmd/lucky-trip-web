@@ -247,7 +247,11 @@ export default function LuckyListBairroScreen() {
               }
             >
               <View style={s.cardImageWrap}>
-                <Image source={place.image} style={s.cardImage} resizeMode="cover" />
+                {place.photo_url ? (
+                  <Image source={{ uri: place.photo_url }} style={s.cardImage} resizeMode="cover" />
+                ) : (
+                  <View style={[s.cardImage, { backgroundColor: "#1A0E04" }]} />
+                )}
                 <LinearGradient
                   colors={["rgba(0,0,0,0.22)", "rgba(0,0,0,0.05)", "rgba(0,0,0,0.55)"]}
                   locations={[0, 0.45, 1]}

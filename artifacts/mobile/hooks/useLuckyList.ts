@@ -65,6 +65,7 @@ export function useLuckyList(): State {
           localizacao: bairro                          || "Rio de Janeiro",
           categoria:   "LUCKY LIST",
           descricao:   "Um dos achados especiais da Lucky List — lugares que só quem sabe, sabe.",
+          photo_url:   supaPhoto,
           image:       supaPhoto ? { uri: supaPhoto } : null,
           xPct:        pin.xPct,
           yPct:        pin.yPct,
