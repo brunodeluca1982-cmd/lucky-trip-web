@@ -307,10 +307,10 @@ async function enrichPlaces(
         duracao = (row.duracao_media as string) ?? "1-2h";
         photo_url = (row.photo_url as string | null) ?? null;
         meu_olhar = (row.meu_olhar as string | null) ?? null;
-        console.log("PHOTO IN PIPELINE [oQueFazer]:", photo_url);
+        console.log("FETCHED FROM DB:", row.nome, row.photo_url);
       }
     } else if (s.categoria === "lucky") {
-      // Look up in lucky_list_rio — confirmed columns: id,nome,bairro,tipo,tags_ia,momento_ideal,photo_url,meu_olhar
+      // Look up in lucky_list_rio_v2 — confirmed columns: id,nome,bairro,tipo,tags_ia,momento_ideal,photo_url,meu_olhar
       const row = luckyMap.get(s.id);
       if (row) {
         area = (row.bairro as string) || area;
@@ -321,7 +321,7 @@ async function enrichPlaces(
         energia = "medium";
         photo_url = (row.photo_url as string | null) ?? null;
         meu_olhar = (row.meu_olhar as string | null) ?? null;
-        console.log("PHOTO IN PIPELINE [lucky]:", photo_url);
+        console.log("FETCHED FROM DB:", row.nome, row.photo_url);
       }
     } else if (s.categoria === "restaurante") {
       const row = restMap.get(Number(s.id));
@@ -332,7 +332,7 @@ async function enrichPlaces(
         perfil = row.perfil_publico as string | undefined;
         photo_url = (row.photo_url as string | null) ?? null;
         meu_olhar = (row.meu_olhar as string | null) ?? null;
-        console.log("PHOTO IN PIPELINE [restaurante]:", photo_url);
+        console.log("FETCHED FROM DB:", row.nome, row.photo_url);
         // Use DB momento_ideal if present; fall back to ["lunch"] so existing
         // behavior is preserved for restaurants that have no momento_ideal set.
         const dbMomento = (row.momento_ideal as string[] | null) ?? [];
@@ -496,6 +496,7 @@ async function fetchComplementaryContent(
         photo_url: (row.photo_url as string | null) ?? null,
         meu_olhar: (row.meu_olhar as string | null) ?? null,
       });
+      console.log("FETCHED FROM DB:", row.nome, row.photo_url);
     }
 
     // Build o_que_fazer candidates
@@ -519,6 +520,7 @@ async function fetchComplementaryContent(
         photo_url: (row.photo_url as string | null) ?? null,
         meu_olhar: (row.meu_olhar as string | null) ?? null,
       });
+      console.log("FETCHED FROM DB:", row.nome, row.photo_url);
     }
 
     // Score the merged pool, sort descending, take top needActs.
@@ -583,6 +585,7 @@ async function fetchComplementaryContent(
         photo_url: (row.photo_url as string | null) ?? null,
         meu_olhar: (row.meu_olhar as string | null) ?? null,
       };
+      console.log("FETCHED FROM DB:", row.nome, row.photo_url);
 
       // Classify into exactly one bucket — mutually exclusive.
       // isDinnerRestaurantInferred covers fine-dining/bistro/seafood with no momento_ideal.
