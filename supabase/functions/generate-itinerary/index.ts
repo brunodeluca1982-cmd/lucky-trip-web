@@ -61,6 +61,7 @@ interface EnrichedPlace {
   id: string;
   name: string;
   categoria: SavedCategory;
+  source_table: string; // e.g. "o_que_fazer_rio_v2" | "lucky_list_rio_v2" | "restaurantes" | "stay_hotels"
   // ── Location
   area: string; // bairro name
   zone: number; // 1-6, South → North
@@ -356,6 +357,7 @@ async function enrichPlaces(
       id: s.id,
       name,
       categoria: s.categoria,
+      source_table: categoriaToTable(s.categoria),
       area: area || "Rio de Janeiro",
       zone: getZone(area),
       momento_ideal: momento,
@@ -483,6 +485,7 @@ async function fetchComplementaryContent(
         id,
         name: (row.nome as string) || area,
         categoria: "lucky",
+        source_table: "lucky_list_rio_v2",
         area,
         zone: getZone(area),
         momento_ideal: Array.isArray(momento) ? momento : [],
@@ -505,6 +508,7 @@ async function fetchComplementaryContent(
         id,
         name: (row.nome as string) || area,
         categoria: "oQueFazer",
+        source_table: "o_que_fazer_rio_v2",
         area,
         zone: getZone(area),
         momento_ideal: (row.momento_ideal as string[]) ?? [],
@@ -565,6 +569,7 @@ async function fetchComplementaryContent(
         id,
         name: (row.nome as string) || area,
         categoria: "restaurante",
+        source_table: "restaurantes",
         area,
         zone: getZone(area),
         momento_ideal: dbMomento.length > 0 ? dbMomento : ["lunch"],
@@ -2102,10 +2107,11 @@ function validateAndFix(
   allPlaces: EnrichedPlace[],
 ): DiaRoteiro[] {
   // 7a. Re-attach any items dropped during Gemini refinement ─────────────────
+  // usedIds keys are "${source_table}_${id}" to avoid cross-table ID collisions.
   const usedIds = new Set<string>();
   for (const day of days) {
     for (const p of day.periodos) {
-      for (const it of p.items) usedIds.add(it.id);
+      for (const it of p.items) usedIds.add(`${it.source_table}_${it.id}`);
     }
   }
 
@@ -2115,8 +2121,9 @@ function validateAndFix(
   for (const day of days) {
     for (const p of day.periodos) {
       p.items = p.items.filter((it) => {
-        if (globalSeenIds.has(it.id)) return false;
-        globalSeenIds.add(it.id);
+        const key = `${it.source_table}_${it.id}`;
+        if (globalSeenIds.has(key)) return false;
+        globalSeenIds.add(key);
         return true;
       });
     }
@@ -2125,25 +2132,25 @@ function validateAndFix(
   usedIds.clear();
   for (const day of days) {
     for (const p of day.periodos) {
-      for (const it of p.items) usedIds.add(it.id);
+      for (const it of p.items) usedIds.add(`${it.source_table}_${it.id}`);
     }
   }
 
-  const lost = allPlaces.filter((p) => !usedIds.has(p.id));
+  const lost = allPlaces.filter((p) => !usedIds.has(`${p.source_table}_${p.id}`));
   if (lost.length > 0 && days.length > 0) {
     const lastDay = days[days.length - 1];
     const tarde = lastDay.periodos.find((p) => p.periodo === "tarde");
     // Only attach items not already present anywhere (belt-and-suspenders)
     const lostItems = lost
-      .filter((l) => !usedIds.has(l.id))
+      .filter((l) => !usedIds.has(`${l.source_table}_${l.id}`))
       .map((l) => {
-        usedIds.add(l.id);
+        usedIds.add(`${l.source_table}_${l.id}`);
         return {
           id: l.id,
           titulo: l.name,
           categoria: l.categoria,
           localizacao: l.area,
-          source_table: categoriaToTable(l.categoria),
+          source_table: l.source_table,
           // Step F — Supabase photo_url only; no external fallback
           image: l.photo_url ? { uri: l.photo_url } : undefined,
           photo_url: l.photo_url ?? null,
@@ -2161,8 +2168,10 @@ function validateAndFix(
   }
 
   // 7b. Temporal sanity pass — fix any invalid period assignments ─────────────
+  // Composite key "${source_table}_${id}" prevents cross-table ID collisions
+  // (o_que_fazer_rio_v2 and lucky_list_rio_v2 share the same numeric ID space).
   const placeById = new Map<string, EnrichedPlace>(
-    allPlaces.map((p) => [p.id, p]),
+    allPlaces.map((p) => [`${p.source_table}_${p.id}`, p]),
   );
 
   for (const day of days) {
@@ -2172,7 +2181,7 @@ function validateAndFix(
       const keep: ItemRoteiro[] = [];
 
       for (const item of periodoBlock.items) {
-        const place = placeById.get(item.id);
+        const place = placeById.get(`${item.source_table}_${item.id}`);
 
         // Rule 0 — Source-of-truth strip
         // Any item whose id is not present in allPlaces (the Supabase-sourced registry)
@@ -2349,7 +2358,7 @@ function validateAndFix(
       // Step 1 — frequency map
       const freq = new Map<string, number>();
       for (const it of allFinalItems) {
-        const loc = it.localizacao || placeById.get(it.id)?.area || "";
+        const loc = it.localizacao || placeById.get(`${it.source_table}_${it.id}`)?.area || "";
         if (loc) freq.set(loc, (freq.get(loc) ?? 0) + 1);
       }
       if (freq.size > 0) {
@@ -2371,9 +2380,9 @@ function validateAndFix(
           let winner = "";
           let bestDur = -1;
           for (const it of allFinalItems) {
-            const loc = it.localizacao || placeById.get(it.id)?.area || "";
+            const loc = it.localizacao || placeById.get(`${it.source_table}_${it.id}`)?.area || "";
             if (!tied.has(loc)) continue;
-            const dur = parseDur(placeById.get(it.id)?.duracao);
+            const dur = parseDur(placeById.get(`${it.source_table}_${it.id}`)?.duracao);
             if (dur > bestDur) {
               bestDur = dur;
               winner = loc;
@@ -2395,7 +2404,7 @@ function validateAndFix(
   for (const day of days) {
     for (const periodo of day.periodos) {
       for (const item of periodo.items) {
-        const place = placeById.get(item.id);
+        const place = placeById.get(`${item.source_table}_${item.id}`);
         if (place) {
           item.photo_url = place.photo_url ?? null;
           item.image = place.photo_url ? { uri: place.photo_url } : undefined;
