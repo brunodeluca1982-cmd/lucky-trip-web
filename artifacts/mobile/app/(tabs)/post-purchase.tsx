@@ -71,8 +71,10 @@ export default function PostPurchaseScreen() {
         return;
       }
 
-      const apiBase = process.env.EXPO_PUBLIC_APP_ORIGIN
-        ?? (process.env.EXPO_PUBLIC_DOMAIN ? `https://${process.env.EXPO_PUBLIC_DOMAIN}` : "");
+      const apiBase =
+        process.env.EXPO_PUBLIC_API_ORIGIN ||
+        process.env.EXPO_PUBLIC_APP_ORIGIN ||
+        (process.env.EXPO_PUBLIC_DOMAIN ? `https://${process.env.EXPO_PUBLIC_DOMAIN}` : "");
 
       async function poll() {
         if (cancelled) return;

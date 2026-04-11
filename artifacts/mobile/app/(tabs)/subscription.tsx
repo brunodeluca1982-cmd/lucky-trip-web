@@ -93,9 +93,13 @@ export default function SubscriptionScreen() {
         return;
       }
 
-      // Base URL for the API server (proxied through the same Replit domain)
-      const apiBase = process.env.EXPO_PUBLIC_APP_ORIGIN
-        || (process.env.EXPO_PUBLIC_DOMAIN ? `https://${process.env.EXPO_PUBLIC_DOMAIN}` : "");
+      // Base URL for the API server.
+      // EXPO_PUBLIC_API_ORIGIN targets the Replit API server when the frontend
+      // is hosted elsewhere (e.g. Netlify). Falls back to APP_ORIGIN for Replit dev.
+      const apiBase =
+        process.env.EXPO_PUBLIC_API_ORIGIN ||
+        process.env.EXPO_PUBLIC_APP_ORIGIN ||
+        (process.env.EXPO_PUBLIC_DOMAIN ? `https://${process.env.EXPO_PUBLIC_DOMAIN}` : "");
 
       const appOrigin = process.env.EXPO_PUBLIC_APP_ORIGIN
         || (process.env.EXPO_PUBLIC_EXPO_DOMAIN ? `https://${process.env.EXPO_PUBLIC_EXPO_DOMAIN}` : "");
@@ -145,8 +149,10 @@ export default function SubscriptionScreen() {
         setRestoreMsg("Sessão expirada. Faça login novamente.");
         return;
       }
-      const apiBase = process.env.EXPO_PUBLIC_APP_ORIGIN
-        || (process.env.EXPO_PUBLIC_DOMAIN ? `https://${process.env.EXPO_PUBLIC_DOMAIN}` : "");
+      const apiBase =
+        process.env.EXPO_PUBLIC_API_ORIGIN ||
+        process.env.EXPO_PUBLIC_APP_ORIGIN ||
+        (process.env.EXPO_PUBLIC_DOMAIN ? `https://${process.env.EXPO_PUBLIC_DOMAIN}` : "");
       const res = await fetch(`${apiBase}/api/stripe/sync-subscription`, {
         headers: { Authorization: `Bearer ${currentSession.access_token}` },
       });
