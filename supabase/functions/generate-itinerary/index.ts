@@ -404,14 +404,17 @@ async function fetchComplementaryContent(
   const currentDinner = existingPlaces.filter(
     (p) =>
       p.categoria === "restaurante" &&
-      (isBarRestaurant(p) || isDinnerRestaurant(p)),
+      (isBarRestaurant(p) ||
+        isDinnerRestaurant(p) ||
+        isDinnerRestaurantInferred(p)),
   ).length;
   const currentLunch = existingPlaces.filter(
     (p) =>
       p.categoria === "restaurante" &&
       !isBreakfastRestaurant(p) &&
       !isBarRestaurant(p) &&
-      !isDinnerRestaurant(p),
+      !isDinnerRestaurant(p) &&
+      !isDinnerRestaurantInferred(p),
   ).length;
 
   const needActs = Math.max(0, targetActs - currentActs);
@@ -582,9 +585,15 @@ async function fetchComplementaryContent(
         meu_olhar: (row.meu_olhar as string | null) ?? null,
       };
 
-      // Classify into exactly one bucket — mutually exclusive
+      // Classify into exactly one bucket — mutually exclusive.
+      // isDinnerRestaurantInferred covers fine-dining/bistro/seafood with no momento_ideal.
       if (isBreakfastRestaurant(p)) breakfastPool.push(p);
-      else if (isBarRestaurant(p) || isDinnerRestaurant(p)) dinnerPool.push(p);
+      else if (
+        isBarRestaurant(p) ||
+        isDinnerRestaurant(p) ||
+        isDinnerRestaurantInferred(p)
+      )
+        dinnerPool.push(p);
       else lunchPool.push(p);
     }
 
@@ -825,10 +834,99 @@ function isBarRestaurant(p: EnrichedPlace): boolean {
   return false;
 }
 
+// ── Dinner inference (no momento_ideal on restaurantes table) ─────────────────
+// Checks especialidade + tags for dinner-specific signals when isDinnerRestaurant
+// cannot fire (empty momento_ideal). Never overlaps with isBreakfastRestaurant or
+// isBarRestaurant — those are checked first in classifyPeriodo.
+const DINNER_ESPECIALIDADE_INFERRED = [
+  "jantar",
+  "fine dining",
+  "alta gastronomia",
+  "contemporânea",
+  "contemporanea",
+  "contemporâneo",
+  "contemporaneo",
+  "gastronômica",
+  "gastronomica",
+  "bistrô",
+  "bistro",
+  "frutos do mar",
+  "marisqueira",
+  "ostras",
+  "rodízio",
+  "rodizio",
+];
+const DINNER_TAGS_INFERRED = new Set([
+  "jantar",
+  "fine dining",
+  "alta gastronomia",
+  "bistrô",
+  "bistro",
+  "frutos do mar",
+  "marisqueira",
+  "rodízio",
+  "rodizio",
+]);
+
+function isDinnerRestaurantInferred(p: EnrichedPlace): boolean {
+  if (p.especialidade) {
+    const esp = p.especialidade.toLowerCase();
+    if (DINNER_ESPECIALIDADE_INFERRED.some((sub) => esp.includes(sub)))
+      return true;
+  }
+  if (p.tags.some((t) => DINNER_TAGS_INFERRED.has(t.toLowerCase())))
+    return true;
+  return false;
+}
+
+// ── Lunch inference ───────────────────────────────────────────────────────────
+// Explicit lunch signals. Used to confirm almoco assignment is intentional.
+const LUNCH_ESPECIALIDADE_INFERRED = [
+  "almoço",
+  "almoco",
+  "self-service",
+  "self service",
+  "executivo",
+  "prato do dia",
+  "quilo",
+  "por kilo",
+  "por quilo",
+  "bufê",
+  "bufe",
+  "buffet",
+];
+const LUNCH_TAGS_INFERRED = new Set([
+  "almoço",
+  "almoco",
+  "self-service",
+  "por quilo",
+  "executivo",
+  "prato do dia",
+]);
+
+function isLunchRestaurant(p: EnrichedPlace): boolean {
+  if (p.especialidade) {
+    const esp = p.especialidade.toLowerCase();
+    if (LUNCH_ESPECIALIDADE_INFERRED.some((sub) => esp.includes(sub)))
+      return true;
+  }
+  if (p.tags.some((t) => LUNCH_TAGS_INFERRED.has(t.toLowerCase())))
+    return true;
+  return false;
+}
+
 function classifyPeriodo(p: EnrichedPlace, vibe: string): PeriodoDia {
   if (p.categoria === "restaurante") {
+    // 1. Breakfast signals (momento_ideal / especialidade / tags) → manha
     if (isBreakfastRestaurant(p)) return "manha";
-    if (isDinnerRestaurant(p) || isBarRestaurant(p)) return "noite";
+    // 2. Explicit dinner signals (momento_ideal) → noite
+    if (isDinnerRestaurant(p)) return "noite";
+    // 3. Bar / nightlife (especialidade + tags, no momento_ideal needed) → noite
+    if (isBarRestaurant(p)) return "noite";
+    // 4. Dinner inferred from especialidade / tags (restaurantes have no momento_ideal) → noite
+    if (isDinnerRestaurantInferred(p)) return "noite";
+    // 5. Explicit lunch signals → almoco
+    // 6. Default: almoco (most casual restaurants are lunch-capable)
     return "almoco";
   }
 
@@ -1616,21 +1714,19 @@ function buildFullDraft(
     }
 
     // ── 5c. Restaurants ───────────────────────────────────────────────────────
-    // Bars/nightlife (via isBarRestaurant) → noite regardless of position.
-    // Breakfast places (via isBreakfastRestaurant) → manha regardless of position.
-    // First non-bar, non-breakfast restaurant → almoco.
-    // Second+ non-bar → almoco (all restaurants default to lunch in the DB).
-    // NOTE: restaurantes table has no momento_ideal column, so isDinnerRestaurant()
-    // always returns false. isBarRestaurant() compensates via especialidade + tags_ia.
-    rests.forEach((r, i) => {
-      let p: PeriodoDia;
-      if (isBreakfastRestaurant(r)) {
-        p = "manha";
-      } else if (isDinnerRestaurant(r) || isBarRestaurant(r)) {
-        p = "noite";
-      } else {
-        p = i === 0 ? "almoco" : "almoco";
-      }
+    // Use best_periodo set by classifyPeriodo (step 3) — it already applies the
+    // full signal chain: breakfast → manha, bar/dinner → noite, inferred dinner →
+    // noite, default → almoco. Re-classifying here would bypass isDinnerRestaurantInferred
+    // and other inference helpers added to classifyPeriodo.
+    //
+    // Time coherence guarantees from classifyPeriodo:
+    //   breakfast restaurants → manha  (06:00–11:00 window only)
+    //   lunch restaurants     → almoco (12:00–15:00 window only)
+    //   dinner/bar restaurants → noite (18:00+ window only)
+    //   inferred dinner        → noite
+    //   no clear signal        → almoco (safe default for casual restaurants)
+    rests.forEach((r) => {
+      const p: PeriodoDia = r.best_periodo ?? "almoco";
       if (!periodMap.has(p)) periodMap.set(p, []);
       periodMap.get(p)!.push(r);
     });
@@ -1727,7 +1823,7 @@ async function refineWithGemini(
   // 🔥 NOVO: trava total — não deixa Gemini bagunçar nada crítico
   const lockedStructure = JSON.stringify(draft);
 
-  const prompt = You are NOT an AI assistant.
+  const prompt = `You are NOT an AI assistant.
 
     You are a senior luxury travel concierge working for a premium product called "The Lucky Trip".
 
@@ -1935,6 +2031,7 @@ async function refineWithGemini(
     # OUTPUT
 
     Return ONLY valid JSON.
+  `;
 
   try {
     const res = await fetch(
@@ -2107,7 +2204,8 @@ function validateAndFix(
 
         // Rule 2: restaurant temporal placement — subtype-aware
         // Breakfast restaurants (padaria, café, brunch) are valid in manha.
-        // Dinner-only restaurants are evicted from manha to noite.
+        // Dinner-only restaurants (explicit or inferred) are evicted from manha to noite.
+        // Bar/nightlife restaurants are evicted from manha to noite.
         // All other restaurants are evicted from manha to almoco.
         if (
           item.categoria === "restaurante" &&
@@ -2117,7 +2215,11 @@ function validateAndFix(
             keep.push(item);
             continue;
           }
-          if (isDinnerRestaurant(place)) {
+          if (
+            isDinnerRestaurant(place) ||
+            isBarRestaurant(place) ||
+            isDinnerRestaurantInferred(place)
+          ) {
             evictions.push({ item, to: "noite" });
             continue;
           }
@@ -2128,11 +2230,12 @@ function validateAndFix(
         // Rule 5: dinner-only restaurant → not almoco or tarde
         // Extended from almoco-only to also cover tarde: a dinner-only restaurant
         // can land in tarde via validateAndFix 7a re-attachment. Both are wrong.
+        // Also covers inferred dinner restaurants (no momento_ideal but dinner signals).
         if (
           item.categoria === "restaurante" &&
           (periodoBlock.periodo === "almoco" ||
             periodoBlock.periodo === "tarde") &&
-          isDinnerRestaurant(place)
+          (isDinnerRestaurant(place) || isDinnerRestaurantInferred(place))
         ) {
           evictions.push({ item, to: "noite" });
           continue;
