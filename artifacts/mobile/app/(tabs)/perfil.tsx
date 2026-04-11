@@ -166,7 +166,7 @@ function HeroBackground() {
 type AuthScreen = "login" | "signup" | "forgot";
 
 export default function PerfilScreen() {
-  const { user, loading: authLoading, signOut, signInWithPassword, signUp, sendPasswordReset, signInWithGoogle } = useAuth();
+  const { user, loading: authLoading, signOut, signInWithPassword, signUp, sendPasswordReset, signInWithGoogle, signInWithOtp } = useAuth();
   const { isPremium } = useGuia();
   const insets = useSafeAreaInsets();
 
@@ -179,7 +179,9 @@ export default function PerfilScreen() {
   const [agreed,        setAgreed]        = useState(false);
   const [loading,       setLoading]       = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [otpLoading,    setOtpLoading]    = useState(false);
   const [needsConfirm,  setNeedsConfirm]  = useState(false);
+  const [otpSent,       setOtpSent]       = useState(false);
   const [resetSent,     setResetSent]     = useState(false);
   const [error,         setError]         = useState<string | null>(null);
 
@@ -189,6 +191,7 @@ export default function PerfilScreen() {
     setShowPass(false);
     setNeedsConfirm(false);
     setResetSent(false);
+    setOtpSent(false);
   }
 
   function goLogin()  { clearForm(); setScreen("login");  }
@@ -269,6 +272,23 @@ export default function PerfilScreen() {
     }
   }
 
+  async function handleOtp() {
+    const trimEmail = email.trim().toLowerCase();
+    if (!trimEmail || loading || otpLoading) return;
+    setOtpLoading(true);
+    setError(null);
+    try {
+      const { error: err } = await signInWithOtp(trimEmail);
+      if (err) setError(translateAuthError(err, true));
+      else setOtpSent(true);
+    } catch {
+      setError("Erro inesperado. Tente novamente.");
+    } finally {
+      setOtpLoading(false);
+      webCleanup();
+    }
+  }
+
   // ── Auth is still resolving — show spinner (prevents flash of login for logged-in users)
   if (authLoading) {
     return (
@@ -306,6 +326,8 @@ export default function PerfilScreen() {
         >
           {needsConfirm ? (
             <EmailSentState email={email} kind="confirm" onBack={goLogin} />
+          ) : otpSent ? (
+            <EmailSentState email={email} kind="otp" onBack={goLogin} />
           ) : resetSent ? (
             <EmailSentState email={email} kind="reset" onBack={goLogin} />
           ) : screen === "forgot" ? (
@@ -333,9 +355,11 @@ export default function PerfilScreen() {
               password={password} setPassword={setPassword}
               showPass={showPass} setShowPass={setShowPass}
               loading={loading}   googleLoading={googleLoading}
+              otpLoading={otpLoading}
               error={error}
               onSubmit={handleLogin}
               onGooglePress={handleGoogle}
+              onOtpPress={handleOtp}
               onGoSignup={goSignup}
               onGoForgot={goForgot}
             />
@@ -352,16 +376,17 @@ function LoginScreen({
   email, setEmail,
   password, setPassword,
   showPass, setShowPass,
-  loading, googleLoading,
-  error, onSubmit, onGooglePress, onGoSignup, onGoForgot,
+  loading, googleLoading, otpLoading,
+  error, onSubmit, onGooglePress, onOtpPress, onGoSignup, onGoForgot,
 }: {
   email: string;       setEmail: (v: string) => void;
   password: string;    setPassword: (v: string) => void;
   showPass: boolean;   setShowPass: (v: boolean) => void;
-  loading: boolean;    googleLoading: boolean;
+  loading: boolean;    googleLoading: boolean; otpLoading: boolean;
   error: string | null;
   onSubmit: () => void;
   onGooglePress: () => void;
+  onOtpPress: () => void;
   onGoSignup: () => void;
   onGoForgot: () => void;
 }) {
@@ -497,6 +522,24 @@ function LoginScreen({
         <Text style={[s.footerLink, { fontSize: 13 }]} suppressHighlighting>
           Esqueceu a senha?
         </Text>
+      </TouchableOpacity>
+
+      {/* Magic link — for users who signed in via OTP and have no password */}
+      <TouchableOpacity
+        style={{ marginTop: 20, alignItems: "center" }}
+        onPress={onOtpPress}
+        activeOpacity={0.7}
+        disabled={otpLoading}
+        accessibilityRole="button"
+      >
+        {otpLoading ? (
+          <ActivityIndicator size="small" color={GOLD} />
+        ) : (
+          <Text style={[s.footerText, { fontSize: 13, color: "rgba(255,255,255,0.45)" }]} suppressHighlighting>
+            Prefere entrar{" "}
+            <Text style={{ color: GOLD, textDecorationLine: "underline" }}>sem senha, por link no e-mail</Text>
+          </Text>
+        )}
       </TouchableOpacity>
     </View>
   );
@@ -753,9 +796,10 @@ function ForgotScreen({
 function EmailSentState({
   email, kind, onBack,
 }: {
-  email: string; kind: "confirm" | "reset"; onBack: () => void;
+  email: string; kind: "confirm" | "reset" | "otp"; onBack: () => void;
 }) {
   const isReset = kind === "reset";
+  const isOtp   = kind === "otp";
   return (
     <View style={s.center}>
       <Image source={LOGO} style={s.logo} resizeMode="contain" />
@@ -763,17 +807,21 @@ function EmailSentState({
         <Feather name="mail" size={28} color={GOLD} />
       </View>
       <Text style={s.headline} suppressHighlighting>
-        {isReset ? "Verifique seu e-mail" : "Confirme seu e-mail"}
+        {isReset ? "Verifique seu e-mail" : isOtp ? "Link enviado" : "Confirme seu e-mail"}
       </Text>
       <Text style={s.sub} suppressHighlighting>
         {isReset
           ? "Enviamos o link de redefinição para"
+          : isOtp
+          ? "Enviamos o link de acesso para"
           : "Enviamos um e-mail de confirmação para"}{"\n"}
         <Text style={{ color: GOLD, fontFamily: "Inter_500Medium" }}>{email}</Text>
       </Text>
       <Text style={s.sentNote} suppressHighlighting>
         {isReset
           ? "Clique no link para criar uma nova senha e voltar a acessar sua conta."
+          : isOtp
+          ? "Clique no link no e-mail para entrar automaticamente, sem precisar de senha."
           : "Clique no link no e-mail para ativar sua conta e entrar automaticamente."}
       </Text>
       <TouchableOpacity style={{ marginTop: 24 }} onPress={onBack} activeOpacity={0.7} accessibilityRole="button">

@@ -189,9 +189,11 @@ export class Storage {
 
   async upsertSupabaseAccessLevel(
     userId: string,
-    planType: string,
+    _planType: string,
     accessUntil: Date,
   ): Promise<void> {
+    // access_levels.plan_type check constraint only allows "free" | "premium"
+    const planType = "premium";
     const sb = makeSupabaseAdmin();
     const { error } = await sb
       .from("access_levels")
@@ -216,6 +218,8 @@ export class Storage {
   }
 
   // ── Supabase public.subscriptions ─────────────────────────────────────────
+  // NOTE: subscriptions table has no unique constraint on user_id — use
+  // update-first, then insert-if-missing pattern instead of upsert.
 
   async upsertSupabaseSubscription(
     userId: string,
@@ -227,16 +231,62 @@ export class Storage {
     }
   ): Promise<void> {
     const sb = makeSupabaseAdmin();
-    const payload: Record<string, any> = { user_id: userId };
+    const payload: Record<string, any> = {};
     if (data.stripe_customer_id)     payload["stripe_customer_id"]     = data.stripe_customer_id;
     if (data.stripe_subscription_id) payload["stripe_subscription_id"] = data.stripe_subscription_id;
     if (data.status)                 payload["status"]                  = data.status;
     if (data.current_period_end)     payload["current_period_end"]      = data.current_period_end.toISOString();
 
-    const { error } = await sb
+    // Try updating the existing row first
+    const { data: updated, error: updateErr } = await sb
       .from("subscriptions")
-      .upsert(payload, { onConflict: "user_id" });
-    if (error) throw new Error(`upsertSupabaseSubscription: ${error.message}`);
+      .update(payload)
+      .eq("user_id", userId)
+      .select("user_id");
+    if (updateErr) throw new Error(`upsertSupabaseSubscription (update): ${updateErr.message}`);
+
+    // If no row existed, insert a new one
+    if (!updated || updated.length === 0) {
+      const { error: insertErr } = await sb
+        .from("subscriptions")
+        .insert({ user_id: userId, ...payload });
+      if (insertErr) throw new Error(`upsertSupabaseSubscription (insert): ${insertErr.message}`);
+    }
+  }
+
+  // Read stripe_customer_id from Supabase subscriptions table (returns null if not found)
+  async getSupabaseSubscription(userId: string): Promise<{
+    stripe_customer_id?: string;
+    stripe_subscription_id?: string;
+    status?: string;
+  } | null> {
+    const sb = makeSupabaseAdmin();
+    const { data, error } = await sb
+      .from("subscriptions")
+      .select("stripe_customer_id, stripe_subscription_id, status")
+      .eq("user_id", userId)
+      .limit(1)
+      .single();
+    if (error || !data) return null;
+    return data as { stripe_customer_id?: string; stripe_subscription_id?: string; status?: string };
+  }
+
+  // Find user_id by Stripe customer ID (checks Supabase subscriptions table)
+  async getSupabaseSubscriptionByCustomerId(customerId: string): Promise<{
+    user_id: string;
+    stripe_customer_id?: string;
+    stripe_subscription_id?: string;
+    status?: string;
+  } | null> {
+    const sb = makeSupabaseAdmin();
+    const { data, error } = await sb
+      .from("subscriptions")
+      .select("user_id, stripe_customer_id, stripe_subscription_id, status")
+      .eq("stripe_customer_id", customerId)
+      .limit(1)
+      .single();
+    if (error || !data) return null;
+    return data as { user_id: string; stripe_customer_id?: string; stripe_subscription_id?: string; status?: string };
   }
 
   async revokeSupabaseSubscription(userId: string): Promise<void> {

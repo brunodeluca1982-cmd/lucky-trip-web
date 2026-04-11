@@ -183,14 +183,16 @@ router.post(
         ? cancel_url!
         : `${serverOrigin}/subscription`;
 
-      // Find or create Stripe customer
-      let sub        = await storage.getUserSubscription(req.user.id);
-      let customerId = sub?.stripe_customer_id ?? null;
+      // Find or create Stripe customer — check Supabase first, then Replit DB fallback
+      const sbSub    = await storage.getSupabaseSubscription(req.user.id);
+      const replitSub = sbSub?.stripe_customer_id ? null : await storage.getUserSubscription(req.user.id);
+      let customerId  = sbSub?.stripe_customer_id ?? replitSub?.stripe_customer_id ?? null;
 
       if (!customerId) {
         const customer = await stripeService.createCustomer(req.user.email ?? "", req.user.id);
         customerId = customer.id;
         await storage.upsertUserSubscription(req.user.id, { stripe_customer_id: customerId });
+        await storage.upsertSupabaseSubscription(req.user.id, { stripe_customer_id: customerId }).catch(() => {});
         logger.info({ userId: req.user.id, customerId }, "Stripe customer created");
       }
 
@@ -258,7 +260,9 @@ router.get(
       }
 
       const customerId = session.customer as string;
-      let sub = await storage.getSubscriptionByCustomerId(customerId);
+      // Check Supabase first, then fall back to Replit DB
+      const sbSubByCust = await storage.getSupabaseSubscriptionByCustomerId(customerId);
+      let sub = sbSubByCust ?? await storage.getSubscriptionByCustomerId(customerId);
       if (!sub) sub = await storage.getUserSubscription(req.user.id);
 
       if (sub || session.customer) {
@@ -309,7 +313,9 @@ router.get(
   "/subscription",
   requireAuth(async (req, res) => {
     try {
-      const sub = await storage.getUserSubscription(req.user.id);
+      // Supabase-first, then Replit DB fallback
+      const sbSub = await storage.getSupabaseSubscription(req.user.id);
+      const sub   = sbSub?.stripe_subscription_id ? sbSub : await storage.getUserSubscription(req.user.id);
       if (!sub?.stripe_subscription_id) {
         return res.json({ subscription: null }) as any;
       }
@@ -337,7 +343,9 @@ router.get(
   "/sync-subscription",
   requireAuth(async (req, res) => {
     try {
-      const sub = await storage.getUserSubscription(req.user.id);
+      // Supabase-first, then Replit DB fallback
+      const sbSub   = await storage.getSupabaseSubscription(req.user.id);
+      const sub     = sbSub?.stripe_customer_id ? sbSub : await storage.getUserSubscription(req.user.id);
       if (!sub?.stripe_customer_id) {
         return res.json({ synced: false, reason: "no_customer" }) as any;
       }
@@ -411,7 +419,9 @@ router.post(
   "/portal",
   requireAuth(async (req, res) => {
     try {
-      const sub = await storage.getUserSubscription(req.user.id);
+      // Supabase-first, then Replit DB fallback
+      const sbSub = await storage.getSupabaseSubscription(req.user.id);
+      const sub   = sbSub?.stripe_customer_id ? sbSub : await storage.getUserSubscription(req.user.id);
       if (!sub?.stripe_customer_id) {
         return res.status(400).json({ error: "No Stripe customer found for this user" }) as any;
       }
