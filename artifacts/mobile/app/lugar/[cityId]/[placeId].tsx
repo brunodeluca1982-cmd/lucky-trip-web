@@ -216,28 +216,36 @@ function useSupabaseLugar(
         } else if (effectiveTable === "stay_hotels") {
           const { data, error: err } = await supabase
             .from("stay_hotels")
-            .select("id, hotel_name, hotel_category, photo_url, reserve_url, neighborhoods(neighborhood_name)")
+            .select("*")
             .eq("id", placeId)
             .maybeSingle();
           if (err) console.warn("[useSupabaseLugar] stay_hotels error:", err.message);
           if (data) {
-            const neighborhoodName =
-              ((data as any).neighborhoods as { neighborhood_name: string } | null)
-                ?.neighborhood_name ?? "Rio de Janeiro";
-            const pin = resolvePin("rio", neighborhoodName, 0);
+            // Use neighborhood_slug as location display (no join needed)
+            const neighborhoodSlug =
+              (data as any).neighborhood_slug as string | null ?? "rio-de-janeiro";
+            const neighborhoodDisplay = neighborhoodSlug
+              .split("-")
+              .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
+              .join(" ");
+            const pin = resolvePin("rio", neighborhoodDisplay, 0);
             // photo_url IS present in stay_hotels — always use it when available
             const photoUri = (data as any).photo_url as string | null ?? null;
+            // Use my_view as description (hotel editorial text)
+            const myView   = (data as any).my_view as string | null;
+            const descricao = myView ?? "Uma das hospedagens selecionadas para a sua estadia no Rio de Janeiro.";
             resolved = {
-              id:          String((data as any).id),
-              titulo:      (data as any).hotel_name as string | null ?? "Hotel",
-              localizacao: neighborhoodName,
-              categoria:   ((data as any).hotel_category as string | null)?.toUpperCase() ?? "HOTEL",
-              descricao:   "Uma das hospedagens selecionadas para a sua estadia no Rio de Janeiro.",
-              image:       getImageForEntity("hotel", (data as any).hotel_name ?? "", neighborhoodName, photoUri),
-              xPct:        pin.xPct,
-              yPct:        pin.yPct,
-              tipo_item:   "hotel",
-              booking_url: (data as any).reserve_url ?? null,
+              id:              String((data as any).id),
+              titulo:          (data as any).hotel_name as string | null ?? "Hotel",
+              localizacao:     neighborhoodDisplay,
+              categoria:       ((data as any).hotel_category as string | null)?.toUpperCase() ?? "HOTEL",
+              descricao,
+              image:           getImageForEntity("hotel", (data as any).hotel_name ?? "", neighborhoodDisplay, photoUri),
+              xPct:            pin.xPct,
+              yPct:            pin.yPct,
+              tipo_item:       "hotel",
+              google_maps_url: (data as any).google_maps_url ?? null,
+              booking_url:     (data as any).reserve_url ?? null,
             };
           }
         } else if (effectiveTable === "friend_guide_places") {
