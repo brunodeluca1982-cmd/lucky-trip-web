@@ -4,11 +4,17 @@
  * Fetches real photos from Google Places for entity table rows that lack photo_url.
  * Writes back to the entity table and caches in place_photos.
  *
+ * Runs until ALL rows with photo_url IS NULL are processed (no LIMIT).
+ * Works in batches of 20–50 rows to keep each Google-API burst manageable.
+ * Rows that permanently fail (not found / no photo) are skipped in
+ * subsequent batches so the loop always terminates.
+ *
  * POST body:
- *   table?:       "stay_hotels" | "lucky_list_rio" | "restaurantes" | "o_que_fazer_rio"
- *                  (default: all four)
- *   batch_size?:  number  (default 20, max 50)
- *   force?:       boolean (default false — skip rows that already have photo_url)
+ *   table?:        "stay_hotels" | "lucky_list_rio" | "restaurantes" | "o_que_fazer_rio"
+ *                   (default: all four)
+ *   batch_size?:   number  (default 20, max 50)
+ *   force?:        boolean (default false — skip rows that already have photo_url)
+ *   max_batches?:  number  (default 200 — hard safety cap per table)
  *
  * Uses GOOGLE_MAPS_API_KEY + SUPABASE_SERVICE_ROLE_KEY from Supabase secrets.
  */
@@ -80,35 +86,22 @@ async function getPhotoRef(placeId: string, key: string): Promise<string | null>
 /**
  * Resolve a photo_reference to a stable CDN URL (lh3.googleusercontent.com).
  *
- * FIX: The previous implementation used `redirect: "manual"` and tried to read
- * the `Location` header. In Deno/Supabase edge functions, opaque redirect
- * responses do NOT expose the Location header, so the CDN URL was never
- * captured and the fallback stored the raw Google API URL (with embedded key).
- *
- * Fix: use the default `redirect: "follow"`. After following the 302, `res.url`
- * is the final CDN URL (lh3.googleusercontent.com/...) — stable, keyless, permanent.
+ * Uses redirect:"follow" so Deno exposes the final URL via res.url after the
+ * 302 redirect — a stable, keyless lh3.googleusercontent.com CDN URL.
  */
 async function resolvePhotoCdnUrl(photoRef: string, key: string): Promise<string | null> {
   const apiUrl =
     "https://maps.googleapis.com/maps/api/place/photo" +
     `?maxwidth=800&photo_reference=${encodeURIComponent(photoRef)}&key=${key}`;
   try {
-    // redirect: "follow" (default) — Deno follows the 302 and exposes the
-    // final URL via res.url, which is the keyless lh3.googleusercontent.com CDN URL.
     const res = await fetch(apiUrl);
     if (!res.ok) return null;
 
-    // res.url is the URL of the final response after following all redirects.
-    // When Google redirects to the CDN, res.url === "https://lh3.googleusercontent.com/..."
-    // which is a permanent URL with no API key embedded.
     const finalUrl = res.url;
     if (finalUrl && finalUrl.startsWith("http") && !finalUrl.includes("googleapis.com/maps/api")) {
       return finalUrl;
     }
 
-    // If for any reason the CDN redirect didn't happen (direct 200 from Google),
-    // do NOT store the API URL with the embedded key. Return null so the row
-    // stays unset and can be retried later.
     return null;
   } catch {
     return null;
@@ -123,12 +116,11 @@ async function enrichRow(
   neighborhoodCol: string,
   googleKey: string,
 ): Promise<{ id: string; status: string; url?: string }> {
-  const id     = row.id as string;
+  const id     = String(row.id);
   const name   = row[nameCol] as string;
   const bairro = (row[neighborhoodCol] as string) ?? "";
 
-  // 1. Check place_photos cache first — avoids ANY Google call if we've
-  //    already enriched this entity in a previous run.
+  // 1. Check place_photos cache — avoids any Google call if already enriched.
   const { data: cached } = await supabase
     .from("place_photos")
     .select("photo_url")
@@ -137,8 +129,6 @@ async function enrichRow(
     .maybeSingle();
 
   if (cached?.photo_url) {
-    // Already cached — write back to entity table if missing, then stop.
-    // This is the only write; no Google call is made.
     await supabase
       .from(table)
       .update({ photo_url: cached.photo_url })
@@ -146,32 +136,28 @@ async function enrichRow(
     return { id, status: "from_cache", url: cached.photo_url };
   }
 
-  // 2. Find via Google Places — called ONCE per place, result cached immediately.
+  // 2. Find via Google Places — called ONCE per place.
   const query = `${name} ${bairro}`;
   const found = await findPlace(query, googleKey);
   if (!found) return { id, status: "not_found" };
 
   let photoRef = found.photoRef;
   if (!photoRef) {
-    // findPlace returned a place_id but no photo; fetch from Place Details.
     photoRef = await getPhotoRef(found.placeId, googleKey);
   }
   if (!photoRef) return { id, status: "no_photo_reference" };
 
-  // 3. Resolve photo_reference → stable CDN URL (lh3.googleusercontent.com).
-  //    Never stores the Google API URL with the embedded key.
+  // 3. Resolve photo_reference → stable CDN URL.
   const cdnUrl = await resolvePhotoCdnUrl(photoRef, googleKey);
   if (!cdnUrl) return { id, status: "cdn_resolve_failed" };
 
-  // 4. Write to entity table — photo_url is now permanently set.
-  //    Future runs will skip this row (photo_url IS NOT NULL).
+  // 4. Write photo_url to entity table — permanently set, skipped on future runs.
   await supabase
     .from(table)
     .update({ photo_url: cdnUrl })
     .eq("id", id);
 
   // 5. Cache in place_photos — guards against entity table resets.
-  //    upsert ensures idempotency if the function is called concurrently.
   await supabase
     .from("place_photos")
     .upsert(
@@ -208,10 +194,11 @@ serve(async (req: Request) => {
   const serviceKey  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase    = createClient(supabaseUrl, serviceKey);
 
-  const body      = req.method === "POST" ? await req.json().catch(() => ({})) : {};
-  const tables    = body.tables    ?? Object.keys(TABLE_CONFIGS);
-  const batchSize = Math.min(Number(body.batch_size ?? 20), 50);
-  const force     = Boolean(body.force ?? false);
+  const body       = req.method === "POST" ? await req.json().catch(() => ({})) : {};
+  const tables     = body.tables     ?? Object.keys(TABLE_CONFIGS);
+  const batchSize  = Math.min(Math.max(Number(body.batch_size  ?? 20), 1), 50);
+  const force      = Boolean(body.force ?? false);
+  const maxBatches = Number(body.max_batches ?? 200); // hard safety cap per table
 
   const summary: Record<string, unknown> = {};
 
@@ -219,44 +206,82 @@ serve(async (req: Request) => {
     const cfg = TABLE_CONFIGS[table];
     if (!cfg) { summary[table] = { error: "unknown table" }; continue; }
 
-    // Build the base query — select only the columns needed for enrichment.
-    let query = supabase
-      .from(table)
-      .select(`id, ${cfg.nameCol}, ${cfg.neighborhoodCol}`)
-      .limit(batchSize);
+    const counts = { enriched: 0, from_cache: 0, not_found: 0, failed: 0, batches: 0 };
 
-    // FIX: Only apply the active filter when the table actually has that column.
-    // o_que_fazer_rio and lucky_list_rio have no "ativo" column — applying
-    // .eq("ativo", true) on them produces a PostgREST error that silently
-    // skips enrichment for those tables entirely.
-    if (cfg.activeCol) {
-      query = query.eq(cfg.activeCol, true);
+    // IDs that permanently failed this run — excluded from subsequent batches
+    // so the loop always terminates even when Google can't find a place.
+    const skipIds: string[] = [];
+
+    for (let batchNum = 0; batchNum < maxBatches; batchNum++) {
+      // ── Fetch next batch of rows still missing photo_url ────────────────
+      let query = supabase
+        .from(table)
+        .select(`id, ${cfg.nameCol}, ${cfg.neighborhoodCol}`)
+        .limit(batchSize);
+
+      // Only tables with an active column get the active filter.
+      if (cfg.activeCol) {
+        query = query.eq(cfg.activeCol, true);
+      }
+
+      // Skip rows that already have a photo unless force=true.
+      if (!force) {
+        query = query.or("photo_url.is.null,photo_url.eq.");
+      }
+
+      // Exclude IDs that failed permanently earlier in this run.
+      if (skipIds.length > 0) {
+        query = query.not("id", "in", `(${skipIds.join(",")})`);
+      }
+
+      const { data: rows, error } = await query;
+
+      if (error) {
+        counts.failed++;
+        console.error(`[enrich] ${table} batch ${batchNum} query error:`, error.message);
+        break;
+      }
+
+      // Stop condition: no more rows with photo_url IS NULL.
+      if (!rows?.length) break;
+
+      counts.batches++;
+
+      // ── Enrich all rows in this batch in parallel ────────────────────────
+      const results = await Promise.allSettled(
+        rows.map((row) =>
+          enrichRow(
+            supabase,
+            table,
+            row as Record<string, unknown>,
+            cfg.nameCol,
+            cfg.neighborhoodCol,
+            googleKey,
+          )
+        ),
+      );
+
+      for (const r of results) {
+        if (r.status === "rejected") {
+          counts.failed++;
+          continue;
+        }
+        const { id, status } = r.value;
+        if (status === "enriched") {
+          counts.enriched++;
+        } else if (status === "from_cache") {
+          counts.from_cache++;
+        } else {
+          // not_found | no_photo_reference | cdn_resolve_failed
+          // Mark as permanently skipped so this ID is excluded from the
+          // next batch query — prevents an infinite loop on bad rows.
+          counts.not_found++;
+          skipIds.push(id);
+        }
+      }
     }
 
-    // Only process rows that need enrichment (no photo yet), unless force=true.
-    if (!force) {
-      query = query.or("photo_url.is.null,photo_url.eq.");
-    }
-
-    const { data: rows, error } = await query;
-    if (error) { summary[table] = { error: error.message }; continue; }
-    if (!rows?.length) { summary[table] = { processed: 0, note: "all rows have photos" }; continue; }
-
-    const results = await Promise.allSettled(
-      rows.map((row) =>
-        enrichRow(supabase, table, row as Record<string, unknown>, cfg.nameCol, cfg.neighborhoodCol, googleKey)
-      ),
-    );
-
-    const counts = { enriched: 0, from_cache: 0, not_found: 0, failed: 0 };
-    for (const r of results) {
-      if (r.status === "rejected") { counts.failed++; continue; }
-      const s = r.value.status;
-      if      (s === "enriched")                                                     counts.enriched++;
-      else if (s === "from_cache")                                                   counts.from_cache++;
-      else if (s === "not_found" || s === "no_photo_reference" || s === "cdn_resolve_failed") counts.not_found++;
-    }
-    summary[table] = { processed: rows.length, ...counts };
+    summary[table] = { ...counts, permanently_skipped: skipIds.length };
   }
 
   return new Response(
