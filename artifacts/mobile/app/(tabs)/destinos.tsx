@@ -40,7 +40,6 @@ interface DestCardProps {
   id: string;
   cidade: string;
   pais: string;
-  image: ImageSourcePropType;
   heroImageUrl?: string | null;
   selected: boolean;
   lancado: boolean;
@@ -50,7 +49,6 @@ const DestCard = memo(function DestCard({
   id,
   cidade,
   pais,
-  image,
   heroImageUrl,
   selected,
   lancado,
@@ -58,11 +56,6 @@ const DestCard = memo(function DestCard({
   const handlePress = useCallback(() => {
     router.push({ pathname: "/cidade/[id]", params: { id } });
   }, [id]);
-
-  // Priority: hero_image_url (Supabase) → local bundled asset (always safe)
-  const imgSource: ImageSourcePropType = heroImageUrl
-    ? { uri: heroImageUrl }
-    : image;
 
   return (
     <Pressable
@@ -74,11 +67,13 @@ const DestCard = memo(function DestCard({
         pressed && { opacity: 0.88, transform: [{ scale: 0.97 }] },
       ]}
     >
-      <Image
-        source={imgSource}
-        style={[s.cardImage, !lancado && { opacity: 0.68 }]}
-        resizeMode="cover"
-      />
+      {heroImageUrl != null && (
+        <Image
+          source={{ uri: heroImageUrl }}
+          style={[s.cardImage, !lancado && { opacity: 0.68 }]}
+          resizeMode="cover"
+        />
+      )}
 
       {/* Bottom gradient — bottom 45% only */}
       <LinearGradient
@@ -241,7 +236,6 @@ export default function DestinosScreen() {
                     id={d.id}
                     cidade={d.cidade}
                     pais={d.pais}
-                    image={d.image}
                     heroImageUrl={heroImages[d.id] ?? null}
                     selected={d.id === SELECTED_ID}
                     lancado={d.lancado}

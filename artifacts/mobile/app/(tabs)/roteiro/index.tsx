@@ -38,7 +38,6 @@ import Colors from "@/constants/colors";
 import { useGuia, sourceTableFromCategoria } from "@/context/GuiaContext";
 import type { SavedCategory, SavedItem, SourceTable } from "@/context/GuiaContext";
 import { supabase } from "@/lib/supabase";
-import { getNeighborhoodImage } from "@/data/neighborhoodImages";
 import { getImageForEntity } from "@/utils/getImageForEntity";
 import {
   buildItinerary,
@@ -1224,7 +1223,7 @@ interface Suggestion {
   id: string;
   titulo: string;
   localizacao: string;
-  image: ReturnType<typeof getNeighborhoodImage>;
+  image: { uri: string } | null;
   categoria: SavedCategory;
   /** Explicit Supabase table — always set for curated DB items. */
   source_table?: SourceTable;
@@ -1257,9 +1256,9 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
       try {
         const [r1, r2, r3, r4] = await Promise.all([
           supabase.from("restaurantes").select("id,nome,bairro,especialidade,photo_url").ilike("nome", `%${q}%`).limit(6),
-          supabase.from("o_que_fazer_rio").select("id,nome,bairro,categoria").ilike("nome", `%${q}%`).limit(6),
-          supabase.from("lucky_list_rio").select("id,nome,bairro,tipo").ilike("nome", `%${q}%`).limit(4),
-          supabase.from("stay_hotels").select("id,nome,bairro,categoria").ilike("nome", `%${q}%`).limit(4),
+          supabase.from("o_que_fazer_rio").select("id,nome,bairro,categoria,photo_url").ilike("nome", `%${q}%`).limit(6),
+          supabase.from("lucky_list_rio").select("id,nome,bairro,tipo,photo_url").ilike("nome", `%${q}%`).limit(4),
+          supabase.from("stay_hotels").select("id,nome,bairro,categoria,photo_url").ilike("nome", `%${q}%`).limit(4),
         ]);
         const rows: Suggestion[] = [
           ...(r1.data ?? []).map((r: Record<string, unknown>) => ({
@@ -1271,19 +1270,19 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
           })),
           ...(r2.data ?? []).map((r: Record<string, unknown>) => ({
             id: String(r.id), titulo: (r.nome as string) || "", localizacao: (r.bairro as string) || "",
-            image: getNeighborhoodImage((r.bairro as string) || ""), categoria: "oQueFazer" as SavedCategory,
+            image: (r.photo_url as string | null) ? { uri: r.photo_url as string } : null, categoria: "oQueFazer" as SavedCategory,
             source_table: "o_que_fazer_rio" as SourceTable,
             subtitle: (r.categoria as string) ?? "O que fazer",
           })),
           ...(r3.data ?? []).map((r: Record<string, unknown>) => ({
             id: String(r.id), titulo: (r.nome as string) || "", localizacao: (r.bairro as string) || "",
-            image: getNeighborhoodImage((r.bairro as string) || ""), categoria: "lucky" as SavedCategory,
+            image: (r.photo_url as string | null) ? { uri: r.photo_url as string } : null, categoria: "lucky" as SavedCategory,
             source_table: "lucky_list_rio" as SourceTable,
             subtitle: (r.tipo as string) ?? "Lucky",
           })),
           ...(r4.data ?? []).map((r: Record<string, unknown>) => ({
             id: String(r.id), titulo: (r.nome as string) || "", localizacao: (r.bairro as string) || "",
-            image: getNeighborhoodImage((r.bairro as string) || ""), categoria: "hotel" as SavedCategory,
+            image: (r.photo_url as string | null) ? { uri: r.photo_url as string } : null, categoria: "hotel" as SavedCategory,
             source_table: "stay_hotels" as SourceTable,
             subtitle: (r.categoria as string) ?? "Hotel",
           })),
@@ -1319,13 +1318,13 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
       } else if (item.categoria === "lucky") {
         const { data } = await supabase
           .from("lucky_list_rio")
-          .select("id, nome, bairro, tipo")
+          .select("id, nome, bairro, tipo, photo_url")
           .limit(14);
         rows = (data ?? []).map((r: Record<string, unknown>) => ({
           id:           String(r.id),
           titulo:       (r.nome as string) || "Lucky pick",
           localizacao:  (r.bairro as string) || "",
-          image:        getNeighborhoodImage((r.bairro as string) || ""),
+          image:        (r.photo_url as string | null) ? { uri: r.photo_url as string } : null,
           categoria:    "lucky" as SavedCategory,
           source_table: "lucky_list_rio" as SourceTable,
           subtitle:     (r.tipo as string) ?? undefined,
@@ -1333,13 +1332,13 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
       } else {
         const { data } = await supabase
           .from("o_que_fazer_rio")
-          .select("id, nome, bairro, categoria")
+          .select("id, nome, bairro, categoria, photo_url")
           .limit(14);
         rows = (data ?? []).map((r: Record<string, unknown>) => ({
           id:           String(r.id),
           titulo:       (r.nome as string) || "Experiência",
           localizacao:  (r.bairro as string) || "",
-          image:        getNeighborhoodImage((r.bairro as string) || ""),
+          image:        (r.photo_url as string | null) ? { uri: r.photo_url as string } : null,
           categoria:    "oQueFazer" as SavedCategory,
           source_table: "o_que_fazer_rio" as SourceTable,
           subtitle:     (r.categoria as string) ?? undefined,
@@ -2110,30 +2109,23 @@ function navigateToItem(item: SavedItem) {
   });
 }
 
-function getItemFallbackImage(categoria: SavedCategory): ReturnType<typeof require> {
-  switch (categoria) {
-    case "restaurante": return require("@/assets/images/restaurante1.png");
-    case "hotel":       return require("@/assets/images/hotel1.png");
-    default:            return require("@/assets/images/pao-acucar.png");
-  }
-}
-
-// ItemThumb — renders item thumbnail with onError fallback.
-// Prevents blank images when URIs fail (network, CORS, expired URL).
-function ItemThumb({ image, categoria }: { image: unknown; categoria: SavedCategory }) {
+// ItemThumb — renders item thumbnail only when a valid Supabase image URI exists.
+// Shows no image (dark card background) when image is null or URI fails.
+function ItemThumb({ image }: { image: { uri: string } | null | unknown }) {
   const [errored, setErrored] = React.useState(false);
-  const fallback = getItemFallbackImage(categoria);
-  const src = (!errored && image != null && image !== undefined && image !== 0)
-    ? (image as ReturnType<typeof require>)
-    : fallback;
+  const src = (!errored && image != null && typeof image === "object" && "uri" in (image as object))
+    ? (image as { uri: string })
+    : null;
   return (
     <>
-      <Image
-        source={src}
-        style={StyleSheet.absoluteFill}
-        resizeMode="cover"
-        onError={() => setErrored(true)}
-      />
+      {src != null && (
+        <Image
+          source={src}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+          onError={() => setErrored(true)}
+        />
+      )}
       <LinearGradient
         colors={["transparent", "rgba(0,0,0,0.32)"]}
         style={StyleSheet.absoluteFill}
@@ -2240,7 +2232,7 @@ function ResultDayCard({
 
                       {/* Thumbnail */}
                       <View style={re.thumb}>
-                        <ItemThumb image={item.image} categoria={item.categoria} />
+                        <ItemThumb image={item.image} />
                       </View>
 
                       {/* Info */}

@@ -24,7 +24,7 @@ interface PlaceCardProps {
   localizacao?: string;
   categoria?: string;
   descricao?: string;
-  image: ImageSourcePropType;
+  image: ImageSourcePropType | null;
   size?: "small" | "medium" | "large";
   variant?: "default" | "horizontal" | "secret";
   onPress?: () => void;
@@ -61,7 +61,7 @@ export function PlaceCard({
   if (variant === "secret") {
     return (
       <Pressable onPress={onPress} style={[styles.secretCard, { width: SCREEN_WIDTH - 48 }]}>
-        <Image source={image} style={styles.secretImage} resizeMode="cover" />
+        {image != null && <Image source={image} style={styles.secretImage} resizeMode="cover" />}
         <View style={styles.secretContent}>
           {localizacao ? (
             <View style={styles.tagRow}>
@@ -97,7 +97,7 @@ export function PlaceCard({
         pressed && { opacity: 0.93, transform: [{ scale: 0.98 }] },
       ]}
     >
-      <Image source={image} style={styles.image} resizeMode="cover" />
+      {image != null && <Image source={image} style={styles.image} resizeMode="cover" />}
       <LinearGradient
         colors={["transparent", "rgba(0,0,0,0.72)"]}
         style={styles.gradient}

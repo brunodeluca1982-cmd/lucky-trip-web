@@ -68,11 +68,7 @@ export default function LuckyListBairroScreen() {
     (n) => n.neighborhood_name === bairroNome,
   ) ?? null;
 
-  const heroImage = getNeighborhoodHero(
-    supabaseNeighborhood?.image_url,
-    bairroNome,
-    destino.image,
-  );
+  const heroImage = getNeighborhoodHero(supabaseNeighborhood?.image_url);
 
   const [editorialOpen, setEditorialOpen] = useState(false);
 
@@ -86,11 +82,13 @@ export default function LuckyListBairroScreen() {
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* ── Full-screen background (persists while scrolling) ── */}
-      <Image
-        source={heroImage}
-        style={StyleSheet.absoluteFillObject}
-        resizeMode="cover"
-      />
+      {heroImage != null && (
+        <Image
+          source={heroImage}
+          style={StyleSheet.absoluteFillObject}
+          resizeMode="cover"
+        />
+      )}
       <LinearGradient
         colors={["rgba(0,0,0,0.05)", "rgba(0,0,0,0.38)", "rgba(0,0,0,0.82)", "rgba(0,0,0,0.95)"]}
         locations={[0, 0.30, 0.54, 1.0]}

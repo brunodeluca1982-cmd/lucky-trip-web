@@ -1,36 +1,14 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { getImageForEntity } from "@/utils/getImageForEntity";
 
 export interface Destino {
   id: string;
   cidade: string;
   pais: string;
   descricao: string;
-  image: any;
+  image: null;
   lancado: boolean;
 }
-
-const SLUG_IMAGE: Record<string, any> = {
-  "rio":       require("../assets/images/hero-rio.png"),
-  "santorini": require("../assets/images/hero-santorini.png"),
-  "kyoto":     require("../assets/images/hero-kyoto.png"),
-};
-
-function destinoImage(slug: string, nome: string): any {
-  return SLUG_IMAGE[slug] ?? getImageForEntity("city", nome);
-}
-
-const STATIC_RIO_FALLBACK: Destino[] = [
-  {
-    id:        "rio",
-    cidade:    "Rio de Janeiro",
-    pais:      "Brasil",
-    descricao: "A cidade maravilhosa — praias douradas, florestas urbanas e o carnaval mais famoso do mundo.",
-    image:     require("../assets/images/hero-rio.png"),
-    lancado:   true,
-  },
-];
 
 export function useDestinos() {
   const [destinos, setDestinos] = useState<Destino[]>([]);
@@ -56,15 +34,15 @@ export function useDestinos() {
           cidade:    row.nome,
           pais:      row.pais,
           descricao: row.descricao ?? "",
-          image:     destinoImage(row.slug as string, row.nome),
+          image:     null,
           lancado:   row.lancado ?? false,
         }));
 
-        if (!cancelled) setDestinos(rows.length > 0 ? rows : STATIC_RIO_FALLBACK);
+        if (!cancelled) setDestinos(rows);
       } catch (e: any) {
         if (!cancelled) {
           setError(e.message ?? "Erro ao carregar destinos");
-          setDestinos(STATIC_RIO_FALLBACK);
+          setDestinos([]);
         }
       } finally {
         if (!cancelled) setLoading(false);

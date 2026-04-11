@@ -21,7 +21,7 @@ interface HotelCardProps {
   nome: string;
   localizacao: string;
   tipo: string;
-  image: ImageSourcePropType;
+  image: ImageSourcePropType | null;
   onPress?: () => void;
 }
 
@@ -42,7 +42,7 @@ export function HotelCard({ id, nome, localizacao, tipo, image, onPress }: Hotel
         pressed && { opacity: 0.92, transform: [{ scale: 0.97 }] },
       ]}
     >
-      <Image source={image} style={styles.image} resizeMode="cover" />
+      {image != null && <Image source={image} style={styles.image} resizeMode="cover" />}
       <LinearGradient
         colors={["transparent", "rgba(0,0,0,0.78)"]}
         style={styles.gradient}

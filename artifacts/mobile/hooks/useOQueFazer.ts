@@ -1,11 +1,10 @@
 /**
  * useOQueFazer.ts — Fetches activities from Supabase `o_que_fazer_rio` table.
  * Returns LugarPlace-compatible objects for use in O que fazer screens.
- * Photos: Supabase photo_url only. Falls back to local bundled neighborhood asset.
+ * Photos: Supabase photo_url only. Returns null when no Supabase image exists.
  */
 
 import { useEffect, useState } from "react";
-import { ImageSourcePropType } from "react-native";
 import { supabase } from "@/lib/supabase";
 import type { LugarPlace } from "@/data/lugares";
 import { resolvePin } from "@/data/lugares";
@@ -55,7 +54,7 @@ export function useOQueFazer(): State {
           localizacao:   bairro                                         || "Rio de Janeiro",
           categoria:     ((row.categoria as string | null)?.toUpperCase()) ?? "EXPERIÊNCIA",
           descricao:     "Uma das experiências selecionadas para o Rio de Janeiro.",
-          image:         getImageForEntity("activity", row.nome ?? "", bairro, supaPhoto) as ImageSourcePropType,
+          image:         getImageForEntity("activity", row.nome ?? "", bairro, supaPhoto),
           xPct:          pin.xPct,
           yPct:          pin.yPct,
           tipo_item:     "experiencia",

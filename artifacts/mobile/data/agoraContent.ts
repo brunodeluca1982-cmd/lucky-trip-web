@@ -20,7 +20,7 @@ export interface AgoraItem {
   localizacao: string;
   tag: string;
   descricao: string;
-  image: ImageSourcePropType;
+  image: ImageSourcePropType | null;
   placeId?: string;
 }
 
@@ -28,7 +28,7 @@ export interface DestaquePick {
   titulo: string;
   localizacao: string;
   tag: string;
-  image: ImageSourcePropType;
+  image: ImageSourcePropType | null;
 }
 
 export const AGORA_CONTENT: Record<string, Record<Periodo, AgoraItem[]>> = {

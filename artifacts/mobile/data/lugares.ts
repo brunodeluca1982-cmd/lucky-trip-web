@@ -22,7 +22,7 @@ export interface LugarPlace {
   localizacao: string; // bairro — used to look up zone
   categoria: string;
   descricao: string;
-  image: ImageSourcePropType;
+  image: ImageSourcePropType | null;
   images?: ImageSourcePropType[]; // optional multi-image carousel; falls back to [image]
   preco?: string;
   xPct: number;
@@ -113,10 +113,9 @@ export function resolvePin(
   };
 }
 
-// ── Shorthand: resolve a neighborhood image by localizacao ───────────────────
-// All place images go through this — never hardcode images in place data.
-function ni(localizacao: string): ImageSourcePropType {
-  return getNeighborhoodImage(localizacao) as ImageSourcePropType;
+// ── Image placeholder — always null (Supabase photo_url is the only valid source) ──
+function ni(_localizacao: string): null {
+  return null;
 }
 
 // ── Place data by city and category ──────────────────────────────────────────

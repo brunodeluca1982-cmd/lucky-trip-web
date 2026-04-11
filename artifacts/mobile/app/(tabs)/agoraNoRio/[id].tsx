@@ -51,7 +51,7 @@ function HeroCard({ item, cityId }: { item: AgoraItem; cityId: string }) {
       style={({ pressed }) => [s.heroCard, pressed && { opacity: 0.90 }]}
       onPress={() => item.placeId && router.push(`/lugar/${cityId}/${item.placeId}`)}
     >
-      <Image source={item.image} style={s.heroCardImage} resizeMode="cover" />
+      {item.image != null && <Image source={item.image} style={s.heroCardImage} resizeMode="cover" />}
       <LinearGradient
         colors={["rgba(0,0,0,0.02)", "rgba(0,0,0,0.85)"]}
         locations={[0.3, 1]}
@@ -81,7 +81,7 @@ function MomentoCard({ item, cityId }: { item: AgoraItem; cityId: string }) {
       style={({ pressed }) => [s.momentoCard, pressed && { opacity: 0.88, transform: [{ scale: 0.97 }] }]}
       onPress={() => item.placeId && router.push(`/lugar/${cityId}/${item.placeId}`)}
     >
-      <Image source={item.image} style={s.momentoImage} resizeMode="cover" />
+      {item.image != null && <Image source={item.image} style={s.momentoImage} resizeMode="cover" />}
       <LinearGradient
         colors={["rgba(0,0,0,0.02)", "rgba(0,0,0,0.84)"]}
         locations={[0.25, 1]}
@@ -102,7 +102,7 @@ function MomentoCard({ item, cityId }: { item: AgoraItem; cityId: string }) {
 function DestaqueCard({ pick }: { pick: DestaquePick }) {
   return (
     <View style={s.destaqueCard}>
-      <Image source={pick.image} style={s.destaqueImage} resizeMode="cover" />
+      {pick.image != null && <Image source={pick.image} style={s.destaqueImage} resizeMode="cover" />}
       <LinearGradient
         colors={["rgba(0,0,0,0.04)", "rgba(0,0,0,0.82)"]}
         locations={[0.2, 1]}
@@ -151,7 +151,7 @@ export default function AgoraNoRioScreen() {
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* ── Fullscreen background ── */}
-      <Image source={destino.image} style={s.bgImage} resizeMode="cover" />
+      {destino.image != null && <Image source={destino.image} style={s.bgImage} resizeMode="cover" />}
       <LinearGradient
         colors={["rgba(0,0,0,0.55)", "rgba(0,0,0,0.40)", "#000000"]}
         locations={[0, 0.28, 0.52]}

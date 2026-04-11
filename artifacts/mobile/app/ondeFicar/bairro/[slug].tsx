@@ -77,11 +77,7 @@ export default function BairroDetailScreen() {
 
   const destino = destinos.find((d) => d.id === (cityId ?? "rio")) ?? destinos[0];
 
-  const heroImage = getNeighborhoodHero(
-    neighborhood?.image_url,
-    neighborhood?.neighborhood_name,
-    destino.image,
-  );
+  const heroImage = getNeighborhoodHero(neighborhood?.image_url);
 
   const [editorialOpen, setEditorialOpen] = useState(false);
 
@@ -105,11 +101,13 @@ export default function BairroDetailScreen() {
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* ── Full-screen background (persists while scrolling) ── */}
-      <Image
-        source={heroImage}
-        style={StyleSheet.absoluteFillObject}
-        resizeMode="cover"
-      />
+      {heroImage != null && (
+        <Image
+          source={heroImage}
+          style={StyleSheet.absoluteFillObject}
+          resizeMode="cover"
+        />
+      )}
       <LinearGradient
         colors={["rgba(0,0,0,0.05)", "rgba(0,0,0,0.38)", "rgba(0,0,0,0.82)", "rgba(0,0,0,0.95)"]}
         locations={[0, 0.30, 0.54, 1.0]}

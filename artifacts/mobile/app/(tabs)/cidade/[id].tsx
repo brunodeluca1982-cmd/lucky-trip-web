@@ -30,7 +30,6 @@ import { HotelCard } from "@/components/HotelCard";
 import { useOQueFazer } from "@/hooks/useOQueFazer";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import { useNeighborhoods } from "@/hooks/useNeighborhoods";
-import { getNeighborhoodImage } from "@/data/neighborhoodImages";
 
 const C = Colors.light;
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -414,7 +413,7 @@ export default function CidadeScreen() {
                         nome={r.nome}
                         bairro={r.bairro}
                         categoria={r.categoria}
-                        image={r.resolvedPhotoUri ? { uri: r.resolvedPhotoUri } : require("../../../assets/images/hero-rio.png")}
+                        image={r.resolvedPhotoUri ? { uri: r.resolvedPhotoUri } : null}
                         onPress={() => router.push({
                           pathname: "/lugar/[cityId]/[placeId]",
                           params: { cityId: "rio", placeId: String(r.id), source_table: "restaurantes" },
@@ -446,7 +445,7 @@ export default function CidadeScreen() {
                           image={
                             h.photo_url
                               ? { uri: h.photo_url }
-                              : getNeighborhoodImage(h.neighborhood_slug ?? h.localizacao)
+                              : null
                           }
                           onPress={() => router.push({
                             pathname: "/lugar/[cityId]/[placeId]",

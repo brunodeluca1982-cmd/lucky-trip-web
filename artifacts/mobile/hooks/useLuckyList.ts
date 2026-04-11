@@ -1,11 +1,10 @@
 /**
  * useLuckyList.ts — Fetches lucky picks from Supabase `lucky_list_rio` table.
  * Returns LugarPlace-compatible objects for use in Lucky List screens.
- * Photos: Supabase photo_url only. Falls back to local bundled neighborhood asset.
+ * Photos: Supabase photo_url only. Returns null when no Supabase image exists.
  */
 
 import { useEffect, useState } from "react";
-import { ImageSourcePropType } from "react-native";
 import { supabase } from "@/lib/supabase";
 import type { LugarPlace } from "@/data/lugares";
 import { resolvePin } from "@/data/lugares";
@@ -65,7 +64,7 @@ export function useLuckyList(): State {
           localizacao: bairro                          || "Rio de Janeiro",
           categoria:   "LUCKY LIST",
           descricao:   "Um dos achados especiais da Lucky List — lugares que só quem sabe, sabe.",
-          image:       getImageForEntity(entityType, row.nome ?? "", bairro, supaPhoto) as ImageSourcePropType,
+          image:       getImageForEntity(entityType, row.nome ?? "", bairro, supaPhoto),
           xPct:        pin.xPct,
           yPct:        pin.yPct,
           tipo_item:   resolvedTipo,
