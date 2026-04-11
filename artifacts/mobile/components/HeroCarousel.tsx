@@ -14,6 +14,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import Colors from "@/constants/colors";
+import { useBackground } from "@/context/BackgroundContext";
 
 const C = Colors.light;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -35,6 +36,12 @@ interface HeroCarouselProps {
 }
 
 function HeroSlide({ item }: { item: HeroItem }) {
+  // Mirror the global background for the active destination (Rio).
+  // For all other slides, fall back to the item's own static image.
+  const { pool, currentIdx } = useBackground();
+  const imageSource: ImageSourcePropType =
+    item.cityId === "rio" && pool.length > 0 ? pool[currentIdx] : item.image;
+
   return (
     <Pressable
       style={({ pressed }) => [styles.slide, pressed && { opacity: 0.94 }]}
@@ -55,7 +62,7 @@ function HeroSlide({ item }: { item: HeroItem }) {
         }
       }}
     >
-      <Image source={item.image} style={styles.image} resizeMode="cover" />
+      <Image source={imageSource} style={styles.image} resizeMode="cover" />
       <View style={styles.dimOverlay} />
       <LinearGradient
         colors={["transparent", "rgba(0,0,0,0.50)", "rgba(0,0,0,0.88)"]}
