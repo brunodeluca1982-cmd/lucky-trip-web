@@ -3110,6 +3110,7 @@ export default function RoteiroScreen() {
     if (generating) return;
     setGenError(null);
     setGenerating(true);
+    console.log("STEP 1 - iniciou geração");
 
     try {
       const supabaseUrl  = process.env.EXPO_PUBLIC_SUPABASE_URL  ?? "";
@@ -3149,6 +3150,7 @@ export default function RoteiroScreen() {
       console.log("[ItineraryScreen] response", data);
 
       if (!response.ok || !data?.days) throw new Error(data?.error ?? data?.message ?? `HTTP ${response.status}`);
+      console.log("STEP 2 - resposta recebida", data);
 
       const savedMap = new Map(saved.map((s) => [s.id, s]));
       const hydratedDays: DiaRoteiro[] = (data.days as DiaRoteiro[]).map((day) => ({
@@ -3268,10 +3270,13 @@ export default function RoteiroScreen() {
         "@luckytrip/current_itinerary",
         JSON.stringify(itineraryResult),
       );
-      router.push("/roteiro/resultado");
+      if (itineraryResult && itineraryResult.days?.length > 0) {
+        console.log("STEP 3 - navegando para resultado");
+        router.push("/roteiro/resultado");
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erro desconhecido";
-      console.log("[ItineraryScreen] error", err);
+      console.error("ERRO NA GERAÇÃO", err);
       setGenError(msg);
     } finally {
       setGenerating(false);
