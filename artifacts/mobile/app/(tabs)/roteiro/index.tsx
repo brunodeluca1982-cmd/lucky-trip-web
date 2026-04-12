@@ -2830,7 +2830,7 @@ export default function RoteiroScreen() {
   const params      = useLocalSearchParams<{ contextual?: string }>();
   const isContextual = params.contextual === "1";
 
-  const { saved, user } = useGuia();
+  const { saved, user, setCurrentItinerary } = useGuia();
 
   const [result,            setResult]            = useState<ItineraryResult | null>(null);
   const [generating,        setGenerating]        = useState(false);
@@ -3253,14 +3253,17 @@ export default function RoteiroScreen() {
         } catch { /* auto-save failure is silent — result still shows */ }
       }
 
-      setResult({
+      const itineraryResult: ItineraryResult = {
         destination: data.destination ?? "Rio de Janeiro",
         source:      "trip_saved_places",
         preferences: { inspirations, vibe },
         summary:     data.summary,
         days:        hydratedDays,
-      });
+      };
+      setResult(itineraryResult);
+      setCurrentItinerary(itineraryResult);
       if (autoSavedId) setSavedItineraryId(autoSavedId);
+      router.push("/roteiro/resultado");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erro desconhecido";
       console.log("[ItineraryScreen] error", err);

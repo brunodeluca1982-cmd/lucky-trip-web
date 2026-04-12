@@ -1,0 +1,583 @@
+import React, { useRef } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  StyleSheet,
+  Platform,
+  Alert,
+  Linking,
+  Image,
+} from "react-native";
+import { router } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { useGuia, sourceTableFromCategoria } from "@/context/GuiaContext";
+import type { SavedItem, SourceTable } from "@/context/GuiaContext";
+import type { ItineraryResult } from "@/utils/buildItinerary";
+import { PERIODO_LABEL, PERIODO_ICON } from "@/utils/buildRoteiro";
+import type { DiaRoteiro } from "@/utils/buildRoteiro";
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const GOLD    = "#D4AF37";
+const BG      = "#1A0E04";
+const SURFACE = "#231508";
+const BORDER  = "rgba(212,175,55,0.15)";
+
+// ── Item navigation (mirrors index.tsx) ───────────────────────────────────────
+
+function navigateToItem(item: SavedItem) {
+  if (item.isExternal) {
+    if (item.placeId) {
+      Linking.openURL(`https://www.google.com/maps/place/?q=place_id:${item.placeId}`);
+      return;
+    }
+    if (item.lat && item.lng) {
+      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${item.lat},${item.lng}`);
+      return;
+    }
+    Alert.alert("Em breve disponível", "Este lugar ainda não tem página de detalhes.");
+    return;
+  }
+  if (!item.id) {
+    Alert.alert("Em breve disponível", "Este lugar ainda não tem página de detalhes.");
+    return;
+  }
+  const table: SourceTable = item.source_table ?? sourceTableFromCategoria(item.categoria);
+  if (table === "stay_hotels") {
+    router.push({ pathname: "/ondeFicar/hotel/[hotelId]", params: { hotelId: item.id } });
+    return;
+  }
+  router.push({
+    pathname: "/lugar/[cityId]/[placeId]",
+    params: {
+      cityId:       "rio",
+      placeId:      item.id,
+      source_table: table,
+      titulo:       item.titulo ?? "",
+      localizacao:  item.localizacao ?? "",
+    },
+  });
+}
+
+// ── Item thumbnail ─────────────────────────────────────────────────────────────
+
+function ItemThumb({ image }: { image: { uri: string } | null | unknown }) {
+  const [errored, setErrored] = React.useState(false);
+  const src =
+    !errored && image != null && typeof image === "object" && "uri" in (image as object)
+      ? (image as { uri: string })
+      : null;
+  return (
+    <>
+      {src != null && (
+        <Image
+          source={src}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+          onError={() => setErrored(true)}
+        />
+      )}
+      <LinearGradient
+        colors={["transparent", "rgba(0,0,0,0.32)"]}
+        style={StyleSheet.absoluteFill}
+      />
+    </>
+  );
+}
+
+// ── Period time helpers ────────────────────────────────────────────────────────
+
+const PERIOD_START: Record<string, number> = {
+  manha:  8,
+  almoco: 12,
+  tarde:  15,
+  noite:  19,
+};
+
+function getItemTime(periodo: string, index: number): string {
+  const base  = PERIOD_START[periodo] ?? 9;
+  const hour  = base + Math.floor(index * 1.5);
+  const clamp = Math.min(hour, 23);
+  return `${String(clamp).padStart(2, "0")}:${index % 2 === 0 ? "00" : "30"}`;
+}
+
+// ── Day card ──────────────────────────────────────────────────────────────────
+
+function DayCard({
+  dia,
+  onLayout,
+}: {
+  dia:       DiaRoteiro;
+  onLayout?: (y: number) => void;
+}) {
+  const [collapsed, setCollapsed] = React.useState(false);
+  const allItems = dia.periodos.flatMap((p) => p.items);
+
+  return (
+    <View
+      style={sc.dayCard}
+      onLayout={(e) => onLayout?.(e.nativeEvent.layout.y)}
+    >
+      {/* Day header */}
+      <Pressable
+        style={({ pressed }) => [sc.dayHeader, pressed && { opacity: 0.85 }]}
+        onPress={() => setCollapsed((v) => !v)}
+      >
+        <View style={sc.dayBadge}>
+          <Text style={sc.dayBadgeText}>DIA {dia.numero}</Text>
+        </View>
+        <Text style={sc.dayBairro} numberOfLines={1}>{dia.bairro}</Text>
+        <Feather
+          name={collapsed ? "chevron-down" : "chevron-up"}
+          size={15}
+          color="rgba(255,255,255,0.35)"
+        />
+      </Pressable>
+
+      {/* Collapsed summary */}
+      {collapsed && (
+        <View style={sc.collapsedRow}>
+          <Text style={sc.collapsedText}>
+            {allItems.length} {allItems.length === 1 ? "lugar" : "lugares"}
+          </Text>
+        </View>
+      )}
+
+      {/* Period blocks */}
+      {!collapsed && (
+        <View style={sc.dayBody}>
+          {dia.periodos.map((periodo) => (
+            <View key={periodo.periodo} style={sc.periodoSection}>
+              {/* Period label */}
+              <View style={sc.periodoHeader}>
+                <Feather
+                  name={PERIODO_ICON[periodo.periodo] as any}
+                  size={11}
+                  color={GOLD}
+                />
+                <Text style={sc.periodoLabel}>{PERIODO_LABEL[periodo.periodo]}</Text>
+                <View style={sc.periodoDivider} />
+              </View>
+
+              {/* Items */}
+              {periodo.items.map((item, idx) => (
+                <Pressable
+                  key={`${item.source_table ?? item.categoria}_${item.id}_${idx}`}
+                  style={({ pressed }) => [sc.itemRow, pressed && { opacity: 0.78 }]}
+                  onPress={() => navigateToItem(item)}
+                >
+                  {/* Time column */}
+                  <View style={sc.timeCol}>
+                    <Text style={sc.timeLabel}>{getItemTime(periodo.periodo, idx)}</Text>
+                  </View>
+
+                  {/* Connector */}
+                  <View style={sc.connectorCol}>
+                    <View style={sc.connectorDot} />
+                    {idx < periodo.items.length - 1 && <View style={sc.connectorLine} />}
+                  </View>
+
+                  {/* Card */}
+                  <View style={sc.itemCard}>
+                    <View style={sc.thumb}>
+                      <ItemThumb image={item.image ?? null} />
+                    </View>
+                    <View style={sc.itemInfo}>
+                      <Text style={sc.itemTitle} numberOfLines={2}>{item.titulo}</Text>
+                      <Text style={sc.itemBairro} numberOfLines={1}>
+                        {item.localizacao || dia.bairro}
+                      </Text>
+                    </View>
+                    <Feather name="chevron-right" size={13} color="rgba(255,255,255,0.30)" />
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+// ── Main screen ───────────────────────────────────────────────────────────────
+
+export default function ResultadoScreen() {
+  const insets    = useSafeAreaInsets();
+  const topPad    = Platform.OS === "web" ? 67 : insets.top;
+  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+
+  const { currentItinerary, setCurrentItinerary } = useGuia();
+  const scrollRef = useRef<ScrollView>(null);
+  const [dayOffsets, setDayOffsets] = React.useState<Record<number, number>>({});
+  const [activeChip, setActiveChip] = React.useState<number | null>(null);
+
+  function handleBack() {
+    setCurrentItinerary(null);
+    router.back();
+  }
+
+  function handleDayChip(num: number) {
+    setActiveChip(num);
+    const y = dayOffsets[num] ?? 0;
+    scrollRef.current?.scrollTo({ y: Math.max(0, y - 16), animated: true });
+  }
+
+  // Guard: if there's no itinerary, go back
+  if (!currentItinerary) {
+    return (
+      <View style={[sc.root, { paddingTop: topPad }]}>
+        <Pressable style={sc.backBtn} onPress={() => router.back()}>
+          <Feather name="arrow-left" size={20} color="#fff" />
+        </Pressable>
+        <View style={sc.emptyCenter}>
+          <Text style={sc.emptyText}>Nenhum roteiro gerado.</Text>
+          <Pressable style={sc.emptyBtn} onPress={() => router.back()}>
+            <Text style={sc.emptyBtnText}>Voltar</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  const { totalDays, totalItems } = currentItinerary.summary;
+
+  return (
+    <View style={[sc.root, { paddingBottom: bottomPad }]}>
+      {/* Header */}
+      <View style={[sc.header, { paddingTop: topPad }]}>
+        <Pressable style={sc.backBtn} onPress={handleBack} hitSlop={10}>
+          <Feather name="arrow-left" size={20} color="#fff" />
+        </Pressable>
+        <Text style={sc.headerTitle}>Roteiro</Text>
+        <View style={{ width: 36 }} />
+      </View>
+
+      <ScrollView
+        ref={scrollRef}
+        style={sc.scroll}
+        contentContainerStyle={sc.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Hero */}
+        <View style={sc.hero}>
+          <Text style={sc.heroEyebrow}>Rio de Janeiro</Text>
+          <Text style={sc.heroTitle}>
+            {totalDays} {totalDays === 1 ? "dia" : "dias"} no Rio
+          </Text>
+          <Text style={sc.heroMeta}>
+            {totalItems} {totalItems === 1 ? "experiência curada" : "experiências curadas"}
+          </Text>
+
+          {/* Day chips */}
+          {currentItinerary.days.length > 1 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={sc.chipScroll}
+              contentContainerStyle={sc.chipRow}
+            >
+              {currentItinerary.days.map((dia) => {
+                const active = activeChip === dia.numero;
+                return (
+                  <Pressable
+                    key={dia.numero}
+                    style={({ pressed }) => [
+                      sc.chip,
+                      active && sc.chipActive,
+                      pressed && { opacity: 0.7 },
+                    ]}
+                    onPress={() => handleDayChip(dia.numero)}
+                  >
+                    <Text style={[sc.chipText, active && sc.chipTextActive]}>
+                      Dia {dia.numero}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          )}
+        </View>
+
+        {/* Day cards */}
+        {currentItinerary.days.map((dia) => (
+          <DayCard
+            key={dia.numero}
+            dia={dia}
+            onLayout={(y) =>
+              setDayOffsets((prev) => ({ ...prev, [dia.numero]: y }))
+            }
+          />
+        ))}
+
+        <View style={{ height: 48 }} />
+      </ScrollView>
+    </View>
+  );
+}
+
+// ── Styles ────────────────────────────────────────────────────────────────────
+
+const sc = StyleSheet.create({
+  root: {
+    flex:            1,
+    backgroundColor: BG,
+  },
+
+  // Header
+  header: {
+    flexDirection:   "row",
+    alignItems:      "center",
+    justifyContent:  "space-between",
+    paddingHorizontal: 20,
+    paddingBottom:   12,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
+  },
+  headerTitle: {
+    fontFamily: "PlayfairDisplay_600SemiBold",
+    fontSize:   17,
+    color:      "#fff",
+    letterSpacing: 0.4,
+  },
+  backBtn: {
+    width:           36,
+    height:          36,
+    alignItems:      "center",
+    justifyContent:  "center",
+  },
+
+  // Scroll
+  scroll:        { flex: 1 },
+  scrollContent: { paddingHorizontal: 16, paddingTop: 4 },
+
+  // Hero
+  hero: {
+    paddingVertical: 24,
+    alignItems:      "center",
+    gap:             4,
+  },
+  heroEyebrow: {
+    fontFamily:    "Inter_400Regular",
+    fontSize:      11,
+    color:         GOLD,
+    letterSpacing: 2,
+    textTransform: "uppercase",
+  },
+  heroTitle: {
+    fontFamily:    "PlayfairDisplay_700Bold",
+    fontSize:      30,
+    color:         "#fff",
+    letterSpacing: 0.3,
+    marginTop:     4,
+  },
+  heroMeta: {
+    fontFamily: "Inter_400Regular",
+    fontSize:   13,
+    color:      "rgba(255,255,255,0.55)",
+    marginTop:  2,
+  },
+
+  // Day chips
+  chipScroll: { marginTop: 16 },
+  chipRow: {
+    flexDirection: "row",
+    gap:           8,
+    paddingHorizontal: 4,
+  },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical:   6,
+    borderRadius:      20,
+    borderWidth:       1,
+    borderColor:       "rgba(212,175,55,0.30)",
+    backgroundColor:   "rgba(212,175,55,0.06)",
+  },
+  chipActive: {
+    backgroundColor: GOLD,
+    borderColor:     GOLD,
+  },
+  chipText: {
+    fontFamily: "Inter_500Medium",
+    fontSize:   12,
+    color:      "rgba(255,255,255,0.65)",
+  },
+  chipTextActive: {
+    color: "#1A0E04",
+  },
+
+  // Day card
+  dayCard: {
+    backgroundColor: SURFACE,
+    borderRadius:    14,
+    borderWidth:     1,
+    borderColor:     BORDER,
+    marginBottom:    12,
+    overflow:        "hidden",
+  },
+  dayHeader: {
+    flexDirection:     "row",
+    alignItems:        "center",
+    gap:               10,
+    paddingHorizontal: 16,
+    paddingVertical:   14,
+  },
+  dayBadge: {
+    backgroundColor: "rgba(212,175,55,0.15)",
+    borderRadius:    6,
+    paddingHorizontal: 8,
+    paddingVertical:   3,
+  },
+  dayBadgeText: {
+    fontFamily:    "Inter_600SemiBold",
+    fontSize:      10,
+    color:         GOLD,
+    letterSpacing: 1.2,
+  },
+  dayBairro: {
+    flex:       1,
+    fontFamily: "PlayfairDisplay_600SemiBold",
+    fontSize:   15,
+    color:      "#fff",
+  },
+  collapsedRow: {
+    paddingHorizontal: 16,
+    paddingBottom:     12,
+  },
+  collapsedText: {
+    fontFamily: "Inter_400Regular",
+    fontSize:   12,
+    color:      "rgba(255,255,255,0.40)",
+  },
+
+  // Day body
+  dayBody: {
+    paddingBottom: 8,
+  },
+
+  // Period
+  periodoSection: {
+    paddingHorizontal: 16,
+    paddingBottom:     8,
+  },
+  periodoHeader: {
+    flexDirection:  "row",
+    alignItems:     "center",
+    gap:            6,
+    paddingVertical: 10,
+  },
+  periodoLabel: {
+    fontFamily:    "Inter_500Medium",
+    fontSize:      11,
+    color:         "rgba(255,255,255,0.60)",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  periodoDivider: {
+    flex:            1,
+    height:          StyleSheet.hairlineWidth,
+    backgroundColor: "rgba(255,255,255,0.10)",
+  },
+
+  // Item row
+  itemRow: {
+    flexDirection:  "row",
+    alignItems:     "flex-start",
+    marginBottom:   10,
+  },
+  timeCol: {
+    width:      42,
+    paddingTop: 12,
+    alignItems: "flex-end",
+    paddingRight: 6,
+  },
+  timeLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize:   10,
+    color:      "rgba(255,255,255,0.35)",
+    letterSpacing: 0.3,
+  },
+  connectorCol: {
+    width:          18,
+    alignItems:     "center",
+    paddingTop:     14,
+    marginRight:    8,
+  },
+  connectorDot: {
+    width:           6,
+    height:          6,
+    borderRadius:    3,
+    backgroundColor: GOLD,
+  },
+  connectorLine: {
+    flex:            1,
+    width:           1,
+    backgroundColor: "rgba(212,175,55,0.25)",
+    marginTop:       4,
+    minHeight:       32,
+  },
+  itemCard: {
+    flex:            1,
+    flexDirection:   "row",
+    alignItems:      "center",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius:    10,
+    borderWidth:     1,
+    borderColor:     "rgba(255,255,255,0.07)",
+    overflow:        "hidden",
+    minHeight:       60,
+    gap:             10,
+    paddingRight:    10,
+  },
+  thumb: {
+    width:           80,
+    height:          56,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    flexShrink:      0,
+    overflow:        "hidden",
+  },
+  itemInfo: {
+    flex:          1,
+    paddingVertical: 10,
+  },
+  itemTitle: {
+    fontFamily: "Inter_500Medium",
+    fontSize:   13,
+    color:      "#fff",
+    lineHeight: 18,
+  },
+  itemBairro: {
+    fontFamily: "Inter_400Regular",
+    fontSize:   11,
+    color:      "rgba(255,255,255,0.45)",
+    marginTop:  2,
+  },
+
+  // Empty state
+  emptyCenter: {
+    flex:           1,
+    alignItems:     "center",
+    justifyContent: "center",
+    gap:            16,
+  },
+  emptyText: {
+    fontFamily: "Inter_400Regular",
+    fontSize:   15,
+    color:      "rgba(255,255,255,0.55)",
+  },
+  emptyBtn: {
+    paddingHorizontal: 24,
+    paddingVertical:   10,
+    borderRadius:      24,
+    backgroundColor:   GOLD,
+  },
+  emptyBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize:   14,
+    color:      "#1A0E04",
+  },
+});

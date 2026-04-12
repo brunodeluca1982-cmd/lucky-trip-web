@@ -42,6 +42,7 @@ import { AppState, type AppStateStatus, type ImageSourcePropType } from "react-n
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import type { ItineraryResult } from "@/utils/buildItinerary";
 
 // ── Storage keys ───────────────────────────────────────────────────────────────
 
@@ -256,6 +257,9 @@ interface GuiaContextType {
   paywallType: PaywallType;
   showPaywall: (type: PaywallType) => void;
   hidePaywall: () => void;
+  /** Last AI-generated itinerary — set immediately after generation, cleared on back */
+  currentItinerary:    ItineraryResult | null;
+  setCurrentItinerary: (r: ItineraryResult | null) => void;
 }
 
 const GuiaContext = createContext<GuiaContextType | null>(null);
@@ -270,6 +274,7 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
   const [authPromptVisible, setAuthPromptVisible] = useState(false);
   const [paywallVisible,    setPaywallVisible]    = useState(false);
   const [paywallType,       setPaywallType]       = useState<PaywallType>("depth");
+  const [currentItinerary,  setCurrentItinerary]  = useState<ItineraryResult | null>(null);
 
   // Ref so async callbacks can read the current saved list without stale closures
   const savedRef = useRef<SavedItem[]>([]);
@@ -554,6 +559,8 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
         paywallType,
         showPaywall,
         hidePaywall,
+        currentItinerary,
+        setCurrentItinerary,
       }}
     >
       {children}
