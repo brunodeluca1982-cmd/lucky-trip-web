@@ -2701,11 +2701,16 @@ serve(async (req) => {
     const savedIds = new Set(savedPlaces.map((p) => p.id));
     places = scoreAndSortPool(places, preferences, savedIds);
 
+    console.log("AFTER SORT", places.map((p) => p.name));
+
     // ── Step 3c: Semantic dedup — same real-world place, different label ──────
     // "Arpoador" + "Melhor tarde do Arpoador" → identity "arpoador" → keep one.
     // Runs after scoring so the first (best-ranked) occurrence always wins.
     // Runs before geographic clustering and buildFullDraft slot assignment.
     places = deduplicateByPlaceIdentity(places);
+
+    console.log("AFTER DEDUP", places.map((p) => p.name));
+    console.log("IDENTITIES", places.map((p) => ({ name: p.name, identity: placeIdentity(p.name) })));
 
     // ── Step 4: Macro-region clustering (oeste + norte isolated from centro + sul)
     const { dayGroups, dayRestaurants } = groupByGeography(
@@ -2723,6 +2728,8 @@ serve(async (req) => {
 
     // ── Step 7: Validation — recover any dropped places ───────────────────────
     days = validateAndFix(days, places);
+
+    console.log("FINAL DAYS", JSON.stringify(days));
 
     const result: ItineraryResult = {
       destination: dest,
