@@ -92,6 +92,9 @@ interface EnrichedPlace {
   // Stamped by scoreAndSortPool; read by sortBucket for intra-zone ordering.
   // Optional: absent on synthetic places created after scoring runs.
   prefScore?: number;
+  // ── Computed in Step 3c (in-memory only, never persisted or serialized)
+  // Derived from tags / name / categoria. Used by Step 5 variety + rhythm logic.
+  experience_type?: string;
 }
 
 /** Output types — must stay compatible with the existing DiaRoteiro UI shape */
@@ -1674,6 +1677,187 @@ function categoriaToTable(cat: SavedCategory): string {
   }
 }
 
+// ── STEP 5 helpers: Experience variety + day rhythm ───────────────────────────
+//
+// computeExperienceType  — derives one of six semantic labels from tags/name/categoria.
+// enforceVarietyInPeriod — breaks runs of the same type within a period.
+// enforceRelaxCap        — caps "relax" items (max 1/period, max 2/day).
+// applyDayRhythm         — soft mutual-benefit swaps between periods.
+//
+// All four are pure in-memory operations. They never touch the DB, the API
+// response shape, validateAndFix, or the clustering logic.
+
+function computeExperienceType(p: EnrichedPlace): string {
+  const haystack = [p.name, ...(p.tags ?? []), ...(p.vibe_tags ?? [])]
+    .join(" ")
+    .toLowerCase();
+  if (/beach|praia/.test(haystack)) return "relax";
+  if (/sunset|mirante|vista/.test(haystack)) return "scenic";
+  if (p.categoria === "restaurante") return "food";
+  if (/museu|museum|cultura|história|historia|history/.test(haystack))
+    return "culture";
+  if (/bar|nightlife|drinks|balada/.test(haystack)) return "nightlife";
+  if (/trilha|activity|outdoor|atividade|esporte/.test(haystack))
+    return "active";
+  return "relax";
+}
+
+// A. No two consecutive items in the same period may share experience_type.
+// When a clash is found, try to swap with a later non-clashing item.
+// If impossible (all remaining are same type), keep the higher-prefScore item
+// and remove the lower — never remove "food" items.
+function enforceVarietyInPeriod(
+  items: EnrichedPlace[],
+  periodo: PeriodoDia,
+): EnrichedPlace[] {
+  // almoco is always 1 restaurant; variety enforcement doesn't apply.
+  if (periodo === "almoco" || items.length <= 1) return items;
+
+  const result = [...items];
+  let i = 0;
+  while (i < result.length - 1) {
+    const typeA = result[i].experience_type ?? "relax";
+    const typeB = result[i + 1].experience_type ?? "relax";
+    if (typeA !== typeB) {
+      i++;
+      continue;
+    }
+    // Found two consecutive same-type items — try to swap result[i+1] with a
+    // later item of a different type.
+    let swapIdx = -1;
+    for (let j = i + 2; j < result.length; j++) {
+      if ((result[j].experience_type ?? "relax") !== typeA) {
+        swapIdx = j;
+        break;
+      }
+    }
+    if (swapIdx !== -1) {
+      [result[i + 1], result[swapIdx]] = [result[swapIdx], result[i + 1]];
+      // Re-check pair (i, i+1) — the new i+1 might still clash with i
+      continue;
+    }
+    // No swap candidate — keep higher-scored, remove lower.
+    // Never remove food items (restaurants are protected).
+    const scoreA = result[i].prefScore ?? 0;
+    const scoreB = result[i + 1].prefScore ?? 0;
+    const canRemoveA = result[i].categoria !== "restaurante";
+    const canRemoveB = result[i + 1].categoria !== "restaurante";
+    if (canRemoveB && scoreA >= scoreB) {
+      result.splice(i + 1, 1); // remove i+1, keep i
+    } else if (canRemoveA && scoreB > scoreA) {
+      result.splice(i, 1); // remove i; new result[i] is the old result[i+1]
+    } else {
+      i++; // neither can be removed — skip
+    }
+  }
+  return result;
+}
+
+// B. Max 1 "relax" item per period; max 2 "relax" items per day.
+// Excess items are removed lowest-prefScore-first.
+function enforceRelaxCap(periodMap: Map<PeriodoDia, EnrichedPlace[]>): void {
+  // Pass 1 — max 1 relax per period
+  for (const [periodo, items] of periodMap.entries()) {
+    const relaxes = items.filter((p) => (p.experience_type ?? "relax") === "relax");
+    if (relaxes.length <= 1) continue;
+    const sorted = [...relaxes].sort(
+      (a, b) => (b.prefScore ?? 0) - (a.prefScore ?? 0),
+    );
+    const keepKey = `${sorted[0]!.source_table}_${sorted[0]!.id}`;
+    periodMap.set(
+      periodo,
+      items.filter(
+        (p) =>
+          (p.experience_type ?? "relax") !== "relax" ||
+          `${p.source_table}_${p.id}` === keepKey,
+      ),
+    );
+  }
+
+  // Pass 2 — max 2 relax per day (across all periods)
+  const allRelax: Array<{ periodo: PeriodoDia; item: EnrichedPlace }> = [];
+  for (const [periodo, items] of periodMap.entries()) {
+    for (const item of items) {
+      if ((item.experience_type ?? "relax") === "relax")
+        allRelax.push({ periodo, item });
+    }
+  }
+  if (allRelax.length <= 2) return;
+
+  // Sort ascending by prefScore — lowest scores go first for removal
+  allRelax.sort((a, b) => (a.item.prefScore ?? 0) - (b.item.prefScore ?? 0));
+  const toRemove = new Set(
+    allRelax
+      .slice(0, allRelax.length - 2)
+      .map(({ item }) => `${item.source_table}_${item.id}`),
+  );
+  for (const [periodo, items] of periodMap.entries()) {
+    periodMap.set(
+      periodo,
+      items.filter((p) => !toRemove.has(`${p.source_table}_${p.id}`)),
+    );
+  }
+}
+
+// C. Soft day-rhythm enforcement — only swaps when BOTH items benefit.
+// manhã prefers active/culture; tarde prefers relax/scenic; noite prefers food/nightlife.
+// almoco is untouched (already managed by restaurant logic).
+// No removal ever happens here — if no mutual-benefit swap is found, item stays put.
+const RHYTHM_PREFERRED: Record<PeriodoDia, string[]> = {
+  manha: ["active", "culture"],
+  almoco: ["food"],
+  tarde: ["relax", "scenic"],
+  noite: ["food", "nightlife"],
+};
+
+function applyDayRhythm(periodMap: Map<PeriodoDia, EnrichedPlace[]>): void {
+  const periods: PeriodoDia[] = ["manha", "almoco", "tarde", "noite"];
+
+  for (const fromPeriodo of periods) {
+    if (fromPeriodo === "almoco") continue; // managed by restaurant classification
+    const fromItems = periodMap.get(fromPeriodo);
+    if (!fromItems || fromItems.length === 0) continue;
+    const fromPreferred = RHYTHM_PREFERRED[fromPeriodo];
+
+    for (let fi = 0; fi < fromItems.length; fi++) {
+      const item = fromItems[fi];
+      const itemType = item.experience_type ?? "relax";
+      if (fromPreferred.includes(itemType)) continue; // already well-placed
+      if (item.categoria === "restaurante") continue; // food items are never moved
+
+      // Find a mutual-benefit swap in another period:
+      // - item.type must fit toPeriodo (toPreferred includes itemType)
+      // - candidate.type must fit fromPeriodo (fromPreferred includes candidateType)
+      // - candidate is not a food item
+      let swapped = false;
+      for (const toPeriodo of periods) {
+        if (toPeriodo === fromPeriodo || toPeriodo === "almoco") continue;
+        const toItems = periodMap.get(toPeriodo);
+        if (!toItems || toItems.length === 0) continue;
+        const toPreferred = RHYTHM_PREFERRED[toPeriodo];
+        if (!toPreferred.includes(itemType)) continue; // item doesn't fit toPeriodo either
+
+        const ti = toItems.findIndex(
+          (t) =>
+            fromPreferred.includes(t.experience_type ?? "relax") &&
+            t.categoria !== "restaurante",
+        );
+        if (ti === -1) continue;
+
+        // Perform the mutual-benefit swap
+        const candidate = toItems[ti];
+        fromItems[fi] = candidate;
+        toItems[ti] = item;
+        periodMap.set(fromPeriodo, fromItems);
+        periodMap.set(toPeriodo, toItems);
+        swapped = true;
+        break;
+      }
+      void swapped; // soft rule — no action if swap wasn't possible
+    }
+  }
+}
+
 function buildFullDraft(
   dayGroups: EnrichedPlace[][],
   dayRestaurants: EnrichedPlace[][],
@@ -1773,6 +1957,17 @@ function buildFullDraft(
     if (noiteItems && noiteItems.length > noiteCap) {
       periodMap.set("noite", noiteItems.slice(0, noiteCap));
     }
+
+    // ── 5c-variety. Experiential intelligence ────────────────────────────────
+    // A. Variety: no two consecutive same experience_type within a period.
+    for (const [periodo, items] of periodMap.entries()) {
+      periodMap.set(periodo, enforceVarietyInPeriod(items, periodo));
+    }
+    // B. Relax cap: max 1 "relax" per period, max 2 "relax" per day.
+    enforceRelaxCap(periodMap);
+    // C. Day rhythm: soft mutual-benefit swaps between periods.
+    //    Only fires when BOTH items benefit — never forces removal.
+    applyDayRhythm(periodMap);
 
     // ── 5d. Within-period flow + proximity sequencing ────────────────────────
     // First: flow sort anchors the time-critical item (breakfast, dinner, sunset)
@@ -2708,6 +2903,11 @@ serve(async (req) => {
     // Runs after scoring so the first (best-ranked) occurrence always wins.
     // Runs before geographic clustering and buildFullDraft slot assignment.
     places = deduplicateByPlaceIdentity(places);
+
+    // ── Step 3c-variety: stamp experience_type on every place (in-memory only) ─
+    // Must run after dedup so we don't waste work on dropped duplicates.
+    // Must run before groupByGeography so dayGroups carry the field into buildFullDraft.
+    places = places.map((p) => ({ ...p, experience_type: computeExperienceType(p) }));
 
     console.log("AFTER DEDUP", places.map((p) => p.name));
     console.log("IDENTITIES", places.map((p) => ({ name: p.name, identity: placeIdentity(p.name) })));

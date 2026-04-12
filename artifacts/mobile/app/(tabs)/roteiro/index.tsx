@@ -3690,7 +3690,10 @@ export default function RoteiroScreen() {
                   | undefined;
                 return {
                   ...item,
-                  image: compPhoto ? { uri: compPhoto } : null,
+                  // Real Supabase photo wins; fall back to category static PNG.
+                  // Same priority rule as Path A (saved items) — never discard a real photo.
+                    image: compPhoto ? { uri: compPhoto } : null,
+                    : getItemFallbackImage(cat),
                   source_table:
                     (edgeSourceTable as SourceTable | undefined) ??
                     sourceTableFromCategoria(cat),
