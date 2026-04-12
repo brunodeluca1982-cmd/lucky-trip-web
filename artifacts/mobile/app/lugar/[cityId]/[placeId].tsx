@@ -55,10 +55,12 @@ function resolveSaveCategory(
   categoria?: string,
 ): SavedCategory {
   // Preferred: derive from source_table (authoritative)
-  if (source_table === "restaurantes")    return "restaurante";
-  if (source_table === "stay_hotels")     return "hotel";
+  if (source_table === "restaurantes")       return "restaurante";
+  if (source_table === "stay_hotels")        return "hotel";
   if (source_table === "o_que_fazer_rio_v2") return "oQueFazer";
+  if (source_table === "o_que_fazer_rio")    return "oQueFazer";
   if (source_table === "lucky_list_rio_v2")  return "lucky";
+  if (source_table === "lucky_list_rio")     return "lucky";
   // Legacy: categoria param from older navigation paths
   if (categoria === "restaurante") return "restaurante";
   if (categoria === "hotel")       return "hotel";
@@ -245,6 +247,67 @@ function useSupabaseLugar(
               tipo_item:       "hotel",
               google_maps_url: (data as any).google_maps_url ?? null,
               booking_url:     (data as any).reserve_url ?? null,
+            };
+          }
+        } else if (effectiveTable === "o_que_fazer_rio") {
+          // Legacy UUID-keyed table — same column structure as o_que_fazer_rio_v2
+          const { data, error: err } = await supabase
+            .from("o_que_fazer_rio")
+            .select("*")
+            .eq("id", placeId)
+            .maybeSingle();
+          if (err) console.warn("[useSupabaseLugar] o_que_fazer_rio error:", err.message);
+          if (data) {
+            const pin = resolvePin("rio", (data as any).bairro ?? "", 0);
+            const photoUri = (data as any).photo_url as string | null ?? null;
+            const meuOlhar = (data as any).meu_olhar as string | null;
+            const descricao = meuOlhar ?? "Uma das experiências selecionadas para o seu roteiro no Rio.";
+            resolved = {
+              id:              String((data as any).id),
+              titulo:          (data as any).nome ?? "Experiência",
+              localizacao:     (data as any).bairro ?? "Rio de Janeiro",
+              categoria:       ((data as any).categoria as string | null)?.toUpperCase() ?? "EXPERIÊNCIA",
+              descricao,
+              image:           getImageForEntity("activity", (data as any).nome ?? "", (data as any).bairro ?? "", photoUri),
+              xPct:            pin.xPct,
+              yPct:            pin.yPct,
+              tipo_item:       "experiencia",
+              google_maps_url: (data as any).google_maps_url ?? null,
+            };
+          }
+        } else if (effectiveTable === "lucky_list_rio") {
+          // Legacy UUID-keyed table — same column structure as lucky_list_rio_v2
+          const { data, error: err } = await supabase
+            .from("lucky_list_rio")
+            .select("*")
+            .eq("id", placeId)
+            .maybeSingle();
+          if (err) console.warn("[useSupabaseLugar] lucky_list_rio error:", err.message);
+          if (data) {
+            const pin = resolvePin("rio", (data as any).bairro ?? "", 0);
+            const photoUri  = (data as any).photo_url as string | null ?? null;
+            const meuOlhar  = (data as any).meu_olhar as string | null;
+            const descricao = meuOlhar ?? "Um dos achados especiais da Lucky List — lugares que só quem sabe, sabe.";
+            const tipoItem  = (data as any).tipo_item as string | null;
+            const entityType =
+              tipoItem === "restaurante" ? "restaurant" :
+              tipoItem === "hotel"       ? "hotel"       :
+              "activity";
+            const resolvedTipo =
+              tipoItem === "restaurante" ? "restaurante" :
+              tipoItem === "hotel"       ? "hotel"       :
+              "experiencia";
+            resolved = {
+              id:              String((data as any).id),
+              titulo:          (data as any).nome ?? "Lucky Pick",
+              localizacao:     (data as any).bairro ?? "Rio de Janeiro",
+              categoria:       (tipoItem?.toUpperCase()) ?? "LUCKY LIST",
+              descricao,
+              image:           getImageForEntity(entityType, (data as any).nome ?? "", (data as any).bairro ?? "", photoUri),
+              xPct:            pin.xPct,
+              yPct:            pin.yPct,
+              tipo_item:       resolvedTipo,
+              google_maps_url: (data as any).google_maps_url ?? null,
             };
           }
         } else if (effectiveTable === "friend_guide_places") {
