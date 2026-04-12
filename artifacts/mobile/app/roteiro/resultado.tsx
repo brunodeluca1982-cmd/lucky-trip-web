@@ -281,14 +281,14 @@ export default function ResultadoScreen() {
   if (!itinerary) {
     return (
       <View style={[sc.root, { paddingTop: topPad }]}>
-        <Pressable style={sc.backBtn} onPress={() => router.back()} hitSlop={12}>
+        <Pressable style={sc.backBtn} onPress={handleBack} hitSlop={12}>
           <Feather name="arrow-left" size={20} color="#fff" />
         </Pressable>
         <View style={sc.centerContent}>
           <Feather name="map" size={40} color="rgba(212,175,55,0.40)" />
           <Text style={sc.emptyText}>Nenhum roteiro disponível.</Text>
           <Text style={sc.emptySubtext}>Gere um novo roteiro para começar.</Text>
-          <Pressable style={sc.emptyBtn} onPress={() => router.back()}>
+          <Pressable style={sc.emptyBtn} onPress={handleBack}>
             <Text style={sc.emptyBtnText}>Voltar</Text>
           </Pressable>
         </View>
