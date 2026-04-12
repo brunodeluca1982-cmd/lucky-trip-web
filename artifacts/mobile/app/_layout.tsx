@@ -69,6 +69,7 @@ function RootLayoutNav() {
         <Stack.Screen name="diario"              options={{ headerShown: false, contentStyle: { backgroundColor: "#0D0D0D" }, animation: "slide_from_right" }} />
         <Stack.Screen name="contas"              options={{ headerShown: false, contentStyle: { backgroundColor: "#0D0D0D" }, animation: "slide_from_right" }} />
         <Stack.Screen name="comoChegar/[cityId]" options={{ headerShown: false, contentStyle: { backgroundColor: "#1A0E04" }, animation: "slide_from_right" }} />
+        <Stack.Screen name="roteiro/resultado"  options={{ headerShown: false, contentStyle: { backgroundColor: "#1A0E04" }, animation: "slide_from_right" }} />
       </Stack>
     </ThemeProvider>
   );

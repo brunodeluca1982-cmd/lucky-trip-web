@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -9,11 +9,13 @@ import {
   Alert,
   Linking,
   Image,
+  ActivityIndicator,
 } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useGuia, sourceTableFromCategoria } from "@/context/GuiaContext";
 import type { SavedItem, SourceTable } from "@/context/GuiaContext";
 import type { ItineraryResult } from "@/utils/buildItinerary";
@@ -26,8 +28,9 @@ const GOLD    = "#D4AF37";
 const BG      = "#1A0E04";
 const SURFACE = "#231508";
 const BORDER  = "rgba(212,175,55,0.15)";
+const ITINERARY_KEY = "@luckytrip/current_itinerary";
 
-// ── Item navigation (mirrors index.tsx) ───────────────────────────────────────
+// ── Item navigation ───────────────────────────────────────────────────────────
 
 function navigateToItem(item: SavedItem) {
   if (item.isExternal) {
@@ -122,7 +125,6 @@ function DayCard({
       style={sc.dayCard}
       onLayout={(e) => onLayout?.(e.nativeEvent.layout.y)}
     >
-      {/* Day header */}
       <Pressable
         style={({ pressed }) => [sc.dayHeader, pressed && { opacity: 0.85 }]}
         onPress={() => setCollapsed((v) => !v)}
@@ -138,7 +140,6 @@ function DayCard({
         />
       </Pressable>
 
-      {/* Collapsed summary */}
       {collapsed && (
         <View style={sc.collapsedRow}>
           <Text style={sc.collapsedText}>
@@ -147,12 +148,10 @@ function DayCard({
         </View>
       )}
 
-      {/* Period blocks */}
       {!collapsed && (
         <View style={sc.dayBody}>
           {dia.periodos.map((periodo) => (
             <View key={periodo.periodo} style={sc.periodoSection}>
-              {/* Period label */}
               <View style={sc.periodoHeader}>
                 <Feather
                   name={PERIODO_ICON[periodo.periodo] as any}
@@ -163,25 +162,21 @@ function DayCard({
                 <View style={sc.periodoDivider} />
               </View>
 
-              {/* Items */}
               {periodo.items.map((item, idx) => (
                 <Pressable
                   key={`${item.source_table ?? item.categoria}_${item.id}_${idx}`}
                   style={({ pressed }) => [sc.itemRow, pressed && { opacity: 0.78 }]}
                   onPress={() => navigateToItem(item)}
                 >
-                  {/* Time column */}
                   <View style={sc.timeCol}>
                     <Text style={sc.timeLabel}>{getItemTime(periodo.periodo, idx)}</Text>
                   </View>
 
-                  {/* Connector */}
                   <View style={sc.connectorCol}>
                     <View style={sc.connectorDot} />
                     {idx < periodo.items.length - 1 && <View style={sc.connectorLine} />}
                   </View>
 
-                  {/* Card */}
                   <View style={sc.itemCard}>
                     <View style={sc.thumb}>
                       <ItemThumb image={item.image ?? null} />
@@ -213,11 +208,56 @@ export default function ResultadoScreen() {
 
   const { currentItinerary, setCurrentItinerary } = useGuia();
   const scrollRef = useRef<ScrollView>(null);
-  const [dayOffsets, setDayOffsets] = React.useState<Record<number, number>>({});
-  const [activeChip, setActiveChip] = React.useState<number | null>(null);
+
+  // Local copy of the itinerary — survives context race conditions
+  const [itinerary, setItinerary] = useState<ItineraryResult | null>(
+    currentItinerary ?? null,
+  );
+  const [loading, setLoading]     = useState<boolean>(!currentItinerary);
+  const [dayOffsets, setDayOffsets] = useState<Record<number, number>>({});
+  const [activeChip, setActiveChip] = useState<number | null>(null);
+
+  // On mount: if context already has the data, use it immediately.
+  // Otherwise load from AsyncStorage (guards against context race condition).
+  useEffect(() => {
+    if (currentItinerary) {
+      setItinerary(currentItinerary);
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    AsyncStorage.getItem(ITINERARY_KEY)
+      .then((raw) => {
+        if (cancelled) return;
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw) as ItineraryResult;
+            setItinerary(parsed);
+          } catch {
+            // Corrupt data — leave itinerary null, show error state
+          }
+        }
+      })
+      .catch(() => { /* AsyncStorage unavailable — show error state */ })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, []);
+
+  // Sync context updates into local state (e.g. after a new generation)
+  useEffect(() => {
+    if (currentItinerary) {
+      setItinerary(currentItinerary);
+      setLoading(false);
+    }
+  }, [currentItinerary]);
 
   function handleBack() {
     setCurrentItinerary(null);
+    AsyncStorage.removeItem(ITINERARY_KEY).catch(() => {});
     router.back();
   }
 
@@ -227,15 +267,27 @@ export default function ResultadoScreen() {
     scrollRef.current?.scrollTo({ y: Math.max(0, y - 16), animated: true });
   }
 
-  // Guard: if there's no itinerary, go back
-  if (!currentItinerary) {
+  // ── Loading state ──────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <View style={[sc.root, sc.centerContent, { paddingTop: topPad }]}>
+        <ActivityIndicator size="large" color={GOLD} />
+        <Text style={sc.loadingText}>Carregando roteiro…</Text>
+      </View>
+    );
+  }
+
+  // ── No data state ──────────────────────────────────────────────────────────
+  if (!itinerary) {
     return (
       <View style={[sc.root, { paddingTop: topPad }]}>
-        <Pressable style={sc.backBtn} onPress={() => router.back()}>
+        <Pressable style={sc.backBtn} onPress={() => router.back()} hitSlop={12}>
           <Feather name="arrow-left" size={20} color="#fff" />
         </Pressable>
-        <View style={sc.emptyCenter}>
-          <Text style={sc.emptyText}>Nenhum roteiro gerado.</Text>
+        <View style={sc.centerContent}>
+          <Feather name="map" size={40} color="rgba(212,175,55,0.40)" />
+          <Text style={sc.emptyText}>Nenhum roteiro disponível.</Text>
+          <Text style={sc.emptySubtext}>Gere um novo roteiro para começar.</Text>
           <Pressable style={sc.emptyBtn} onPress={() => router.back()}>
             <Text style={sc.emptyBtnText}>Voltar</Text>
           </Pressable>
@@ -244,7 +296,8 @@ export default function ResultadoScreen() {
     );
   }
 
-  const { totalDays, totalItems } = currentItinerary.summary;
+  // ── Result ─────────────────────────────────────────────────────────────────
+  const { totalDays, totalItems } = itinerary.summary;
 
   return (
     <View style={[sc.root, { paddingBottom: bottomPad }]}>
@@ -274,14 +327,14 @@ export default function ResultadoScreen() {
           </Text>
 
           {/* Day chips */}
-          {currentItinerary.days.length > 1 && (
+          {itinerary.days.length > 1 && (
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               style={sc.chipScroll}
               contentContainerStyle={sc.chipRow}
             >
-              {currentItinerary.days.map((dia) => {
+              {itinerary.days.map((dia) => {
                 const active = activeChip === dia.numero;
                 return (
                   <Pressable
@@ -304,7 +357,7 @@ export default function ResultadoScreen() {
         </View>
 
         {/* Day cards */}
-        {currentItinerary.days.map((dia) => (
+        {itinerary.days.map((dia) => (
           <DayCard
             key={dia.numero}
             dia={dia}
@@ -327,33 +380,48 @@ const sc = StyleSheet.create({
     flex:            1,
     backgroundColor: BG,
   },
+  centerContent: {
+    flex:           1,
+    alignItems:     "center",
+    justifyContent: "center",
+    gap:            12,
+    paddingHorizontal: 32,
+  },
 
   // Header
   header: {
-    flexDirection:   "row",
-    alignItems:      "center",
-    justifyContent:  "space-between",
+    flexDirection:     "row",
+    alignItems:        "center",
+    justifyContent:    "space-between",
     paddingHorizontal: 20,
-    paddingBottom:   12,
+    paddingBottom:     12,
     borderBottomWidth: 1,
     borderBottomColor: BORDER,
   },
   headerTitle: {
-    fontFamily: "PlayfairDisplay_600SemiBold",
-    fontSize:   17,
-    color:      "#fff",
+    fontFamily:    "PlayfairDisplay_600SemiBold",
+    fontSize:      17,
+    color:         "#fff",
     letterSpacing: 0.4,
   },
   backBtn: {
-    width:           36,
-    height:          36,
-    alignItems:      "center",
-    justifyContent:  "center",
+    width:          36,
+    height:         36,
+    alignItems:     "center",
+    justifyContent: "center",
   },
 
   // Scroll
   scroll:        { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingTop: 4 },
+
+  // Loading
+  loadingText: {
+    fontFamily: "Inter_400Regular",
+    fontSize:   14,
+    color:      "rgba(255,255,255,0.55)",
+    marginTop:  12,
+  },
 
   // Hero
   hero: {
@@ -385,8 +453,8 @@ const sc = StyleSheet.create({
   // Day chips
   chipScroll: { marginTop: 16 },
   chipRow: {
-    flexDirection: "row",
-    gap:           8,
+    flexDirection:     "row",
+    gap:               8,
     paddingHorizontal: 4,
   },
   chip: {
@@ -427,8 +495,8 @@ const sc = StyleSheet.create({
     paddingVertical:   14,
   },
   dayBadge: {
-    backgroundColor: "rgba(212,175,55,0.15)",
-    borderRadius:    6,
+    backgroundColor:   "rgba(212,175,55,0.15)",
+    borderRadius:      6,
     paddingHorizontal: 8,
     paddingVertical:   3,
   },
@@ -465,9 +533,9 @@ const sc = StyleSheet.create({
     paddingBottom:     8,
   },
   periodoHeader: {
-    flexDirection:  "row",
-    alignItems:     "center",
-    gap:            6,
+    flexDirection:   "row",
+    alignItems:      "center",
+    gap:             6,
     paddingVertical: 10,
   },
   periodoLabel: {
@@ -485,27 +553,27 @@ const sc = StyleSheet.create({
 
   // Item row
   itemRow: {
-    flexDirection:  "row",
-    alignItems:     "flex-start",
-    marginBottom:   10,
+    flexDirection: "row",
+    alignItems:    "flex-start",
+    marginBottom:  10,
   },
   timeCol: {
-    width:      42,
-    paddingTop: 12,
-    alignItems: "flex-end",
+    width:        42,
+    paddingTop:   12,
+    alignItems:   "flex-end",
     paddingRight: 6,
   },
   timeLabel: {
-    fontFamily: "Inter_400Regular",
-    fontSize:   10,
-    color:      "rgba(255,255,255,0.35)",
+    fontFamily:    "Inter_400Regular",
+    fontSize:      10,
+    color:         "rgba(255,255,255,0.35)",
     letterSpacing: 0.3,
   },
   connectorCol: {
-    width:          18,
-    alignItems:     "center",
-    paddingTop:     14,
-    marginRight:    8,
+    width:       18,
+    alignItems:  "center",
+    paddingTop:  14,
+    marginRight: 8,
   },
   connectorDot: {
     width:           6,
@@ -541,7 +609,7 @@ const sc = StyleSheet.create({
     overflow:        "hidden",
   },
   itemInfo: {
-    flex:          1,
+    flex:            1,
     paddingVertical: 10,
   },
   itemTitle: {
@@ -558,20 +626,22 @@ const sc = StyleSheet.create({
   },
 
   // Empty state
-  emptyCenter: {
-    flex:           1,
-    alignItems:     "center",
-    justifyContent: "center",
-    gap:            16,
-  },
   emptyText: {
+    fontFamily: "PlayfairDisplay_600SemiBold",
+    fontSize:   18,
+    color:      "#fff",
+    textAlign:  "center",
+  },
+  emptySubtext: {
     fontFamily: "Inter_400Regular",
-    fontSize:   15,
-    color:      "rgba(255,255,255,0.55)",
+    fontSize:   13,
+    color:      "rgba(255,255,255,0.50)",
+    textAlign:  "center",
   },
   emptyBtn: {
-    paddingHorizontal: 24,
-    paddingVertical:   10,
+    marginTop:         8,
+    paddingHorizontal: 28,
+    paddingVertical:   12,
     borderRadius:      24,
     backgroundColor:   GOLD,
   },

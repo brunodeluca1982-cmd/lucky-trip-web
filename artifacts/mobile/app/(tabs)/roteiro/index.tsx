@@ -14,6 +14,7 @@
  */
 
 import React, { useEffect, useRef, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { RotatingBackground } from "@/components/RotatingBackground";
 import {
   Alert,
@@ -3263,6 +3264,10 @@ export default function RoteiroScreen() {
       setResult(itineraryResult);
       setCurrentItinerary(itineraryResult);
       if (autoSavedId) setSavedItineraryId(autoSavedId);
+      await AsyncStorage.setItem(
+        "@luckytrip/current_itinerary",
+        JSON.stringify(itineraryResult),
+      );
       router.push("/roteiro/resultado");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erro desconhecido";
