@@ -21,14 +21,32 @@ import type { SavedItem, SourceTable } from "@/context/GuiaContext";
 import type { ItineraryResult } from "@/utils/buildItinerary";
 import { PERIODO_LABEL, PERIODO_ICON } from "@/utils/buildRoteiro";
 import type { DiaRoteiro } from "@/utils/buildRoteiro";
+import { RotatingBackground } from "@/components/RotatingBackground";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const GOLD    = "#D4AF37";
-const BG      = "#1A0E04";
-const SURFACE = "#231508";
-const BORDER  = "rgba(212,175,55,0.15)";
+const GOLD       = "#D4AF37";
+const BG         = "#1A0E04";
+const GLASS_CARD = "rgba(255,255,255,0.07)";
+const GLASS_ITEM = "rgba(255,255,255,0.05)";
+const BORDER     = "rgba(212,175,55,0.15)";
 const ITINERARY_KEY = "@luckytrip/current_itinerary";
+
+// ── Cinematic background (shared with all premium screens) ────────────────────
+
+function CinematicBackground() {
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: BG }]} />
+      <RotatingBackground />
+      <LinearGradient
+        colors={["rgba(26,14,4,0.50)", "rgba(26,14,4,0.82)", BG]}
+        locations={[0, 0.55, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+    </View>
+  );
+}
 
 // ── Item navigation ───────────────────────────────────────────────────────────
 
@@ -270,9 +288,12 @@ export default function ResultadoScreen() {
   // ── Loading state ──────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <View style={[sc.root, sc.centerContent, { paddingTop: topPad }]}>
-        <ActivityIndicator size="large" color={GOLD} />
-        <Text style={sc.loadingText}>Carregando roteiro…</Text>
+      <View style={sc.root}>
+        <CinematicBackground />
+        <View style={[sc.centerContent, { paddingTop: topPad }]}>
+          <ActivityIndicator size="large" color={GOLD} />
+          <Text style={sc.loadingText}>Carregando roteiro…</Text>
+        </View>
       </View>
     );
   }
@@ -280,10 +301,13 @@ export default function ResultadoScreen() {
   // ── No data state ──────────────────────────────────────────────────────────
   if (!itinerary) {
     return (
-      <View style={[sc.root, { paddingTop: topPad }]}>
-        <Pressable style={sc.backBtn} onPress={handleBack} hitSlop={12}>
-          <Feather name="arrow-left" size={20} color="#fff" />
-        </Pressable>
+      <View style={sc.root}>
+        <CinematicBackground />
+        <View style={{ paddingTop: topPad }}>
+          <Pressable style={sc.backBtn} onPress={handleBack} hitSlop={12}>
+            <Feather name="arrow-left" size={20} color="#fff" />
+          </Pressable>
+        </View>
         <View style={sc.centerContent}>
           <Feather name="map" size={40} color="rgba(212,175,55,0.40)" />
           <Text style={sc.emptyText}>Nenhum roteiro disponível.</Text>
@@ -301,6 +325,7 @@ export default function ResultadoScreen() {
 
   return (
     <View style={[sc.root, { paddingBottom: bottomPad }]}>
+      <CinematicBackground />
       {/* Header */}
       <View style={[sc.header, { paddingTop: topPad }]}>
         <Pressable style={sc.backBtn} onPress={handleBack} hitSlop={10}>
@@ -379,6 +404,7 @@ const sc = StyleSheet.create({
   root: {
     flex:            1,
     backgroundColor: BG,
+    overflow:        "hidden",
   },
   centerContent: {
     flex:           1,
@@ -480,10 +506,10 @@ const sc = StyleSheet.create({
 
   // Day card
   dayCard: {
-    backgroundColor: SURFACE,
+    backgroundColor: GLASS_CARD,
     borderRadius:    14,
     borderWidth:     1,
-    borderColor:     BORDER,
+    borderColor:     "rgba(255,255,255,0.12)",
     marginBottom:    12,
     overflow:        "hidden",
   },
@@ -592,10 +618,10 @@ const sc = StyleSheet.create({
     flex:            1,
     flexDirection:   "row",
     alignItems:      "center",
-    backgroundColor: "rgba(255,255,255,0.04)",
+    backgroundColor: GLASS_ITEM,
     borderRadius:    10,
     borderWidth:     1,
-    borderColor:     "rgba(255,255,255,0.07)",
+    borderColor:     "rgba(255,255,255,0.10)",
     overflow:        "hidden",
     minHeight:       60,
     gap:             10,

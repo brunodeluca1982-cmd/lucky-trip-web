@@ -1733,6 +1733,27 @@ function buildFullDraft(
       periodMap.get(p)!.push(r);
     });
 
+    // ── 5c-rest. Max 1 restaurant per meal slot (manha / almoco) ─────────────
+    // Prevents consecutive restaurant blocks (e.g. 3 lunch spots in almoco).
+    // Extra restaurants: first surplus is promoted to noite when that slot has
+    // no restaurant yet; remaining extras are dropped. No cross-day move — Step A.
+    for (const mealSlot of ["manha", "almoco"] as PeriodoDia[]) {
+      const mealItems = periodMap.get(mealSlot) ?? [];
+      const mealRests = mealItems.filter((p) => p.categoria === "restaurante");
+      if (mealRests.length <= 1) continue;
+      const [keepRest, ...extraRests] = mealRests;
+      const nonRestItems = mealItems.filter((p) => p.categoria !== "restaurante");
+      periodMap.set(mealSlot, [keepRest, ...nonRestItems]);
+      // Promote first extra to noite if noite has no restaurant yet
+      const noiteItems = periodMap.get("noite") ?? [];
+      const noiteRests = noiteItems.filter((p) => p.categoria === "restaurante");
+      if (noiteRests.length === 0 && extraRests.length > 0) {
+        noiteItems.push(extraRests[0]!);
+        periodMap.set("noite", noiteItems);
+      }
+      // Remaining extras dropped — prefer clean schedule over overcrowded noite
+    }
+
     // ── 5c-cap. Enforce tarde and noite slot caps (Step A) ────────────────────
     // Items exceeding the cap are dropped from this day and not redistributed.
     //
@@ -2602,13 +2623,16 @@ serve(async (req) => {
     );
 
     // Merge: saved items always come first (preserved position in clustering)
-    // Dedup: remove any place that appears more than once (by ID).
+    // Dedup: remove any place that appears more than once (by composite key).
+    // Composite key = "${source_table}_${id}" — prevents cross-table ID collisions
+    // (o_que_fazer_rio_v2 and restaurantes share the same integer ID space).
     // Saved items win over complementary — the filter preserves first occurrence.
     const _mergedRaw = [...savedPlaces, ...complementaryPlaces];
     const _seenMerge = new Set<string>();
     let places = _mergedRaw.filter((p) => {
-      if (_seenMerge.has(p.id)) return false;
-      _seenMerge.add(p.id);
+      const key = `${p.source_table}_${p.id}`;
+      if (_seenMerge.has(key)) return false;
+      _seenMerge.add(key);
       return true;
     });
 
