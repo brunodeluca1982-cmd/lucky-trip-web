@@ -2481,6 +2481,59 @@ function validateAndFix(
     .map((d, i) => ({ ...d, numero: i + 1 }));
 }
 
+// ── STEP 3c: Semantic place deduplication ─────────────────────────────────────
+//
+// Collapses entries that refer to the same real-world location but carry
+// different editorial labels.  Example:
+//
+//   "Arpoador"  +  "Melhor tarde do Arpoador"  →  kept: "Arpoador"
+//
+// Algorithm:
+//   1. Strip diacritics + punctuation from each item's name.
+//   2. Remove generic descriptor words (listed in IDENTITY_STOP_WORDS).
+//   3. The remaining token string is the "place identity".
+//   4. On the first occurrence of each identity, keep the item.
+//      On every subsequent occurrence, drop it.
+//
+// Must run AFTER scoreAndSortPool — that step sorts saved items first and
+// higher-prefScore items before lower ones, so the first occurrence of any
+// identity is already the best candidate to keep.
+// Must run BEFORE groupByGeography and buildFullDraft.
+
+const IDENTITY_STOP_WORDS = new Set<string>([
+  // Descriptors listed in the product spec
+  "melhor", "vista", "experiencia", "experience", "top", "best",
+  "tarde", "manha",
+  // Portuguese prepositions / articles that modify rather than name a place
+  "do", "da", "de", "dos", "das", "no", "na", "nos", "nas", "em", "ao", "aos",
+  "um", "uma",
+]);
+
+function placeIdentity(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // strip diacritics  ã→a  é→e  etc.
+    .replace(/[^a-z0-9 ]/g, " ")    // replace punctuation / special chars
+    .split(/\s+/)
+    .filter((w) => w.length > 1 && !IDENTITY_STOP_WORDS.has(w))
+    .join(" ")
+    .trim();
+}
+
+// places must already be sorted (saved-first, then by prefScore desc) so that
+// the winning item for each identity is always the first occurrence.
+function deduplicateByPlaceIdentity(places: EnrichedPlace[]): EnrichedPlace[] {
+  const seen = new Set<string>();
+  return places.filter((p) => {
+    const identity = placeIdentity(p.name);
+    if (!identity) return true;       // no usable identity — always keep
+    if (seen.has(identity)) return false; // semantic duplicate — drop
+    seen.add(identity);
+    return true;
+  });
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 serve(async (req) => {
@@ -2647,6 +2700,12 @@ serve(async (req) => {
     // Soft scoring only — never removes places. Saved items always rank first.
     const savedIds = new Set(savedPlaces.map((p) => p.id));
     places = scoreAndSortPool(places, preferences, savedIds);
+
+    // ── Step 3c: Semantic dedup — same real-world place, different label ──────
+    // "Arpoador" + "Melhor tarde do Arpoador" → identity "arpoador" → keep one.
+    // Runs after scoring so the first (best-ranked) occurrence always wins.
+    // Runs before geographic clustering and buildFullDraft slot assignment.
+    places = deduplicateByPlaceIdentity(places);
 
     // ── Step 4: Macro-region clustering (oeste + norte isolated from centro + sul)
     const { dayGroups, dayRestaurants } = groupByGeography(
