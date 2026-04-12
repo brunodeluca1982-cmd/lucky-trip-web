@@ -37,7 +37,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useGuia, sourceTableFromCategoria } from "@/context/GuiaContext";
-import type { SavedCategory, SavedItem, SourceTable } from "@/context/GuiaContext";
+import type {
+  SavedCategory,
+  SavedItem,
+  SourceTable,
+} from "@/context/GuiaContext";
 import { supabase } from "@/lib/supabase";
 import { getImageForEntity } from "@/utils/getImageForEntity";
 import {
@@ -47,10 +51,13 @@ import {
 } from "@/utils/buildItinerary";
 import { PERIODO_LABEL, PERIODO_ICON } from "@/utils/buildRoteiro";
 import type { DiaRoteiro } from "@/utils/buildRoteiro";
-import { useInspirationPhotos, type InspirationPhotoMap } from "@/hooks/useInspirationPhotos";
+import {
+  useInspirationPhotos,
+  type InspirationPhotoMap,
+} from "@/hooks/useInspirationPhotos";
 
-const C          = Colors.light;
-const GOLD       = "#D4AF37";
+const C = Colors.light;
+const GOLD = "#D4AF37";
 const DARK_BROWN = "#FFFFFF";
 const { width: SW } = Dimensions.get("window");
 
@@ -58,72 +65,103 @@ const { width: SW } = Dimensions.get("window");
 // Types + static data
 // ─────────────────────────────────────────────────────────────────────────────
 
-type TravelVibe  = "solo" | "casal" | "amigos" | "família";
+type TravelVibe = "solo" | "casal" | "amigos" | "família";
 type BudgetStyle = "essencial" | "conforto" | "sofisticado";
 
 const COMPANIONS: { id: TravelVibe; label: string; icon: string }[] = [
-  { id: "solo",    label: "Solo",    icon: "user"  },
-  { id: "casal",   label: "Casal",   icon: "heart" },
-  { id: "amigos",  label: "Amigos",  icon: "users" },
-  { id: "família", label: "Família", icon: "home"  },
+  { id: "solo", label: "Solo", icon: "user" },
+  { id: "casal", label: "Casal", icon: "heart" },
+  { id: "amigos", label: "Amigos", icon: "users" },
+  { id: "família", label: "Família", icon: "home" },
 ];
 
 const BUDGETS: { id: BudgetStyle; label: string; desc: string }[] = [
-  { id: "essencial",   label: "Essencial",   desc: "Custo-benefício · experiências acessíveis" },
-  { id: "conforto",    label: "Conforto",    desc: "Qualidade equilibrada · bom e bem feito" },
-  { id: "sofisticado", label: "Sofisticado", desc: "Melhor do Rio · exclusivo e premium" },
+  {
+    id: "essencial",
+    label: "Essencial",
+    desc: "Custo-benefício · experiências acessíveis",
+  },
+  {
+    id: "conforto",
+    label: "Conforto",
+    desc: "Qualidade equilibrada · bom e bem feito",
+  },
+  {
+    id: "sofisticado",
+    label: "Sofisticado",
+    desc: "Melhor do Rio · exclusivo e premium",
+  },
 ];
 
 const CATEGORY_LABEL: Record<SavedCategory, string> = {
-  oQueFazer:   "O Que Fazer",
+  oQueFazer: "O Que Fazer",
   restaurante: "Restaurante",
-  hotel:       "Hotel",
-  lucky:       "Lucky",
+  hotel: "Hotel",
+  lucky: "Lucky",
 };
 
 // Result phase helpers — time labels, weather, travel connectors
 const PERIODO_TIME: Record<string, number> = {
-  manha:      9 * 60,
-  almoco:     12 * 60 + 30,
-  tarde:      14 * 60,
-  jantar:     19 * 60 + 30,
+  manha: 9 * 60,
+  almoco: 12 * 60 + 30,
+  tarde: 14 * 60,
+  jantar: 19 * 60 + 30,
   late_night: 21 * 60,
-  noite:      19 * 60 + 30,
+  noite: 19 * 60 + 30,
 };
 
 // ─── Rio de Janeiro fixed time anchors ────────────────────────────────────────
 // Average year-round approximations (winter ~17:30, summer ~18:30 → midpoint 18:00).
 // Future: replace with live weather/astronomy API without changing anchor logic.
-const RIO_SUNSET_MINUTES  = 18 * 60; // 18:00
-const RIO_SUNRISE_MINUTES =  6 * 60; // 06:00
+const RIO_SUNSET_MINUTES = 18 * 60; // 18:00
+const RIO_SUNRISE_MINUTES = 6 * 60; // 06:00
 
 // ─── Item signal detectors ────────────────────────────────────────────────────
 // Title-based matching only — momento_ideal and tags_ia are not on the client
 // type. Detection is conservative: only exact cultural phrases are matched.
 
 function _isSunsetItem(t: string): boolean {
-  return t.includes("pôr do sol") || t.includes("por do sol") ||
-         t.includes("pôr-do-sol") || t.includes("sunset");
+  return (
+    t.includes("pôr do sol") ||
+    t.includes("por do sol") ||
+    t.includes("pôr-do-sol") ||
+    t.includes("sunset")
+  );
 }
 
 function _isSunriseItem(t: string): boolean {
-  return t.includes("nascer do sol") || t.includes("nascer-do-sol") ||
-         t.includes("amanhecer")     || t.includes("sunrise");
+  return (
+    t.includes("nascer do sol") ||
+    t.includes("nascer-do-sol") ||
+    t.includes("amanhecer") ||
+    t.includes("sunrise")
+  );
 }
 
 function _isTheaterItem(t: string): boolean {
-  return t.includes("teatro")     || t.includes("show")      ||
-         t.includes("concerto")   || t.includes("espetáculo") ||
-         t.includes("espetaculo") || t.includes("ópera")     ||
-         t.includes("opera")      || t.includes("ballet")    ||
-         t.includes("peça");
+  return (
+    t.includes("teatro") ||
+    t.includes("show") ||
+    t.includes("concerto") ||
+    t.includes("espetáculo") ||
+    t.includes("espetaculo") ||
+    t.includes("ópera") ||
+    t.includes("opera") ||
+    t.includes("ballet") ||
+    t.includes("peça")
+  );
 }
 
 function _isNightlifeBar(t: string, categoria: string): boolean {
-  return t.includes("samba")   || t.includes("pagode")  ||
-         t.includes("chorinho") || t.includes("baile")  ||
-         t.includes("balada")   || t.includes("clube noturno") ||
-         (t.includes(" bar ")   && categoria !== "restaurante");
+  return (
+    t.includes("samba") ||
+    t.includes("pagode") ||
+    t.includes("chorinho") ||
+    t.includes("baile") ||
+    t.includes("balada") ||
+    t.includes("clube noturno") ||
+    (t.includes(" bar ") && categoria !== "restaurante")
+  );
 }
 
 // ─── Anchor time resolver ──────────────────────────────────────────────────────
@@ -138,19 +176,20 @@ function _isNightlifeBar(t: string, categoria: string): boolean {
 //   5. Nightlife bar → 21:00 noite, ONLY when first item in the period
 
 function _getAnchorTime(
-  item:    { titulo: string; categoria: string },
+  item: { titulo: string; categoria: string },
   periodo: string,
   isFirst: boolean,
 ): number | null {
   const t = item.titulo.toLowerCase();
-  if (_isSunsetItem(t)  && periodo === "tarde")  return RIO_SUNSET_MINUTES  - 60;
-  if (_isSunriseItem(t) && periodo === "manha")  return RIO_SUNRISE_MINUTES - 30;
+  if (_isSunsetItem(t) && periodo === "tarde") return RIO_SUNSET_MINUTES - 60;
+  if (_isSunriseItem(t) && periodo === "manha") return RIO_SUNRISE_MINUTES - 30;
   if (item.categoria === "restaurante") {
     if (periodo === "almoco") return 12 * 60 + 30;
-    if (periodo === "noite")  return 20 * 60;
+    if (periodo === "noite") return 20 * 60;
   }
-  if (_isTheaterItem(t)             && periodo === "noite") return 19 * 60 + 30;
-  if (_isNightlifeBar(t, item.categoria) && periodo === "noite" && isFirst) return 21 * 60;
+  if (_isTheaterItem(t) && periodo === "noite") return 19 * 60 + 30;
+  if (_isNightlifeBar(t, item.categoria) && periodo === "noite" && isFirst)
+    return 21 * 60;
   return null;
 }
 
@@ -168,9 +207,9 @@ function parseDuracao(dur: string | undefined | null): number {
   if (s.startsWith("30")) return 30;
   if (s.startsWith("45")) return 45;
   if (s.startsWith("1h") || s.startsWith("1-") || s === "1h") return 75;
-  if (s.startsWith("1"))  return 60;
+  if (s.startsWith("1")) return 60;
   if (s.startsWith("2h") || s.startsWith("2-")) return 135;
-  if (s.startsWith("2"))  return 120;
+  if (s.startsWith("2")) return 120;
   if (s.startsWith("3") || s.startsWith("4") || s.startsWith("5")) return 180;
   return 90;
 }
@@ -189,14 +228,14 @@ function parseDuracao(dur: string | undefined | null): number {
 //   instead of a collision at 19:30 for both.
 function getItemTime(periodo: string, items: SavedItem[], idx: number): string {
   let refMinutes = PERIODO_TIME[periodo] ?? 9 * 60;
-  let refIdx     = -1;
+  let refIdx = -1;
 
   for (let i = 0; i <= idx; i++) {
     const anchor = _getAnchorTime(items[i], periodo, i === 0);
     if (anchor !== null) {
       if (i === idx) return _fmt(anchor);
       refMinutes = anchor;
-      refIdx     = i;
+      refIdx = i;
     }
   }
 
@@ -212,37 +251,60 @@ function getItemTime(periodo: string, items: SavedItem[], idx: number): string {
 }
 
 type WeatherIcon = "sun" | "cloud" | "wind";
-const WEATHER_SEQ: WeatherIcon[] = ["sun", "sun", "cloud", "cloud", "cloud", "sun", "wind", "sun"];
+const WEATHER_SEQ: WeatherIcon[] = [
+  "sun",
+  "sun",
+  "cloud",
+  "cloud",
+  "cloud",
+  "sun",
+  "wind",
+  "sun",
+];
 function getDayWeather(dayNum: number): WeatherIcon {
   return WEATHER_SEQ[(dayNum - 1) % WEATHER_SEQ.length];
 }
 
-const GLASS_BG     = "rgba(255,255,255,0.15)";
+const GLASS_BG = "rgba(255,255,255,0.15)";
 const GLASS_HEADER = "rgba(0,0,0,0.42)";
 const GLASS_BORDER = "rgba(255,255,255,0.22)";
-const CREAM        = "#FFFFFF";
+const CREAM = "#FFFFFF";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Calendar utilities
 // ─────────────────────────────────────────────────────────────────────────────
 
 const MONTH_PT = [
-  "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
-  "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro",
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
 ];
-const DAY_PT = ["D","S","T","Q","Q","S","S"];
+const DAY_PT = ["D", "S", "T", "Q", "Q", "S", "S"];
 
 function isSameDay(a: Date, b: Date) {
-  return a.getFullYear() === b.getFullYear() &&
-         a.getMonth()    === b.getMonth()    &&
-         a.getDate()     === b.getDate();
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
 }
 function isBeforeDay(a: Date, b: Date) {
-  const norm = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const norm = (d: Date) =>
+    new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   return norm(a) < norm(b);
 }
 function isBetweenDays(d: Date, start: Date, end: Date) {
-  const norm = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const norm = (x: Date) =>
+    new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
   return norm(d) > norm(start) && norm(d) < norm(end);
 }
 function addMonths(date: Date, n: number): Date {
@@ -250,7 +312,8 @@ function addMonths(date: Date, n: number): Date {
   return d;
 }
 function calDays(month: Date): (Date | null)[] {
-  const y = month.getFullYear(), m = month.getMonth();
+  const y = month.getFullYear(),
+    m = month.getMonth();
   const first = new Date(y, m, 1).getDay();
   const total = new Date(y, m + 1, 0).getDate();
   const cells: (Date | null)[] = Array(first).fill(null);
@@ -262,27 +325,50 @@ function calDays(month: Date): (Date | null)[] {
 // Inspiration cards data — image-based 3×2 grid
 // ─────────────────────────────────────────────────────────────────────────────
 
-const INSPIRATIONS_DATA: { id: Inspiration; label: string; image: ReturnType<typeof require> }[] = [
-  { id: "natureza",   label: "Natureza",    image: require("@/assets/images/secret1.png") },
-  { id: "gastronomy", label: "Gastronomia", image: require("@/assets/images/restaurante2.png") },
-  { id: "culture",    label: "Cultura",     image: require("@/assets/images/cristo.png") },
-  { id: "adventure",  label: "Aventura",    image: require("@/assets/images/pao-acucar.png") },
-  { id: "beach",      label: "Relaxamento", image: require("@/assets/images/hotel1.png") },
-  { id: "festa",      label: "Festa",       image: require("@/assets/images/lapa.png") },
+const INSPIRATIONS_DATA: {
+  id: Inspiration;
+  label: string;
+  image: ReturnType<typeof require>;
+}[] = [
+  {
+    id: "natureza",
+    label: "Natureza",
+    image: require("@/assets/images/secret1.png"),
+  },
+  {
+    id: "gastronomy",
+    label: "Gastronomia",
+    image: require("@/assets/images/restaurante2.png"),
+  },
+  {
+    id: "culture",
+    label: "Cultura",
+    image: require("@/assets/images/cristo.png"),
+  },
+  {
+    id: "adventure",
+    label: "Aventura",
+    image: require("@/assets/images/pao-acucar.png"),
+  },
+  {
+    id: "beach",
+    label: "Relaxamento",
+    image: require("@/assets/images/hotel1.png"),
+  },
+  { id: "festa", label: "Festa", image: require("@/assets/images/lapa.png") },
 ];
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Journey types
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface JourneyGenerateProps {
-  nights:        number;
-  travelVibe:    TravelVibe;
-  inspirations:  Inspiration[];
-  budget:        BudgetStyle;
-  vibe:          Vibe;
-  arrivalDate:   string | null;
+  nights: number;
+  travelVibe: TravelVibe;
+  inspirations: Inspiration[];
+  budget: BudgetStyle;
+  vibe: Vibe;
+  arrivalDate: string | null;
   departureDate: string | null;
 }
 
@@ -304,24 +390,32 @@ function InlineCalendar({
   const today = new Date();
   const [viewMonth, setViewMonth] = useState(initialMonth ?? value ?? today);
   const days = calDays(viewMonth);
-  const min  = minDate ?? today;
+  const min = minDate ?? today;
 
   return (
     <View style={fp.cal}>
       <View style={fp.calHeader}>
-        <Pressable onPress={() => setViewMonth(addMonths(viewMonth, -1))} hitSlop={12}>
+        <Pressable
+          onPress={() => setViewMonth(addMonths(viewMonth, -1))}
+          hitSlop={12}
+        >
           <Feather name="chevron-left" size={18} color={CREAM} />
         </Pressable>
         <Text style={fp.calMonth}>
           {MONTH_PT[viewMonth.getMonth()]} {viewMonth.getFullYear()}
         </Text>
-        <Pressable onPress={() => setViewMonth(addMonths(viewMonth, 1))} hitSlop={12}>
+        <Pressable
+          onPress={() => setViewMonth(addMonths(viewMonth, 1))}
+          hitSlop={12}
+        >
           <Feather name="chevron-right" size={18} color={CREAM} />
         </Pressable>
       </View>
       <View style={fp.calWeek}>
         {DAY_PT.map((d, index) => (
-          <Text key={`${d}_${index}`} style={fp.calWeekDay}>{d}</Text>
+          <Text key={`${d}_${index}`} style={fp.calWeekDay}>
+            {d}
+          </Text>
         ))}
       </View>
       <View style={fp.calGrid}>
@@ -332,15 +426,21 @@ function InlineCalendar({
           return (
             <Pressable
               key={d.toISOString()}
-              style={[fp.calCell, selected && fp.calCellActive, past && fp.calCellPast]}
+              style={[
+                fp.calCell,
+                selected && fp.calCellActive,
+                past && fp.calCellPast,
+              ]}
               onPress={() => !past && onSelect(d)}
               disabled={past}
             >
-              <Text style={[
-                fp.calDayText,
-                selected && fp.calDayTextActive,
-                past && fp.calDayTextPast,
-              ]}>
+              <Text
+                style={[
+                  fp.calDayText,
+                  selected && fp.calDayTextActive,
+                  past && fp.calDayTextPast,
+                ]}
+              >
                 {d.getDate()}
               </Text>
             </Pressable>
@@ -379,7 +479,9 @@ function FlowPage1({
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === "web" ? 72 : insets.top + 20;
   const [openCal, setOpenCal] = useState<"arrival" | "departure" | null>(null);
-  const [deptInitMonth, setDeptInitMonth] = useState<Date | undefined>(undefined);
+  const [deptInitMonth, setDeptInitMonth] = useState<Date | undefined>(
+    undefined,
+  );
 
   function fmtDate(d: Date | null): string | null {
     if (!d) return null;
@@ -392,7 +494,9 @@ function FlowPage1({
     setDeptInitMonth(new Date(d.getFullYear(), d.getMonth() + 1, 1));
     setOpenCal("departure");
     if (departureDate && !isBeforeDay(d, departureDate)) {
-      onDepartureChange(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1));
+      onDepartureChange(
+        new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1),
+      );
     }
   }
 
@@ -404,12 +508,17 @@ function FlowPage1({
   return (
     <ScrollView
       style={{ flex: 1 }}
-      contentContainerStyle={[fp.page, { paddingTop: topPad, paddingBottom: 110 }]}
+      contentContainerStyle={[
+        fp.page,
+        { paddingTop: topPad, paddingBottom: 110 },
+      ]}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
       <Text style={fp.bigTitle}>Criar roteiro</Text>
-      <Text style={fp.bigSub}>Vamos organizar sua viagem em poucos passos.</Text>
+      <Text style={fp.bigSub}>
+        Vamos organizar sua viagem em poucos passos.
+      </Text>
       <View style={fp.divider} />
 
       {showDestination && (
@@ -431,14 +540,18 @@ function FlowPage1({
 
       <View style={fp.section}>
         <Text style={fp.sectionLabel}>Quando será a viagem?</Text>
-        <Text style={fp.sectionSub}>Informe as datas de chegada e partida. (Opcional)</Text>
+        <Text style={fp.sectionSub}>
+          Informe as datas de chegada e partida. (Opcional)
+        </Text>
 
         <Pressable
           style={[fp.dateField, openCal === "arrival" && fp.dateFieldActive]}
           onPress={() => setOpenCal(openCal === "arrival" ? null : "arrival")}
         >
           <Feather name="calendar" size={15} color="rgba(255,255,255,0.50)" />
-          <Text style={[fp.dateFieldText, !arrivalDate && fp.dateFieldPlaceholder]}>
+          <Text
+            style={[fp.dateFieldText, !arrivalDate && fp.dateFieldPlaceholder]}
+          >
             {fmtDate(arrivalDate) ?? "Data de chegada"}
           </Text>
           <Feather
@@ -453,10 +566,17 @@ function FlowPage1({
 
         <Pressable
           style={[fp.dateField, openCal === "departure" && fp.dateFieldActive]}
-          onPress={() => setOpenCal(openCal === "departure" ? null : "departure")}
+          onPress={() =>
+            setOpenCal(openCal === "departure" ? null : "departure")
+          }
         >
           <Feather name="calendar" size={15} color="rgba(255,255,255,0.50)" />
-          <Text style={[fp.dateFieldText, !departureDate && fp.dateFieldPlaceholder]}>
+          <Text
+            style={[
+              fp.dateFieldText,
+              !departureDate && fp.dateFieldPlaceholder,
+            ]}
+          >
             {fmtDate(departureDate) ?? "Data de partida"}
           </Text>
           <Feather
@@ -517,7 +637,10 @@ function FlowPage2({
   return (
     <ScrollView
       style={{ flex: 1 }}
-      contentContainerStyle={[fp.page, { paddingTop: topPad, paddingBottom: 110 }]}
+      contentContainerStyle={[
+        fp.page,
+        { paddingTop: topPad, paddingBottom: 110 },
+      ]}
       showsVerticalScrollIndicator={false}
     >
       <Pressable style={fp.backRow} onPress={onBack} hitSlop={12}>
@@ -541,7 +664,11 @@ function FlowPage2({
               style={[fp.insCard, active && fp.insCardActive]}
               onPress={() => onToggleInspiration(ins.id)}
             >
-              <Image source={imgSrc} style={StyleSheet.absoluteFill} resizeMode="cover" />
+              <Image
+                source={imgSrc}
+                style={StyleSheet.absoluteFill}
+                resizeMode="cover"
+              />
               <LinearGradient
                 colors={["rgba(0,0,0,0.06)", "rgba(0,0,0,0.68)"]}
                 locations={[0, 1]}
@@ -574,7 +701,9 @@ function FlowPage2({
                   size={12}
                   color={active ? "rgba(0,0,0,0.70)" : "rgba(255,255,255,0.55)"}
                 />
-                <Text style={[fp.pillText, active && fp.pillTextActive]}>{c.label}</Text>
+                <Text style={[fp.pillText, active && fp.pillTextActive]}>
+                  {c.label}
+                </Text>
               </Pressable>
             );
           })}
@@ -582,7 +711,9 @@ function FlowPage2({
       </View>
 
       <View style={fp.glassSection}>
-        <Text style={fp.glassSectionLabel}>Estilo da viagem — toque para criar o roteiro</Text>
+        <Text style={fp.glassSectionLabel}>
+          Estilo da viagem — toque para criar o roteiro
+        </Text>
         <View style={fp.pillRow}>
           {BUDGETS.map((b) => {
             const active = budget === b.id;
@@ -592,7 +723,9 @@ function FlowPage2({
                 style={[fp.pill, active && fp.pillActive]}
                 onPress={() => onBudgetChange(b.id)}
               >
-                <Text style={[fp.pillText, active && fp.pillTextActive]}>{b.label}</Text>
+                <Text style={[fp.pillText, active && fp.pillTextActive]}>
+                  {b.label}
+                </Text>
               </Pressable>
             );
           })}
@@ -607,46 +740,65 @@ function FlowPage2({
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface TripFlowProps {
-  savedCount:   number;
+  savedCount: number;
   isContextual: boolean;
-  onGenerate:   (p: JourneyGenerateProps) => void;
+  onGenerate: (p: JourneyGenerateProps) => void;
 }
 
-function TripFlow({ savedCount: _savedCount, isContextual: _isContextual, onGenerate }: TripFlowProps) {
+function TripFlow({
+  savedCount: _savedCount,
+  isContextual: _isContextual,
+  onGenerate,
+}: TripFlowProps) {
   return <ContextualFlow onGenerate={onGenerate} />;
 }
 
-function StandardFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) => void }) {
-  const [page,          setPage]          = useState(0);
-  const [destination,   setDestination]   = useState("Rio de Janeiro");
-  const [arrivalDate,   setArrivalDate]   = useState<Date | null>(null);
+function StandardFlow({
+  onGenerate,
+}: {
+  onGenerate: (p: JourneyGenerateProps) => void;
+}) {
+  const [page, setPage] = useState(0);
+  const [destination, setDestination] = useState("Rio de Janeiro");
+  const [arrivalDate, setArrivalDate] = useState<Date | null>(null);
   const [departureDate, setDepartureDate] = useState<Date | null>(null);
-  const [travelVibe,    setTravelVibe]    = useState<TravelVibe>("amigos");
-  const [inspirations,  setInspirations]  = useState<Inspiration[]>([]);
-  const [budget,        setBudget]        = useState<BudgetStyle>("conforto");
+  const [travelVibe, setTravelVibe] = useState<TravelVibe>("amigos");
+  const [inspirations, setInspirations] = useState<Inspiration[]>([]);
+  const [budget, setBudget] = useState<BudgetStyle>("conforto");
   const inspirationPhotos = useInspirationPhotos();
 
-  function handleNext() { setPage(1); }
-  function handleBack() { setPage(0); }
+  function handleNext() {
+    setPage(1);
+  }
+  function handleBack() {
+    setPage(0);
+  }
 
   function handleBudgetAndGenerate(b: BudgetStyle) {
     setBudget(b);
     const n =
       arrivalDate && departureDate
-        ? Math.max(1, Math.round(
-            (departureDate.getTime() - arrivalDate.getTime()) / 86400000,
-          ))
+        ? Math.max(
+            1,
+            Math.round(
+              (departureDate.getTime() - arrivalDate.getTime()) / 86400000,
+            ),
+          )
         : 3;
     const toYMD = (d: Date) => d.toISOString().split("T")[0];
-    setTimeout(() => onGenerate({
-      nights:        n,
-      travelVibe,
-      inspirations,
-      budget:        b,
-      vibe:          "moderado",
-      arrivalDate:   arrivalDate ? toYMD(arrivalDate) : null,
-      departureDate: departureDate ? toYMD(departureDate) : null,
-    }), 300);
+    setTimeout(
+      () =>
+        onGenerate({
+          nights: n,
+          travelVibe,
+          inspirations,
+          budget: b,
+          vibe: "moderado",
+          arrivalDate: arrivalDate ? toYMD(arrivalDate) : null,
+          departureDate: departureDate ? toYMD(departureDate) : null,
+        }),
+      300,
+    );
   }
 
   function toggleInspiration(id: Inspiration) {
@@ -685,17 +837,21 @@ function StandardFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) =>
 // Steps: 0 = Dates  1 = Company  2 = Interests  3 = Style/Budget
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ContextualFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) => void }) {
+function ContextualFlow({
+  onGenerate,
+}: {
+  onGenerate: (p: JourneyGenerateProps) => void;
+}) {
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === "web" ? 72 : insets.top + 20;
 
-  const [step,          setStep]          = useState(0);
-  const [arrivalDate,   setArrivalDate]   = useState<Date | null>(null);
+  const [step, setStep] = useState(0);
+  const [arrivalDate, setArrivalDate] = useState<Date | null>(null);
   const [departureDate, setDepartureDate] = useState<Date | null>(null);
-  const [openCal,       setOpenCal]       = useState<"arrival" | "departure" | null>(null);
-  const [travelVibe,    setTravelVibe]    = useState<TravelVibe | null>(null);
-  const [inspirations,  setInspirations]  = useState<Inspiration[]>([]);
-  const [budget,        setBudget]        = useState<BudgetStyle | null>(null);
+  const [openCal, setOpenCal] = useState<"arrival" | "departure" | null>(null);
+  const [travelVibe, setTravelVibe] = useState<TravelVibe | null>(null);
+  const [inspirations, setInspirations] = useState<Inspiration[]>([]);
+  const [budget, setBudget] = useState<BudgetStyle | null>(null);
   const inspirationPhotos = useInspirationPhotos();
 
   function fmtDate(d: Date | null): string | null {
@@ -707,7 +863,9 @@ function ContextualFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) 
     setArrivalDate(d);
     setOpenCal("departure");
     if (departureDate && !isBeforeDay(d, departureDate)) {
-      setDepartureDate(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1));
+      setDepartureDate(
+        new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1),
+      );
     }
   }
 
@@ -732,18 +890,27 @@ function ContextualFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) 
     setBudget(b);
     const nights =
       arrivalDate && departureDate
-        ? Math.max(1, Math.round((departureDate.getTime() - arrivalDate.getTime()) / 86400000))
+        ? Math.max(
+            1,
+            Math.round(
+              (departureDate.getTime() - arrivalDate.getTime()) / 86400000,
+            ),
+          )
         : 3;
     const toYMD = (d: Date) => d.toISOString().split("T")[0];
-    setTimeout(() => onGenerate({
-      nights,
-      travelVibe:    travelVibe ?? "amigos",
-      inspirations,
-      budget:        b,
-      vibe:          "moderado",
-      arrivalDate:   arrivalDate ? toYMD(arrivalDate) : null,
-      departureDate: departureDate ? toYMD(departureDate) : null,
-    }), 300);
+    setTimeout(
+      () =>
+        onGenerate({
+          nights,
+          travelVibe: travelVibe ?? "amigos",
+          inspirations,
+          budget: b,
+          vibe: "moderado",
+          arrivalDate: arrivalDate ? toYMD(arrivalDate) : null,
+          departureDate: departureDate ? toYMD(departureDate) : null,
+        }),
+      300,
+    );
   }
 
   const STEP_LABELS = ["Datas", "Companhia", "Interesses", "Estilo"];
@@ -751,7 +918,10 @@ function ContextualFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) 
   return (
     <ScrollView
       style={{ flex: 1 }}
-      contentContainerStyle={[fp.page, { paddingTop: topPad, paddingBottom: 110 }]}
+      contentContainerStyle={[
+        fp.page,
+        { paddingTop: topPad, paddingBottom: 110 },
+      ]}
       showsVerticalScrollIndicator={false}
     >
       {/* ── Progress indicators ── */}
@@ -759,12 +929,18 @@ function ContextualFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) 
         {STEP_LABELS.map((label, i) => (
           <View
             key={label}
-            style={[cf.stepDot, i === step && cf.stepDotActive, i < step && cf.stepDotDone]}
+            style={[
+              cf.stepDot,
+              i === step && cf.stepDotActive,
+              i < step && cf.stepDotDone,
+            ]}
           >
             {i < step ? (
               <Feather name="check" size={10} color={C.darkBrown} />
             ) : (
-              <Text style={[cf.stepNum, i === step && cf.stepNumActive]}>{i + 1}</Text>
+              <Text style={[cf.stepNum, i === step && cf.stepNumActive]}>
+                {i + 1}
+              </Text>
             )}
           </View>
         ))}
@@ -783,7 +959,11 @@ function ContextualFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) 
               style={[cf.dateBtn, openCal === "arrival" && cf.dateBtnActive]}
               onPress={() => setOpenCal("arrival")}
             >
-              <Feather name="calendar" size={14} color={arrivalDate ? GOLD : `${GOLD}55`} />
+              <Feather
+                name="calendar"
+                size={14}
+                color={arrivalDate ? GOLD : `${GOLD}55`}
+              />
               <Text style={[cf.dateBtnText, arrivalDate && cf.dateBtnTextSet]}>
                 {fmtDate(arrivalDate) ?? "Chegada"}
               </Text>
@@ -793,8 +973,14 @@ function ContextualFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) 
               style={[cf.dateBtn, openCal === "departure" && cf.dateBtnActive]}
               onPress={() => setOpenCal("departure")}
             >
-              <Feather name="calendar" size={14} color={departureDate ? GOLD : `${GOLD}55`} />
-              <Text style={[cf.dateBtnText, departureDate && cf.dateBtnTextSet]}>
+              <Feather
+                name="calendar"
+                size={14}
+                color={departureDate ? GOLD : `${GOLD}55`}
+              />
+              <Text
+                style={[cf.dateBtnText, departureDate && cf.dateBtnTextSet]}
+              >
                 {fmtDate(departureDate) ?? "Saída"}
               </Text>
             </Pressable>
@@ -803,7 +989,11 @@ function ContextualFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) 
           {openCal && (
             <InlineCalendar
               value={openCal === "arrival" ? arrivalDate : departureDate}
-              minDate={openCal === "departure" && arrivalDate ? arrivalDate : new Date()}
+              minDate={
+                openCal === "departure" && arrivalDate
+                  ? arrivalDate
+                  : new Date()
+              }
               onSelect={openCal === "arrival" ? handleArrival : handleDeparture}
             />
           )}
@@ -826,7 +1016,10 @@ function ContextualFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) 
             {COMPANIONS.map((c) => (
               <Pressable
                 key={c.id}
-                style={[cf.companionCard, travelVibe === c.id && cf.companionCardActive]}
+                style={[
+                  cf.companionCard,
+                  travelVibe === c.id && cf.companionCardActive,
+                ]}
                 onPress={() => handleCompanion(c.id)}
               >
                 <Feather
@@ -834,7 +1027,12 @@ function ContextualFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) 
                   size={26}
                   color={travelVibe === c.id ? GOLD : "rgba(255,255,255,0.55)"}
                 />
-                <Text style={[cf.companionLabel, travelVibe === c.id && cf.companionLabelActive]}>
+                <Text
+                  style={[
+                    cf.companionLabel,
+                    travelVibe === c.id && cf.companionLabelActive,
+                  ]}
+                >
                   {c.label}
                 </Text>
               </Pressable>
@@ -862,7 +1060,11 @@ function ContextualFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) 
                   style={[fp.insCard, active && fp.insCardActive]}
                   onPress={() => toggleInspiration(ins.id)}
                 >
-                  <Image source={imgSrc} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                  <Image
+                    source={imgSrc}
+                    style={StyleSheet.absoluteFill}
+                    resizeMode="cover"
+                  />
                   <LinearGradient
                     colors={["transparent", "rgba(0,0,0,0.35)"]}
                     locations={[0.25, 1]}
@@ -903,7 +1105,12 @@ function ContextualFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) 
                 style={[cf.budgetCard, budget === b.id && cf.budgetCardActive]}
                 onPress={() => handleBudget(b.id)}
               >
-                <Text style={[cf.budgetLabel, budget === b.id && cf.budgetLabelActive]}>
+                <Text
+                  style={[
+                    cf.budgetLabel,
+                    budget === b.id && cf.budgetLabelActive,
+                  ]}
+                >
                   {b.label}
                 </Text>
                 <Text style={cf.budgetDesc}>{b.desc}</Text>
@@ -1227,7 +1434,6 @@ const fp = StyleSheet.create({
   },
 });
 
-
 // ─────────────────────────────────────────────────────────────────────────────
 // ReplaceSheet — in-context item replacement overlay
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1244,73 +1450,122 @@ interface Suggestion {
 }
 
 interface ReplaceSheetProps {
-  item:      SavedItem;
-  diaNum:    number;
-  onClose:   () => void;
+  item: SavedItem;
+  diaNum: number;
+  onClose: () => void;
   onReplace: (diaNum: number, itemId: string, newItem: SavedItem) => void;
 }
 
 function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
-  const [suggestions,  setSuggestions]  = useState<Suggestion[]>([]);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [crossResults, setCrossResults] = useState<Suggestion[]>([]);
-  const [loading,      setLoading]      = useState(true);
+  const [loading, setLoading] = useState(true);
   const [crossLoading, setCrossLoading] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
-  const [searchQuery,  setSearchQuery]  = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     let cancelled = false;
-    fetchSuggestions(cancelled).then(() => {}).catch(() => {});
-    return () => { cancelled = true; };
+    fetchSuggestions(cancelled)
+      .then(() => {})
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [item.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Cross-category internal DB search — fires at 2+ chars, finds ANY place in the DB
   useEffect(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (q.length < 2) { setCrossResults([]); setCrossLoading(false); return; }
+    if (q.length < 2) {
+      setCrossResults([]);
+      setCrossLoading(false);
+      return;
+    }
     setCrossLoading(true);
     const timer = setTimeout(async () => {
       try {
         const [r1, r2, r3, r4] = await Promise.all([
-          supabase.from("restaurantes").select("id,nome,bairro,especialidade,photo_url").ilike("nome", `%${q}%`).limit(6),
-          supabase.from("o_que_fazer_rio_v2").select("id,nome,bairro,categoria,photo_url").eq("ativo", true).ilike("nome", `%${q}%`).limit(6),
-          supabase.from("lucky_list_rio_v2").select("id,nome,bairro,tipo,photo_url").eq("ativo", true).ilike("nome", `%${q}%`).limit(4),
-          supabase.from("stay_hotels").select("id,nome,bairro,categoria,photo_url").ilike("nome", `%${q}%`).limit(4),
+          supabase
+            .from("restaurantes")
+            .select("id,nome,bairro,especialidade,photo_url")
+            .ilike("nome", `%${q}%`)
+            .limit(6),
+          supabase
+            .from("o_que_fazer_rio_v2")
+            .select("id,nome,bairro,categoria,photo_url")
+            .eq("ativo", true)
+            .ilike("nome", `%${q}%`)
+            .limit(6),
+          supabase
+            .from("lucky_list_rio_v2")
+            .select("id,nome,bairro,tipo,photo_url")
+            .eq("ativo", true)
+            .ilike("nome", `%${q}%`)
+            .limit(4),
+          supabase
+            .from("stay_hotels")
+            .select("id,nome,bairro,categoria,photo_url")
+            .ilike("nome", `%${q}%`)
+            .limit(4),
         ]);
         const rows: Suggestion[] = [
           ...(r1.data ?? []).map((r: Record<string, unknown>) => ({
-            id: String(r.id), titulo: (r.nome as string) || "", localizacao: (r.bairro as string) || "",
-            image: getImageForEntity("restaurant", (r.nome as string) || "", (r.bairro as string) || "", (r.photo_url as string | null) ?? null),
+            id: String(r.id),
+            titulo: (r.nome as string) || "",
+            localizacao: (r.bairro as string) || "",
+            image: getImageForEntity(
+              "restaurant",
+              (r.nome as string) || "",
+              (r.bairro as string) || "",
+              (r.photo_url as string | null) ?? null,
+            ),
             categoria: "restaurante" as SavedCategory,
             source_table: "restaurantes" as SourceTable,
             subtitle: (r.especialidade as string) ?? "Restaurante",
           })),
           ...(r2.data ?? []).map((r: Record<string, unknown>) => ({
-            id: String(r.id), titulo: (r.nome as string) || "", localizacao: (r.bairro as string) || "",
-            image: (r.photo_url as string | null) ? { uri: r.photo_url as string } : null, categoria: "oQueFazer" as SavedCategory,
+            id: String(r.id),
+            titulo: (r.nome as string) || "",
+            localizacao: (r.bairro as string) || "",
+            image: (r.photo_url as string | null)
+              ? { uri: r.photo_url as string }
+              : null,
+            categoria: "oQueFazer" as SavedCategory,
             source_table: "o_que_fazer_rio_v2" as SourceTable,
             subtitle: (r.categoria as string) ?? "O que fazer",
           })),
           ...(r3.data ?? []).map((r: Record<string, unknown>) => ({
-            id: String(r.id), titulo: (r.nome as string) || "", localizacao: (r.bairro as string) || "",
-            image: (r.photo_url as string | null) ? { uri: r.photo_url as string } : null, categoria: "lucky" as SavedCategory,
+            id: String(r.id),
+            titulo: (r.nome as string) || "",
+            localizacao: (r.bairro as string) || "",
+            image: (r.photo_url as string | null)
+              ? { uri: r.photo_url as string }
+              : null,
+            categoria: "lucky" as SavedCategory,
             source_table: "lucky_list_rio_v2" as SourceTable,
             subtitle: (r.tipo as string) ?? "Lucky",
           })),
           ...(r4.data ?? []).map((r: Record<string, unknown>) => ({
-            id: String(r.id), titulo: (r.nome as string) || "", localizacao: (r.bairro as string) || "",
-            image: (r.photo_url as string | null) ? { uri: r.photo_url as string } : null, categoria: "hotel" as SavedCategory,
+            id: String(r.id),
+            titulo: (r.nome as string) || "",
+            localizacao: (r.bairro as string) || "",
+            image: (r.photo_url as string | null)
+              ? { uri: r.photo_url as string }
+              : null,
+            categoria: "hotel" as SavedCategory,
             source_table: "stay_hotels" as SourceTable,
             subtitle: (r.categoria as string) ?? "Hotel",
           })),
         ];
         setCrossResults(rows);
-      } catch { setCrossResults([]); }
+      } catch {
+        setCrossResults([]);
+      }
       setCrossLoading(false);
     }, 400);
     return () => clearTimeout(timer);
   }, [searchQuery]);
-
 
   async function fetchSuggestions(cancelled: boolean) {
     setLoading(true);
@@ -1324,13 +1579,19 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
           .eq("ativo", true)
           .limit(14);
         rows = (data ?? []).map((r: Record<string, unknown>) => ({
-          id:           String(r.id),
-          titulo:       (r.nome as string) || "Restaurante",
-          localizacao:  (r.bairro as string) || "",
-          image:        getImageForEntity("restaurant", (r.nome as string) || "", (r.bairro as string) || "", (r.photo_url as string | null) ?? null),
-          categoria:    "restaurante" as SavedCategory,
+          id: String(r.id),
+          titulo: (r.nome as string) || "Restaurante",
+          localizacao: (r.bairro as string) || "",
+          image: getImageForEntity(
+            "restaurant",
+            (r.nome as string) || "",
+            (r.bairro as string) || "",
+            (r.photo_url as string | null) ?? null,
+          ),
+          categoria: "restaurante" as SavedCategory,
           source_table: "restaurantes" as SourceTable,
-          subtitle:     (r.especialidade as string) ?? (r.categoria as string) ?? undefined,
+          subtitle:
+            (r.especialidade as string) ?? (r.categoria as string) ?? undefined,
         }));
       } else if (item.categoria === "lucky") {
         const { data } = await supabase
@@ -1339,13 +1600,15 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
           .eq("ativo", true)
           .limit(14);
         rows = (data ?? []).map((r: Record<string, unknown>) => ({
-          id:           String(r.id),
-          titulo:       (r.nome as string) || "Lucky pick",
-          localizacao:  (r.bairro as string) || "",
-          image:        (r.photo_url as string | null) ? { uri: r.photo_url as string } : null,
-          categoria:    "lucky" as SavedCategory,
+          id: String(r.id),
+          titulo: (r.nome as string) || "Lucky pick",
+          localizacao: (r.bairro as string) || "",
+          image: (r.photo_url as string | null)
+            ? { uri: r.photo_url as string }
+            : null,
+          categoria: "lucky" as SavedCategory,
           source_table: "lucky_list_rio_v2" as SourceTable,
-          subtitle:     (r.tipo as string) ?? undefined,
+          subtitle: (r.tipo as string) ?? undefined,
         }));
       } else {
         const { data } = await supabase
@@ -1354,20 +1617,26 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
           .eq("ativo", true)
           .limit(14);
         rows = (data ?? []).map((r: Record<string, unknown>) => ({
-          id:           String(r.id),
-          titulo:       (r.nome as string) || "Experiência",
-          localizacao:  (r.bairro as string) || "",
-          image:        (r.photo_url as string | null) ? { uri: r.photo_url as string } : null,
-          categoria:    "oQueFazer" as SavedCategory,
+          id: String(r.id),
+          titulo: (r.nome as string) || "Experiência",
+          localizacao: (r.bairro as string) || "",
+          image: (r.photo_url as string | null)
+            ? { uri: r.photo_url as string }
+            : null,
+          categoria: "oQueFazer" as SavedCategory,
           source_table: "o_que_fazer_rio_v2" as SourceTable,
-          subtitle:     (r.categoria as string) ?? undefined,
+          subtitle: (r.categoria as string) ?? undefined,
         }));
       }
 
       if (cancelled) return;
       // Exclude the current item; prefer same bairro
-      const same  = rows.filter((r) => r.localizacao === item.localizacao && r.id !== item.id);
-      const other = rows.filter((r) => r.localizacao !== item.localizacao && r.id !== item.id);
+      const same = rows.filter(
+        (r) => r.localizacao === item.localizacao && r.id !== item.id,
+      );
+      const other = rows.filter(
+        (r) => r.localizacao !== item.localizacao && r.id !== item.id,
+      );
       setSuggestions([...same, ...other]);
     } catch {
       if (!cancelled) setSuggestions([]);
@@ -1401,12 +1670,13 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
     setIsConfirming(true);
     try {
       const newItem: SavedItem = {
-        id:           sug.id,
-        titulo:       sug.titulo,
-        localizacao:  sug.localizacao,
-        image:        sug.image,
-        categoria:    sug.categoria,
-        source_table: sug.source_table ?? sourceTableFromCategoria(sug.categoria),
+        id: sug.id,
+        titulo: sug.titulo,
+        localizacao: sug.localizacao,
+        image: sug.image,
+        categoria: sug.categoria,
+        source_table:
+          sug.source_table ?? sourceTableFromCategoria(sug.categoria),
       };
       onReplace(diaNum, item.id, newItem);
       onClose();
@@ -1420,13 +1690,20 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
     return (
       <Pressable
         key={`${sug.source_table ?? sug.categoria}_${sug.id}`}
-        style={({ pressed }) => [rs.sugCard, (pressed || isConfirming) && { opacity: 0.75 }]}
+        style={({ pressed }) => [
+          rs.sugCard,
+          (pressed || isConfirming) && { opacity: 0.75 },
+        ]}
         onPress={() => confirmReplace(sug)}
         disabled={isConfirming}
       >
         <View style={rs.sugThumb}>
           {sug.image != null && (
-            <Image source={sug.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            <Image
+              source={sug.image}
+              style={StyleSheet.absoluteFill}
+              resizeMode="cover"
+            />
           )}
           <LinearGradient
             colors={["transparent", "rgba(0,0,0,0.35)"]}
@@ -1434,10 +1711,14 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
           />
         </View>
         <View style={rs.sugInfo}>
-          <Text style={rs.sugName} numberOfLines={1}>{sug.titulo}</Text>
+          <Text style={rs.sugName} numberOfLines={1}>
+            {sug.titulo}
+          </Text>
           <View style={rs.sugLocRow}>
             <Feather name="map-pin" size={9} color={`${GOLD}80`} />
-            <Text style={rs.sugLoc} numberOfLines={1}>{sug.localizacao}</Text>
+            <Text style={rs.sugLoc} numberOfLines={1}>
+              {sug.localizacao}
+            </Text>
           </View>
           {sug.subtitle ? (
             <View style={rs.sugBadge}>
@@ -1446,9 +1727,11 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
           ) : null}
         </View>
         <View style={rs.useBtn}>
-          {isConfirming
-            ? <Feather name="loader" size={11} color="#000" />
-            : <Text style={rs.useBtnText}>Usar</Text>}
+          {isConfirming ? (
+            <Feather name="loader" size={11} color="#000" />
+          ) : (
+            <Text style={rs.useBtnText}>Usar</Text>
+          )}
         </View>
       </Pressable>
     );
@@ -1467,14 +1750,21 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
         </Pressable>
         <View style={rs.headerCenter}>
           <Text style={rs.headerTitle}>Substituir lugar</Text>
-          <Text style={rs.headerSub} numberOfLines={1}>{item.titulo}</Text>
+          <Text style={rs.headerSub} numberOfLines={1}>
+            {item.titulo}
+          </Text>
         </View>
         <View style={rs.headerBtn} />
       </View>
 
       {/* Search bar */}
       <View style={rs.searchRow}>
-        <Feather name="search" size={14} color={`${GOLD}80`} style={rs.searchIcon} />
+        <Feather
+          name="search"
+          size={14}
+          color={`${GOLD}80`}
+          style={rs.searchIcon}
+        />
         <TextInput
           style={rs.searchInput}
           placeholder="Buscar qualquer lugar no Rio…"
@@ -1520,27 +1810,36 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
             <>
               <View style={rs.sectionLabelRow}>
                 <Text style={rs.sectionLabel}>✦ Outros lugares no Rio</Text>
-                {crossLoading && <Text style={rs.sectionLabelSub}>buscando…</Text>}
+                {crossLoading && (
+                  <Text style={rs.sectionLabelSub}>buscando…</Text>
+                )}
               </View>
               {crossDeduped.map(renderSugCard)}
             </>
           )}
 
           {/* ── Curated empty state — shown when search has results to offer ─── */}
-          {q.length >= 2 && localFiltered.length === 0 && crossDeduped.length === 0 && !crossLoading && (
-            <View style={rs.emptyState}>
-              <Feather name="search" size={24} color={`${GOLD}50`} />
-              <Text style={rs.emptyText}>Nenhum lugar encontrado na nossa curadoria</Text>
-              <Text style={rs.emptySub}>Tente outro nome ou categoria</Text>
-            </View>
-          )}
+          {q.length >= 2 &&
+            localFiltered.length === 0 &&
+            crossDeduped.length === 0 &&
+            !crossLoading && (
+              <View style={rs.emptyState}>
+                <Feather name="search" size={24} color={`${GOLD}50`} />
+                <Text style={rs.emptyText}>
+                  Nenhum lugar encontrado na nossa curadoria
+                </Text>
+                <Text style={rs.emptySub}>Tente outro nome ou categoria</Text>
+              </View>
+            )}
 
           {/* ── Prompt: no query entered yet ── */}
           {q.length < 2 && localFiltered.length === 0 && !loading && (
             <View style={rs.emptyState}>
               <Feather name="search" size={24} color={`${GOLD}50`} />
               <Text style={rs.emptyText}>Nenhum lugar encontrado</Text>
-              <Text style={rs.emptySub}>Digite o nome de qualquer lugar no Rio</Text>
+              <Text style={rs.emptySub}>
+                Digite o nome de qualquer lugar no Rio
+              </Text>
             </View>
           )}
         </ScrollView>
@@ -1756,7 +2055,11 @@ function ScreenHeader({
         onPress={onBack}
         hitSlop={10}
       >
-        <Feather name="arrow-left" size={18} color={isResult ? CREAM : C.darkBrown} />
+        <Feather
+          name="arrow-left"
+          size={18}
+          color={isResult ? CREAM : C.darkBrown}
+        />
       </Pressable>
 
       <View style={hd.center}>
@@ -1836,11 +2139,19 @@ function LoadingPhase() {
       Animated.loop(
         Animated.sequence([
           Animated.delay(i * 260),
-          Animated.timing(dot, { toValue: 1, duration: 400, useNativeDriver: true }),
-          Animated.timing(dot, { toValue: 0.3, duration: 400, useNativeDriver: true }),
+          Animated.timing(dot, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+          Animated.timing(dot, {
+            toValue: 0.3,
+            duration: 400,
+            useNativeDriver: true,
+          }),
           Animated.delay((dots.length - i - 1) * 260),
-        ])
-      )
+        ]),
+      ),
     );
     animations.forEach((a) => a.start());
     return () => animations.forEach((a) => a.stop());
@@ -1852,10 +2163,15 @@ function LoadingPhase() {
         <Feather name="zap" size={22} color={GOLD} />
       </View>
       <Text style={sc.loadingText}>Estamos organizando sua viagem</Text>
-      <Text style={sc.loadingSubText}>Selecionando as melhores experiências para você</Text>
+      <Text style={sc.loadingSubText}>
+        Selecionando as melhores experiências para você
+      </Text>
       <View style={sc.loadingDots}>
         {dots.map((dot, i) => (
-          <Animated.View key={`dot-${i}`} style={[sc.loadingDot, { opacity: dot }]} />
+          <Animated.View
+            key={`dot-${i}`}
+            style={[sc.loadingDot, { opacity: dot }]}
+          />
         ))}
       </View>
     </View>
@@ -1867,16 +2183,16 @@ function LoadingPhase() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface ResultPhaseProps {
-  result:         ItineraryResult;
-  hotelItem:      SavedItem | null;
-  totalPlaces:    number;
-  editMode:       boolean;
-  onToggleEdit:   () => void;
-  onReplaceItem:  (diaNum: number, itemId: string, newItem: SavedItem) => void;
-  onShareResult:  () => void;
-  onExport:       () => void;
-  isExporting:    boolean;
-  scrollRef:      React.RefObject<ScrollView>;
+  result: ItineraryResult;
+  hotelItem: SavedItem | null;
+  totalPlaces: number;
+  editMode: boolean;
+  onToggleEdit: () => void;
+  onReplaceItem: (diaNum: number, itemId: string, newItem: SavedItem) => void;
+  onShareResult: () => void;
+  onExport: () => void;
+  isExporting: boolean;
+  scrollRef: React.RefObject<ScrollView>;
 }
 
 function ResultPhase({
@@ -1892,38 +2208,47 @@ function ResultPhase({
   scrollRef,
 }: ResultPhaseProps) {
   const { totalDays, totalItems } = result.summary;
-  const [dayOffsets, setDayOffsets]     = React.useState<Record<number, number>>({});
+  const [dayOffsets, setDayOffsets] = React.useState<Record<number, number>>(
+    {},
+  );
   const [activeDayChip, setActiveDayChip] = React.useState<number | null>(null);
 
   function handleWhatsApp() {
     const msg = encodeURIComponent(
-      `Olá! Criei meu roteiro de ${totalDays} dias no Rio de Janeiro com o Lucky Trip. Pode me ajudar a refinar?`
+      `Olá! Criei meu roteiro de ${totalDays} dias no Rio de Janeiro com o Lucky Trip. Pode me ajudar a refinar?`,
     );
     Linking.openURL(`https://wa.me/?text=${msg}`);
   }
 
   function handleOpenMap() {
-    const allItems = result.days.flatMap((d) => d.periodos.flatMap((p) => p.items));
+    const allItems = result.days.flatMap((d) =>
+      d.periodos.flatMap((p) => p.items),
+    );
     if (allItems.length === 0) return;
 
     if (allItems.length === 1) {
       const q = `${allItems[0].titulo} Rio de Janeiro`;
-      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`);
+      Linking.openURL(
+        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`,
+      );
       return;
     }
 
     // Build Google Maps directions URL with origin + destination + up to 8 waypoints (Maps limit)
     const ordered = allItems.slice(0, 10);
-    const origin      = encodeURIComponent(`${ordered[0].titulo} Rio de Janeiro`);
-    const destination = encodeURIComponent(`${ordered[ordered.length - 1].titulo} Rio de Janeiro`);
-    const waypoints   = ordered
+    const origin = encodeURIComponent(`${ordered[0].titulo} Rio de Janeiro`);
+    const destination = encodeURIComponent(
+      `${ordered[ordered.length - 1].titulo} Rio de Janeiro`,
+    );
+    const waypoints = ordered
       .slice(1, -1)
       .map((i) => encodeURIComponent(`${i.titulo} Rio de Janeiro`))
       .join("|");
 
-    const url = waypoints.length > 0
-      ? `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&waypoints=${waypoints}&travelmode=walking`
-      : `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=walking`;
+    const url =
+      waypoints.length > 0
+        ? `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&waypoints=${waypoints}&travelmode=walking`
+        : `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=walking`;
 
     Linking.openURL(url);
   }
@@ -1943,7 +2268,8 @@ function ResultPhase({
           {totalDays} {totalDays === 1 ? "dia" : "dias"} no Rio
         </Text>
         <Text style={re.resultHeroMeta}>
-          {totalItems} {totalItems === 1 ? "experiência curada" : "experiências curadas"}
+          {totalItems}{" "}
+          {totalItems === 1 ? "experiência curada" : "experiências curadas"}
         </Text>
 
         {/* Day navigation chips */}
@@ -1962,11 +2288,16 @@ function ResultPhase({
                   style={({ pressed }) => [
                     re.dayNavPill,
                     isActive && re.dayNavPillActive,
-                    pressed && { opacity: 0.70 },
+                    pressed && { opacity: 0.7 },
                   ]}
                   onPress={() => handleDayChipPress(dia.numero)}
                 >
-                  <Text style={[re.dayNavPillText, isActive && re.dayNavPillTextActive]}>
+                  <Text
+                    style={[
+                      re.dayNavPillText,
+                      isActive && re.dayNavPillTextActive,
+                    ]}
+                  >
                     Dia {dia.numero}
                   </Text>
                 </Pressable>
@@ -1980,7 +2311,9 @@ function ResultPhase({
       {editMode && (
         <View style={re.editBanner}>
           <Feather name="edit-2" size={12} color={GOLD} />
-          <Text style={re.editBannerText}>Toque em um item para substituí-lo</Text>
+          <Text style={re.editBannerText}>
+            Toque em um item para substituí-lo
+          </Text>
           <Pressable onPress={onToggleEdit} hitSlop={8}>
             <Text style={re.editBannerDone}>Concluir</Text>
           </Pressable>
@@ -1991,11 +2324,20 @@ function ResultPhase({
       {hotelItem && (
         <Pressable
           style={re.hotelCard}
-          onPress={() => router.push({ pathname: "/ondeFicar/hotel/[hotelId]", params: { hotelId: hotelItem.id } })}
+          onPress={() =>
+            router.push({
+              pathname: "/ondeFicar/hotel/[hotelId]",
+              params: { hotelId: hotelItem.id },
+            })
+          }
         >
           {/* Thumbnail */}
           <View style={re.hotelThumb}>
-            <Image source={hotelItem.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            <Image
+              source={hotelItem.image}
+              style={StyleSheet.absoluteFill}
+              resizeMode="cover"
+            />
             <LinearGradient
               colors={["transparent", "rgba(0,0,0,0.38)"]}
               style={StyleSheet.absoluteFill}
@@ -2004,11 +2346,15 @@ function ResultPhase({
           {/* Content */}
           <View style={re.hotelContent}>
             <Text style={re.hotelLabel}>✦ Hotel recomendado</Text>
-            <Text style={re.hotelName} numberOfLines={1}>{hotelItem.titulo}</Text>
+            <Text style={re.hotelName} numberOfLines={1}>
+              {hotelItem.titulo}
+            </Text>
             {hotelItem.localizacao ? (
               <View style={re.hotelLocRow}>
                 <Feather name="map-pin" size={9} color={`${GOLD}90`} />
-                <Text style={re.hotelLoc} numberOfLines={1}>{hotelItem.localizacao}</Text>
+                <Text style={re.hotelLoc} numberOfLines={1}>
+                  {hotelItem.localizacao}
+                </Text>
               </View>
             ) : null}
           </View>
@@ -2019,7 +2365,11 @@ function ResultPhase({
       {/* ── Action row ── */}
       <View style={re.actionRow}>
         <Pressable
-          style={({ pressed }) => [re.actionBtn, re.actionBtnEdit, pressed && { opacity: 0.82 }]}
+          style={({ pressed }) => [
+            re.actionBtn,
+            re.actionBtnEdit,
+            pressed && { opacity: 0.82 },
+          ]}
           onPress={onToggleEdit}
         >
           <Feather name="edit-2" size={14} color={GOLD} />
@@ -2028,31 +2378,47 @@ function ResultPhase({
           </Text>
         </Pressable>
         <Pressable
-          style={({ pressed }) => [re.actionBtn, re.actionBtnWA, pressed && { opacity: 0.82 }]}
+          style={({ pressed }) => [
+            re.actionBtn,
+            re.actionBtnWA,
+            pressed && { opacity: 0.82 },
+          ]}
           onPress={handleWhatsApp}
         >
           <Feather name="message-circle" size={14} color={CREAM} />
           <Text style={re.actionBtnText}>WhatsApp</Text>
         </Pressable>
         <Pressable
-          style={({ pressed }) => [re.actionBtn, re.actionBtnExport, (pressed || isExporting) && { opacity: 0.70 }]}
+          style={({ pressed }) => [
+            re.actionBtn,
+            re.actionBtnExport,
+            (pressed || isExporting) && { opacity: 0.7 },
+          ]}
           onPress={onExport}
           disabled={isExporting}
         >
           <Feather name="link" size={14} color={CREAM} />
-          <Text style={re.actionBtnText}>{isExporting ? "Gerando..." : "Exportar"}</Text>
+          <Text style={re.actionBtnText}>
+            {isExporting ? "Gerando..." : "Exportar"}
+          </Text>
         </Pressable>
       </View>
 
       {/* ── Map CTA ── */}
-      <Pressable style={({ pressed }) => [re.mapCta, pressed && { opacity: 0.80 }]} onPress={handleOpenMap}>
+      <Pressable
+        style={({ pressed }) => [re.mapCta, pressed && { opacity: 0.8 }]}
+        onPress={handleOpenMap}
+      >
         <View style={re.mapCtaLeft}>
           <View style={re.mapCtaIcon}>
             <Feather name="map-pin" size={14} color={GOLD} />
           </View>
           <View>
             <Text style={re.mapCtaLabel}>Ver roteiro completo no mapa</Text>
-            <Text style={re.mapCtaSub}>{totalPlaces} {totalPlaces === 1 ? "lugar selecionado" : "lugares selecionados"}</Text>
+            <Text style={re.mapCtaSub}>
+              {totalPlaces}{" "}
+              {totalPlaces === 1 ? "lugar selecionado" : "lugares selecionados"}
+            </Text>
           </View>
         </View>
         <Feather name="arrow-right" size={15} color={`${GOLD}70`} />
@@ -2065,7 +2431,9 @@ function ResultPhase({
           dia={dia}
           editMode={editMode}
           onReplaceItem={onReplaceItem}
-          onLayout={(y) => setDayOffsets((prev) => ({ ...prev, [dia.numero]: y }))}
+          onLayout={(y) =>
+            setDayOffsets((prev) => ({ ...prev, [dia.numero]: y }))
+          }
         />
       ))}
     </>
@@ -2075,46 +2443,66 @@ function ResultPhase({
 function navigateToItem(item: SavedItem) {
   // ── Debug log — always fires to help diagnose routing issues ──
   console.log("[navigateToItem]", {
-    id:           item.id,
+    id: item.id,
     source_table: item.source_table,
-    categoria:    item.categoria,
-    isExternal:   item.isExternal ?? false,
-    titulo:       item.titulo,
+    categoria: item.categoria,
+    isExternal: item.isExternal ?? false,
+    titulo: item.titulo,
   });
 
   // ── External items: route by coordinates or Google Place ID, never by name ──
   if (item.isExternal) {
     if (item.placeId) {
       console.log("[navigateToItem] → Google Maps (place_id)", item.placeId);
-      Linking.openURL(`https://www.google.com/maps/place/?q=place_id:${item.placeId}`);
+      Linking.openURL(
+        `https://www.google.com/maps/place/?q=place_id:${item.placeId}`,
+      );
       return;
     }
     if (item.lat && item.lng) {
-      console.log("[navigateToItem] → Google Maps (coords)", item.lat, item.lng);
-      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${item.lat},${item.lng}`);
+      console.log(
+        "[navigateToItem] → Google Maps (coords)",
+        item.lat,
+        item.lng,
+      );
+      Linking.openURL(
+        `https://www.google.com/maps/search/?api=1&query=${item.lat},${item.lng}`,
+      );
       return;
     }
     // External item with no coordinates — cannot navigate
-    console.warn("[navigateToItem] External item has no placeId or coords — showing fallback");
-    Alert.alert("Em breve disponível", "Este lugar ainda não tem página de detalhes.");
+    console.warn(
+      "[navigateToItem] External item has no placeId or coords — showing fallback",
+    );
+    Alert.alert(
+      "Em breve disponível",
+      "Este lugar ainda não tem página de detalhes.",
+    );
     return;
   }
 
   // ── Internal items: must have a valid id ──
   if (!item.id) {
     console.warn("[navigateToItem] Item has no id — showing fallback");
-    Alert.alert("Em breve disponível", "Este lugar ainda não tem página de detalhes.");
+    Alert.alert(
+      "Em breve disponível",
+      "Este lugar ainda não tem página de detalhes.",
+    );
     return;
   }
 
   // Derive source_table: prefer explicit field, fall back to categoria mapping
-  const table: SourceTable = item.source_table ?? sourceTableFromCategoria(item.categoria);
+  const table: SourceTable =
+    item.source_table ?? sourceTableFromCategoria(item.categoria);
 
   console.log("[navigateToItem] → detail page", { table, id: item.id });
 
   // Hotels have their own dedicated detail route
   if (table === "stay_hotels") {
-    router.push({ pathname: "/ondeFicar/hotel/[hotelId]", params: { hotelId: item.id } });
+    router.push({
+      pathname: "/ondeFicar/hotel/[hotelId]",
+      params: { hotelId: item.id },
+    });
     return;
   }
 
@@ -2122,10 +2510,10 @@ function navigateToItem(item: SavedItem) {
   router.push({
     pathname: "/lugar/[cityId]/[placeId]",
     params: {
-      cityId:      "rio",
-      placeId:     item.id,
+      cityId: "rio",
+      placeId: item.id,
       source_table: table,
-      titulo:      item.titulo ?? "",
+      titulo: item.titulo ?? "",
       localizacao: item.localizacao ?? "",
     },
   });
@@ -2135,9 +2523,13 @@ function navigateToItem(item: SavedItem) {
 // Shows no image (dark card background) when image is null or URI fails.
 function ItemThumb({ image }: { image: { uri: string } | null | unknown }) {
   const [errored, setErrored] = React.useState(false);
-  const src = (!errored && image != null && typeof image === "object" && "uri" in (image as object))
-    ? (image as { uri: string })
-    : null;
+  const src =
+    !errored &&
+    image != null &&
+    typeof image === "object" &&
+    "uri" in (image as object)
+      ? (image as { uri: string })
+      : null;
   return (
     <>
       {src != null && (
@@ -2162,24 +2554,33 @@ function ResultDayCard({
   onReplaceItem,
   onLayout,
 }: {
-  dia:           DiaRoteiro;
-  editMode:      boolean;
+  dia: DiaRoteiro;
+  editMode: boolean;
   onReplaceItem: (diaNum: number, itemId: string, newItem: SavedItem) => void;
-  onLayout?:     (y: number) => void;
+  onLayout?: (y: number) => void;
 }) {
   const weather = getDayWeather(dia.numero);
   const allItems = dia.periodos.flatMap((p) => p.items);
-  const travelMinTotal = allItems.reduce((sum, it) => sum + parseDuracao(it.duracao), 0) || 90;
+  const travelMinTotal =
+    allItems.reduce((sum, it) => sum + parseDuracao(it.duracao), 0) || 90;
   const [collapsed, setCollapsed] = React.useState(false);
 
   function handleDayMap() {
-    const places = allItems.slice(0, 4).map((i) => i.titulo).join(" + ");
+    const places = allItems
+      .slice(0, 4)
+      .map((i) => i.titulo)
+      .join(" + ");
     const query = `${places} ${dia.bairro} Rio de Janeiro`;
-    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`);
+    Linking.openURL(
+      `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`,
+    );
   }
 
   return (
-    <View style={re.dayCard} onLayout={(e) => onLayout?.(e.nativeEvent.layout.y)}>
+    <View
+      style={re.dayCard}
+      onLayout={(e) => onLayout?.(e.nativeEvent.layout.y)}
+    >
       {/* ── Day header (tappable to collapse) ── */}
       <Pressable
         style={({ pressed }) => [re.dayHeader, pressed && { opacity: 0.88 }]}
@@ -2188,7 +2589,9 @@ function ResultDayCard({
         <View style={re.dayNumBadge}>
           <Text style={re.dayNumText}>DIA {dia.numero}</Text>
         </View>
-        <Text style={re.dayBairro} numberOfLines={1}>{dia.bairro}</Text>
+        <Text style={re.dayBairro} numberOfLines={1}>
+          {dia.bairro}
+        </Text>
         <Feather name={weather} size={13} color="rgba(255,255,255,0.40)" />
         {!collapsed && (
           <View style={re.travelChip}>
@@ -2207,7 +2610,8 @@ function ResultDayCard({
       {collapsed && (
         <View style={re.dayCollapsedRow}>
           <Text style={re.dayCollapsedText}>
-            {allItems.length} {allItems.length === 1 ? "lugar" : "lugares"} · {travelMinTotal} min
+            {allItems.length} {allItems.length === 1 ? "lugar" : "lugares"} ·{" "}
+            {travelMinTotal} min
           </Text>
           <Feather name="clock" size={10} color="rgba(255,255,255,0.30)" />
         </View>
@@ -2225,20 +2629,31 @@ function ResultDayCard({
                   size={11}
                   color={GOLD}
                 />
-                <Text style={re.periodLabel}>{PERIODO_LABEL[periodo.periodo]}</Text>
+                <Text style={re.periodLabel}>
+                  {PERIODO_LABEL[periodo.periodo]}
+                </Text>
                 <View style={re.periodDivider} />
               </View>
 
               {/* Items */}
               {periodo.items.map((item, idx) => {
-                const timeStr = getItemTime(periodo.periodo, periodo.items, idx);
+                const timeStr = getItemTime(
+                  periodo.periodo,
+                  periodo.items,
+                  idx,
+                );
                 const travelMin = 10 + ((dia.numero * 7 + idx * 5) % 22);
-                const travelKm  = (1.8 + (dia.numero + idx) * 1.3).toFixed(1);
+                const travelKm = (1.8 + (dia.numero + idx) * 1.3).toFixed(1);
 
                 return (
-                  <React.Fragment key={`${item.source_table ?? item.categoria}_${item.id}`}>
+                  <React.Fragment
+                    key={`${item.source_table ?? item.categoria}_${item.id}`}
+                  >
                     <Pressable
-                      style={({ pressed }) => [re.itemRow, pressed && { opacity: 0.80 }]}
+                      style={({ pressed }) => [
+                        re.itemRow,
+                        pressed && { opacity: 0.8 },
+                      ]}
                       onPress={() => {
                         if (editMode) {
                           onReplaceItem(dia.numero, item.id, item);
@@ -2259,9 +2674,15 @@ function ResultDayCard({
 
                       {/* Info */}
                       <View style={re.itemInfo}>
-                        <Text style={re.itemName} numberOfLines={1}>{item.titulo}</Text>
+                        <Text style={re.itemName} numberOfLines={1}>
+                          {item.titulo}
+                        </Text>
                         <View style={re.itemLocRow}>
-                          <Feather name="map-pin" size={9} color={`${GOLD}80`} />
+                          <Feather
+                            name="map-pin"
+                            size={9}
+                            color={`${GOLD}80`}
+                          />
                           <Text style={re.itemLoc} numberOfLines={1}>
                             {item.localizacao ?? dia.bairro}
                           </Text>
@@ -2269,13 +2690,17 @@ function ResultDayCard({
                         {item.isExternal ? (
                           <View style={[re.catBadge, re.catBadgeExternal]}>
                             <Feather name="plus-circle" size={9} color={GOLD} />
-                            <Text style={[re.catBadgeText, re.catBadgeTextExternal]}>
+                            <Text
+                              style={[re.catBadgeText, re.catBadgeTextExternal]}
+                            >
                               Adicionado por você
                             </Text>
                           </View>
                         ) : (
                           <View style={re.catBadge}>
-                            <Text style={re.catBadgeText}>{CATEGORY_LABEL[item.categoria]}</Text>
+                            <Text style={re.catBadgeText}>
+                              {CATEGORY_LABEL[item.categoria]}
+                            </Text>
                           </View>
                         )}
                       </View>
@@ -2285,38 +2710,49 @@ function ResultDayCard({
                           <Feather name="refresh-cw" size={13} color={GOLD} />
                         </View>
                       ) : (
-                        <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.22)" />
-                    )}
-                  </Pressable>
+                        <Feather
+                          name="chevron-right"
+                          size={14}
+                          color="rgba(255,255,255,0.22)"
+                        />
+                      )}
+                    </Pressable>
 
-                  {/* Travel connector between items */}
-                  {idx < periodo.items.length - 1 && (
-                    <View style={re.travelConnector}>
-                      <View style={re.timeColSpacer} />
-                      <View style={re.connectorPill}>
-                        <Feather name="truck" size={9} color="rgba(255,255,255,0.40)" />
-                        <Text style={re.connectorText}>
-                          Carro · {travelMin} min · {travelKm} km
-                        </Text>
+                    {/* Travel connector between items */}
+                    {idx < periodo.items.length - 1 && (
+                      <View style={re.travelConnector}>
+                        <View style={re.timeColSpacer} />
+                        <View style={re.connectorPill}>
+                          <Feather
+                            name="truck"
+                            size={9}
+                            color="rgba(255,255,255,0.40)"
+                          />
+                          <Text style={re.connectorText}>
+                            Carro · {travelMin} min · {travelKm} km
+                          </Text>
+                        </View>
                       </View>
-                    </View>
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </View>
-        ))}
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </View>
+          ))}
 
-        {/* ── Per-day map button ── */}
-        <Pressable
-          style={({ pressed }) => [re.dayMapBtn, pressed && { opacity: 0.75 }]}
-          onPress={handleDayMap}
-        >
-          <Feather name="map-pin" size={11} color={GOLD} />
-          <Text style={re.dayMapBtnText}>Ver Dia {dia.numero} no mapa</Text>
-          <Feather name="arrow-right" size={12} color={`${GOLD}55`} />
-        </Pressable>
-      </View>
+          {/* ── Per-day map button ── */}
+          <Pressable
+            style={({ pressed }) => [
+              re.dayMapBtn,
+              pressed && { opacity: 0.75 },
+            ]}
+            onPress={handleDayMap}
+          >
+            <Feather name="map-pin" size={11} color={GOLD} />
+            <Text style={re.dayMapBtnText}>Ver Dia {dia.numero} no mapa</Text>
+            <Feather name="arrow-right" size={12} color={`${GOLD}55`} />
+          </Pressable>
+        </View>
       )}
     </View>
   );
@@ -2824,23 +3260,26 @@ const re = StyleSheet.create({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function RoteiroScreen() {
-  const insets    = useSafeAreaInsets();
-  const topPad    = Platform.OS === "web" ? 67 : insets.top;
+  const insets = useSafeAreaInsets();
+  const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
-  const params      = useLocalSearchParams<{ contextual?: string }>();
+  const params = useLocalSearchParams<{ contextual?: string }>();
   const isContextual = params.contextual === "1";
 
   const { saved, user, setCurrentItinerary } = useGuia();
 
-  const [result,            setResult]            = useState<ItineraryResult | null>(null);
-  const [generating,        setGenerating]        = useState(false);
-  const [editMode,          setEditMode]          = useState(false);
-  const [isExporting,       setIsExporting]       = useState(false);
-  const [replacingItem,     setReplacingItem]     = useState<{ item: SavedItem; diaNum: number } | null>(null);
+  const [result, setResult] = useState<ItineraryResult | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [replacingItem, setReplacingItem] = useState<{
+    item: SavedItem;
+    diaNum: number;
+  } | null>(null);
   /** ID of the auto-saved user_itineraries row — set after generation, used by Share/Export to update rather than re-insert. */
-  const [savedItineraryId,  setSavedItineraryId]  = useState<string | null>(null);
-  const [genError,          setGenError]          = useState<string | null>(null);
+  const [savedItineraryId, setSavedItineraryId] = useState<string | null>(null);
+  const [genError, setGenError] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
   function replaceItem(diaNum: number, itemId: string, newItem: SavedItem) {
@@ -2854,7 +3293,9 @@ export default function RoteiroScreen() {
             ...dia,
             periodos: dia.periodos.map((periodo) => ({
               ...periodo,
-              items: periodo.items.map((it) => (it.id === itemId ? newItem : it)),
+              items: periodo.items.map((it) =>
+                it.id === itemId ? newItem : it,
+              ),
             })),
           };
         }),
@@ -2869,12 +3310,17 @@ export default function RoteiroScreen() {
   function buildShareLines(shareSlug?: string): string {
     if (!result) return "";
     const lines: string[] = [`✦ Roteiro Rio de Janeiro — The Lucky Trip\n`];
-    if (shareSlug) lines.push(`Ver roteiro completo: https://theluckytrip.app/r/${shareSlug}\n`);
+    if (shareSlug)
+      lines.push(
+        `Ver roteiro completo: https://theluckytrip.app/r/${shareSlug}\n`,
+      );
     for (const dia of result.days) {
       lines.push(`Dia ${dia.numero} — ${dia.bairro}`);
       for (const periodo of dia.periodos) {
         const label = PERIODO_LABEL[periodo.periodo];
-        const itens = periodo.items.map((it) => `  • ${it.titulo} (${it.localizacao || dia.bairro})`).join("\n");
+        const itens = periodo.items
+          .map((it) => `  • ${it.titulo} (${it.localizacao || dia.bairro})`)
+          .join("\n");
         if (itens) lines.push(`${label}\n${itens}`);
       }
       lines.push("");
@@ -2888,7 +3334,10 @@ export default function RoteiroScreen() {
 
     // 1. Persist (or mark public) and get a shareable slug
     try {
-      shareSlug = Array.from({ length: 8 }, () => Math.random().toString(36)[2]).join("");
+      shareSlug = Array.from(
+        { length: 8 },
+        () => Math.random().toString(36)[2],
+      ).join("");
 
       if (savedItineraryId) {
         // Auto-save already ran — just mark public and attach the share slug
@@ -2902,17 +3351,18 @@ export default function RoteiroScreen() {
         const { data: itinerary, error: itinErr } = await supabase
           .from("user_itineraries")
           .insert({
-            destination_id:   "rio-de-janeiro",
+            destination_id: "rio-de-janeiro",
             destination_name: result.destination ?? "Rio de Janeiro",
-            status:           "generated",
-            is_public:        true,
-            share_slug:       shareSlug,
-            days_count:       result.summary.totalDays,
-            items_count:      result.summary.totalItems,
-            inspiration_tags: (result.preferences?.inspirations ?? []) as string[],
-            travel_company:   null,
-            budget_style:     result.preferences?.vibe ?? null,
-            generated_at:     new Date().toISOString(),
+            status: "generated",
+            is_public: true,
+            share_slug: shareSlug,
+            days_count: result.summary.totalDays,
+            items_count: result.summary.totalItems,
+            inspiration_tags: (result.preferences?.inspirations ??
+              []) as string[],
+            travel_company: null,
+            budget_style: result.preferences?.vibe ?? null,
+            generated_at: new Date().toISOString(),
           })
           .select("id")
           .single();
@@ -2923,22 +3373,22 @@ export default function RoteiroScreen() {
           const roteiroItens = result.days.flatMap((dia) =>
             dia.periodos.flatMap((periodo, _pi) =>
               periodo.items.map((item, idx) => ({
-                roteiro_id:        itinerary.id,
+                roteiro_id: itinerary.id,
                 user_itinerary_id: itinerary.id,
-                name:              item.titulo,
-                day_index:         dia.numero - 1,
-                order_in_day:      idx,
-                time_slot:         periodo.periodo,
-                source:            item.isExternal ? "external" : "saved",
-                ref_table:         item.isExternal ? "external" : null,
-                place_id:          item.isExternal ? (item.placeId ?? null) : null,
-                neighborhood:      item.localizacao ?? dia.bairro,
-                address:           item.isExternal ? (item.address ?? null) : null,
-                city:              "Rio de Janeiro",
-                lat:               item.isExternal ? (item.lat ?? null) : null,
-                lng:               item.isExternal ? (item.lng ?? null) : null,
-              }))
-            )
+                name: item.titulo,
+                day_index: dia.numero - 1,
+                order_in_day: idx,
+                time_slot: periodo.periodo,
+                source: item.isExternal ? "external" : "saved",
+                ref_table: item.isExternal ? "external" : null,
+                place_id: item.isExternal ? (item.placeId ?? null) : null,
+                neighborhood: item.localizacao ?? dia.bairro,
+                address: item.isExternal ? (item.address ?? null) : null,
+                city: "Rio de Janeiro",
+                lat: item.isExternal ? (item.lat ?? null) : null,
+                lng: item.isExternal ? (item.lng ?? null) : null,
+              })),
+            ),
           );
           await supabase.from("roteiro_itens").insert(roteiroItens);
         }
@@ -2948,8 +3398,10 @@ export default function RoteiroScreen() {
     }
 
     // 2. Build share content
-    const shareText  = buildShareLines(shareSlug);
-    const shareUrl   = shareSlug ? `https://theluckytrip.app/r/${shareSlug}` : undefined;
+    const shareText = buildShareLines(shareSlug);
+    const shareUrl = shareSlug
+      ? `https://theluckytrip.app/r/${shareSlug}`
+      : undefined;
     const shareTitle = "Roteiro Rio de Janeiro — The Lucky Trip";
 
     // 3. Platform-aware sharing — always produces visible output
@@ -2957,24 +3409,30 @@ export default function RoteiroScreen() {
       try {
         await Share.share({
           message: shareText,
-          url:     shareUrl,         // iOS only — adds a URL field
-          title:   shareTitle,       // Android
+          url: shareUrl, // iOS only — adds a URL field
+          title: shareTitle, // Android
         });
-      } catch { /* user dismissed */ }
+      } catch {
+        /* user dismissed */
+      }
     };
 
     if (Platform.OS === "web") {
       // Web: try Web Share API first, then Alert fallback
-      const canWebShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+      const canWebShare =
+        typeof navigator !== "undefined" &&
+        typeof navigator.share === "function";
       if (canWebShare) {
         try {
           await navigator.share({
             title: shareTitle,
-            text:  shareText,
-            url:   shareUrl,
+            text: shareText,
+            url: shareUrl,
           });
           return;
-        } catch { /* dismissed or unsupported — fall through */ }
+        } catch {
+          /* dismissed or unsupported — fall through */
+        }
       }
       // Fallback for web browsers without Share API: show link in Alert
       Alert.alert(
@@ -2982,21 +3440,17 @@ export default function RoteiroScreen() {
         shareUrl
           ? `Seu roteiro está disponível em:\n\n${shareUrl}\n\nCopie o link e compartilhe.`
           : shareText.slice(0, 300),
-        [{ text: "OK" }]
+        [{ text: "OK" }],
       );
     } else if (shareUrl) {
       // Native with URL: show Alert with URL + share button
-      Alert.alert(
-        "Roteiro salvo",
-        `Link do seu roteiro:\n\n${shareUrl}`,
-        [
-          {
-            text: "Compartilhar",
-            onPress: doNativeShare,
-          },
-          { text: "Fechar", style: "cancel" },
-        ]
-      );
+      Alert.alert("Roteiro salvo", `Link do seu roteiro:\n\n${shareUrl}`, [
+        {
+          text: "Compartilhar",
+          onPress: doNativeShare,
+        },
+        { text: "Fechar", style: "cancel" },
+      ]);
     } else {
       // Native without URL: open share sheet directly
       await doNativeShare();
@@ -3015,7 +3469,10 @@ export default function RoteiroScreen() {
 
     // 1. Generate slug + persist itinerary to Supabase
     try {
-      const slug = Array.from({ length: 8 }, () => Math.random().toString(36)[2]).join("");
+      const slug = Array.from(
+        { length: 8 },
+        () => Math.random().toString(36)[2],
+      ).join("");
 
       if (savedItineraryId) {
         // Auto-save already ran — just mark public and attach the export slug
@@ -3029,17 +3486,18 @@ export default function RoteiroScreen() {
         const { data: itinerary, error: itinErr } = await supabase
           .from("user_itineraries")
           .insert({
-            destination_id:   "rio-de-janeiro",
+            destination_id: "rio-de-janeiro",
             destination_name: result.destination ?? "Rio de Janeiro",
-            status:           "generated",
-            is_public:        true,
-            share_slug:       slug,
-            days_count:       result.summary.totalDays,
-            items_count:      result.summary.totalItems,
-            inspiration_tags: (result.preferences?.inspirations ?? []) as string[],
-            travel_company:   null,
-            budget_style:     result.preferences?.vibe ?? null,
-            generated_at:     new Date().toISOString(),
+            status: "generated",
+            is_public: true,
+            share_slug: slug,
+            days_count: result.summary.totalDays,
+            items_count: result.summary.totalItems,
+            inspiration_tags: (result.preferences?.inspirations ??
+              []) as string[],
+            travel_company: null,
+            budget_style: result.preferences?.vibe ?? null,
+            generated_at: new Date().toISOString(),
           })
           .select("id")
           .single();
@@ -3048,28 +3506,30 @@ export default function RoteiroScreen() {
           const roteiroItens = result.days.flatMap((dia) =>
             dia.periodos.flatMap((periodo) =>
               periodo.items.map((item, idx) => ({
-                roteiro_id:        itinerary.id,
+                roteiro_id: itinerary.id,
                 user_itinerary_id: itinerary.id,
-                name:              item.titulo,
-                day_index:         dia.numero - 1,
-                order_in_day:      idx,
-                time_slot:         periodo.periodo,
-                source:            item.isExternal ? "external" : "saved",
-                ref_table:         item.isExternal ? "external" : null,
-                place_id:          item.isExternal ? (item.placeId ?? null) : null,
-                neighborhood:      item.localizacao ?? dia.bairro,
-                address:           item.isExternal ? (item.address ?? null) : null,
-                city:              "Rio de Janeiro",
-                lat:               item.isExternal ? (item.lat ?? null) : null,
-                lng:               item.isExternal ? (item.lng ?? null) : null,
-              }))
-            )
+                name: item.titulo,
+                day_index: dia.numero - 1,
+                order_in_day: idx,
+                time_slot: periodo.periodo,
+                source: item.isExternal ? "external" : "saved",
+                ref_table: item.isExternal ? "external" : null,
+                place_id: item.isExternal ? (item.placeId ?? null) : null,
+                neighborhood: item.localizacao ?? dia.bairro,
+                address: item.isExternal ? (item.address ?? null) : null,
+                city: "Rio de Janeiro",
+                lat: item.isExternal ? (item.lat ?? null) : null,
+                lng: item.isExternal ? (item.lng ?? null) : null,
+              })),
+            ),
           );
           await supabase.from("roteiro_itens").insert(roteiroItens);
           exportUrl = `https://theluckytrip.app/r/${slug}`;
         }
       }
-    } catch { /* Supabase unavailable — proceed without URL */ }
+    } catch {
+      /* Supabase unavailable — proceed without URL */
+    }
 
     const urlToShow = exportUrl ?? "Roteiro ainda não salvo. Tente novamente.";
 
@@ -3077,11 +3537,13 @@ export default function RoteiroScreen() {
     if (Platform.OS === "web") {
       try {
         if (exportUrl) await navigator.clipboard.writeText(exportUrl);
-      } catch { /* clipboard not available */ }
+      } catch {
+        /* clipboard not available */
+      }
       Alert.alert(
         exportUrl ? "Link copiado!" : "Exportar roteiro",
         `${urlToShow}\n\nCompartilhe este link para acessar o roteiro no navegador.`,
-        [{ text: "OK" }]
+        [{ text: "OK" }],
       );
     } else {
       Alert.alert(
@@ -3091,21 +3553,32 @@ export default function RoteiroScreen() {
           ? [
               {
                 text: "Compartilhar link",
-                onPress: () => Share.share({ message: exportUrl, url: exportUrl, title: "Roteiro Rio de Janeiro — The Lucky Trip" }),
+                onPress: () =>
+                  Share.share({
+                    message: exportUrl,
+                    url: exportUrl,
+                    title: "Roteiro Rio de Janeiro — The Lucky Trip",
+                  }),
               },
               { text: "Fechar", style: "cancel" },
             ]
-          : [{ text: "OK" }]
+          : [{ text: "OK" }],
       );
     }
     setIsExporting(false);
   }
 
-  const hotelItem   = saved.find((s) => s.categoria === "hotel") ?? null;
+  const hotelItem = saved.find((s) => s.categoria === "hotel") ?? null;
   const totalPlaces = saved.filter((s) => s.categoria !== "hotel").length;
 
   async function handleGenerate({
-    nights, travelVibe, inspirations, budget, vibe, arrivalDate, departureDate,
+    nights,
+    travelVibe,
+    inspirations,
+    budget,
+    vibe,
+    arrivalDate,
+    departureDate,
   }: JourneyGenerateProps) {
     if (generating) return;
     setGenError(null);
@@ -3113,93 +3586,127 @@ export default function RoteiroScreen() {
     console.log("STEP 1 - iniciou geração");
 
     try {
-      const supabaseUrl  = process.env.EXPO_PUBLIC_SUPABASE_URL  ?? "";
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
       const supabaseAnon = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
       const serializableItems = saved.map((s) => ({
-        id:          s.id,
-        titulo:      s.titulo,
-        categoria:   s.categoria,
+        id: s.id,
+        titulo: s.titulo,
+        categoria: s.categoria,
         localizacao: s.localizacao,
       }));
 
       const payload = {
-        savedItems:    serializableItems,
-        destination:   "Rio de Janeiro",
-        preferences:   { inspirations, vibe, travelVibe, budget },
+        savedItems: serializableItems,
+        destination: "Rio de Janeiro",
+        preferences: { inspirations, vibe, travelVibe, budget },
         requestedDays: nights,
-        arrivalDate:   arrivalDate ?? null,
+        arrivalDate: arrivalDate ?? null,
         departureDate: departureDate ?? null,
       };
 
       console.log("[ItineraryScreen] payload", payload);
 
-      const response = await fetch(`${supabaseUrl}/functions/v1/generate-itinerary`, {
-        method: "POST",
-        headers: {
-          "Content-Type":  "application/json",
-          "Authorization": `Bearer ${supabaseAnon}`,
-          "apikey":        supabaseAnon,
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/generate-itinerary`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${supabaseAnon}`,
+            apikey: supabaseAnon,
+          },
+          body: JSON.stringify(payload),
         },
-        body: JSON.stringify(payload),
-      });
+      );
 
       console.log("[ItineraryScreen] status", response.status);
 
       const data = await response.json();
       console.log("[ItineraryScreen] response", data);
 
-      if (!response.ok || !data?.days) throw new Error(data?.error ?? data?.message ?? `HTTP ${response.status}`);
+      if (!response.ok || !data?.days)
+        throw new Error(
+          data?.error ?? data?.message ?? `HTTP ${response.status}`,
+        );
       console.log("STEP 2 - resposta recebida", data);
 
       const savedMap = new Map(saved.map((s) => [s.id, s]));
-      const hydratedDays: DiaRoteiro[] = (data.days as DiaRoteiro[]).map((day) => ({
-        ...day,
-        periodos: day.periodos.map((p) => ({
-          ...p,
-          items: p.items.map((item) => {
-            const found = savedMap.get(item.id);
-            if (found) {
-              // Merge: engine data takes priority for display + classification.
-              // Saved item provides routing fields (source_table, isExternal, placeId, lat, lng, address)
-              // that the engine output does not carry.
-              const engineCat   = (item.categoria as SavedCategory | undefined) ?? found.categoria;
-              const edgeSrcTbl  = (item as any).source_table as SourceTable | undefined;
-              const enginePhoto = (item as any).photo_url as string | null | undefined;
-              return {
-                ...found,
-                // Engine-enriched classification — overrides save-time value
-                categoria:    engineCat,
-                // DB bairro preferred; fall back to saved value
-                localizacao:  item.localizacao || found.localizacao,
-                // Save-time source_table is authoritative for routing; engine value is fallback
-                source_table: found.source_table ?? edgeSrcTbl ?? sourceTableFromCategoria(engineCat),
-                // Real photo from Step F when available; fall back to saved image
-                image:        enginePhoto ? { uri: enginePhoto } : found.image,
-                // Step F enrichment fields — additive, not in SavedItem schema before this merge
-                ...(enginePhoto              != null && { photo_url: enginePhoto }),
-                ...((item as any).descricao  != null && { descricao: (item as any).descricao }),
-                ...((item as any).duracao    != null && { duracao:   (item as any).duracao   }),
-              } as SavedItem;
-            }
-            // Engine introduced a complement item not in the saved list.
-            // Use engine categoria + source_table; use real Supabase photo when available.
-            const cat = (item.categoria as SavedCategory | undefined) ?? "oQueFazer";
-            const edgeSourceTable = (item as any).source_table as string | undefined;
-            const compPhoto = (item as any).photo_url as string | null | undefined;
-            return {
-              ...item,
-              // Real Supabase photo wins; fall back to category static PNG.
-              // Same priority rule as Path A (saved items) — never discard a real photo.
-              image:        compPhoto ? { uri: compPhoto } : getItemFallbackImage(cat),
-              source_table: (edgeSourceTable as SourceTable | undefined) ?? sourceTableFromCategoria(cat),
-              ...(compPhoto != null && { photo_url: compPhoto }),
-              ...(((item as any).descricao)  != null && { descricao: (item as any).descricao }),
-              ...(((item as any).duracao)    != null && { duracao:   (item as any).duracao   }),
-            } as SavedItem;
-          }).filter(Boolean),
-        })),
-      }));
+      const hydratedDays: DiaRoteiro[] = (data.days as DiaRoteiro[]).map(
+        (day) => ({
+          ...day,
+          periodos: day.periodos.map((p) => ({
+            ...p,
+            items: p.items
+              .map((item) => {
+                const found = savedMap.get(item.id);
+                if (found) {
+                  // Merge: engine data takes priority for display + classification.
+                  // Saved item provides routing fields (source_table, isExternal, placeId, lat, lng, address)
+                  // that the engine output does not carry.
+                  const engineCat =
+                    (item.categoria as SavedCategory | undefined) ??
+                    found.categoria;
+                  const edgeSrcTbl = (item as any).source_table as
+                    | SourceTable
+                    | undefined;
+                  const enginePhoto = (item as any).photo_url as
+                    | string
+                    | null
+                    | undefined;
+                  return {
+                    ...found,
+                    // Engine-enriched classification — overrides save-time value
+                    categoria: engineCat,
+                    // DB bairro preferred; fall back to saved value
+                    localizacao: item.localizacao || found.localizacao,
+                    // Save-time source_table is authoritative for routing; engine value is fallback
+                    source_table:
+                      found.source_table ??
+                      edgeSrcTbl ??
+                      sourceTableFromCategoria(engineCat),
+                    // Real photo from Step F when available; fall back to saved image
+                    image: enginePhoto ? { uri: enginePhoto } : found.image,
+                    // Step F enrichment fields — additive, not in SavedItem schema before this merge
+                    ...(enginePhoto != null && { photo_url: enginePhoto }),
+                    ...((item as any).descricao != null && {
+                      descricao: (item as any).descricao,
+                    }),
+                    ...((item as any).duracao != null && {
+                      duracao: (item as any).duracao,
+                    }),
+                  } as SavedItem;
+                }
+                // Engine introduced a complement item not in the saved list.
+                // Use engine categoria + source_table; use real Supabase photo when available.
+                const cat =
+                  (item.categoria as SavedCategory | undefined) ?? "oQueFazer";
+                const edgeSourceTable = (item as any).source_table as
+                  | string
+                  | undefined;
+                const compPhoto = (item as any).photo_url as
+                  | string
+                  | null
+                  | undefined;
+                return {
+                  ...item,
+                  image: compPhoto ? { uri: compPhoto } : null,
+                  source_table:
+                    (edgeSourceTable as SourceTable | undefined) ??
+                    sourceTableFromCategoria(cat),
+                  ...(compPhoto != null && { photo_url: compPhoto }),
+                  ...((item as any).descricao != null && {
+                    descricao: (item as any).descricao,
+                  }),
+                  ...((item as any).duracao != null && {
+                    duracao: (item as any).duracao,
+                  }),
+                } as SavedItem;
+              })
+              .filter(Boolean),
+          })),
+        }),
+      );
 
       // ── Auto-save for authenticated users ─────────────────────────────────
       // Persists the itinerary header + items to Supabase before showing the result.
@@ -3215,16 +3722,16 @@ export default function RoteiroScreen() {
           const { data: itin, error: itinErr } = await supabase
             .from("user_itineraries")
             .insert({
-              user_id:          user.id,
-              destination_id:   "rio-de-janeiro",
+              user_id: user.id,
+              destination_id: "rio-de-janeiro",
               destination_name: data.destination ?? "Rio de Janeiro",
-              status:           "generated",
-              is_public:        false,
-              days_count:       data.summary?.totalDays ?? hydratedDays.length,
-              items_count:      data.summary?.totalItems ?? itemCount,
+              status: "generated",
+              is_public: false,
+              days_count: data.summary?.totalDays ?? hydratedDays.length,
+              items_count: data.summary?.totalItems ?? itemCount,
               inspiration_tags: (inspirations ?? []) as string[],
-              budget_style:     vibe ?? null,
-              generated_at:     new Date().toISOString(),
+              budget_style: vibe ?? null,
+              generated_at: new Date().toISOString(),
             })
             .select("id")
             .single();
@@ -3234,34 +3741,36 @@ export default function RoteiroScreen() {
             const roteiroItens = hydratedDays.flatMap((dia) =>
               dia.periodos.flatMap((periodo) =>
                 periodo.items.map((item, idx) => ({
-                  roteiro_id:        itin.id,
+                  roteiro_id: itin.id,
                   user_itinerary_id: itin.id,
-                  name:              item.titulo,
-                  day_index:         dia.numero - 1,
-                  order_in_day:      idx,
-                  time_slot:         periodo.periodo,
-                  source:            item.isExternal ? "external" : "saved",
-                  ref_table:         item.isExternal ? "external" : null,
-                  place_id:          item.isExternal ? (item.placeId ?? null) : null,
-                  neighborhood:      item.localizacao ?? dia.bairro,
-                  address:           item.isExternal ? (item.address ?? null) : null,
-                  city:              "Rio de Janeiro",
-                  lat:               item.isExternal ? (item.lat ?? null) : null,
-                  lng:               item.isExternal ? (item.lng ?? null) : null,
-                }))
-              )
+                  name: item.titulo,
+                  day_index: dia.numero - 1,
+                  order_in_day: idx,
+                  time_slot: periodo.periodo,
+                  source: item.isExternal ? "external" : "saved",
+                  ref_table: item.isExternal ? "external" : null,
+                  place_id: item.isExternal ? (item.placeId ?? null) : null,
+                  neighborhood: item.localizacao ?? dia.bairro,
+                  address: item.isExternal ? (item.address ?? null) : null,
+                  city: "Rio de Janeiro",
+                  lat: item.isExternal ? (item.lat ?? null) : null,
+                  lng: item.isExternal ? (item.lng ?? null) : null,
+                })),
+              ),
             );
             await supabase.from("roteiro_itens").insert(roteiroItens);
           }
-        } catch { /* auto-save failure is silent — result still shows */ }
+        } catch {
+          /* auto-save failure is silent — result still shows */
+        }
       }
 
       const itineraryResult: ItineraryResult = {
         destination: data.destination ?? "Rio de Janeiro",
-        source:      "trip_saved_places",
+        source: "trip_saved_places",
         preferences: { inspirations, vibe },
-        summary:     data.summary,
-        days:        hydratedDays,
+        summary: data.summary,
+        days: hydratedDays,
       };
       setResult(itineraryResult);
       setCurrentItinerary(itineraryResult);
@@ -3283,13 +3792,14 @@ export default function RoteiroScreen() {
     }
   }
 
-  const phase: "journey" | "loading" | "result" =
-    generating ? "loading" : result ? "result" : "journey";
-
+  const phase: "journey" | "loading" | "result" = generating
+    ? "loading"
+    : result
+      ? "result"
+      : "journey";
 
   return (
     <View style={sc.root}>
-
       {/* ── Cinematic background — global rotating pool (shared with all screens) ── */}
       <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}>
         <RotatingBackground />
@@ -3305,7 +3815,13 @@ export default function RoteiroScreen() {
         <View style={{ paddingTop: topPad }}>
           <ScreenHeader
             phase={phase}
-            onBack={() => { setResult(null); setGenerating(false); setEditMode(false); setSavedItineraryId(null); setGenError(null); }}
+            onBack={() => {
+              setResult(null);
+              setGenerating(false);
+              setEditMode(false);
+              setSavedItineraryId(null);
+              setGenError(null);
+            }}
             onShare={handleShare}
           />
         </View>
@@ -3323,7 +3839,8 @@ export default function RoteiroScreen() {
             <View style={sc.errorBanner}>
               <Feather name="alert-circle" size={14} color="#E53E3E" />
               <Text style={sc.errorText}>
-                Não foi possível gerar o roteiro. Verifique sua conexão e tente novamente.
+                Não foi possível gerar o roteiro. Verifique sua conexão e tente
+                novamente.
               </Text>
             </View>
           )}
@@ -3337,7 +3854,10 @@ export default function RoteiroScreen() {
           ref={scrollRef}
           showsVerticalScrollIndicator={false}
           style={{ backgroundColor: "transparent" }}
-          contentContainerStyle={[sc.content, { paddingBottom: bottomPad + 96 }]}
+          contentContainerStyle={[
+            sc.content,
+            { paddingBottom: bottomPad + 96 },
+          ]}
         >
           <ResultPhase
             result={result!}
@@ -3611,4 +4131,3 @@ const cf = StyleSheet.create({
     lineHeight: 18,
   },
 });
-
