@@ -40,9 +40,7 @@ import type { SavedCategory, SavedItem, SourceTable } from "@/context/GuiaContex
 import { supabase } from "@/lib/supabase";
 import { getImageForEntity } from "@/utils/getImageForEntity";
 import {
-  buildItinerary,
   type Inspiration,
-  type ItineraryPreferences,
   type ItineraryResult,
   type Vibe,
 } from "@/utils/buildItinerary";
@@ -278,11 +276,13 @@ const INSPIRATIONS_DATA: { id: Inspiration; label: string; image: ReturnType<typ
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface JourneyGenerateProps {
-  nights:       number;
-  travelVibe:   TravelVibe;
-  inspirations: Inspiration[];
-  budget:       BudgetStyle;
-  vibe:         Vibe;
+  nights:        number;
+  travelVibe:    TravelVibe;
+  inspirations:  Inspiration[];
+  budget:        BudgetStyle;
+  vibe:          Vibe;
+  arrivalDate:   string | null;
+  departureDate: string | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -636,7 +636,16 @@ function StandardFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) =>
             (departureDate.getTime() - arrivalDate.getTime()) / 86400000,
           ))
         : 3;
-    setTimeout(() => onGenerate({ nights: n, travelVibe, inspirations, budget: b, vibe: "moderado" }), 300);
+    const toYMD = (d: Date) => d.toISOString().split("T")[0];
+    setTimeout(() => onGenerate({
+      nights:        n,
+      travelVibe,
+      inspirations,
+      budget:        b,
+      vibe:          "moderado",
+      arrivalDate:   arrivalDate ? toYMD(arrivalDate) : null,
+      departureDate: departureDate ? toYMD(departureDate) : null,
+    }), 300);
   }
 
   function toggleInspiration(id: Inspiration) {
@@ -724,12 +733,15 @@ function ContextualFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) 
       arrivalDate && departureDate
         ? Math.max(1, Math.round((departureDate.getTime() - arrivalDate.getTime()) / 86400000))
         : 3;
+    const toYMD = (d: Date) => d.toISOString().split("T")[0];
     setTimeout(() => onGenerate({
       nights,
-      travelVibe: travelVibe ?? "amigos",
+      travelVibe:    travelVibe ?? "amigos",
       inspirations,
-      budget: b,
-      vibe: "moderado",
+      budget:        b,
+      vibe:          "moderado",
+      arrivalDate:   arrivalDate ? toYMD(arrivalDate) : null,
+      departureDate: departureDate ? toYMD(departureDate) : null,
     }), 300);
   }
 
@@ -2827,6 +2839,7 @@ export default function RoteiroScreen() {
   const [replacingItem,     setReplacingItem]     = useState<{ item: SavedItem; diaNum: number } | null>(null);
   /** ID of the auto-saved user_itineraries row — set after generation, used by Share/Export to update rather than re-insert. */
   const [savedItineraryId,  setSavedItineraryId]  = useState<string | null>(null);
+  const [genError,          setGenError]          = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
   function replaceItem(diaNum: number, itemId: string, newItem: SavedItem) {
@@ -3091,12 +3104,16 @@ export default function RoteiroScreen() {
   const totalPlaces = saved.filter((s) => s.categoria !== "hotel").length;
 
   async function handleGenerate({
-    nights, travelVibe, inspirations, budget, vibe,
+    nights, travelVibe, inspirations, budget, vibe, arrivalDate, departureDate,
   }: JourneyGenerateProps) {
     if (generating) return;
+    setGenError(null);
     setGenerating(true);
 
     try {
+      const supabaseUrl  = process.env.EXPO_PUBLIC_SUPABASE_URL  ?? "";
+      const supabaseAnon = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
+
       const serializableItems = saved.map((s) => ({
         id:          s.id,
         titulo:      s.titulo,
@@ -3104,16 +3121,33 @@ export default function RoteiroScreen() {
         localizacao: s.localizacao,
       }));
 
-      const { data, error } = await supabase.functions.invoke("generate-itinerary", {
-        body: {
-          savedItems:   serializableItems,
-          destination:  "Rio de Janeiro",
-          preferences:  { inspirations, vibe, travelVibe, budget },
-          requestedDays: nights,
+      const payload = {
+        savedItems:    serializableItems,
+        destination:   "Rio de Janeiro",
+        preferences:   { inspirations, vibe, travelVibe, budget },
+        requestedDays: nights,
+        arrivalDate:   arrivalDate ?? null,
+        departureDate: departureDate ?? null,
+      };
+
+      console.log("[ItineraryScreen] payload", payload);
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/generate-itinerary`, {
+        method: "POST",
+        headers: {
+          "Content-Type":  "application/json",
+          "Authorization": `Bearer ${supabaseAnon}`,
+          "apikey":        supabaseAnon,
         },
+        body: JSON.stringify(payload),
       });
 
-      if (error || !data?.days) throw new Error(error?.message ?? "empty response");
+      console.log("[ItineraryScreen] status", response.status);
+
+      const data = await response.json();
+      console.log("[ItineraryScreen] response", data);
+
+      if (!response.ok || !data?.days) throw new Error(data?.error ?? data?.message ?? `HTTP ${response.status}`);
 
       const savedMap = new Map(saved.map((s) => [s.id, s]));
       const hydratedDays: DiaRoteiro[] = (data.days as DiaRoteiro[]).map((day) => ({
@@ -3227,9 +3261,10 @@ export default function RoteiroScreen() {
         days:        hydratedDays,
       });
       if (autoSavedId) setSavedItineraryId(autoSavedId);
-    } catch (_) {
-      const prefs: ItineraryPreferences = { inspirations, vibe };
-      setResult(buildItinerary(saved, prefs));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erro desconhecido";
+      console.log("[ItineraryScreen] error", err);
+      setGenError(msg);
     } finally {
       setGenerating(false);
     }
@@ -3257,7 +3292,7 @@ export default function RoteiroScreen() {
         <View style={{ paddingTop: topPad }}>
           <ScreenHeader
             phase={phase}
-            onBack={() => { setResult(null); setGenerating(false); setEditMode(false); setSavedItineraryId(null); }}
+            onBack={() => { setResult(null); setGenerating(false); setEditMode(false); setSavedItineraryId(null); setGenError(null); }}
             onShare={handleShare}
           />
         </View>
@@ -3265,11 +3300,21 @@ export default function RoteiroScreen() {
 
       {/* ── Phase content ── */}
       {phase === "journey" && (
-        <TripFlow
-          savedCount={saved.length}
-          isContextual={isContextual}
-          onGenerate={handleGenerate}
-        />
+        <>
+          <TripFlow
+            savedCount={saved.length}
+            isContextual={isContextual}
+            onGenerate={handleGenerate}
+          />
+          {genError && (
+            <View style={sc.errorBanner}>
+              <Feather name="alert-circle" size={14} color="#E53E3E" />
+              <Text style={sc.errorText}>
+                Não foi possível gerar o roteiro. Verifique sua conexão e tente novamente.
+              </Text>
+            </View>
+          )}
+        </>
       )}
 
       {phase === "loading" && <LoadingPhase />}
@@ -3529,6 +3574,28 @@ const cf = StyleSheet.create({
     fontSize: 13,
     color: "rgba(255,255,255,0.62)",
     lineHeight: 19,
+  },
+  errorBanner: {
+    position: "absolute",
+    bottom: 100,
+    left: 22,
+    right: 22,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    backgroundColor: "rgba(0,0,0,0.88)",
+    borderWidth: 1,
+    borderColor: "rgba(229,62,62,0.38)",
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  errorText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.88)",
+    flex: 1,
+    lineHeight: 18,
   },
 });
 
