@@ -525,9 +525,17 @@ async function fetchComplementaryContent(
   ).length;
 
   const needActs = Math.max(0, targetActs - currentActs);
+
+  // ── Preference density: gastronomia/festa raise restaurant counts ────────────
+  const insps = preferences.inspirations ?? [];
+  const hasGastroInspo = insps.includes("gastronomia") || insps.includes("gastronomy");
+  const hasFestInspo   = insps.includes("festa")       || insps.includes("nightlife");
+  const extraLunch     = hasGastroInspo ? requestedDays : 0;           // +1 lunch/day for food lovers
+  const extraDinner    = hasFestInspo   ? requestedDays * 2 : 0;       // +2 bar/dinner/day for nightlife
+
   const needBreakfast = Math.max(0, requestedDays - currentBreakfast);
-  const needDinner = Math.max(0, requestedDays - currentDinner);
-  const needLunch = Math.max(0, requestedDays - currentLunch);
+  const needDinner    = Math.max(0, requestedDays - currentDinner + extraDinner);
+  const needLunch     = Math.max(0, requestedDays - currentLunch  + extraLunch);
   const totalRestNeeded = needBreakfast + needDinner + needLunch;
 
   if (needActs === 0 && totalRestNeeded === 0) return [];
@@ -650,14 +658,36 @@ async function fetchComplementaryContent(
   // ── 3. Restaurantes — 1 breakfast + 1 lunch + 1 dinner/bar per day ─────────
   // Fetches a broad pool, classifies into 3 slots, scores + picks independently.
   // Guarantees noite always has a bar/dinner anchor and manha always has breakfast.
+  // BUDGET CONSTRAINT: pre-filters by preco_nivel when budget is set.
   if (totalRestNeeded > 0) {
-    const { data: restRows } = await supa
+    const budget = preferences.budget ?? null;
+    const restLimit = Math.min(150, totalRestNeeded * 6 + 30);
+
+    // Build budget-constrained query first, fallback to unrestricted if empty
+    let budgetQuery = supa
       .from("restaurantes")
-      .select(
-        "id,nome,bairro,especialidade,perfil_publico,preco_nivel,tags_ia,momento_ideal,photo_url,meu_olhar",
-      )
-      .eq("ativo", true)
-      .limit(Math.min(150, totalRestNeeded * 6 + 30));
+      .select("id,nome,bairro,especialidade,perfil_publico,preco_nivel,tags_ia,momento_ideal,photo_url,meu_olhar")
+      .eq("ativo", true);
+
+    // Hard budget pre-filter — applies preco_nivel range constraint
+    // Falls back to full pool below if budget query returns < 5 results
+    if (budget === "sofisticado") budgetQuery = budgetQuery.gte("preco_nivel", 3);
+    if (budget === "essencial")   budgetQuery = budgetQuery.lte("preco_nivel", 3);
+
+    let { data: restRowsRaw } = await budgetQuery.limit(restLimit);
+
+    // Fallback: budget filter returned too few → use unrestricted pool
+    if (!restRowsRaw || restRowsRaw.length < 5) {
+      console.log(`[fetchComplementary] budget="${budget}" filter returned ${restRowsRaw?.length ?? 0} restaurants — falling back to unrestricted pool`);
+      const { data: fallbackRows } = await supa
+        .from("restaurantes")
+        .select("id,nome,bairro,especialidade,perfil_publico,preco_nivel,tags_ia,momento_ideal,photo_url,meu_olhar")
+        .eq("ativo", true)
+        .limit(restLimit);
+      restRowsRaw = fallbackRows;
+    }
+
+    const restRows = restRowsRaw;
 
     const breakfastPool: EnrichedPlace[] = [];
     const dinnerPool: EnrichedPlace[] = [];
@@ -1572,15 +1602,48 @@ const INSPIRATION_TAGS: Record<string, string[]> = {
 
 function inspirationScore(p: EnrichedPlace, inspirations: string[]): number {
   if (inspirations.length === 0) return 0;
-  const haystack = [...p.tags, ...p.vibe_tags, p.categoria].map((t) =>
+  const haystack = [...p.tags, ...p.vibe_tags, p.categoria, p.especialidade ?? "", p.perfil_publico ?? ""].map((t) =>
     t.toLowerCase(),
   );
+  // Normalize inspirations: accept both PT and EN keys
+  const normalized = inspirations.flatMap((ins) => {
+    const aliases: Record<string, string[]> = {
+      gastronomia: ["gastronomy", "gastronomia"],
+      gastronomy:  ["gastronomy", "gastronomia"],
+      natureza:    ["nature",     "natureza", "adventure"],
+      nature:      ["nature",     "natureza"],
+      festa:       ["nightlife",  "festa"],
+      nightlife:   ["nightlife",  "festa"],
+      cultura:     ["culture",    "cultura"],
+      culture:     ["culture",    "cultura"],
+      adventure:   ["adventure"],
+      beach:       ["beach"],
+      lucky:       ["lucky"],
+    };
+    return aliases[ins] ?? [ins];
+  });
+  const uniqueIns = [...new Set(normalized)];
+
   let total = 0;
-  for (const ins of inspirations) {
+  for (const ins of uniqueIns) {
     const kws = INSPIRATION_TAGS[ins] ?? [];
     const hits = kws.filter((kw) => haystack.some((h) => h.includes(kw)));
     total += hits.length * 2;
-    if (ins === "gastronomy" && p.categoria === "restaurante") total += 3;
+    // Bonus: exact categoria match
+    if ((ins === "gastronomy" || ins === "gastronomia") && p.categoria === "restaurante") total += 4;
+    if ((ins === "nightlife"  || ins === "festa") && p.categoria === "restaurante") {
+      // bar/nightlife restaurants get bonus
+      const isBar = haystack.some((h) => h.includes("bar") || h.includes("nightlife") || h.includes("samba") || h.includes("forró") || h.includes("balada"));
+      if (isBar) total += 4;
+    }
+    if ((ins === "natureza" || ins === "nature") && p.categoria === "oQueFazer") {
+      const isOutdoor = haystack.some((h) => h.includes("praia") || h.includes("parque") || h.includes("trilha") || h.includes("natureza") || h.includes("outdoor"));
+      if (isOutdoor) total += 4;
+    }
+    if ((ins === "cultura" || ins === "culture") && p.categoria === "oQueFazer") {
+      const isCultura = haystack.some((h) => h.includes("museu") || h.includes("cultura") || h.includes("história") || h.includes("arte") || h.includes("teatro"));
+      if (isCultura) total += 4;
+    }
     if (
       ins === "beach" &&
       p.tags.some((t) => t.includes("beach") || t.includes("praia"))
@@ -1612,11 +1675,22 @@ function budgetScore(p: EnrichedPlace, budget: string | null): number {
   if (!budget) return 0;
 
   // preco_nivel from DB takes priority when available (1=muito barato, 5=muito caro)
+  // HARD CONSTRAINT ENFORCEMENT: budget mismatches get strong negative weight
   const nivel = p.preco_nivel ?? null;
   if (nivel !== null) {
-    if (budget === "sofisticado") return nivel >= 4 ? 3 : nivel <= 2 ? -2 : 0;
-    if (budget === "essencial") return nivel <= 2 ? 3 : nivel >= 4 ? -2 : 0;
-    return 0; // "conforto" = neutral
+    if (budget === "sofisticado") {
+      if (nivel >= 4) return 6;         // strong match → strong boost
+      if (nivel === 3) return 1;         // acceptable mid-range
+      if (nivel <= 2) return -5;         // budget item in luxury trip → strong penalty
+    }
+    if (budget === "essencial") {
+      if (nivel <= 2) return 6;          // budget item in economic trip → strong boost
+      if (nivel === 3) return 0;         // neutral mid-range
+      if (nivel >= 4) return -5;         // luxury item in economic trip → strong penalty
+    }
+    // "conforto" = balanced → mild preference for mid-range
+    if (nivel === 3) return 1;
+    return 0;
   }
 
   // Fallback: text-signal matching when preco_nivel not available
@@ -1630,14 +1704,14 @@ function budgetScore(p: EnrichedPlace, budget: string | null): number {
     .toLowerCase();
 
   if (budget === "sofisticado") {
-    const match = BUDGET_SIGNALS_SOFISTICADO.some((s) => text.includes(s));
+    const match    = BUDGET_SIGNALS_SOFISTICADO.some((s) => text.includes(s));
     const mismatch = BUDGET_SIGNALS_ESSENCIAL.some((s) => text.includes(s));
-    return match ? 3 : mismatch ? -2 : 0;
+    return match ? 5 : mismatch ? -4 : 0;
   }
   if (budget === "essencial") {
-    const match = BUDGET_SIGNALS_ESSENCIAL.some((s) => text.includes(s));
+    const match    = BUDGET_SIGNALS_ESSENCIAL.some((s) => text.includes(s));
     const mismatch = BUDGET_SIGNALS_SOFISTICADO.some((s) => text.includes(s));
-    return match ? 3 : mismatch ? -2 : 0;
+    return match ? 5 : mismatch ? -4 : 0;
   }
   return 0; // "conforto" = neutral
 }
@@ -1838,12 +1912,31 @@ function curateByExperienceType(
     caps[t] = base * tripLength;
   }
   // Preference adjustments: generous supply so day-builder has what it needs
-  if (inspirations.includes("gastronomy")) caps.food   = Math.max(caps.food,   tripLength * 3);
-  if (inspirations.includes("nightlife"))  caps.nightlife = Math.max(caps.nightlife, tripLength * 2);
-  if (inspirations.includes("nature"))   { caps.scenic = Math.max(caps.scenic, tripLength * 3);
-                                           caps.active  = Math.max(caps.active,  tripLength * 2); }
-  if (inspirations.includes("adventure"))  caps.active  = Math.max(caps.active,  tripLength * 2);
-  if (inspirations.includes("culture"))    caps.culture = Math.max(caps.culture, tripLength * 3);
+  // Accept both Portuguese (frontend) and English variants
+  const hasGastronomy = inspirations.includes("gastronomy") || inspirations.includes("gastronomia");
+  const hasNatureza   = inspirations.includes("nature")     || inspirations.includes("natureza");
+  const hasFesta      = inspirations.includes("nightlife")  || inspirations.includes("festa");
+  const hasCultura    = inspirations.includes("culture")    || inspirations.includes("cultura");
+  const hasAdventure  = inspirations.includes("adventure");
+
+  if (hasGastronomy) {
+    caps.food      = Math.max(caps.food,      tripLength * 4); // more meals: breakfast + 2x lunch/dinner
+    caps.nightlife = Math.max(caps.nightlife, tripLength * 2); // food-focused evenings
+  }
+  if (hasFesta) {
+    caps.nightlife = Math.max(caps.nightlife, tripLength * 3); // strong nightlife presence every day
+    caps.food      = Math.max(caps.food,      tripLength * 3); // bars count as food
+  }
+  if (hasNatureza) {
+    caps.scenic    = Math.max(caps.scenic,    tripLength * 4);
+    caps.active    = Math.max(caps.active,    tripLength * 3);
+    caps.relax     = Math.max(caps.relax,     tripLength * 2);
+  }
+  if (hasCultura) {
+    caps.culture   = Math.max(caps.culture,   tripLength * 4);
+    caps.relax     = Math.max(caps.relax,     tripLength * 2);
+  }
+  if (hasAdventure) caps.active  = Math.max(caps.active,  tripLength * 3);
 
   // Group by experience_type, preserving input order within each group
   const grouped = new Map<string, EnrichedPlace[]>();
@@ -2529,6 +2622,29 @@ async function refineWithGemini(
 
     ---
 
+    # 💰 BUDGET CONTEXT (MANDATORY — affects tone and experience suggestions)
+
+    Budget: ${prefs.budget ?? "não definido"}
+
+    - sofisticado: premium venues, fine dining, curated luxury experiences, unhurried pacing
+    - conforto: balanced quality, a mix of good restaurants and experiences
+    - econômico/essencial: accessible, authentic, local — quality without excess
+
+    When reordering, ALWAYS prioritize items that match the declared budget tier.
+    NEVER suggest premium pacing for econômico travelers or rushed/cheap vibes for sofisticado.
+
+    ---
+
+    # 🎯 TRAVELER PROFILE
+
+    Inspirations: ${(prefs.inspirations ?? []).join(", ") || "não definido"}
+    Travel Companion: ${prefs.travelVibe ?? "não definido"}
+    Pace: ${prefs.vibe ?? "moderado"}
+
+    These are HARD CONSTRAINTS on the trip composition. The itinerary must reflect them clearly.
+
+    ---
+
     # INPUT
 
     ${lockedStructure}
@@ -3018,6 +3134,106 @@ function deduplicateByPlaceIdentity(places: EnrichedPlace[]): EnrichedPlace[] {
   });
 }
 
+// ── AUTO-HOTEL SELECTION ───────────────────────────────────────────────────────
+//
+// Called at Step 7b when the user did NOT save a hotel.
+// Selects the best hotel from stay_hotels based on:
+//   1. Budget preference  → hotel.categoria (luxury/boutique/standard matching)
+//   2. Preference bairro  → preferred neighborhood for the inspiration
+//   3. Zone proximity     → close to itinerary cluster
+//
+// Returns the best-scored hotel row or null if stay_hotels is empty.
+
+const PREFERENCE_NEIGHBORHOODS: Record<string, string[]> = {
+  gastronomia: ["ipanema", "leblon", "botafogo", "jardim botânico", "humaitá"],
+  gastronomy:  ["ipanema", "leblon", "botafogo", "jardim botânico", "humaitá"],
+  natureza:    ["barra da tijuca", "recreio", "santa teresa", "urca", "lagoa"],
+  nature:      ["barra da tijuca", "recreio", "santa teresa", "urca", "lagoa"],
+  festa:       ["lapa", "botafogo", "santa teresa", "flamengo"],
+  nightlife:   ["lapa", "botafogo", "santa teresa", "flamengo"],
+  cultura:     ["santa teresa", "centro", "glória", "catete", "botafogo"],
+  culture:     ["santa teresa", "centro", "glória", "catete", "botafogo"],
+  beach:       ["ipanema", "copacabana", "barra da tijuca", "leblon"],
+};
+
+// Budget → preferred hotel.categoria signals
+const BUDGET_HOTEL_SIGNALS: Record<string, string[]> = {
+  sofisticado: ["luxo", "luxury", "boutique", "design", "premium", "5 estrelas", "5-estrelas"],
+  essencial:   ["econômico", "hostel", "pousada", "simples", "básico", "budget"],
+  conforto:    ["boutique", "comfort", "4 estrelas", "4-estrelas", "contemporâneo"],
+};
+
+async function selectAutoHotel(
+  preferences: Preferences,
+  itineraryPlaces: EnrichedPlace[],
+  supa: ReturnType<typeof createClient>,
+): Promise<{ id: string; nome: string; bairro: string; photo_url: string | null } | null> {
+  const { data: hotels } = await supa
+    .from("stay_hotels")
+    .select("id,nome,bairro,categoria,photo_url")
+    .limit(60);
+
+  if (!hotels || hotels.length === 0) {
+    console.warn("[selectAutoHotel] stay_hotels is empty — cannot auto-select");
+    return null;
+  }
+
+  const budget         = preferences.budget ?? null;
+  const inspirations   = preferences.inspirations ?? [];
+  const itinerarZones  = new Set(itineraryPlaces.map((p) => p.zone));
+
+  // Build preferred neighborhood set from inspirations
+  const preferredNeighborhoods = new Set<string>();
+  for (const ins of inspirations) {
+    for (const nb of (PREFERENCE_NEIGHBORHOODS[ins] ?? [])) {
+      preferredNeighborhoods.add(nb.toLowerCase());
+    }
+  }
+
+  // Budget signals for matching
+  const budgetSignals      = budget ? (BUDGET_HOTEL_SIGNALS[budget] ?? []) : [];
+  const antiBudgetSignals  = budget === "sofisticado" ? BUDGET_HOTEL_SIGNALS.essencial
+                           : budget === "essencial"   ? BUDGET_HOTEL_SIGNALS.sofisticado
+                           : [];
+
+  const scored = (hotels as Record<string, unknown>[]).map((h) => {
+    const bairro   = ((h.bairro as string) ?? "").toLowerCase();
+    const categ    = ((h.categoria as string) ?? "").toLowerCase();
+    const zone     = getZone((h.bairro as string) ?? "");
+    let score      = 0;
+
+    // Budget match
+    if (budgetSignals.some((s) => categ.includes(s)))      score += 5;
+    if (antiBudgetSignals.some((s) => categ.includes(s)))  score -= 4;
+
+    // Preference neighborhood match
+    if ([...preferredNeighborhoods].some((nb) => bairro.includes(nb))) score += 4;
+
+    // Zone proximity to itinerary cluster
+    if (itinerarZones.has(zone))                                score += 3;
+    else {
+      for (const iz of itinerarZones) {
+        if (Math.abs(zone - iz) === 1) { score += 1; break; }
+      }
+    }
+
+    return { h, score };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  const best = scored[0]?.h;
+  if (!best) return null;
+
+  console.log(`[selectAutoHotel] auto-selected "${best.nome}" (bairro=${best.bairro}, categoria=${best.categoria}, score=${scored[0].score})`);
+
+  return {
+    id:        String(best.id),
+    nome:      (best.nome as string) || "Hotel",
+    bairro:    (best.bairro as string) || "",
+    photo_url: sanitizePhotoUrl(best.photo_url as string | null),
+  };
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 serve(async (req) => {
@@ -3224,11 +3440,19 @@ serve(async (req) => {
     days = validateAndFix(days, places);
 
     // ── Step 7b: Hotel injection ───────────────────────────────────────────────
-    // Hotels bypass the experience flow entirely. They are fetched from stay_hotels
-    // and attached as a fixed `hotel` block on every day — rendered before manhã.
+    // RULE: EVERY itinerary MUST include a hotel block on every day.
+    //
+    // Scenario A: user saved a hotel → fetch it from stay_hotels and inject.
+    // Scenario B: user did NOT save a hotel → auto-select via selectAutoHotel()
+    //             based on budget preference, inspirations, and zone proximity.
+    //
     // This injection runs AFTER validateAndFix so it can never be removed by it.
-    const primaryHotel = hotelItems[0]; // first saved hotel (zone-scoring already used for hotelZone)
+    const primaryHotel = hotelItems[0];
+
+    let resolvedHotelRow: { id: string; nome: string; bairro: string; photo_url: string | null } | null = null;
+
     if (primaryHotel) {
+      // Scenario A: user saved a hotel
       const { data: hotelRow } = await supa
         .from("stay_hotels")
         .select("id,nome,bairro,photo_url")
@@ -3236,21 +3460,39 @@ serve(async (req) => {
         .maybeSingle();
 
       if (hotelRow) {
-        const hotelPhoto: string | null = sanitizePhotoUrl(hotelRow.photo_url as string | null);
-        console.log("PHOTO SOURCE hotel", hotelRow.id, hotelPhoto);
-        const hotelBlock: ItemRoteiro = {
-          id:           String(hotelRow.id),
-          titulo:       (hotelRow.nome as string)    || primaryHotel.titulo,
-          categoria:    "hotel",
-          localizacao:  (hotelRow.bairro as string)  || primaryHotel.localizacao || "",
-          source_table: "stay_hotels",
-          image:        hotelPhoto ? { uri: hotelPhoto } : undefined,
-          photo_url:    hotelPhoto,
+        resolvedHotelRow = {
+          id:        String(hotelRow.id),
+          nome:      (hotelRow.nome as string)   || primaryHotel.titulo,
+          bairro:    (hotelRow.bairro as string) || primaryHotel.localizacao || "",
+          photo_url: sanitizePhotoUrl(hotelRow.photo_url as string | null),
         };
-        for (const day of days) {
-          day.hotel = hotelBlock;
-        }
       }
+    }
+
+    if (!resolvedHotelRow) {
+      // Scenario B: no saved hotel OR saved hotel ID not found in DB
+      // Auto-select based on budget + preferences + zone proximity
+      console.log("[Step 7b] No saved hotel — running auto-hotel selection");
+      resolvedHotelRow = await selectAutoHotel(preferences, places, supa);
+    }
+
+    if (resolvedHotelRow) {
+      const hotelPhoto = resolvedHotelRow.photo_url;
+      console.log("PHOTO SOURCE hotel", resolvedHotelRow.id, hotelPhoto);
+      const hotelBlock: ItemRoteiro = {
+        id:           resolvedHotelRow.id,
+        titulo:       resolvedHotelRow.nome,
+        categoria:    "hotel",
+        localizacao:  resolvedHotelRow.bairro,
+        source_table: "stay_hotels",
+        image:        hotelPhoto ? { uri: hotelPhoto } : undefined,
+        photo_url:    hotelPhoto,
+      };
+      for (const day of days) {
+        day.hotel = hotelBlock;
+      }
+    } else {
+      console.error("[Step 7b] CRITICAL: Could not assign any hotel — stay_hotels may be empty");
     }
 
     // ── FINAL SAFETY PASS — guarantee photo_url: string|null on every item ──────
