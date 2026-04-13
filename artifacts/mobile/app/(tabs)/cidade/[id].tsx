@@ -30,6 +30,7 @@ import { HotelCard } from "@/components/HotelCard";
 import { useOQueFazer } from "@/hooks/useOQueFazer";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import { useNeighborhoods } from "@/hooks/useNeighborhoods";
+import { sanitizePhotoUrl } from "@/utils/getImageForEntity";
 
 const C = Colors.light;
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -443,8 +444,8 @@ export default function CidadeScreen() {
                           localizacao={h.localizacao}
                           tipo={h.hotel_category}
                           image={
-                            h.photo_url
-                              ? { uri: h.photo_url }
+                            sanitizePhotoUrl(h.photo_url)
+                              ? { uri: sanitizePhotoUrl(h.photo_url)! }
                               : null
                           }
                           onPress={() => router.push({

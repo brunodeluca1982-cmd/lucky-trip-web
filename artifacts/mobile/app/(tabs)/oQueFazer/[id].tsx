@@ -26,6 +26,7 @@ import { destinos } from "@/data/mockData";
 import RioMapView from "@/components/RioMapView";
 import { useGuia } from "@/context/GuiaContext";
 import { useOQueFazer } from "@/hooks/useOQueFazer";
+import { sanitizePhotoUrl } from "@/utils/getImageForEntity";
 
 const C = Colors.light;
 const GOLD = "#D4AF37";
@@ -146,8 +147,8 @@ export default function OQueFazerScreen() {
               }
             >
               <View style={s.cardImageWrap}>
-                {place.photo_url ? (
-                  <Image source={{ uri: place.photo_url }} style={s.cardImage} resizeMode="cover" />
+                {sanitizePhotoUrl(place.photo_url) ? (
+                  <Image source={{ uri: sanitizePhotoUrl(place.photo_url)! }} style={s.cardImage} resizeMode="cover" />
                 ) : (
                   <View style={[s.cardImage, { backgroundColor: "#1A0E04" }]} />
                 )}

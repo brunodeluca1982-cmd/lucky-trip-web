@@ -26,6 +26,7 @@ import { destinos } from "@/data/mockData";
 import RioMapView from "@/components/RioMapView";
 import { useGuia } from "@/context/GuiaContext";
 import { useLuckyList } from "@/hooks/useLuckyList";
+import { sanitizePhotoUrl } from "@/utils/getImageForEntity";
 
 const FREE_ITEMS = 3;
 
@@ -157,9 +158,9 @@ export default function LuckyListScreen() {
                 }}
               >
                 <View style={s.cardImageWrap}>
-                  {place.photo_url ? (
+                  {sanitizePhotoUrl(place.photo_url) ? (
                     <Image
-                      source={{ uri: place.photo_url }}
+                      source={{ uri: sanitizePhotoUrl(place.photo_url)! }}
                       style={[s.cardImage, isLocked && s.cardImageLocked]}
                       resizeMode="cover"
                     />

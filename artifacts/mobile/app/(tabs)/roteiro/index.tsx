@@ -43,7 +43,7 @@ import type {
   SourceTable,
 } from "@/context/GuiaContext";
 import { supabase } from "@/lib/supabase";
-import { getImageForEntity } from "@/utils/getImageForEntity";
+import { getImageForEntity, sanitizePhotoUrl } from "@/utils/getImageForEntity";
 import {
   type Inspiration,
   type ItineraryResult,
@@ -1528,8 +1528,8 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
             id: String(r.id),
             titulo: (r.nome as string) || "",
             localizacao: (r.bairro as string) || "",
-            image: (r.photo_url as string | null)
-              ? { uri: r.photo_url as string }
+            image: sanitizePhotoUrl(r.photo_url as string | null)
+              ? { uri: sanitizePhotoUrl(r.photo_url as string | null)! }
               : null,
             categoria: "oQueFazer" as SavedCategory,
             source_table: "o_que_fazer_rio_v2" as SourceTable,
@@ -1539,8 +1539,8 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
             id: String(r.id),
             titulo: (r.nome as string) || "",
             localizacao: (r.bairro as string) || "",
-            image: (r.photo_url as string | null)
-              ? { uri: r.photo_url as string }
+            image: sanitizePhotoUrl(r.photo_url as string | null)
+              ? { uri: sanitizePhotoUrl(r.photo_url as string | null)! }
               : null,
             categoria: "lucky" as SavedCategory,
             source_table: "lucky_list_rio_v2" as SourceTable,
@@ -1550,8 +1550,8 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
             id: String(r.id),
             titulo: (r.nome as string) || "",
             localizacao: (r.bairro as string) || "",
-            image: (r.photo_url as string | null)
-              ? { uri: r.photo_url as string }
+            image: sanitizePhotoUrl(r.photo_url as string | null)
+              ? { uri: sanitizePhotoUrl(r.photo_url as string | null)! }
               : null,
             categoria: "hotel" as SavedCategory,
             source_table: "stay_hotels" as SourceTable,
@@ -1603,8 +1603,8 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
           id: String(r.id),
           titulo: (r.nome as string) || "Lucky pick",
           localizacao: (r.bairro as string) || "",
-          image: (r.photo_url as string | null)
-            ? { uri: r.photo_url as string }
+          image: sanitizePhotoUrl(r.photo_url as string | null)
+            ? { uri: sanitizePhotoUrl(r.photo_url as string | null)! }
             : null,
           categoria: "lucky" as SavedCategory,
           source_table: "lucky_list_rio_v2" as SourceTable,
@@ -1620,8 +1620,8 @@ function ReplaceSheet({ item, diaNum, onClose, onReplace }: ReplaceSheetProps) {
           id: String(r.id),
           titulo: (r.nome as string) || "Experiência",
           localizacao: (r.bairro as string) || "",
-          image: (r.photo_url as string | null)
-            ? { uri: r.photo_url as string }
+          image: sanitizePhotoUrl(r.photo_url as string | null)
+            ? { uri: sanitizePhotoUrl(r.photo_url as string | null)! }
             : null,
           categoria: "oQueFazer" as SavedCategory,
           source_table: "o_que_fazer_rio_v2" as SourceTable,

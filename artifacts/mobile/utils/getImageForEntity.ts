@@ -1,8 +1,10 @@
 /**
  * getImageForEntity.ts — Unified image resolver for all entity types.
  *
- * Rule: Supabase photo_url only. Returns null when no Supabase image exists.
- * Never shows a local bundled asset as a substitute for a real entity photo.
+ * STRICT RULE: Supabase photo_url ONLY.
+ * - lh3.googleusercontent.com URLs are BANNED.
+ * - Any Google CDN URL is treated as null.
+ * - No fallback to external APIs or local assets.
  */
 
 export type EntityType = "neighborhood" | "restaurant" | "hotel" | "activity" | "city";
@@ -10,8 +12,22 @@ export type EntityType = "neighborhood" | "restaurant" | "hotel" | "activity" | 
 export type EntityImageSource = { uri: string } | null;
 
 /**
+ * Sanitizes a photo_url value.
+ * Returns null if the URL is from Google (googleusercontent / lh3.google).
+ * Logs an error if a violation is detected.
+ */
+export function sanitizePhotoUrl(url: string | null | undefined): string | null {
+  if (!url || !url.trim()) return null;
+  if (url.includes("googleusercontent") || url.includes("lh3.google")) {
+    console.error("[INVALID IMAGE SOURCE] Google URL blocked:", url);
+    return null;
+  }
+  return url.trim();
+}
+
+/**
  * Returns { uri: supabaseImageUrl } when a valid Supabase photo_url is present.
- * Returns null when no Supabase image exists — callers must handle null.
+ * Returns null when no Supabase image exists — callers must show a placeholder.
  *
  * @param supabaseImageUrl - Supabase photo_url / hero_image_url
  */
@@ -21,8 +37,7 @@ export function getImageForEntity(
   _localizacao?: string,
   supabaseImageUrl?: string | null,
 ): EntityImageSource {
-  if (supabaseImageUrl && supabaseImageUrl.trim().length > 0) {
-    return { uri: supabaseImageUrl.trim() };
-  }
+  const safe = sanitizePhotoUrl(supabaseImageUrl);
+  if (safe) return { uri: safe };
   return null;
 }

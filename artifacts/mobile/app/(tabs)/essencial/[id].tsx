@@ -26,6 +26,7 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
+import { sanitizePhotoUrl } from "@/utils/getImageForEntity";
 import { destinos } from "@/data/mockData";
 import type { LugarPlace } from "@/data/lugares";
 import { useOQueFazer } from "@/hooks/useOQueFazer";
@@ -49,8 +50,8 @@ function ClassicoCard({ item }: { item: LugarPlace }) {
         params: { cityId: "rio", placeId: item.id, source_table: "o_que_fazer_rio_v2" },
       })}
     >
-      {item.photo_url ? (
-        <Image source={{ uri: item.photo_url }} style={s.classicoImage} resizeMode="cover" />
+      {sanitizePhotoUrl(item.photo_url) ? (
+        <Image source={{ uri: sanitizePhotoUrl(item.photo_url)! }} style={s.classicoImage} resizeMode="cover" />
       ) : (
         <View style={[s.classicoImage, { backgroundColor: "#1A0E04" }]} />
       )}
@@ -93,8 +94,8 @@ function LuckyCard({
     >
       {/* Image */}
       <View style={s.luckyImageWrap}>
-        {item.photo_url ? (
-          <Image source={{ uri: item.photo_url }} style={s.luckyImage} resizeMode="cover" />
+        {sanitizePhotoUrl(item.photo_url) ? (
+          <Image source={{ uri: sanitizePhotoUrl(item.photo_url)! }} style={s.luckyImage} resizeMode="cover" />
         ) : (
           <View style={[s.luckyImage, { backgroundColor: "#1A0E04" }]} />
         )}

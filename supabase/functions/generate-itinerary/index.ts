@@ -279,6 +279,20 @@ function computeTripLength(
 //
 // Then fetchComplementaryContent() pads out the pool to support multi-day trips.
 
+// ── PHOTO PURITY — Supabase SSOT ─────────────────────────────────────────────
+// photo_url MUST come from Supabase tables only.
+// lh3.googleusercontent.com URLs are FORBIDDEN (injected by the now-disabled
+// enrich-entity-photos function). Any Google URL is nullified and logged.
+function sanitizePhotoUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (url.includes("googleusercontent") || url.includes("lh3.google")) {
+    console.error("[INVALID IMAGE SOURCE] Google URL detected — nullified:", url);
+    return null;
+  }
+  return url;
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function enrichPlaces(
   saved: SavedItemInput[],
   supa: ReturnType<typeof createClient>,
@@ -383,9 +397,9 @@ async function enrichPlaces(
         vibe_tags = (row.vibe as string[]) ?? [];
         energia = (row.energia as string) ?? "medium";
         duracao = (row.duracao_media as string) ?? "1-2h";
-        photo_url = (row.photo_url as string | null) ?? null;
+        photo_url = sanitizePhotoUrl(row.photo_url as string | null);
         meu_olhar = (row.meu_olhar as string | null) ?? null;
-        console.log("FETCHED FROM DB:", row.nome, row.photo_url);
+        console.log("PHOTO SOURCE", s.id, photo_url);
       } else {
         // ── GATE 3a: oQueFazer ID not in Supabase → reject ───────────────────
         console.log("REJECTED (not in o_que_fazer_rio_v2):", s.titulo, s.id);
@@ -401,9 +415,9 @@ async function enrichPlaces(
         momento = (row.momento_ideal as string[]) ?? [];
         vibe_tags = [];
         energia = "medium";
-        photo_url = (row.photo_url as string | null) ?? null;
+        photo_url = sanitizePhotoUrl(row.photo_url as string | null);
         meu_olhar = (row.meu_olhar as string | null) ?? null;
-        console.log("FETCHED FROM DB:", row.nome, row.photo_url);
+        console.log("PHOTO SOURCE", s.id, photo_url);
       } else {
         // ── GATE 3b: lucky ID not in Supabase → reject ───────────────────────
         console.log("REJECTED (not in lucky_list_rio_v2):", s.titulo, s.id);
@@ -416,9 +430,9 @@ async function enrichPlaces(
         name = (row.nome as string) || name;
         especialidade = row.especialidade as string | undefined;
         perfil = row.perfil_publico as string | undefined;
-        photo_url = (row.photo_url as string | null) ?? null;
+        photo_url = sanitizePhotoUrl(row.photo_url as string | null);
         meu_olhar = (row.meu_olhar as string | null) ?? null;
-        console.log("FETCHED FROM DB:", row.nome, row.photo_url);
+        console.log("PHOTO SOURCE", s.id, photo_url);
         // Use DB momento_ideal if present; fall back to ["lunch"] so existing
         // behavior is preserved for restaurants that have no momento_ideal set.
         const dbMomento = (row.momento_ideal as string[] | null) ?? [];
@@ -581,10 +595,10 @@ async function fetchComplementaryContent(
         tags: Array.isArray(tags) ? tags : [],
         vibe_tags: [],
         duracao: "1-2h",
-        photo_url: (row.photo_url as string | null) ?? null,
+        photo_url: sanitizePhotoUrl(row.photo_url as string | null),
         meu_olhar: (row.meu_olhar as string | null) ?? null,
       });
-      console.log("FETCHED FROM DB:", row.nome, row.photo_url);
+      console.log("PHOTO SOURCE", row.id, sanitizePhotoUrl(row.photo_url as string | null));
     }
 
     // Build o_que_fazer candidates
@@ -605,10 +619,10 @@ async function fetchComplementaryContent(
         tags: (row.tags_ia as string[]) ?? [],
         vibe_tags: (row.vibe as string[]) ?? [],
         duracao: (row.duracao_media as string) ?? "1-2h",
-        photo_url: (row.photo_url as string | null) ?? null,
+        photo_url: sanitizePhotoUrl(row.photo_url as string | null),
         meu_olhar: (row.meu_olhar as string | null) ?? null,
       });
-      console.log("FETCHED FROM DB:", row.nome, row.photo_url);
+      console.log("PHOTO SOURCE", row.id, sanitizePhotoUrl(row.photo_url as string | null));
     }
 
     // Score the merged pool, sort descending, take top needActs.
@@ -670,10 +684,10 @@ async function fetchComplementaryContent(
         especialidade: row.especialidade as string | undefined,
         perfil_publico: row.perfil_publico as string | undefined,
         preco_nivel: row.preco_nivel as number | undefined,
-        photo_url: (row.photo_url as string | null) ?? null,
+        photo_url: sanitizePhotoUrl(row.photo_url as string | null),
         meu_olhar: (row.meu_olhar as string | null) ?? null,
       };
-      console.log("FETCHED FROM DB:", row.nome, row.photo_url);
+      console.log("PHOTO SOURCE", row.id, sanitizePhotoUrl(row.photo_url as string | null));
 
       // Classify into exactly one bucket — mutually exclusive.
       // isDinnerRestaurantInferred covers fine-dining/bistro/seafood with no momento_ideal.
@@ -2603,12 +2617,12 @@ async function refineWithGemini(
             origItemByKey.get(item.id);
           if (orig) {
             item.source_table = orig.source_table;
-            item.photo_url = orig.photo_url ?? null;
-            item.image = orig.image;
+            item.photo_url = sanitizePhotoUrl(orig.photo_url ?? null);
+            item.image = item.photo_url ? { uri: item.photo_url } : undefined;
             item.descricao = item.descricao ?? orig.descricao ?? null;
             item.duracao = item.duracao ?? orig.duracao;
           }
-          console.log("PHOTO AFTER REHYDRATION:", item.photo_url);
+          console.log("PHOTO SOURCE", item.id, item.photo_url);
         }
       }
     }
@@ -2682,8 +2696,8 @@ function validateAndFix(
           localizacao: l.area,
           source_table: l.source_table,
           // Step F — Supabase photo_url only; no external fallback
-          image: l.photo_url ? { uri: l.photo_url } : undefined,
-          photo_url: l.photo_url ?? null,
+          image: sanitizePhotoUrl(l.photo_url) ? { uri: sanitizePhotoUrl(l.photo_url)! } : undefined,
+          photo_url: sanitizePhotoUrl(l.photo_url),
           descricao: l.meu_olhar ?? null,
           duracao: l.duracao,
         };
@@ -2936,11 +2950,11 @@ function validateAndFix(
       for (const item of periodo.items) {
         const place = placeById.get(`${item.source_table}_${item.id}`);
         if (place) {
-          item.photo_url = place.photo_url ?? null;
-          item.image = place.photo_url ? { uri: place.photo_url } : undefined;
+          item.photo_url = sanitizePhotoUrl(place.photo_url ?? null);
+          item.image = item.photo_url ? { uri: item.photo_url } : undefined;
           item.descricao = item.descricao ?? place.meu_olhar ?? null;
           item.duracao = item.duracao ?? place.duracao;
-          console.log("PHOTO IN PIPELINE:", item.photo_url);
+          console.log("PHOTO SOURCE", item.id, item.photo_url);
         }
       }
     }
@@ -3222,7 +3236,8 @@ serve(async (req) => {
         .maybeSingle();
 
       if (hotelRow) {
-        const hotelPhoto: string | null = (hotelRow.photo_url as string | null) ?? null;
+        const hotelPhoto: string | null = sanitizePhotoUrl(hotelRow.photo_url as string | null);
+        console.log("PHOTO SOURCE hotel", hotelRow.id, hotelPhoto);
         const hotelBlock: ItemRoteiro = {
           id:           String(hotelRow.id),
           titulo:       (hotelRow.nome as string)    || primaryHotel.titulo,
@@ -3245,14 +3260,20 @@ serve(async (req) => {
     for (const day of days) {
       for (const p of day.periodos ?? []) {
         for (const item of p.items ?? []) {
+          // Force undefined → null
           if (item.photo_url === undefined) {
             console.warn("MISSING photo_url — forcing null", {
-              id:     item.id,
-              source: item.source_table,
-              titulo: item.titulo,
+              id: item.id, source: item.source_table, titulo: item.titulo,
             });
             item.photo_url = null;
           }
+          // RULE 4 — HARD VALIDATION: reject Google URLs
+          if (item.photo_url && (item.photo_url.includes("googleusercontent") || item.photo_url.includes("lh3.google"))) {
+            console.error("[INVALID IMAGE SOURCE]", item.id, item.photo_url);
+            item.photo_url = null;
+          }
+          // RULE 6 — PHOTO SOURCE logging
+          console.log("PHOTO SOURCE", item.id, item.photo_url);
           // Keep image consistent with photo_url (mobile uses photo_url as SSOT)
           item.image = item.photo_url ? { uri: item.photo_url } : undefined;
         }
@@ -3264,6 +3285,11 @@ serve(async (req) => {
           console.warn("MISSING hotel photo_url — forcing null", { id: h.id });
           h.photo_url = null;
         }
+        if (h.photo_url && (h.photo_url.includes("googleusercontent") || h.photo_url.includes("lh3.google"))) {
+          console.error("[INVALID IMAGE SOURCE] hotel", h.id, h.photo_url);
+          h.photo_url = null;
+        }
+        console.log("PHOTO SOURCE hotel", h.id, h.photo_url);
         h.image = h.photo_url ? { uri: h.photo_url } : undefined;
       }
     }

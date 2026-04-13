@@ -92,6 +92,13 @@ function serveStaticFile(urlPath, res) {
   }
 
   if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+    const spaIndex = path.join(STATIC_ROOT, "web", "index.html");
+    if (fs.existsSync(spaIndex)) {
+      const html = fs.readFileSync(spaIndex);
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.end(html);
+      return;
+    }
     res.writeHead(404);
     res.end("Not Found");
     return;

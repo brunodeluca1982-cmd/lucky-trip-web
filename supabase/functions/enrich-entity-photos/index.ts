@@ -180,6 +180,15 @@ async function enrichRow(
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
 
+  // ── DISABLED — Supabase-only photo policy. ────────────────────────────────
+  // This function injected lh3.googleusercontent.com URLs into photo_url.
+  // It is permanently disabled. photo_url must only come from Supabase storage.
+  return new Response(
+    JSON.stringify({ disabled: true, message: "enrich-entity-photos is disabled — Supabase-only photo policy enforced." }),
+    { status: 403, headers: { ...CORS, "Content-Type": "application/json" } },
+  );
+  // ─────────────────────────────────────────────────────────────────────────
+
   const googleKey = Deno.env.get("GOOGLE_MAPS_API_KEY");
   if (!googleKey) {
     return new Response(

@@ -27,6 +27,7 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
+import { sanitizePhotoUrl } from "@/utils/getImageForEntity";
 import { destinos } from "@/data/mockData";
 import { useNeighborhoods } from "@/hooks/useNeighborhoods";
 import { useOQueFazer } from "@/hooks/useOQueFazer";
@@ -232,8 +233,8 @@ export default function OQueFazerBairroScreen() {
               }
             >
               <View style={s.cardImageWrap}>
-                {place.photo_url ? (
-                  <Image source={{ uri: place.photo_url }} style={s.cardImage} resizeMode="cover" />
+                {sanitizePhotoUrl(place.photo_url) ? (
+                  <Image source={{ uri: sanitizePhotoUrl(place.photo_url)! }} style={s.cardImage} resizeMode="cover" />
                 ) : (
                   <View style={[s.cardImage, { backgroundColor: "#1A0E04" }]} />
                 )}
