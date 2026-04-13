@@ -3238,6 +3238,36 @@ serve(async (req) => {
       }
     }
 
+    // ── FINAL SAFETY PASS — guarantee photo_url: string|null on every item ──────
+    // This runs after ALL steps (validateAndFix, hotel injection) so no item
+    // can leave with photo_url=undefined.  If undefined is found, a warning is
+    // emitted and the field is forced to null.  image is normalized to match.
+    for (const day of days) {
+      for (const p of day.periodos ?? []) {
+        for (const item of p.items ?? []) {
+          if (item.photo_url === undefined) {
+            console.warn("MISSING photo_url — forcing null", {
+              id:     item.id,
+              source: item.source_table,
+              titulo: item.titulo,
+            });
+            item.photo_url = null;
+          }
+          // Keep image consistent with photo_url (mobile uses photo_url as SSOT)
+          item.image = item.photo_url ? { uri: item.photo_url } : undefined;
+        }
+      }
+      // Also normalize hotel block
+      if ((day as any).hotel) {
+        const h = (day as any).hotel as ItemRoteiro;
+        if (h.photo_url === undefined) {
+          console.warn("MISSING hotel photo_url — forcing null", { id: h.id });
+          h.photo_url = null;
+        }
+        h.image = h.photo_url ? { uri: h.photo_url } : undefined;
+      }
+    }
+
     console.log("FINAL DAYS", JSON.stringify(days));
 
     const result: ItineraryResult = {

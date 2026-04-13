@@ -129,27 +129,37 @@ function DeslocamentoRow({
   );
 }
 
-// ── Item thumbnail ─────────────────────────────────────────────────────────────
+// ── Placeholder image — reusable, consistent, no randomness ──────────────────
+// Shown whenever photo_url is null. Same size as real image (parent controls).
 
-function ItemThumb({ image }: { image: { uri: string } | null | unknown }) {
+function PlaceholderImage() {
+  return (
+    <View style={[StyleSheet.absoluteFill, sc.thumbPlaceholder]}>
+      <Feather name="map-pin" size={14} color="rgba(212,175,55,0.22)" />
+    </View>
+  );
+}
+
+// ── Item thumbnail — single source of truth: photo_url string|null ────────────
+// Accepts photo_url directly. Never accepts undefined — caller normalizes first.
+
+function ItemThumb({ photoUrl }: { photoUrl: string | null }) {
   const [errored, setErrored] = React.useState(false);
-  const src =
-    !errored && image != null && typeof image === "object" && "uri" in (image as object)
-      ? (image as { uri: string })
+  const imageSource: { uri: string } | null =
+    !errored && typeof photoUrl === "string" && photoUrl.length > 0
+      ? { uri: photoUrl }
       : null;
   return (
     <>
-      {src != null ? (
+      {imageSource !== null ? (
         <Image
-          source={src}
+          source={imageSource}
           style={StyleSheet.absoluteFill}
           resizeMode="cover"
           onError={() => setErrored(true)}
         />
       ) : (
-        <View style={sc.thumbPlaceholder}>
-          <Feather name="map-pin" size={14} color="rgba(212,175,55,0.22)" />
-        </View>
+        <PlaceholderImage />
       )}
       <LinearGradient
         colors={["transparent", "rgba(0,0,0,0.32)"]}
@@ -236,7 +246,7 @@ function DayCard({
                 }
               >
                 <View style={sc.hotelThumb}>
-                  <ItemThumb image={h.image ?? null} />
+                  <ItemThumb photoUrl={(h as any).photo_url ?? null} />
                 </View>
                 <View style={sc.hotelInfo}>
                   <View style={sc.hotelBadge}>
@@ -264,7 +274,12 @@ function DayCard({
               </View>
 
               {periodo.items.map((item, idx) => {
-                const travel = (item as any).travel_from_previous as TravelData | undefined;
+                // PART 7 — defensive guard: never render an item without an id
+                if (!item || !item.id) return null;
+
+                const travel     = (item as any).travel_from_previous as TravelData | undefined;
+                const photoUrl   = ((item as any).photo_url as string | null) ?? null;
+
                 return (
                   <React.Fragment key={`${item.source_table ?? item.categoria}_${item.id}_${idx}`}>
                     {travel && (
@@ -290,7 +305,7 @@ function DayCard({
 
                       <View style={sc.itemCard}>
                         <View style={sc.thumb}>
-                          <ItemThumb image={item.image ?? null} />
+                          <ItemThumb photoUrl={photoUrl} />
                         </View>
                         <View style={sc.itemInfo}>
                           <Text style={sc.itemTitle} numberOfLines={2}>{item.titulo}</Text>

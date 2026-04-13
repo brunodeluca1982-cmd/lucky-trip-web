@@ -2519,26 +2519,40 @@ function navigateToItem(item: SavedItem) {
   });
 }
 
-// ItemThumb — renders item thumbnail only when a valid Supabase image URI exists.
-// Shows no image (dark card background) when image is null or URI fails.
-function ItemThumb({ image }: { image: { uri: string } | null | unknown }) {
+// PlaceholderImage — reusable placeholder when photo_url is null.
+// Same footprint as a real image (parent View controls size).
+function PlaceholderImage() {
+  return (
+    <View
+      style={[
+        StyleSheet.absoluteFill,
+        { alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.22)" },
+      ]}
+    >
+      <Feather name="map-pin" size={14} color="rgba(212,175,55,0.22)" />
+    </View>
+  );
+}
+
+// ItemThumb — single source of truth: photo_url (string|null).
+// Never accepts undefined — callers must normalise with ?? null.
+function ItemThumb({ photoUrl }: { photoUrl: string | null }) {
   const [errored, setErrored] = React.useState(false);
-  const src =
-    !errored &&
-    image != null &&
-    typeof image === "object" &&
-    "uri" in (image as object)
-      ? (image as { uri: string })
+  const imageSource: { uri: string } | null =
+    !errored && typeof photoUrl === "string" && photoUrl.length > 0
+      ? { uri: photoUrl }
       : null;
   return (
     <>
-      {src != null && (
+      {imageSource !== null ? (
         <Image
-          source={src}
+          source={imageSource}
           style={StyleSheet.absoluteFill}
           resizeMode="cover"
           onError={() => setErrored(true)}
         />
+      ) : (
+        <PlaceholderImage />
       )}
       <LinearGradient
         colors={["transparent", "rgba(0,0,0,0.32)"]}
@@ -2669,7 +2683,7 @@ function ResultDayCard({
 
                       {/* Thumbnail */}
                       <View style={re.thumb}>
-                        <ItemThumb image={item.image} />
+                        <ItemThumb photoUrl={((item as any).photo_url as string | null) ?? null} />
                       </View>
 
                       {/* Info */}
@@ -3650,10 +3664,15 @@ export default function RoteiroScreen() {
                   const edgeSrcTbl = (item as any).source_table as
                     | SourceTable
                     | undefined;
-                  const enginePhoto = (item as any).photo_url as
-                    | string
-                    | null
-                    | undefined;
+                  // SSOT for photo: engine photo_url > saved photo_url > null
+                  // Never fallback to image object — photo_url is the single source of truth.
+                  const enginePhoto = (item as any).photo_url as string | null | undefined;
+                  const resolvedPhoto: string | null =
+                    (typeof enginePhoto === "string" && enginePhoto.length > 0)
+                      ? enginePhoto
+                      : (typeof found.photo_url === "string" && (found.photo_url as string).length > 0)
+                        ? (found.photo_url as string)
+                        : null;
                   return {
                     ...found,
                     // Engine-enriched classification — overrides save-time value
@@ -3665,10 +3684,9 @@ export default function RoteiroScreen() {
                       found.source_table ??
                       edgeSrcTbl ??
                       sourceTableFromCategoria(engineCat),
-                    // Real photo from Step F when available; fall back to saved image
-                    image: enginePhoto ? { uri: enginePhoto } : found.image,
-                    // Step F enrichment fields — additive, not in SavedItem schema before this merge
-                    ...(enginePhoto != null && { photo_url: enginePhoto }),
+                    // photo_url is always string|null — never undefined
+                    photo_url: resolvedPhoto,
+                    image:     resolvedPhoto ? { uri: resolvedPhoto } : undefined,
                     ...((item as any).descricao != null && {
                       descricao: (item as any).descricao,
                     }),
@@ -3684,17 +3702,19 @@ export default function RoteiroScreen() {
                 const edgeSourceTable = (item as any).source_table as
                   | string
                   | undefined;
-                const compPhoto = (item as any).photo_url as
-                  | string
-                  | null
-                  | undefined;
+                // Always normalise photo_url to string|null — single source of truth
+                const compPhoto: string | null =
+                  typeof (item as any).photo_url === "string" &&
+                  ((item as any).photo_url as string).length > 0
+                    ? ((item as any).photo_url as string)
+                    : null;
                 return {
                   ...item,
-                  image: compPhoto ? { uri: compPhoto } : null,
+                  photo_url: compPhoto,
+                  image:     compPhoto ? { uri: compPhoto } : undefined,
                   source_table:
                     (edgeSourceTable as SourceTable | undefined) ??
                     sourceTableFromCategoria(cat),
-                  ...(compPhoto != null && { photo_url: compPhoto }),
                   ...((item as any).descricao != null && {
                     descricao: (item as any).descricao,
                   }),
