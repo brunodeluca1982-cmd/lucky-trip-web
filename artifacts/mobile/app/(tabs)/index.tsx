@@ -31,6 +31,7 @@ import { useLuckyList } from "@/hooks/useLuckyList";
 import { useOQueFazer } from "@/hooks/useOQueFazer";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import { useFriends, type FriendCard } from "@/hooks/useFriends";
+import { useHomeHero } from "@/hooks/useHomeHero";
 
 // ── Context-aware "O que fazer agora" title ───────────────────────────────────
 // Prepositions for known destinations (Portuguese grammar)
@@ -203,21 +204,20 @@ export default function HomeScreen() {
   const { friends, loading: loadingFriends } = useFriends();
   const momentoTab = getCurrentMomento();
 
-  // ── Hero items — SUPABASE ONLY ─────────────────────────────────────────────
-  // Built from o_que_fazer_rio_v2 items that have Supabase photos.
-  // NEVER use mock data. If Supabase returns 0 items → carousel hidden.
-  const heroItems = React.useMemo(() => {
-    const withPhoto = atividades.filter((a) => a.image !== null);
-    if (withPhoto.length === 0) return [];
-    return withPhoto.slice(0, 6).map((a) => ({
-      id:     a.id,
-      cidade: a.titulo,
-      pais:   a.localizacao,
-      badge:  a.categoria ?? "Experiência",
-      image:  a.image as any,
-      cityId: "rio" as const,
-    }));
-  }, [atividades]);
+  // ── Hero items — useHomeHero (Supabase + canonical fallback) ────────────────
+  // ALWAYS renders. Source: o_que_fazer_rio_v2 → canonical 5 fallbacks.
+  // HeroSlide uses BackgroundContext.pool for cityId="rio" (not item.image).
+  const { items: heroData } = useHomeHero();
+  const heroItems = React.useMemo(() =>
+    heroData.map((h) => ({
+      id:     h.id,
+      cidade: h.titulo,
+      pais:   h.localizacao,
+      badge:  h.badge,
+      image:  h.photo_url ? { uri: h.photo_url } : null,
+      cityId: h.cityId,
+    })),
+  [heroData]);
 
   const filteredAtividades = React.useMemo(() => {
     if (!atividades.length) return [];
@@ -269,8 +269,8 @@ export default function HomeScreen() {
         contentContainerStyle={{ paddingBottom: bottomPad + 80 }}
       >
 
-        {/* ── 1. HERO CAROUSEL — Supabase only ── */}
-        {heroItems.length > 0 && <HeroCarousel items={heroItems} />}
+        {/* ── 1. HERO CAROUSEL — Always rendered (Supabase + canonical fallback) ── */}
+        <HeroCarousel items={heroItems} />
 
         {/* ── 2. O QUE FAZER NO RIO ── Supabase: o_que_fazer_rio */}
         <View style={s.section}>

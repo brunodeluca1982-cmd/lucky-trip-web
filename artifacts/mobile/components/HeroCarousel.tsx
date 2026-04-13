@@ -25,7 +25,7 @@ interface HeroItem {
   cidade: string;
   pais: string;
   badge: string;
-  image: ImageSourcePropType;
+  image: ImageSourcePropType | null;
   cityId?: string;
   route?: string;
 }
@@ -36,13 +36,16 @@ interface HeroCarouselProps {
 }
 
 function HeroSlide({ item }: { item: HeroItem }) {
-  // Mirror the global background for the active destination (Rio).
-  // For all other slides, fall back to the item's own static image.
+  // ── Image resolution priority ─────────────────────────────────────────────
+  // 1. Rio items → BackgroundContext.pool (Cloudinary + local fallback)
+  // 2. Non-Rio with photo_url → { uri: item.image }
+  // 3. null → premium placeholder (dark gradient card)
   const { pool, currentIdx } = useBackground();
-  const imageSource: ImageSourcePropType =
-    item.cityId === "rio" && !item.route && pool.length > 0
-      ? pool[currentIdx]
-      : item.image;
+
+  const usePool = item.cityId === "rio" && !item.route && pool.length > 0;
+  const imageSource: ImageSourcePropType | null = usePool
+    ? pool[currentIdx]
+    : item.image ?? null;
 
   return (
     <Pressable
@@ -64,7 +67,12 @@ function HeroSlide({ item }: { item: HeroItem }) {
         }
       }}
     >
-      <Image source={imageSource} style={styles.image} resizeMode="cover" />
+      {imageSource ? (
+        <Image source={imageSource} style={styles.image} resizeMode="cover" />
+      ) : (
+        // Premium placeholder — dark warm background when no image available
+        <View style={[styles.image, styles.placeholder]} />
+      )}
       <View style={styles.dimOverlay} />
       <LinearGradient
         colors={["transparent", "rgba(0,0,0,0.50)", "rgba(0,0,0,0.88)"]}
@@ -159,6 +167,9 @@ const styles = StyleSheet.create({
   image: {
     width: SCREEN_WIDTH,
     height: HERO_HEIGHT,
+  },
+  placeholder: {
+    backgroundColor: "#1A0E04",
   },
   dimOverlay: {
     ...StyleSheet.absoluteFillObject,
