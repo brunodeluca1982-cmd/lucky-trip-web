@@ -1707,19 +1707,35 @@ function computeExperienceType(p: EnrichedPlace): string {
 // up to a per-trip cap, then re-assembles places[] in original prefScore order.
 // This ensures the engine starts with a balanced set instead of trying to fix
 // imbalance after day construction.
-const EXPERIENCE_CAPS: Record<string, (days: number) => number> = {
-  relax:     (d) => d * 2,
-  scenic:    (d) => d * 2,
-  food:      (d) => d * 2, // lunch + dinner per day
-  nightlife: (d) => d * 1,
-  culture:   (d) => d * 2,
-  active:    (d) => d * 1,
+// Base caps per experience_type (multiplier of trip length).
+// Preference inspirations can raise these — they act as HARD MINIMUM supply guarantees.
+const BASE_CAPS: Record<string, number> = {
+  relax:     2,
+  scenic:    2,
+  food:      2, // lunch + dinner per day
+  nightlife: 1,
+  culture:   2,
+  active:    1,
 };
 
 function curateByExperienceType(
   places: EnrichedPlace[],
   tripLength: number,
+  inspirations: string[] = [],
 ): EnrichedPlace[] {
+  // Build per-type caps, adjusted for user preferences
+  const caps: Record<string, number> = {};
+  for (const [t, base] of Object.entries(BASE_CAPS)) {
+    caps[t] = base * tripLength;
+  }
+  // Preference adjustments: generous supply so day-builder has what it needs
+  if (inspirations.includes("gastronomy")) caps.food   = Math.max(caps.food,   tripLength * 3);
+  if (inspirations.includes("nightlife"))  caps.nightlife = Math.max(caps.nightlife, tripLength * 2);
+  if (inspirations.includes("nature"))   { caps.scenic = Math.max(caps.scenic, tripLength * 3);
+                                           caps.active  = Math.max(caps.active,  tripLength * 2); }
+  if (inspirations.includes("adventure"))  caps.active  = Math.max(caps.active,  tripLength * 2);
+  if (inspirations.includes("culture"))    caps.culture = Math.max(caps.culture, tripLength * 3);
+
   // Group by experience_type, preserving input order within each group
   const grouped = new Map<string, EnrichedPlace[]>();
   for (const p of places) {
@@ -1731,8 +1747,7 @@ function curateByExperienceType(
   // For each group: sort desc by prefScore, keep top-N, record their keys
   const keepKeys = new Set<string>();
   for (const [type, group] of grouped.entries()) {
-    const capFn = EXPERIENCE_CAPS[type] ?? ((d: number) => d * 2);
-    const cap = capFn(tripLength);
+    const cap = caps[type] ?? tripLength * 2; // unknown types: generous default
     const sorted = [...group].sort(
       (a, b) => (b.prefScore ?? 0) - (a.prefScore ?? 0),
     );
@@ -1842,62 +1857,132 @@ function enforceRelaxCap(periodMap: Map<PeriodoDia, EnrichedPlace[]>): void {
   }
 }
 
-// C. Soft day-rhythm enforcement — only swaps when BOTH items benefit.
-// manhã prefers active/culture; tarde prefers relax/scenic; noite prefers food/nightlife.
-// almoco is untouched (already managed by restaurant logic).
-// No removal ever happens here — if no mutual-benefit swap is found, item stays put.
-const RHYTHM_PREFERRED: Record<PeriodoDia, string[]> = {
-  manha: ["active", "culture"],
-  almoco: ["food"],
-  tarde: ["relax", "scenic"],
-  noite: ["food", "nightlife"],
+// C. Hard period enforcement — preferred types per period; mismatch → MOVE then REMOVE.
+//
+//  manhã  → active | culture   (energetic morning start)
+//  almoço → food               (managed by restaurant classification; reinforced here)
+//  tarde  → relax | scenic     (and NEVER a restaurant)
+//  noite  → food | nightlife | scenic  (scenic allowed for sunset-ending nights)
+//
+// Priority logic:
+//  1. Remove restaurants from tarde (absolute rule, no exceptions).
+//  2. Remove non-food/nightlife/scenic items from noite ONLY when safe (period won't go empty).
+//  3. Remove pure-relax items from manhã ONLY when active/culture alternatives exist
+//     (avoid stripping the period bare).
+//  Displaced items are re-homed to the best-matching period (loose cap = 4 items);
+//  if no period can accept them they are dropped (per spec: "if impossible → REMOVE").
+
+function enforceHardPeriodRules(periodMap: Map<PeriodoDia, EnrichedPlace[]>): void {
+  const key = (p: EnrichedPlace) => `${p.source_table}_${p.id}`;
+
+  // ── Rule 1: tarde NEVER contains a restaurant ────────────────────────────
+  const tardeAll = periodMap.get("tarde") ?? [];
+  const tardeRests = tardeAll.filter((p) => p.categoria === "restaurante");
+  if (tardeRests.length > 0) {
+    periodMap.set("tarde", tardeAll.filter((p) => p.categoria !== "restaurante"));
+    for (const rest of tardeRests) {
+      // Prefer almoco; fall back to noite; drop if both are full or already have a rest
+      for (const dest of ["almoco", "noite"] as PeriodoDia[]) {
+        const destItems = periodMap.get(dest) ?? [];
+        const hasRest = destItems.some((p) => p.categoria === "restaurante");
+        if (!hasRest) {
+          if (!periodMap.has(dest)) periodMap.set(dest, []);
+          periodMap.get(dest)!.push(rest);
+          break;
+        }
+      }
+    }
+  }
+
+  // ── Rule 2: noite should contain food | nightlife | scenic ───────────────
+  // Only remove mismatches when safe (period keeps at least one item).
+  const noiteAll = periodMap.get("noite") ?? [];
+  const noiteGood = noiteAll.filter((p) =>
+    ["food", "nightlife", "scenic"].includes(p.experience_type ?? "relax"),
+  );
+  const noiteBad = noiteAll.filter(
+    (p) => !["food", "nightlife", "scenic"].includes(p.experience_type ?? "relax"),
+  );
+  if (noiteGood.length > 0 && noiteBad.length > 0) {
+    periodMap.set("noite", noiteGood);
+    for (const item of noiteBad) {
+      const t = item.experience_type ?? "relax";
+      const dest: PeriodoDia | null =
+        t === "active" || t === "culture" ? "manha" : t === "relax" ? "tarde" : null;
+      if (dest) {
+        const destItems = periodMap.get(dest) ?? [];
+        if (destItems.length < 4) {
+          if (!periodMap.has(dest)) periodMap.set(dest, []);
+          periodMap.get(dest)!.push(item);
+        }
+      }
+    }
+  }
+
+  // ── Rule 3: manhã should not contain pure "relax" items when active/culture exist ──
+  const manhaAll = periodMap.get("manha") ?? [];
+  const manhaGood = manhaAll.filter((p) =>
+    ["active", "culture", "food"].includes(p.experience_type ?? "relax"),
+  );
+  const manhaRelax = manhaAll.filter(
+    (p) => !["active", "culture", "food"].includes(p.experience_type ?? "relax"),
+  );
+  if (manhaGood.length > 0 && manhaRelax.length > 0) {
+    // Only remove relax items when there ARE good alternatives (don't empty manhã)
+    periodMap.set("manha", manhaGood);
+    for (const item of manhaRelax) {
+      const tardeNow = periodMap.get("tarde") ?? [];
+      if (tardeNow.length < 4) {
+        if (!periodMap.has("tarde")) periodMap.set("tarde", []);
+        periodMap.get("tarde")!.push(item);
+      }
+      // else: dropped
+    }
+  }
+  void key; // used only in comments for conceptual identity
+}
+
+// Day Narrative: ensure the final period ends with the STRONGEST item.
+// Priority: scenic (6) > food (5) > nightlife (4) > culture (3) > active (2) > relax (1).
+// Applies to the last non-empty period across the whole day (usually noite).
+// Never removes items — only reorders within the last period.
+const NARRATIVE_STRENGTH: Record<string, number> = {
+  scenic: 6,
+  food: 5,
+  nightlife: 4,
+  culture: 3,
+  active: 2,
+  relax: 1,
 };
 
-function applyDayRhythm(periodMap: Map<PeriodoDia, EnrichedPlace[]>): void {
-  const periods: PeriodoDia[] = ["manha", "almoco", "tarde", "noite"];
+function applyDayNarrative(periodMap: Map<PeriodoDia, EnrichedPlace[]>): void {
+  // Find the last occupied period
+  const lastPeriodo = (["noite", "tarde", "almoco", "manha"] as PeriodoDia[]).find(
+    (p) => (periodMap.get(p) ?? []).length > 0,
+  );
+  if (!lastPeriodo) return;
 
-  for (const fromPeriodo of periods) {
-    if (fromPeriodo === "almoco") continue; // managed by restaurant classification
-    const fromItems = periodMap.get(fromPeriodo);
-    if (!fromItems || fromItems.length === 0) continue;
-    const fromPreferred = RHYTHM_PREFERRED[fromPeriodo];
+  const items = periodMap.get(lastPeriodo)!;
+  if (items.length <= 1) return;
 
-    for (let fi = 0; fi < fromItems.length; fi++) {
-      const item = fromItems[fi];
-      const itemType = item.experience_type ?? "relax";
-      if (fromPreferred.includes(itemType)) continue; // already well-placed
-      if (item.categoria === "restaurante") continue; // food items are never moved
-
-      // Find a mutual-benefit swap in another period:
-      // - item.type must fit toPeriodo (toPreferred includes itemType)
-      // - candidate.type must fit fromPeriodo (fromPreferred includes candidateType)
-      // - candidate is not a food item
-      let swapped = false;
-      for (const toPeriodo of periods) {
-        if (toPeriodo === fromPeriodo || toPeriodo === "almoco") continue;
-        const toItems = periodMap.get(toPeriodo);
-        if (!toItems || toItems.length === 0) continue;
-        const toPreferred = RHYTHM_PREFERRED[toPeriodo];
-        if (!toPreferred.includes(itemType)) continue; // item doesn't fit toPeriodo either
-
-        const ti = toItems.findIndex(
-          (t) =>
-            fromPreferred.includes(t.experience_type ?? "relax") &&
-            t.categoria !== "restaurante",
-        );
-        if (ti === -1) continue;
-
-        // Perform the mutual-benefit swap
-        const candidate = toItems[ti];
-        fromItems[fi] = candidate;
-        toItems[ti] = item;
-        periodMap.set(fromPeriodo, fromItems);
-        periodMap.set(toPeriodo, toItems);
-        swapped = true;
-        break;
-      }
-      void swapped; // soft rule — no action if swap wasn't possible
+  // Score each item: strength * 100 + prefScore (tiebreaker)
+  let strongestIdx = 0;
+  let strongestScore = -1;
+  for (let i = 0; i < items.length; i++) {
+    const s =
+      (NARRATIVE_STRENGTH[items[i].experience_type ?? "relax"] ?? 0) * 100 +
+      (items[i].prefScore ?? 0);
+    if (s > strongestScore) {
+      strongestScore = s;
+      strongestIdx = i;
     }
+  }
+
+  // If the strongest item is not already last, move it to the end
+  if (strongestIdx !== items.length - 1) {
+    const strongest = items.splice(strongestIdx, 1)[0]!;
+    items.push(strongest);
+    periodMap.set(lastPeriodo, items);
   }
 }
 
@@ -1905,6 +1990,7 @@ function buildFullDraft(
   dayGroups: EnrichedPlace[][],
   dayRestaurants: EnrichedPlace[][],
   vibe: string,
+  _inspirations: string[] = [], // reserved for per-day preference enforcement
 ): DiaRoteiro[] {
   const manhaCap = MANHA_CAP[vibe] ?? 2;
   const days: DiaRoteiro[] = [];
@@ -2008,9 +2094,9 @@ function buildFullDraft(
     }
     // B. Relax cap: max 1 "relax" per period, max 2 "relax" per day.
     enforceRelaxCap(periodMap);
-    // C. Day rhythm: soft mutual-benefit swaps between periods.
-    //    Only fires when BOTH items benefit — never forces removal.
-    applyDayRhythm(periodMap);
+    // C. Hard period enforcement: wrong-type items are moved then removed.
+    //    Replaces the old soft mutual-benefit swap approach.
+    enforceHardPeriodRules(periodMap);
 
     // ── 5d. Within-period flow + proximity sequencing ────────────────────────
     // First: flow sort anchors the time-critical item (breakfast, dinner, sunset)
@@ -2023,6 +2109,12 @@ function buildFullDraft(
           : sortByDayFlow(items, periodo);
       periodMap.set(periodo, sortByProximity(flowed, periodo));
     }
+
+    // ── 5d-narrative. End of day = strongest moment ───────────────────────────
+    // Reorders the last period so the highest-strength item lands last.
+    // scenic(6) > food(5) > nightlife(4) > culture(3) > active(2) > relax(1).
+    // Only reorders — never removes.
+    applyDayNarrative(periodMap);
 
     // ── 5e. Build ordered periodos ────────────────────────────────────────────
     const periodos: DiaPeriodo[] = PERIODO_ORDER.filter(
@@ -2957,8 +3049,8 @@ serve(async (req) => {
 
     // ── Step 3d: Experience curation — global caps per type, BEFORE clustering ─
     // Reduces the pool to a balanced set so Step 4 and 5 start clean.
-    // E.g. for a 3-day trip: max 6 relax, 3 nightlife, 3 active, 6 food, etc.
-    places = curateByExperienceType(places, tripLength);
+    // Inspirations raise caps for preferred types (gastronomy → more food slots, etc.).
+    places = curateByExperienceType(places, tripLength, preferences.inspirations ?? []);
 
     // ── Step 4: Macro-region clustering (oeste + norte isolated from centro + sul)
     const { dayGroups, dayRestaurants } = groupByGeography(
@@ -2969,7 +3061,7 @@ serve(async (req) => {
     );
 
     // ── Step 5: Build fully populated DiaRoteiro[] with morning load balancing
-    let days = buildFullDraft(dayGroups, dayRestaurants, vibe);
+    let days = buildFullDraft(dayGroups, dayRestaurants, vibe, preferences.inspirations ?? []);
 
     // ── Step 6: Gemini refinement — only reorders within existing períodos ─────
     days = await refineWithGemini(days, dest, preferences, places);
