@@ -1702,6 +1702,49 @@ function computeExperienceType(p: EnrichedPlace): string {
   return "relax";
 }
 
+// Step 3d — Experience Curation (runs BEFORE geographic clustering).
+// Groups places by experience_type, keeps only the top-scoring items per type
+// up to a per-trip cap, then re-assembles places[] in original prefScore order.
+// This ensures the engine starts with a balanced set instead of trying to fix
+// imbalance after day construction.
+const EXPERIENCE_CAPS: Record<string, (days: number) => number> = {
+  relax:     (d) => d * 2,
+  scenic:    (d) => d * 2,
+  food:      (d) => d * 2, // lunch + dinner per day
+  nightlife: (d) => d * 1,
+  culture:   (d) => d * 2,
+  active:    (d) => d * 1,
+};
+
+function curateByExperienceType(
+  places: EnrichedPlace[],
+  tripLength: number,
+): EnrichedPlace[] {
+  // Group by experience_type, preserving input order within each group
+  const grouped = new Map<string, EnrichedPlace[]>();
+  for (const p of places) {
+    const t = p.experience_type ?? "relax";
+    if (!grouped.has(t)) grouped.set(t, []);
+    grouped.get(t)!.push(p);
+  }
+
+  // For each group: sort desc by prefScore, keep top-N, record their keys
+  const keepKeys = new Set<string>();
+  for (const [type, group] of grouped.entries()) {
+    const capFn = EXPERIENCE_CAPS[type] ?? ((d: number) => d * 2);
+    const cap = capFn(tripLength);
+    const sorted = [...group].sort(
+      (a, b) => (b.prefScore ?? 0) - (a.prefScore ?? 0),
+    );
+    for (const p of sorted.slice(0, cap)) {
+      keepKeys.add(`${p.source_table}_${p.id}`);
+    }
+  }
+
+  // Filter places preserving the original prefScore-sorted order from Step 3b
+  return places.filter((p) => keepKeys.has(`${p.source_table}_${p.id}`));
+}
+
 // A. No two consecutive items in the same period may share experience_type.
 // When a clash is found, try to swap with a later non-clashing item.
 // If impossible (all remaining are same type), keep the higher-prefScore item
@@ -2911,6 +2954,11 @@ serve(async (req) => {
 
     console.log("AFTER DEDUP", places.map((p) => p.name));
     console.log("IDENTITIES", places.map((p) => ({ name: p.name, identity: placeIdentity(p.name) })));
+
+    // ── Step 3d: Experience curation — global caps per type, BEFORE clustering ─
+    // Reduces the pool to a balanced set so Step 4 and 5 start clean.
+    // E.g. for a 3-day trip: max 6 relax, 3 nightlife, 3 active, 6 food, etc.
+    places = curateByExperienceType(places, tripLength);
 
     // ── Step 4: Macro-region clustering (oeste + norte isolated from centro + sul)
     const { dayGroups, dayRestaurants } = groupByGeography(
