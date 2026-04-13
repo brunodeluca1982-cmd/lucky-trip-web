@@ -190,10 +190,13 @@ export class Storage {
   async upsertSupabaseAccessLevel(
     userId: string,
     _planType: string,
-    accessUntil: Date,
+    accessUntil: Date | null,
   ): Promise<void> {
     // access_levels.plan_type check constraint only allows "free" | "premium"
     const planType = "premium";
+    // null = lifetime; use far-future sentinel so NOT NULL columns stay valid
+    const farFuture = new Date("2099-01-01T00:00:00.000Z");
+    const until = accessUntil ?? farFuture;
     const sb = makeSupabaseAdmin();
     const { error } = await sb
       .from("access_levels")
@@ -201,7 +204,7 @@ export class Storage {
         {
           user_id:      userId,
           plan_type:    planType,
-          access_until: accessUntil.toISOString(),
+          access_until: until.toISOString(),
         },
         { onConflict: "user_id" }
       );
@@ -311,7 +314,7 @@ export class Storage {
    */
   async provisionPremiumInSupabase(
     userId: string,
-    accessUntilMs: number,
+    accessUntilMs: number | null,
     interval?: string,
     stripeData?: {
       customerId?:     string;
@@ -319,21 +322,22 @@ export class Storage {
       status?:         string;
     }
   ): Promise<void> {
-    const accessUntil = new Date(accessUntilMs);
+    // null or 0 → lifetime access (e.g. 100% coupon with no_payment_required)
+    const accessUntil = (accessUntilMs && accessUntilMs > 0) ? new Date(accessUntilMs) : null;
     const planType = interval === "year" ? "annual" : interval === "month" ? "monthly" : (interval ?? "premium");
 
     // 1. Update auth app_metadata
     const sb = makeSupabaseAdmin();
     const { error: authError } = await sb.auth.admin.updateUserById(userId, {
       app_metadata: {
-        plan_type:    "premium",
-        access_until: accessUntil.toISOString(),
+        plan_type:     "premium",
+        access_until:  accessUntil ? accessUntil.toISOString() : null,
         plan_interval: interval ?? null,
       },
     });
     if (authError) throw new Error(`provisionPremiumInSupabase (auth): ${authError.message}`);
 
-    // 2. Upsert access_levels
+    // 2. Upsert access_levels (null → far-future handled inside)
     await this.upsertSupabaseAccessLevel(userId, planType, accessUntil);
 
     // 3. Upsert subscriptions (if we have Stripe data)
@@ -342,7 +346,7 @@ export class Storage {
         stripe_customer_id:     stripeData.customerId,
         stripe_subscription_id: stripeData.subscriptionId,
         status:                 stripeData.status ?? "active",
-        current_period_end:     accessUntil,
+        current_period_end:     accessUntil ?? undefined,
       });
     }
   }

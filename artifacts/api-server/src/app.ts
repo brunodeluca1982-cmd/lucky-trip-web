@@ -114,7 +114,8 @@ async function handleSubscriptionWebhook(event: any) {
       // Fetch full subscription from Stripe to get period_end
       const stripe = await getUncachableStripeClient();
       const stripeSubscription = await stripe.subscriptions.retrieve(subscriptionId);
-      const periodEndMs = stripeSubscription.current_period_end * 1000;
+      const rawEnd      = stripeSubscription.current_period_end;
+      const periodEndMs = (rawEnd && rawEnd > 0) ? rawEnd * 1000 : null;
       const interval    = stripeSubscription.items.data[0]?.price?.recurring?.interval;
 
       await storage.upsertUserSubscription(sub.user_id, {
@@ -138,8 +139,9 @@ async function handleSubscriptionWebhook(event: any) {
       const sub          = await storage.getSubscriptionByCustomerId(customerId);
       if (!sub) break;
 
-      const interval     = subscription.items?.data?.[0]?.price?.recurring?.interval ?? null;
-      const periodEndMs  = (subscription.current_period_end ?? 0) * 1000;
+      const interval          = subscription.items?.data?.[0]?.price?.recurring?.interval ?? null;
+      const rawSubEnd         = subscription.current_period_end;
+      const periodEndMs       = (rawSubEnd && rawSubEnd > 0) ? rawSubEnd * 1000 : null;
 
       await storage.upsertUserSubscription(sub.user_id, {
         stripe_subscription_id: subscription.id,
@@ -185,7 +187,8 @@ async function handleSubscriptionWebhook(event: any) {
 
       const stripe = await getUncachableStripeClient();
       const stripeSubscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
-      const periodEndMs = stripeSubscription.current_period_end * 1000;
+      const rawInvEnd   = stripeSubscription.current_period_end;
+      const periodEndMs = (rawInvEnd && rawInvEnd > 0) ? rawInvEnd * 1000 : null;
       const interval    = stripeSubscription.items.data[0]?.price?.recurring?.interval;
 
       await storage.upsertUserSubscription(sub.user_id, {

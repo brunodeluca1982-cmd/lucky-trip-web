@@ -275,7 +275,9 @@ router.get(
           : (session.subscription as any);
 
         if (stripeSubscription) {
-          const periodEndMs = stripeSubscription.current_period_end * 1000;
+          // Guard: current_period_end can be 0 or null for no_payment_required sessions
+          const rawEnd      = stripeSubscription.current_period_end;
+          const periodEndMs = (rawEnd && rawEnd > 0) ? rawEnd * 1000 : null;
           const interval    = stripeSubscription.items.data[0]?.price?.recurring?.interval;
 
           await storage.upsertUserSubscription(req.user.id, {
