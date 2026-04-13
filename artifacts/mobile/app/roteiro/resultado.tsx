@@ -245,7 +245,9 @@ function DayCard({
                       onPress={() => navigateToItem(item)}
                     >
                       <View style={sc.timeCol}>
-                        <Text style={sc.timeLabel}>{getItemTime(periodo.periodo, idx)}</Text>
+                        <Text style={sc.timeLabel}>
+                          {(item as any).start_time ?? getItemTime(periodo.periodo, idx)}
+                        </Text>
                       </View>
 
                       <View style={sc.connectorCol}>

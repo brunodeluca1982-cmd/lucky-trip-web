@@ -112,6 +112,9 @@ interface ItemRoteiro {
   descricao?: string | null;   // meu_olhar editorial note; null if not available
   duracao?: string;            // average visit duration e.g. "1-2h"
   experience_type?: string;   // relax | scenic | food | culture | nightlife | active
+  /** Estimated wall-clock start time "HH:MM" — cumulative (period base + travel + durations).
+   *  Absent on items generated before this field was added. */
+  start_time?: string;
   /** Zone-based travel estimate from the preceding item in the day.
    *  Absent on the first item of the day. Uses bairro→zone proximity — no lat/lng in DB. */
   travel_from_previous?: {
@@ -215,6 +218,38 @@ function estimateTravelTime(
   if (diff === 1)            return { distance_km: 3.5,  travel_time_minutes: 22 };
   if (diff === 2)            return { distance_km: 7.0,  travel_time_minutes: 32 };
   return                            { distance_km: 12.0, travel_time_minutes: 45 };
+}
+
+// ── Cumulative time helpers ───────────────────────────────────────────────────
+// Used in Step 5e-time to compute realistic start_time per item.
+
+/** Period base times in minutes since midnight (anchors for each meal/time slot). */
+const PERIODO_BASE_MINUTES: Record<string, number> = {
+  manha:      9  * 60,       // 09:00
+  almoco:     12 * 60 + 30,  // 12:30
+  tarde:      15 * 60 + 30,  // 15:30
+  noite:      19 * 60 + 30,  // 19:30
+  late_night: 22 * 60,       // 22:00
+};
+
+/** Converts a duration string to minutes.  Handles ranges by averaging.
+ *  "1-2h" → 90 min, "1h" → 60, "30min" → 30, "2-4h" → 180. */
+function parseDurationMinutes(duracao?: string): number {
+  if (!duracao) return 90;
+  const range = duracao.match(/(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)\s*h/i);
+  if (range) return Math.round(((parseFloat(range[1]) + parseFloat(range[2])) / 2) * 60);
+  const h   = duracao.match(/(\d+(?:\.\d+)?)\s*h/i);
+  if (h)     return Math.round(parseFloat(h[1]) * 60);
+  const min = duracao.match(/(\d+)\s*(?:min|m)\b/i);
+  if (min)   return parseInt(min[1], 10);
+  return 90;
+}
+
+/** Formats minutes-since-midnight as "HH:MM". */
+function formatMinutes(totalMins: number): string {
+  const h = Math.floor(totalMins / 60) % 24;
+  const m = totalMins % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
 // ── Vibe → items per day ──────────────────────────────────────────────────────
@@ -2219,6 +2254,30 @@ function buildFullDraft(
             );
           }
           prevLocalizacao = item.localizacao;
+        }
+      }
+    }
+
+    // ── 5e-time. Compute cumulative start_time per item ───────────────────────
+    // Algorithm: start from 09:00; at each new period snap to max(current, period_base)
+    // so lunch never starts before 12:30 even if morning finishes early.
+    // Each item's start_time = (snapped period base OR carry-over) + travel time.
+    // After stamping, advance the clock by the item's average duration.
+    {
+      let clockMinutes = PERIODO_BASE_MINUTES["manha"] ?? 540; // 09:00
+      for (const periodo of periodos) {
+        // Snap forward to period base if the clock is behind (never back)
+        const base = PERIODO_BASE_MINUTES[periodo.periodo];
+        if (base !== undefined) clockMinutes = Math.max(clockMinutes, base);
+
+        for (const item of periodo.items) {
+          // Add travel leg BEFORE stamping start_time
+          if (item.travel_from_previous) {
+            clockMinutes += item.travel_from_previous.travel_time_minutes;
+          }
+          item.start_time = formatMinutes(clockMinutes);
+          // Advance clock by item duration
+          clockMinutes += parseDurationMinutes(item.duracao);
         }
       }
     }
