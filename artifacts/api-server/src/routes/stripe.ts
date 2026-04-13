@@ -255,7 +255,10 @@ router.get(
         expand: ["subscription"],
       });
 
-      if (session.payment_status !== "paid") {
+      // "no_payment_required" = 100% coupon applied — subscription is still valid
+      const isConfirmed = session.payment_status === "paid"
+        || session.payment_status === "no_payment_required";
+      if (!isConfirmed) {
         return res.json({ confirmed: false, payment_status: session.payment_status }) as any;
       }
 
