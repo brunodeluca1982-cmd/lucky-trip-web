@@ -120,6 +120,9 @@ interface DiaRoteiro {
   numero: number;
   bairro: string;
   periodos: DiaPeriodo[];
+  /** Injected after Step 7 (validateAndFix) if user saved a hotel.
+   *  Not part of the experience flow — renders as a fixed header block per day. */
+  hotel?: ItemRoteiro;
 }
 
 interface ItineraryResult {
@@ -1688,15 +1691,25 @@ function categoriaToTable(cat: SavedCategory): string {
 // response shape, validateAndFix, or the clustering logic.
 
 function computeExperienceType(p: EnrichedPlace): string {
-  const haystack = [p.name, ...(p.tags ?? []), ...(p.vibe_tags ?? [])]
+  // Include especialidade + perfil_publico so "bar / boteco / cervejaria"
+  // fields on restaurant rows are picked up before the generic "restaurante" check.
+  const haystack = [
+    p.name,
+    ...(p.tags ?? []),
+    ...(p.vibe_tags ?? []),
+    p.especialidade ?? "",
+    p.perfil_publico ?? "",
+  ]
     .join(" ")
     .toLowerCase();
+
   if (/beach|praia/.test(haystack)) return "relax";
   if (/sunset|mirante|vista/.test(haystack)) return "scenic";
+  // ⚠ Bar/boteco/cervejaria check BEFORE generic restaurant — Jobi = nightlife, not food
+  if (/\bbar\b|boteco|cervejaria|pub|balada/.test(haystack)) return "nightlife";
   if (p.categoria === "restaurante") return "food";
   if (/museu|museum|cultura|história|historia|history/.test(haystack))
     return "culture";
-  if (/bar|nightlife|drinks|balada/.test(haystack)) return "nightlife";
   if (/trilha|activity|outdoor|atividade|esporte/.test(haystack))
     return "active";
   return "relax";
@@ -3068,6 +3081,35 @@ serve(async (req) => {
 
     // ── Step 7: Validation — recover any dropped places ───────────────────────
     days = validateAndFix(days, places);
+
+    // ── Step 7b: Hotel injection ───────────────────────────────────────────────
+    // Hotels bypass the experience flow entirely. They are fetched from stay_hotels
+    // and attached as a fixed `hotel` block on every day — rendered before manhã.
+    // This injection runs AFTER validateAndFix so it can never be removed by it.
+    const primaryHotel = hotelItems[0]; // first saved hotel (zone-scoring already used for hotelZone)
+    if (primaryHotel) {
+      const { data: hotelRow } = await supa
+        .from("stay_hotels")
+        .select("id,nome,bairro,photo_url")
+        .eq("id", primaryHotel.id)
+        .maybeSingle();
+
+      if (hotelRow) {
+        const hotelPhoto: string | null = (hotelRow.photo_url as string | null) ?? null;
+        const hotelBlock: ItemRoteiro = {
+          id:           String(hotelRow.id),
+          titulo:       (hotelRow.nome as string)    || primaryHotel.titulo,
+          categoria:    "hotel",
+          localizacao:  (hotelRow.bairro as string)  || primaryHotel.localizacao || "",
+          source_table: "stay_hotels",
+          image:        hotelPhoto ? { uri: hotelPhoto } : undefined,
+          photo_url:    hotelPhoto,
+        };
+        for (const day of days) {
+          day.hotel = hotelBlock;
+        }
+      }
+    }
 
     console.log("FINAL DAYS", JSON.stringify(days));
 

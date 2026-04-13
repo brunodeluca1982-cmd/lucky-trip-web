@@ -20,7 +20,7 @@ import { useGuia, sourceTableFromCategoria } from "@/context/GuiaContext";
 import type { SavedItem, SourceTable } from "@/context/GuiaContext";
 import type { ItineraryResult } from "@/utils/buildItinerary";
 import { PERIODO_LABEL, PERIODO_ICON } from "@/utils/buildRoteiro";
-import type { DiaRoteiro } from "@/utils/buildRoteiro";
+import type { DiaRoteiro, HotelBlock } from "@/utils/buildRoteiro";
 import { RotatingBackground } from "@/components/RotatingBackground";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -94,13 +94,17 @@ function ItemThumb({ image }: { image: { uri: string } | null | unknown }) {
       : null;
   return (
     <>
-      {src != null && (
+      {src != null ? (
         <Image
           source={src}
           style={StyleSheet.absoluteFill}
           resizeMode="cover"
           onError={() => setErrored(true)}
         />
+      ) : (
+        <View style={sc.thumbPlaceholder}>
+          <Feather name="map-pin" size={14} color="rgba(212,175,55,0.22)" />
+        </View>
       )}
       <LinearGradient
         colors={["transparent", "rgba(0,0,0,0.32)"]}
@@ -168,6 +172,40 @@ function DayCard({
 
       {!collapsed && (
         <View style={sc.dayBody}>
+
+          {/* ── Hotel block — fixed header before all periods ──────────────── */}
+          {dia.hotel && (() => {
+            const h = dia.hotel as HotelBlock;
+            return (
+              <Pressable
+                style={({ pressed }) => [sc.hotelBlock, pressed && { opacity: 0.82 }]}
+                onPress={() =>
+                  navigateToItem({
+                    id:           h.id,
+                    titulo:       h.titulo,
+                    localizacao:  h.localizacao,
+                    categoria:    "hotel",
+                    source_table: "stay_hotels",
+                    image:        (h.image ?? null) as SavedItem["image"],
+                  } as SavedItem)
+                }
+              >
+                <View style={sc.hotelThumb}>
+                  <ItemThumb image={h.image ?? null} />
+                </View>
+                <View style={sc.hotelInfo}>
+                  <View style={sc.hotelBadge}>
+                    <Feather name="home" size={9} color={GOLD} />
+                    <Text style={sc.hotelBadgeText}>HOSPEDAGEM</Text>
+                  </View>
+                  <Text style={sc.hotelTitle} numberOfLines={2}>{h.titulo}</Text>
+                  <Text style={sc.hotelBairro}  numberOfLines={1}>{h.localizacao}</Text>
+                </View>
+                <Feather name="chevron-right" size={13} color="rgba(255,255,255,0.30)" />
+              </Pressable>
+            );
+          })()}
+
           {dia.periodos.map((periodo) => (
             <View key={periodo.periodo} style={sc.periodoSection}>
               <View style={sc.periodoHeader}>
@@ -649,6 +687,66 @@ const sc = StyleSheet.create({
     fontSize:   11,
     color:      "rgba(255,255,255,0.45)",
     marginTop:  2,
+  },
+
+  // Image placeholder — shown when no photo_url from Supabase
+  thumbPlaceholder: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems:      "center",
+    justifyContent:  "center",
+    backgroundColor: "rgba(212,175,55,0.04)",
+  },
+
+  // Hotel block — rendered above period sections inside dayBody
+  hotelBlock: {
+    flexDirection:     "row",
+    alignItems:        "center",
+    marginHorizontal:  16,
+    marginTop:         2,
+    marginBottom:      8,
+    backgroundColor:   "rgba(212,175,55,0.07)",
+    borderRadius:      10,
+    borderWidth:       1,
+    borderColor:       "rgba(212,175,55,0.22)",
+    overflow:          "hidden",
+    gap:               10,
+    paddingRight:      10,
+  },
+  hotelThumb: {
+    width:           76,
+    height:          56,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    flexShrink:      0,
+    overflow:        "hidden",
+  },
+  hotelInfo: {
+    flex:            1,
+    paddingVertical: 10,
+    gap:             2,
+  },
+  hotelBadge: {
+    flexDirection: "row",
+    alignItems:    "center",
+    gap:           4,
+    marginBottom:  2,
+  },
+  hotelBadgeText: {
+    fontFamily:    "Inter_600SemiBold",
+    fontSize:      9,
+    color:         GOLD,
+    letterSpacing: 1.4,
+  },
+  hotelTitle: {
+    fontFamily: "Inter_500Medium",
+    fontSize:   13,
+    color:      "#fff",
+    lineHeight: 18,
+  },
+  hotelBairro: {
+    fontFamily: "Inter_400Regular",
+    fontSize:   11,
+    color:      "rgba(255,255,255,0.45)",
+    marginTop:  1,
   },
 
   // Empty state

@@ -57,10 +57,24 @@ export interface DiaPeriodo {
   items: SavedItem[];
 }
 
+/** Minimal hotel info attached per-day by the Edge Function (Step 7b).
+ *  Not part of the experience flow — displayed as a fixed header block. */
+export interface HotelBlock {
+  id: string;
+  titulo: string;
+  localizacao: string;
+  source_table: "stay_hotels";
+  categoria: "hotel";
+  photo_url?: string | null;
+  image?: { uri: string } | null | unknown;
+}
+
 export interface DiaRoteiro {
   numero: number;
   bairro: string;
   periodos: DiaPeriodo[];
+  /** Injected by Edge Function after validation. Present when user saved a hotel. */
+  hotel?: HotelBlock;
 }
 
 // ── Internal helpers ───────────────────────────────────────────────────────────
