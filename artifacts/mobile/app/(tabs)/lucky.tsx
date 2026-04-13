@@ -66,12 +66,29 @@ export default function LuckyScreen() {
   // ── Init: load count from AsyncStorage + sync from Supabase lucky_usage ──
   useEffect(() => {
     (async () => {
-      const [id, countStr, premiumStr] = await Promise.all([
-        getDeviceId(),
-        AsyncStorage.getItem(RESPONSES_USED_KEY),
-        AsyncStorage.getItem(IS_PREMIUM_KEY),
-      ]);
+      // BUG-FIX: wrap entire init in try/catch so deviceId is always set.
+      // If getDeviceId() throws, we fall back to a session-local UUID so
+      // sendQuery never hits the !deviceId guard and silently drops the request.
+      let id: string;
+      try {
+        id = await getDeviceId();
+      } catch (e) {
+        console.warn("[LuckyChat] getDeviceId failed, using fallback:", e);
+        id = `fallback-${Date.now()}`;
+      }
       setDeviceId(id);
+      console.log("[LuckyChat] deviceId set:", id.slice(0, 8) + "...");
+
+      let countStr: string | null = null;
+      let premiumStr: string | null = null;
+      try {
+        [countStr, premiumStr] = await Promise.all([
+          AsyncStorage.getItem(RESPONSES_USED_KEY),
+          AsyncStorage.getItem(IS_PREMIUM_KEY),
+        ]);
+      } catch (e) {
+        console.warn("[LuckyChat] AsyncStorage read failed:", e);
+      }
 
       const localCount = countStr ? parseInt(countStr, 10) : 0;
 
@@ -113,7 +130,9 @@ export default function LuckyScreen() {
       const authoritative = Math.max(localCount, serverCount);
       setResponsesUsed(authoritative);
       if (authoritative !== localCount) {
-        await AsyncStorage.setItem(RESPONSES_USED_KEY, String(authoritative));
+        try {
+          await AsyncStorage.setItem(RESPONSES_USED_KEY, String(authoritative));
+        } catch (_) {}
       }
     })();
   }, []);
@@ -136,35 +155,44 @@ export default function LuckyScreen() {
       scrollToBottom();
 
       try {
-        // Call lucky-concierge with Supabase-grounded context
-        // Use raw fetch so we control status code handling ourselves.
-        // supabase.functions.invoke() throws on any non-2xx, hiding 402 limitReached.
-        const supabaseUrl  = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
-        const supabaseAnon = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
-        const rawRes = await fetch(`${supabaseUrl}/functions/v1/lucky-concierge`, {
+        // ── BUG-FIX: strip trailing slash from SUPABASE_URL before concatenating
+        // EXPO_PUBLIC_SUPABASE_URL is set from $SUPABASE_URL which ends with "/"
+        // causing "//functions/v1/..." double-slash that Supabase routes incorrectly.
+        const supabaseUrl  = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? "").replace(/\/$/, "");
+        const supabaseAnon =  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
+        const endpoint     = `${supabaseUrl}/functions/v1/lucky-concierge`;
+
+        const payload = {
+          query:       userMsg.content,
+          history:     priorHistory.map((m) => ({ role: m.role, content: m.content })),
+          deviceId,
+          destination: "Rio de Janeiro",
+        };
+
+        console.log("[LuckyChat] url", endpoint);
+        console.log("[LuckyChat] payload", payload);
+
+        const rawRes = await fetch(endpoint, {
           method:  "POST",
           headers: {
             "Content-Type":  "application/json",
             "Authorization": `Bearer ${supabaseAnon}`,
             "apikey":        supabaseAnon,
           },
-          body: JSON.stringify({
-            query:       userMsg.content,
-            history:     priorHistory.map((m) => ({ role: m.role, content: m.content })),
-            deviceId,
-            destination: "Rio de Janeiro",
-          }),
+          body: JSON.stringify(payload),
         });
 
+        console.log("[LuckyChat] status", rawRes.status);
+
         const data = await rawRes.json().catch(() => ({}));
-        console.log("[Lucky] status:", rawRes.status, "data keys:", Object.keys(data));
+        console.log("[LuckyChat] data", data);
 
         // 402 = server-side limit reached (authoritative enforcement)
         if (rawRes.status === 402 || data?.limitReached) {
-          console.log("[Lucky] GATE: limit reached");
+          console.log("[LuckyChat] GATE: limit reached");
           const newCount = Math.max(responsesUsed, data?.questionCount ?? FREE_LIMIT);
           setResponsesUsed(newCount);
-          await AsyncStorage.setItem(RESPONSES_USED_KEY, String(newCount));
+          try { await AsyncStorage.setItem(RESPONSES_USED_KEY, String(newCount)); } catch (_) {}
           setLoading(false);
           scrollToBottom();
           return;
@@ -172,17 +200,20 @@ export default function LuckyScreen() {
 
         if (!rawRes.ok || data?.error) {
           const errMsg = data?.error ?? `HTTP ${rawRes.status}`;
-          console.error("[Lucky] server error:", errMsg);
+          console.error("[LuckyChat] server error:", errMsg);
           throw new Error(errMsg);
         }
 
+        console.log("[LuckyChat] reply", data?.reply);
+
         const reply = data?.reply ?? "Desculpe, não consegui processar sua pergunta.";
+        console.log("[LuckyChat] append assistant message");
         setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
 
         // Sync count: use server's authoritative count
         const newCount = data?.questionCount ?? responsesUsed + 1;
         setResponsesUsed(newCount);
-        await AsyncStorage.setItem(RESPONSES_USED_KEY, String(newCount));
+        try { await AsyncStorage.setItem(RESPONSES_USED_KEY, String(newCount)); } catch (_) {}
 
         // Show subtle editorial hint after 2nd free answer (question 2 only, not blocked)
         if (!isPremium && newCount === FREE_LIMIT) {
@@ -192,11 +223,11 @@ export default function LuckyScreen() {
         // Update premium status from server if changed
         if (data?.isPremium && !isPremium) {
           setIsPremium(true);
-          await AsyncStorage.setItem(IS_PREMIUM_KEY, "true");
+          try { await AsyncStorage.setItem(IS_PREMIUM_KEY, "true"); } catch (_) {}
         }
       } catch (err) {
         const errMsg = (err as Error)?.message ?? "unknown";
-        console.error("[Lucky] CATCH:", errMsg);
+        console.error("[LuckyChat] error", errMsg);
         setMessages((prev) => [
           ...prev,
           { role: "assistant", content: "Hmm, algo deu errado. Tente novamente em instantes." },
