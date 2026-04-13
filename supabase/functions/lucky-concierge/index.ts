@@ -38,11 +38,43 @@ interface RequestBody {
 }
 
 // ── Premium check ─────────────────────────────────────────────────────────────
-// Checks access_levels table by user_id (device_id is stored as user_id for
-// anonymous device-based access). Premium is active when plan_type is "premium"
-// or "vip" and access_until is in the future.
+// SOURCE OF TRUTH: matches exactly what the profile screen uses.
+//
+// Priority:
+//   1. Authenticated user JWT → check app_metadata.plan_type + access_until
+//      (written by the Stripe webhook — same source the profile reads).
+//   2. Anonymous fallback → check access_levels table by deviceId.
+//      (for legacy or device-scoped grants only).
+//
+// The previous implementation used ONLY path 2 (access_levels by deviceId),
+// which never matched because Stripe writes to app_metadata, not access_levels.
 
-async function checkPremium(supa: ReturnType<typeof createClient>, deviceId: string): Promise<boolean> {
+async function checkPremium(
+  supa:     ReturnType<typeof createClient>,
+  jwt:      string,
+  deviceId: string,
+): Promise<boolean> {
+  // ── Path 1: authenticated user — read app_metadata (same as profile screen) ──
+  if (jwt) {
+    try {
+      const { data: { user } } = await supa.auth.getUser(jwt);
+      if (user) {
+        const meta      = user.app_metadata as Record<string, unknown> | undefined;
+        const validPlan = meta?.plan_type === "premium" || meta?.plan_type === "vip";
+        // null access_until = lifetime / no expiry — same logic as GuiaContext
+        const notExpired = !meta?.access_until
+          || new Date(meta.access_until as string) > new Date();
+        if (validPlan && notExpired) {
+          console.log("[lucky-concierge] premium via app_metadata (auth user)");
+          return true;
+        }
+      }
+    } catch (e) {
+      console.warn("[lucky-concierge] getUser(jwt) failed:", (e as Error).message);
+    }
+  }
+
+  // ── Path 2: anonymous / device-based fallback ──
   try {
     const { data } = await supa
       .from("access_levels")
@@ -381,8 +413,12 @@ serve(async (req) => {
 
     const supa = createClient(supaUrl, supaKey);
 
-    // ── 1. Premium check ──
-    const isPremium = await checkPremium(supa, deviceId);
+    // ── 1. Premium check — extract JWT from Authorization header ──
+    // Frontend sends the user's session token (not the anon key) when logged in,
+    // so the backend can verify premium via app_metadata — same source as the profile.
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const jwt = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+    const isPremium = await checkPremium(supa, jwt, deviceId);
     console.log("[lucky-concierge] isPremium:", isPremium);
 
     // ── 2. Usage gate (server-side enforcement) ──

@@ -110,11 +110,14 @@ export default function LuckyScreen() {
           .maybeSingle(),
       ]);
 
-      // Premium check: read app_metadata set by the webhook handler
+      // Premium check: read app_metadata set by the webhook handler.
+      // Identical logic to GuiaContext.checkPremiumStatus — must stay in sync.
       if (premiumResult.status === "fulfilled") {
-        const meta = premiumResult.value.data?.user?.app_metadata as Record<string, any> | undefined;
+        const meta       = premiumResult.value.data?.user?.app_metadata as Record<string, any> | undefined;
         const validPlan  = meta?.plan_type === "premium" || meta?.plan_type === "vip";
-        const notExpired = meta?.access_until ? new Date(meta.access_until) > new Date() : false;
+        // null access_until = lifetime / no expiry — treat as valid; deny only when explicitly expired.
+        // BUG-FIX: previously `meta?.access_until ? ... : false` treated null as expired (wrong).
+        const notExpired = !meta?.access_until || new Date(meta.access_until) > new Date();
         if (validPlan && notExpired) {
           setIsPremium(true);
           await AsyncStorage.setItem(IS_PREMIUM_KEY, "true");
@@ -178,6 +181,14 @@ export default function LuckyScreen() {
         const supabaseAnon =  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
         const endpoint     = `${supabaseUrl}/functions/v1/lucky-concierge`;
 
+        // ── Send user's JWT so backend can verify premium via app_metadata ──
+        // GuiaContext and the profile screen both read app_metadata from the auth
+        // user; the backend must receive the user's token to do the same check.
+        // Unauthenticated users fall back to the anon key — device limit applies.
+        const { data: sessionData } = await supabase.auth.getSession();
+        const authToken = sessionData.session?.access_token ?? supabaseAnon;
+        console.log("[LuckyChat] hasSession:", !!sessionData.session);
+
         const payload = {
           query:       userMsg.content,
           history:     priorHistory.map((m) => ({ role: m.role, content: m.content })),
@@ -192,7 +203,7 @@ export default function LuckyScreen() {
           method:  "POST",
           headers: {
             "Content-Type":  "application/json",
-            "Authorization": `Bearer ${supabaseAnon}`,
+            "Authorization": `Bearer ${authToken}`,
             "apikey":        supabaseAnon,
           },
           body: JSON.stringify(payload),
