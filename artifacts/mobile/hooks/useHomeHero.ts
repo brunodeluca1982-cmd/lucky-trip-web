@@ -72,7 +72,7 @@ export function useHomeHero(): State {
         const rows = data ?? [];
 
         if (rows.length === 0) {
-          console.log("[HOME HERO] source: fallback (Supabase returned 0 items)");
+          console.log("[HERO] items: 5 source: fallback (Supabase returned 0 items)");
           setState({ items: CANONICAL_FALLBACK, loading: false });
           return;
         }
@@ -91,7 +91,7 @@ export function useHomeHero(): State {
           };
         });
 
-        console.log(`[HOME HERO] source: supabase (${items.length} items)`);
+        console.log(`[HERO] items: ${items.length} source: supabase`);
         setState({ items, loading: false });
       } catch (err) {
         if (!cancelled) {

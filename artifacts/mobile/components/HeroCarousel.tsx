@@ -35,16 +35,17 @@ interface HeroCarouselProps {
   onIndexChange?: (index: number) => void;
 }
 
-function HeroSlide({ item }: { item: HeroItem }) {
+function HeroSlide({ item, slideIndex }: { item: HeroItem; slideIndex: number }) {
   // ── Image resolution priority ─────────────────────────────────────────────
-  // 1. Rio items → BackgroundContext.pool (Cloudinary + local fallback)
+  // 1. Rio items → BackgroundContext.pool[slideIndex % pool.length]
+  //    Each slide maps to its own pool frame — reconnects hero → background.
   // 2. Non-Rio with photo_url → { uri: item.image }
   // 3. null → premium placeholder (dark gradient card)
-  const { pool, currentIdx } = useBackground();
+  const { pool } = useBackground();
 
   const usePool = item.cityId === "rio" && !item.route && pool.length > 0;
   const imageSource: ImageSourcePropType | null = usePool
-    ? pool[currentIdx]
+    ? pool[slideIndex % pool.length]
     : item.image ?? null;
 
   return (
@@ -133,7 +134,7 @@ export function HeroCarousel({ items, onIndexChange }: HeroCarouselProps) {
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        renderItem={({ item }) => <HeroSlide item={item} />}
+        renderItem={({ item, index }) => <HeroSlide item={item} slideIndex={index} />}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         scrollEventThrottle={16}
