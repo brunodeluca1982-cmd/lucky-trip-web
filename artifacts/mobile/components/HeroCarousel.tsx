@@ -1,10 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Alert,
   Dimensions,
   FlatList,
   Image,
-  ImageSourcePropType,
   Pressable,
   StyleSheet,
   Text,
@@ -14,83 +12,92 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import Colors from "@/constants/colors";
-import { useBackground } from "@/context/BackgroundContext";
+import type { HeroComposedItem, HeroRoute } from "@/hooks/useHeroComposed";
 
 const C = Colors.light;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const HERO_HEIGHT = Math.round(SCREEN_WIDTH * 1.1);
 
-interface HeroItem {
-  id: string;
-  cidade: string;
-  pais: string;
-  badge: string;
-  image: ImageSourcePropType | null;
-  cityId?: string;
-  route?: string;
-}
-
 interface HeroCarouselProps {
-  items: HeroItem[];
+  items: HeroComposedItem[];
   onIndexChange?: (index: number) => void;
 }
 
-function HeroSlide({ item, slideIndex }: { item: HeroItem; slideIndex: number }) {
-  // ── Image resolution priority ─────────────────────────────────────────────
-  // 1. Rio items → BackgroundContext.pool[slideIndex % pool.length]
-  //    Each slide maps to its own pool frame — reconnects hero → background.
-  // 2. Non-Rio with photo_url → { uri: item.image }
-  // 3. null → premium placeholder (dark gradient card)
-  const { pool } = useBackground();
+// ── Navigation handler — one function per route type ─────────────────────────
+function navigateHeroRoute(route: HeroRoute) {
+  switch (route.type) {
+    case "lugar":
+      router.push({
+        pathname: "/lugar/[cityId]/[placeId]",
+        params: {
+          cityId:       route.cityId,
+          placeId:      route.placeId,
+          source_table: route.source_table,
+        },
+      });
+      break;
+    case "friend":
+      router.push({
+        pathname: "/friend/[slug]",
+        params: { slug: route.slug },
+      });
+      break;
+    case "cidade":
+      router.push({
+        pathname: "/cidade/[id]",
+        params: { id: route.id },
+      });
+      break;
+  }
+}
 
-  const usePool = item.cityId === "rio" && !item.route && pool.length > 0;
-  const imageSource: ImageSourcePropType | null = usePool
-    ? pool[slideIndex % pool.length]
-    : item.image ?? null;
+// ── Single slide ──────────────────────────────────────────────────────────────
+function HeroSlide({ item }: { item: HeroComposedItem }) {
+  // Image: use entity's own photo_url (REAL Supabase data).
+  // null → premium dark placeholder (never blank/black).
+  const imageSource = item.photo_url ? { uri: item.photo_url } : null;
 
   return (
     <Pressable
       style={({ pressed }) => [styles.slide, pressed && { opacity: 0.94 }]}
-      onPress={() => {
-        if (!item.cityId) return;
-        if (item.cityId !== "rio") {
-          Alert.alert(
-            "Em breve disponível",
-            "Estamos preparando esse destino com o cuidado do The Lucky Trip",
-            [{ text: "OK" }]
-          );
-          return;
-        }
-        if (item.route) {
-          router.push(item.route as any);
-        } else {
-          router.push({ pathname: "/cidade/[id]", params: { id: item.cityId } });
-        }
-      }}
+      onPress={() => navigateHeroRoute(item.route)}
     >
       {imageSource ? (
-        <Image source={imageSource} style={styles.image} resizeMode="cover" />
+        <Image
+          source={imageSource}
+          style={styles.image}
+          resizeMode="cover"
+          onError={() =>
+            console.log(`[IMAGE] source: fallback (load error) | id: ${item.id}`)
+          }
+        />
       ) : (
-        // Premium placeholder — dark warm background when no image available
         <View style={[styles.image, styles.placeholder]} />
       )}
+
+      {/* Subtle dim layer */}
       <View style={styles.dimOverlay} />
+
+      {/* Bottom gradient */}
       <LinearGradient
         colors={["transparent", "rgba(0,0,0,0.50)", "rgba(0,0,0,0.88)"]}
         style={styles.gradient}
         locations={[0.20, 0.58, 1]}
       />
+
+      {/* Text content */}
       <View style={styles.content}>
         <View style={styles.badgeContainer}>
           <Text style={styles.badgeText}>{item.badge}</Text>
         </View>
-        <Text style={styles.cidade}>{item.cidade}</Text>
-        <Text style={styles.pais}>{item.pais}</Text>
+        <Text style={styles.cidade}>{item.titulo}</Text>
+        <Text style={styles.pais}>{item.localizacao}</Text>
       </View>
     </Pressable>
   );
 }
 
+// ── Carousel ──────────────────────────────────────────────────────────────────
 export function HeroCarousel({ items, onIndexChange }: HeroCarouselProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
@@ -100,7 +107,7 @@ export function HeroCarousel({ items, onIndexChange }: HeroCarouselProps) {
 
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      if (viewableItems.length > 0 && viewableItems[0].index !== null) {
+      if (viewableItems.length > 0 && viewableItems[0].index != null) {
         const idx = viewableItems[0].index;
         setActiveIndex(idx);
         onIndexChangeRef.current?.(idx);
@@ -111,6 +118,7 @@ export function HeroCarousel({ items, onIndexChange }: HeroCarouselProps) {
   const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
 
   useEffect(() => {
+    if (items.length <= 1) return;
     const len = items.length;
     autoplayRef.current = setInterval(() => {
       setActiveIndex((prev) => {
@@ -125,16 +133,18 @@ export function HeroCarousel({ items, onIndexChange }: HeroCarouselProps) {
     };
   }, [items.length]);
 
+  if (items.length === 0) return null;
+
   return (
     <View style={styles.container}>
       <FlatList
         ref={flatListRef}
         data={items}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => `${item.source_table}-${item.id}`}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        renderItem={({ item, index }) => <HeroSlide item={item} slideIndex={index} />}
+        renderItem={({ item }) => <HeroSlide item={item} />}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         scrollEventThrottle={16}
@@ -147,7 +157,7 @@ export function HeroCarousel({ items, onIndexChange }: HeroCarouselProps) {
       <View style={styles.dots}>
         {items.map((item, i) => (
           <View
-            key={item.id}
+            key={`dot-${item.source_table}-${item.id}`}
             style={[styles.dot, i === activeIndex && styles.dotActive]}
           />
         ))}

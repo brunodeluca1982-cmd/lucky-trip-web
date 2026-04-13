@@ -31,7 +31,7 @@ import { useLuckyList } from "@/hooks/useLuckyList";
 import { useOQueFazer } from "@/hooks/useOQueFazer";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import { useFriends, type FriendCard } from "@/hooks/useFriends";
-import { useHomeHero } from "@/hooks/useHomeHero";
+import { useHeroComposed } from "@/hooks/useHeroComposed";
 
 // ── Context-aware "O que fazer agora" title ───────────────────────────────────
 // Prepositions for known destinations (Portuguese grammar)
@@ -204,20 +204,10 @@ export default function HomeScreen() {
   const { friends, loading: loadingFriends } = useFriends();
   const momentoTab = getCurrentMomento();
 
-  // ── Hero items — useHomeHero (Supabase + canonical fallback) ────────────────
-  // ALWAYS renders. Source: o_que_fazer_rio_v2 → canonical 5 fallbacks.
-  // HeroSlide uses BackgroundContext.pool for cityId="rio" (not item.image).
-  const { items: heroData } = useHomeHero();
-  const heroItems = React.useMemo(() =>
-    heroData.map((h) => ({
-      id:     h.id,
-      cidade: h.titulo,
-      pais:   h.localizacao,
-      badge:  h.badge,
-      image:  h.photo_url ? { uri: h.photo_url } : null,
-      cityId: h.cityId,
-    })),
-  [heroData]);
+  // ── Hero items — useHeroComposed (REAL Supabase data) ───────────────────────
+  // 5 slots: restaurante + o_que_fazer + lucky + friend + rio
+  // photo_url comes directly from each entity. Navigation per source_table.
+  const { items: heroItems } = useHeroComposed();
 
   const filteredAtividades = React.useMemo(() => {
     if (!atividades.length) return [];
