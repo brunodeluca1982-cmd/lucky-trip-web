@@ -37,6 +37,8 @@ interface SavedItemInput {
   titulo: string;
   categoria: SavedCategory;
   localizacao?: string;
+  /** True for items added via external search (Google Places) — must be excluded from all engine steps */
+  isExternal?: boolean;
 }
 
 interface Preferences {
@@ -286,7 +288,17 @@ async function enrichPlaces(
   const places: EnrichedPlace[] = [];
 
   for (const s of saved) {
+    // ── GATE 1: skip hotels (handled separately in Step D / Step 7b) ──────────
     if (s.categoria === "hotel") continue;
+
+    // ── GATE 2: skip external items (Google Places, etc.) ────────────────────
+    // External items have IDs that are NOT Supabase primary keys and MUST NOT
+    // enter the experience engine. They would appear as phantom places with
+    // unverified names and no valid source_table entry.
+    if (s.isExternal) {
+      console.log("SKIPPED EXTERNAL:", s.titulo, s.id);
+      continue;
+    }
 
     let area: string = s.localizacao ?? "";
     let name: string = s.titulo;
@@ -314,6 +326,10 @@ async function enrichPlaces(
         photo_url = (row.photo_url as string | null) ?? null;
         meu_olhar = (row.meu_olhar as string | null) ?? null;
         console.log("FETCHED FROM DB:", row.nome, row.photo_url);
+      } else {
+        // ── GATE 3a: oQueFazer ID not in Supabase → reject ───────────────────
+        console.log("REJECTED (not in o_que_fazer_rio_v2):", s.titulo, s.id);
+        continue;
       }
     } else if (s.categoria === "lucky") {
       // Look up in lucky_list_rio_v2 — confirmed columns: id,nome,bairro,tipo,tags_ia,momento_ideal,photo_url,meu_olhar
@@ -328,6 +344,10 @@ async function enrichPlaces(
         photo_url = (row.photo_url as string | null) ?? null;
         meu_olhar = (row.meu_olhar as string | null) ?? null;
         console.log("FETCHED FROM DB:", row.nome, row.photo_url);
+      } else {
+        // ── GATE 3b: lucky ID not in Supabase → reject ───────────────────────
+        console.log("REJECTED (not in lucky_list_rio_v2):", s.titulo, s.id);
+        continue;
       }
     } else if (s.categoria === "restaurante") {
       const row = restMap.get(Number(s.id));
@@ -345,7 +365,9 @@ async function enrichPlaces(
         momento = dbMomento.length > 0 ? dbMomento : ["lunch"];
         tags = (row.tags_ia as string[] | null) ?? [];
       } else {
-        momento = ["lunch"];
+        // ── GATE 3c: restaurante ID not in Supabase → reject ─────────────────
+        console.log("REJECTED (not in restaurantes):", s.titulo, s.id);
+        continue;
       }
     }
 
