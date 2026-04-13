@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { LugarPlace } from "@/data/lugares";
 import { resolvePin } from "@/data/lugares";
+import { sanitizePhotoUrl } from "@/utils/getImageForEntity";
 
 type State = {
   lugares: LugarPlace[];
@@ -47,16 +48,21 @@ export function useOQueFazer(): State {
       const initial: LugarPlace[] = rows.map((row, idx) => {
         const bairro    = (row.bairro as string | null) ?? "";
         const pin       = resolvePin("rio", bairro, idx % 6);
-        const supaPhoto = (row as any).photo_url as string | null ?? null;
-        console.log("PHOTO_URL:", row.photo_url);
+        const rawPhoto  = (row as any).photo_url as string | null ?? null;
+        const safePhoto = sanitizePhotoUrl(rawPhoto);
+        if (rawPhoto && !safePhoto) {
+          console.error(
+            `[useOQueFazer][INVALID IMAGE SOURCE] Rejected photo for "${row.nome}": ${rawPhoto}`
+          );
+        }
         return {
           id:            String(row.id),
-          titulo:        (row.nome as string | null)                    ?? "Experiência",
-          localizacao:   bairro                                         || "Rio de Janeiro",
+          titulo:        (row.nome as string | null)                       ?? "Experiência",
+          localizacao:   bairro                                            || "Rio de Janeiro",
           categoria:     ((row.categoria as string | null)?.toUpperCase()) ?? "EXPERIÊNCIA",
           descricao:     "Uma das experiências selecionadas para o Rio de Janeiro.",
-          photo_url:     supaPhoto,
-          image:         supaPhoto ? { uri: supaPhoto } : null,
+          photo_url:     safePhoto,
+          image:         safePhoto ? { uri: safePhoto } : null,
           xPct:          pin.xPct,
           yPct:          pin.yPct,
           tipo_item:     "experiencia",

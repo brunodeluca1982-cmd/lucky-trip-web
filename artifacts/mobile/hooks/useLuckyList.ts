@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { LugarPlace } from "@/data/lugares";
 import { resolvePin } from "@/data/lugares";
+import { sanitizePhotoUrl } from "@/utils/getImageForEntity";
 
 type State = {
   lugares: LugarPlace[];
@@ -48,8 +49,13 @@ export function useLuckyList(): State {
       const initial: LugarPlace[] = rows.map((row, idx) => {
         const bairro    = (row.bairro as string | null) ?? "";
         const pin       = resolvePin("rio", bairro, idx % 6);
-        const supaPhoto = (row as any).photo_url as string | null ?? null;
-        console.log("PHOTO_URL:", row.photo_url);
+        const rawPhoto  = (row as any).photo_url as string | null ?? null;
+        const supaPhoto = sanitizePhotoUrl(rawPhoto);
+        if (rawPhoto && !supaPhoto) {
+          console.error(
+            `[useLuckyList][INVALID IMAGE SOURCE] Rejected photo for "${row.nome}": ${rawPhoto}`
+          );
+        }
         const tipoItem  = (row as any).tipo_item as string | null;
         const entityType =
           tipoItem === "restaurante" ? "restaurant" :

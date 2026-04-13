@@ -26,7 +26,6 @@ import { PlaceCard } from "@/components/PlaceCard";
 import { RestauranteCard } from "@/components/RestauranteCard";
 import { SectionHeader } from "@/components/SectionHeader";
 import Colors from "@/constants/colors";
-import { heroDestinos } from "@/data/mockData";
 import { useGuia } from "@/context/GuiaContext";
 import { useLuckyList } from "@/hooks/useLuckyList";
 import { useOQueFazer } from "@/hooks/useOQueFazer";
@@ -204,6 +203,22 @@ export default function HomeScreen() {
   const { friends, loading: loadingFriends } = useFriends();
   const momentoTab = getCurrentMomento();
 
+  // ── Hero items — SUPABASE ONLY ─────────────────────────────────────────────
+  // Built from o_que_fazer_rio_v2 items that have Supabase photos.
+  // NEVER use mock data. If Supabase returns 0 items → carousel hidden.
+  const heroItems = React.useMemo(() => {
+    const withPhoto = atividades.filter((a) => a.image !== null);
+    if (withPhoto.length === 0) return [];
+    return withPhoto.slice(0, 6).map((a) => ({
+      id:     a.id,
+      cidade: a.titulo,
+      pais:   a.localizacao,
+      badge:  a.categoria ?? "Experiência",
+      image:  a.image as any,
+      cityId: "rio" as const,
+    }));
+  }, [atividades]);
+
   const filteredAtividades = React.useMemo(() => {
     if (!atividades.length) return [];
     const filtered = atividades.filter((a) => {
@@ -254,8 +269,8 @@ export default function HomeScreen() {
         contentContainerStyle={{ paddingBottom: bottomPad + 80 }}
       >
 
-        {/* ── 1. HERO CAROUSEL ── */}
-        <HeroCarousel items={heroDestinos} />
+        {/* ── 1. HERO CAROUSEL — Supabase only ── */}
+        {heroItems.length > 0 && <HeroCarousel items={heroItems} />}
 
         {/* ── 2. O QUE FAZER NO RIO ── Supabase: o_que_fazer_rio */}
         <View style={s.section}>

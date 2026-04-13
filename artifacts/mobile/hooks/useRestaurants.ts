@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase, type Restaurante } from "@/lib/supabase";
+import { sanitizePhotoUrl } from "@/utils/getImageForEntity";
 
 type State = {
   restaurantes: Restaurante[];
@@ -48,11 +49,16 @@ export function useRestaurants(cidadeId?: string): State {
 
       if (cancelled) return;
 
-      // ── 2. Map photo_url directly ─────────────────────────────────────────
-      const merged: Restaurante[] = rawRows.map((r) => ({
-        ...r,
-        resolvedPhotoUri: r.photo_url ?? null,
-      }));
+      // ── 2. Map + sanitize photo_url (block Google CDN and invalid sources) ──
+      const merged: Restaurante[] = rawRows.map((r) => {
+        const safe = sanitizePhotoUrl(r.photo_url ?? null);
+        if (r.photo_url && !safe) {
+          console.error(
+            `[useRestaurants][INVALID IMAGE SOURCE] Rejected photo for "${r.nome}": ${r.photo_url}`
+          );
+        }
+        return { ...r, resolvedPhotoUri: safe };
+      });
 
       setRestaurantes(merged);
       setLoading(false);

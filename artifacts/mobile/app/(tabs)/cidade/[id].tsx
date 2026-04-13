@@ -22,9 +22,7 @@ import { RotatingBackground } from "@/components/RotatingBackground";
 import {
   destinos,
   detectPeriodo,
-  type Periodo,
 } from "@/data/mockData";
-import { AGORA_CONTENT, FALLBACK_CONTENT } from "@/data/agoraContent";
 import { RestauranteCard } from "@/components/RestauranteCard";
 import { HotelCard } from "@/components/HotelCard";
 import { useOQueFazer } from "@/hooks/useOQueFazer";
@@ -188,10 +186,13 @@ export default function CidadeScreen() {
   const allHotels = neighborhoods.flatMap((n) =>
     (n.hotels ?? []).map((h) => ({ ...h, localizacao: n.neighborhood_name }))
   );
-  // Derive "Agora" label + pinned item from the same source as the next page
-  const cityAgoraContent = AGORA_CONTENT[destino.id] ?? FALLBACK_CONTENT;
-  const firstAgoraItem = cityAgoraContent[periodo]?.[0];
-  const experience = firstAgoraItem?.titulo ?? "Descoberta local";
+  // Derive "Agora" label from Supabase atividades (first item with a matching momento_ideal)
+  const experience = React.useMemo(() => {
+    const match = atividades.find(
+      (a) => typeof a.momento_ideal === "string" && a.momento_ideal.toLowerCase() === periodo
+    );
+    return match?.titulo ?? atividades[0]?.titulo ?? "Descoberta local";
+  }, [atividades, periodo]);
   const agoraLabel = AGORA_LABEL[destino.id] ?? `Agora em ${destino.cidade}`;
   const essentialRef = ESSENTIALS[destino.id] ?? `de ${destino.cidade}`;
 

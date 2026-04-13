@@ -1,18 +1,14 @@
 /**
  * "O que fazer agora" — real-time intelligent guide by time of day.
  *
- * Opens from the "Agora no Rio" card on the cidade/[id] screen.
- *
- * Structure:
- *  – Cinematic hero header (background image + title + period subtitle)
- *  – PeriodoSwitcher (Manhã / Tarde / Noite)
- *  – Hero card (top pick, full-width)
- *  – Horizontal scroll of additional picks
- *  – "Destaque principal" curated 2-column grid
+ * STRICT RULE: ALL content comes from Supabase only.
+ * Any item not found in Supabase is REJECTED with console.error.
+ * If Supabase returns 0 items → UI shows empty state. NEVER fake content.
  */
 
 import React from "react";
 import {
+  ActivityIndicator,
   Animated,
   Dimensions,
   Image,
@@ -28,43 +24,50 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { destinos, periodoMeta, type Periodo } from "@/data/mockData";
-import {
-  AGORA_CONTENT,
-  FALLBACK_CONTENT,
-  DESTAQUE_PRINCIPAL,
-  type AgoraItem,
-  type DestaquePick,
-} from "@/data/agoraContent";
+import { destinos } from "@/data/mockData";
 import { PeriodoSwitcher } from "@/components/PeriodoSwitcher";
 import { useTimeOfDay } from "@/hooks/useTimeOfDay";
+import { useAgoraContent, type AgoraItem, type DestaqueItem } from "@/hooks/useAgoraContent";
 
 const C = Colors.light;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CARD_W = SCREEN_WIDTH * 0.62;
 const GRID_CARD_W = (SCREEN_WIDTH - 48 - 12) / 2;
 
+const PERIODO_META: Record<string, { label: string; subtitle: string }> = {
+  manha: { label: "Manhã",  subtitle: "Manhã no Rio — comece o dia com leveza."   },
+  tarde:  { label: "Tarde", subtitle: "Tarde no Rio — o melhor para este momento." },
+  noite:  { label: "Noite", subtitle: "Noite no Rio — a cidade que nunca dorme."   },
+};
+
 // ── Hero card (first item, full-width) ────────────────────────────────────────
 function HeroCard({ item, cityId }: { item: AgoraItem; cityId: string }) {
   return (
     <Pressable
       style={({ pressed }) => [s.heroCard, pressed && { opacity: 0.90 }]}
-      onPress={() => item.placeId && router.push(`/lugar/${cityId}/${item.placeId}`)}
+      onPress={() =>
+        router.push({
+          pathname: "/lugar/[cityId]/[placeId]",
+          params: { cityId, placeId: item.placeId, source_table: item.source_table },
+        })
+      }
     >
-      {item.image != null && <Image source={item.image} style={s.heroCardImage} resizeMode="cover" />}
+      {item.image != null && (
+        <Image source={item.image} style={s.heroCardImage} resizeMode="cover" />
+      )}
       <LinearGradient
         colors={["rgba(0,0,0,0.02)", "rgba(0,0,0,0.85)"]}
         locations={[0.3, 1]}
         style={StyleSheet.absoluteFill}
       />
-      {/* Tag pill */}
       <View style={s.heroTagPill}>
         <Text style={s.heroTagText}>{item.tag}</Text>
       </View>
-      {/* Content */}
       <View style={s.heroCardContent}>
         <Text style={s.heroCardTitle}>{item.titulo}</Text>
-        <Text style={s.heroCardSub}>{item.descricao}</Text>
+        {item.descricao ? (
+          <Text style={s.heroCardSub} numberOfLines={2}>{item.descricao}</Text>
+        ) : null}
         <View style={s.heroCardAction}>
           <Text style={s.heroCardActionText}>Explorar</Text>
           <Feather name="arrow-right" size={13} color="rgba(255,255,255,0.70)" />
@@ -78,10 +81,20 @@ function HeroCard({ item, cityId }: { item: AgoraItem; cityId: string }) {
 function MomentoCard({ item, cityId }: { item: AgoraItem; cityId: string }) {
   return (
     <Pressable
-      style={({ pressed }) => [s.momentoCard, pressed && { opacity: 0.88, transform: [{ scale: 0.97 }] }]}
-      onPress={() => item.placeId && router.push(`/lugar/${cityId}/${item.placeId}`)}
+      style={({ pressed }) => [
+        s.momentoCard,
+        pressed && { opacity: 0.88, transform: [{ scale: 0.97 }] },
+      ]}
+      onPress={() =>
+        router.push({
+          pathname: "/lugar/[cityId]/[placeId]",
+          params: { cityId, placeId: item.placeId, source_table: item.source_table },
+        })
+      }
     >
-      {item.image != null && <Image source={item.image} style={s.momentoImage} resizeMode="cover" />}
+      {item.image != null && (
+        <Image source={item.image} style={s.momentoImage} resizeMode="cover" />
+      )}
       <LinearGradient
         colors={["rgba(0,0,0,0.02)", "rgba(0,0,0,0.84)"]}
         locations={[0.25, 1]}
@@ -99,10 +112,12 @@ function MomentoCard({ item, cityId }: { item: AgoraItem; cityId: string }) {
 }
 
 // ── Destaque card (2-col grid) ────────────────────────────────────────────────
-function DestaqueCard({ pick }: { pick: DestaquePick }) {
+function DestaqueCard({ pick }: { pick: DestaqueItem }) {
   return (
     <View style={s.destaqueCard}>
-      {pick.image != null && <Image source={pick.image} style={s.destaqueImage} resizeMode="cover" />}
+      {pick.image != null && (
+        <Image source={pick.image} style={s.destaqueImage} resizeMode="cover" />
+      )}
       <LinearGradient
         colors={["rgba(0,0,0,0.04)", "rgba(0,0,0,0.82)"]}
         locations={[0.2, 1]}
@@ -119,39 +134,54 @@ function DestaqueCard({ pick }: { pick: DestaquePick }) {
   );
 }
 
-// ── Main screen ───────────────────────────────────────────────────────────────
+// ── Empty state ───────────────────────────────────────────────────────────────
+function EmptyState({ periodo }: { periodo: string }) {
+  const meta = PERIODO_META[periodo];
+  return (
+    <View style={s.emptyWrap}>
+      <Feather name="compass" size={36} color="rgba(255,255,255,0.20)" />
+      <Text style={s.emptyTitle}>Nada disponível</Text>
+      <Text style={s.emptySubtitle}>
+        Não encontramos sugestões para {meta?.label ?? periodo} no momento.
+      </Text>
+    </View>
+  );
+}
 
+// ── Main screen ───────────────────────────────────────────────────────────────
 export default function AgoraNoRioScreen() {
   const { id, pinnedId } = useLocalSearchParams<{ id: string; pinnedId?: string }>();
-  const insets = useSafeAreaInsets();
-  const topInset = Platform.OS === "web" ? 67 : insets.top;
+  const insets    = useSafeAreaInsets();
+  const topInset  = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
   const destino = destinos.find((d) => d.id === id) ?? destinos[0];
   const { periodo, setPeriodo, fadeAnim } = useTimeOfDay();
-  const meta = periodoMeta[periodo];
+  const meta = PERIODO_META[periodo];
 
-  const cityContent = AGORA_CONTENT[destino.id] ?? FALLBACK_CONTENT;
-  const rawItems = cityContent[periodo] ?? [];
+  const { byPeriodo, destaques, loading, error } = useAgoraContent(destino.id);
 
-  // If a pinnedId was passed from the home screen, move that item to the front.
-  // If it doesn't exist in the current period's items (e.g. user switched period),
-  // the find returns undefined and we fall back to natural order.
-  const pinnedItem = pinnedId ? rawItems.find((item) => item.id === pinnedId) : undefined;
+  const rawItems = byPeriodo[periodo] ?? [];
+
+  const pinnedItem = pinnedId
+    ? rawItems.find((item) => item.id === pinnedId || item.placeId === pinnedId)
+    : undefined;
+
   const items = pinnedItem
-    ? [pinnedItem, ...rawItems.filter((item) => item.id !== pinnedId)]
+    ? [pinnedItem, ...rawItems.filter((item) => item.id !== pinnedItem.id)]
     : rawItems;
 
-  const heroItem = items[0];
+  const heroItem  = items[0];
   const restItems = items.slice(1);
-  const destaques = DESTAQUE_PRINCIPAL[periodo];
 
   return (
     <View style={s.root}>
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* ── Fullscreen background ── */}
-      {destino.image != null && <Image source={destino.image} style={s.bgImage} resizeMode="cover" />}
+      {destino.image != null && (
+        <Image source={destino.image} style={s.bgImage} resizeMode="cover" />
+      )}
       <LinearGradient
         colors={["rgba(0,0,0,0.55)", "rgba(0,0,0,0.40)", "#000000"]}
         locations={[0, 0.28, 0.52]}
@@ -175,58 +205,79 @@ export default function AgoraNoRioScreen() {
           { paddingTop: topInset + 60, paddingBottom: bottomPad + 110 },
         ]}
       >
-        {/* ── Hero header (text over background image) ── */}
+        {/* ── Hero header ── */}
         <View style={s.header}>
           <Text style={s.headerTitle}>O que fazer agora</Text>
           <Animated.Text style={[s.headerSubtitle, { opacity: fadeAnim }]}>
-            {meta.subtitle}
+            {meta?.subtitle ?? ""}
           </Animated.Text>
         </View>
 
         {/* ── Period switcher ── */}
         <PeriodoSwitcher active={periodo} onChange={setPeriodo} dark />
 
-        {/* ── Content animates on period change ── */}
+        {/* ── Content ── */}
         <Animated.View style={{ opacity: fadeAnim }}>
 
-          {/* ── Hero card ── */}
-          {heroItem && (
-            <View style={s.heroSection}>
-              <HeroCard item={heroItem} cityId={destino.id} />
+          {loading ? (
+            <ActivityIndicator
+              color="rgba(201,168,76,0.7)"
+              style={{ marginTop: 40 }}
+            />
+          ) : error ? (
+            <View style={s.emptyWrap}>
+              <Feather name="wifi-off" size={32} color="rgba(255,255,255,0.20)" />
+              <Text style={s.emptyTitle}>Erro ao carregar</Text>
+              <Text style={s.emptySubtitle}>{error}</Text>
             </View>
-          )}
+          ) : (
+            <>
+              {/* ── Hero card ── */}
+              {heroItem ? (
+                <View style={s.heroSection}>
+                  <HeroCard item={heroItem} cityId={destino.id} />
+                </View>
+              ) : (
+                <EmptyState periodo={periodo} />
+              )}
 
-          {/* ── More cards horizontal scroll ── */}
-          {restItems.length > 0 && (
-            <View style={s.maisSection}>
-              <View style={s.maisSectionHeader}>
-                <Text style={s.maisSectionLabel}>Mais para este momento</Text>
-                <Feather name="chevron-right" size={15} color="rgba(255,255,255,0.35)" />
-              </View>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={s.momentoScroll}
-              >
-                {restItems.map((item) => (
-                  <MomentoCard key={item.id} item={item} cityId={destino.id} />
-                ))}
-              </ScrollView>
-            </View>
-          )}
+              {/* ── More cards horizontal scroll ── */}
+              {restItems.length > 0 && (
+                <View style={s.maisSection}>
+                  <View style={s.maisSectionHeader}>
+                    <Text style={s.maisSectionLabel}>Mais para este momento</Text>
+                    <Feather
+                      name="chevron-right"
+                      size={15}
+                      color="rgba(255,255,255,0.35)"
+                    />
+                  </View>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={s.momentoScroll}
+                  >
+                    {restItems.map((item) => (
+                      <MomentoCard key={item.id} item={item} cityId={destino.id} />
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
 
-          {/* ── Destaque principal ── */}
-          {destaques && (
-            <View style={s.destaqueSection}>
-              <View style={s.maisSectionHeader}>
-                <Text style={s.maisSectionLabel}>Destaque principal</Text>
-              </View>
-              <View style={s.destaqueGrid}>
-                {destaques.map((pick) => (
-                  <DestaqueCard key={pick.titulo} pick={pick} />
-                ))}
-              </View>
-            </View>
+              {/* ── Destaque (Supabase restaurants) ── */}
+              {destaques.length > 0 && (
+                <View style={s.destaqueSection}>
+                  <View style={s.maisSectionHeader}>
+                    <Text style={s.maisSectionLabel}>Onde comer</Text>
+                  </View>
+                  <View style={s.destaqueGrid}>
+                    {destaques.slice(0, 2).map((pick) => (
+                      <DestaqueCard key={pick.id} pick={pick} />
+                    ))}
+                  </View>
+                </View>
+              )}
+            </>
           )}
 
         </Animated.View>
@@ -244,7 +295,6 @@ export default function AgoraNoRioScreen() {
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
-
 const s = StyleSheet.create({
   root: {
     flex: 1,
@@ -276,7 +326,6 @@ const s = StyleSheet.create({
 
   scrollContent: {},
 
-  // ── Header (over background image) ──
   header: {
     paddingHorizontal: 24,
     paddingBottom: 18,
@@ -296,7 +345,6 @@ const s = StyleSheet.create({
     lineHeight: 22,
   },
 
-  // ── Hero card ──
   heroSection: {
     paddingHorizontal: 24,
     marginTop: 22,
@@ -366,7 +414,6 @@ const s = StyleSheet.create({
     letterSpacing: 0.3,
   },
 
-  // ── "Mais para este momento" horizontal scroll ──
   maisSection: {
     marginTop: 28,
   },
@@ -439,7 +486,6 @@ const s = StyleSheet.create({
     color: "rgba(255,255,255,0.55)",
   },
 
-  // ── Destaque principal ──
   destaqueSection: {
     marginTop: 32,
   },
@@ -500,7 +546,26 @@ const s = StyleSheet.create({
     color: "rgba(255,255,255,0.52)",
   },
 
-  // ── Footer ──
+  emptyWrap: {
+    alignItems: "center",
+    paddingVertical: 60,
+    paddingHorizontal: 32,
+    gap: 12,
+  },
+  emptyTitle: {
+    fontFamily: "PlayfairDisplay_600SemiBold",
+    fontSize: 18,
+    color: "rgba(255,255,255,0.55)",
+    textAlign: "center",
+  },
+  emptySubtitle: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.32)",
+    textAlign: "center",
+    lineHeight: 20,
+  },
+
   footer: {
     marginTop: 40,
     marginHorizontal: 24,

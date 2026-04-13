@@ -10,10 +10,11 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
-import type { DestaqueType } from "@/data/mockData";
 import Colors from "@/constants/colors";
 import { BookmarkButton } from "@/components/BookmarkButton";
 import type { SavedCategory } from "@/context/GuiaContext";
+
+type DestaqueType = "oQueFazer" | "restaurante" | "hotel" | "lucky";
 
 const C = Colors.light;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
