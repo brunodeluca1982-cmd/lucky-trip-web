@@ -143,7 +143,24 @@ export default function LuckyScreen() {
 
   const sendQuery = useCallback(
     async (query: string) => {
-      if (!query.trim() || loading || isAtLimit || !deviceId) return;
+      // ── Guard: only block on real conditions — NEVER block on deviceId being null ──
+      // deviceId may still be loading when user clicks; we resolve it inline instead.
+      if (!query.trim() || loading || isAtLimit) return;
+
+      console.log("[LuckyChat] sending query", query);
+
+      // ── Resolve deviceId inline — never drop the request because id isn't ready ──
+      let effectiveDeviceId = deviceId;
+      if (!effectiveDeviceId) {
+        try {
+          effectiveDeviceId = await getDeviceId();
+          setDeviceId(effectiveDeviceId);
+        } catch (_) {
+          effectiveDeviceId = `session-${Date.now()}`;
+        }
+        console.log("[LuckyChat] deviceId resolved inline:", effectiveDeviceId.slice(0, 8) + "...");
+      }
+      console.log("[LuckyChat] deviceId", effectiveDeviceId);
 
       Keyboard.dismiss();
       const userMsg: Message = { role: "user", content: query.trim() };
@@ -155,9 +172,8 @@ export default function LuckyScreen() {
       scrollToBottom();
 
       try {
-        // ── BUG-FIX: strip trailing slash from SUPABASE_URL before concatenating
-        // EXPO_PUBLIC_SUPABASE_URL is set from $SUPABASE_URL which ends with "/"
-        // causing "//functions/v1/..." double-slash that Supabase routes incorrectly.
+        // Strip trailing slash from SUPABASE_URL — env var ends with "/" causing
+        // "//functions/v1/..." double-slash that Supabase routes incorrectly.
         const supabaseUrl  = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? "").replace(/\/$/, "");
         const supabaseAnon =  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
         const endpoint     = `${supabaseUrl}/functions/v1/lucky-concierge`;
@@ -165,7 +181,7 @@ export default function LuckyScreen() {
         const payload = {
           query:       userMsg.content,
           history:     priorHistory.map((m) => ({ role: m.role, content: m.content })),
-          deviceId,
+          deviceId:    effectiveDeviceId,
           destination: "Rio de Janeiro",
         };
 
@@ -182,19 +198,29 @@ export default function LuckyScreen() {
           body: JSON.stringify(payload),
         });
 
-        console.log("[LuckyChat] status", rawRes.status);
+        console.log("[LuckyChat] response status", rawRes.status);
 
         const data = await rawRes.json().catch(() => ({}));
-        console.log("[LuckyChat] data", data);
+        console.log("[LuckyChat] response data", data);
+        console.log("[LuckyChat] reply",        data?.reply);
+        console.log("[LuckyChat] limitReached",  data?.limitReached);
 
-        // 402 = server-side limit reached (authoritative enforcement)
+        // 402 or limitReached = server-side gate reached
+        // BUG-FIX: add a visible assistant message explaining the limit BEFORE
+        // updating responsesUsed — previously the chat looked like "no response"
+        // because nothing was appended to the thread when limitReached fired.
         if (rawRes.status === 402 || data?.limitReached) {
-          console.log("[LuckyChat] GATE: limit reached");
+          console.log("[LuckyChat] GATE: limit reached — appending paywall message");
+          setMessages((prev) => [
+            ...prev,
+            {
+              role:    "assistant",
+              content: "Você chegou ao limite de perguntas gratuitas. Continue com o Lucky Premium para perguntas ilimitadas.",
+            },
+          ]);
           const newCount = Math.max(responsesUsed, data?.questionCount ?? FREE_LIMIT);
           setResponsesUsed(newCount);
           try { await AsyncStorage.setItem(RESPONSES_USED_KEY, String(newCount)); } catch (_) {}
-          setLoading(false);
-          scrollToBottom();
           return;
         }
 
@@ -204,10 +230,8 @@ export default function LuckyScreen() {
           throw new Error(errMsg);
         }
 
-        console.log("[LuckyChat] reply", data?.reply);
-
-        const reply = data?.reply ?? "Desculpe, não consegui processar sua pergunta.";
         console.log("[LuckyChat] append assistant message");
+        const reply = data?.reply ?? "Desculpe, não consegui processar sua pergunta.";
         setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
 
         // Sync count: use server's authoritative count
@@ -215,12 +239,12 @@ export default function LuckyScreen() {
         setResponsesUsed(newCount);
         try { await AsyncStorage.setItem(RESPONSES_USED_KEY, String(newCount)); } catch (_) {}
 
-        // Show subtle editorial hint after 2nd free answer (question 2 only, not blocked)
+        // Show subtle editorial hint after 2nd free answer
         if (!isPremium && newCount === FREE_LIMIT) {
           setShowSecondHint(true);
         }
 
-        // Update premium status from server if changed
+        // Update premium flag from server if changed
         if (data?.isPremium && !isPremium) {
           setIsPremium(true);
           try { await AsyncStorage.setItem(IS_PREMIUM_KEY, "true"); } catch (_) {}
@@ -291,8 +315,8 @@ export default function LuckyScreen() {
               )}
             </View>
 
-            {/* ── Entry prompts ── */}
-            {!hasMessages && (
+            {/* ── Entry prompts — hidden when at limit (clicking would be silently blocked) ── */}
+            {!hasMessages && !isAtLimit && (
               <View style={styles.promptsSection}>
                 <Text style={styles.promptsLabel}>Sugestões</Text>
                 <View style={styles.promptsGrid}>
