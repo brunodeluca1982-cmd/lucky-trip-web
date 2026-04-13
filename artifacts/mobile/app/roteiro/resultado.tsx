@@ -88,13 +88,43 @@ function navigateToItem(item: SavedItem) {
 
 type TravelData = { distance_km: number; travel_time_minutes: number };
 
-function TravelChip({ travel }: { travel: TravelData }) {
+// Convert total minutes → "HH:MM" (e.g. 14 → "00:14", 75 → "01:15")
+function minsToHHMM(m: number): string {
+  const h = Math.floor(m / 60);
+  const mins = m % 60;
+  return `${String(h).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+}
+
+// Subtract N minutes from a "HH:MM" string (floors at "00:00")
+function subtractMins(timeStr: string, delta: number): string {
+  const [hh, mm] = timeStr.split(":").map(Number);
+  return minsToHHMM(Math.max(0, (hh ?? 0) * 60 + (mm ?? 0) - delta));
+}
+
+// ── Deslocamento row ── shows departure time, label, travel duration + distance
+function DeslocamentoRow({
+  travel,
+  arrivalTime,
+}: {
+  travel:       TravelData;
+  arrivalTime?: string;
+}) {
+  const departureTime = arrivalTime
+    ? subtractMins(arrivalTime, travel.travel_time_minutes)
+    : null;
+
   return (
-    <View style={sc.travelChip}>
-      <Feather name="navigation" size={8} color="rgba(212,175,55,0.32)" />
-      <Text style={sc.travelChipText}>
-        {travel.travel_time_minutes} min · {travel.distance_km.toFixed(1)} km
-      </Text>
+    <View style={sc.deslocamentoRow}>
+      {departureTime && (
+        <Text style={sc.deslocamentoTime}>{departureTime}</Text>
+      )}
+      <View style={sc.deslocamentoDivider} />
+      <Text style={sc.deslocamentoLabel}>Deslocamento</Text>
+      <View style={{ flex: 1 }} />
+      <Feather name="clock" size={9} color="rgba(255,255,255,0.25)" />
+      <Text style={sc.deslocamentoMeta}>{minsToHHMM(travel.travel_time_minutes)}</Text>
+      <Feather name="map-pin" size={9} color="rgba(255,255,255,0.25)" />
+      <Text style={sc.deslocamentoMeta}>{travel.distance_km.toFixed(1)} km</Text>
     </View>
   );
 }
@@ -238,7 +268,10 @@ function DayCard({
                 return (
                   <React.Fragment key={`${item.source_table ?? item.categoria}_${item.id}_${idx}`}>
                     {travel && (
-                      <TravelChip travel={travel} />
+                      <DeslocamentoRow
+                        travel={travel}
+                        arrivalTime={(item as any).start_time}
+                      />
                     )}
                     <Pressable
                       style={({ pressed }) => [sc.itemRow, pressed && { opacity: 0.78 }]}
@@ -713,21 +746,45 @@ const sc = StyleSheet.create({
     marginTop:  2,
   },
 
-  // Travel chip — appears before each item that has travel_from_previous
-  travelChip: {
-    flexDirection:   "row",
-    alignItems:      "center",
-    gap:             5,
-    paddingLeft:     51,   // 42 (timeCol.width) + 9 (half of connectorCol.width=18) = 51
-    paddingVertical: 3,
-    marginTop:       -2,
-    marginBottom:    2,
+  // Deslocamento row — first-class travel block between items
+  deslocamentoRow: {
+    flexDirection:     "row",
+    alignItems:        "center",
+    gap:               6,
+    paddingHorizontal: 16,
+    paddingVertical:   5,
+    marginTop:         -2,
+    marginBottom:      2,
+    backgroundColor:   "rgba(255,255,255,0.03)",
+    borderTopWidth:    StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor:       "rgba(255,255,255,0.06)",
   },
-  travelChipText: {
+  deslocamentoTime: {
+    fontFamily:    "Inter_500Medium",
+    fontSize:      10,
+    color:         "rgba(255,255,255,0.38)",
+    letterSpacing: 0.3,
+    minWidth:      38,
+  },
+  deslocamentoDivider: {
+    width:           1,
+    height:          10,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    marginHorizontal: 2,
+  },
+  deslocamentoLabel: {
     fontFamily:    "Inter_400Regular",
-    fontSize:      9,
-    color:         "rgba(255,255,255,0.22)",
-    letterSpacing: 0.5,
+    fontSize:      10,
+    color:         "rgba(255,255,255,0.28)",
+    letterSpacing: 0.4,
+  },
+  deslocamentoMeta: {
+    fontFamily:    "Inter_400Regular",
+    fontSize:      10,
+    color:         "rgba(255,255,255,0.28)",
+    letterSpacing: 0.3,
+    marginLeft:    2,
   },
 
   // Image placeholder — shown when no photo_url from Supabase
