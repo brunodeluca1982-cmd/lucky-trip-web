@@ -108,9 +108,16 @@ interface ItemRoteiro {
   source_table: string;
   image?: unknown;
   // Step F — additive enrichment fields (optional, backward compatible)
-  photo_url?: string | null; // Supabase photo_url; null if not available
-  descricao?: string | null; // meu_olhar editorial note; null if not available
-  duracao?: string; // average visit duration e.g. "1-2h"
+  photo_url?: string | null;   // Supabase photo_url; null if not available
+  descricao?: string | null;   // meu_olhar editorial note; null if not available
+  duracao?: string;            // average visit duration e.g. "1-2h"
+  experience_type?: string;   // relax | scenic | food | culture | nightlife | active
+  /** Zone-based travel estimate from the preceding item in the day.
+   *  Absent on the first item of the day. Uses bairro→zone proximity — no lat/lng in DB. */
+  travel_from_previous?: {
+    distance_km: number;
+    travel_time_minutes: number;
+  };
 }
 
 interface DiaPeriodo {
@@ -190,6 +197,24 @@ function getZone(bairro?: string): number {
     if (bairro.toLowerCase().includes(key.toLowerCase())) return zone;
   }
   return 3;
+}
+
+// ── Travel time estimator ─────────────────────────────────────────────────────
+// Provides approximate distance and travel time between two bairros using the
+// zone system (1 = Ipanema/Leblon … 6 = Barra).  Precise lat/lng does not exist
+// in the Supabase schema, so this deterministic zone-delta approximation is used.
+// Same approach as Apple Maps' city-block estimates for areas with sparse GPS data.
+
+function estimateTravelTime(
+  fromArea: string,
+  toArea: string,
+): { distance_km: number; travel_time_minutes: number } {
+  if (fromArea === toArea) return { distance_km: 0.6,  travel_time_minutes: 8  };
+  const diff = Math.abs(getZone(fromArea) - getZone(toArea));
+  if (diff === 0)            return { distance_km: 1.5,  travel_time_minutes: 12 };
+  if (diff === 1)            return { distance_km: 3.5,  travel_time_minutes: 22 };
+  if (diff === 2)            return { distance_km: 7.0,  travel_time_minutes: 32 };
+  return                            { distance_km: 12.0, travel_time_minutes: 45 };
 }
 
 // ── Vibe → items per day ──────────────────────────────────────────────────────
@@ -2163,19 +2188,40 @@ function buildFullDraft(
         const finalPhoto: string | null = a.photo_url ?? null;
 
         return {
-          id: a.id,
-          titulo: a.name,
-          categoria: a.categoria,
-          localizacao: a.area,
-          source_table: categoriaToTable(a.categoria),
+          id:              a.id,
+          titulo:          a.name,
+          categoria:       a.categoria,
+          localizacao:     a.area,
+          source_table:    categoriaToTable(a.categoria),
           // Step F — additive enrichment fields
-          image: finalPhoto ? { uri: finalPhoto } : undefined,
-          photo_url: finalPhoto,
-          descricao: a.meu_olhar ?? null,
-          duracao: a.duracao,
+          image:           finalPhoto ? { uri: finalPhoto } : undefined,
+          photo_url:       finalPhoto,
+          descricao:       a.meu_olhar ?? null,
+          duracao:         a.duracao,
+          experience_type: a.experience_type,
         };
       }),
     }));
+
+    // ── 5e-travel. Inject travel_from_previous across all periods ─────────────
+    // Runs after periodos are built so it can span period boundaries (e.g. last
+    // item of manhã → first item of tarde).  First item of the day has no
+    // travel_from_previous (no preceding item).  Uses zone-based approximation
+    // since the Supabase schema has no lat/lng columns.
+    {
+      let prevLocalizacao: string | null = null;
+      for (const periodo of periodos) {
+        for (const item of periodo.items) {
+          if (prevLocalizacao !== null) {
+            item.travel_from_previous = estimateTravelTime(
+              prevLocalizacao,
+              item.localizacao,
+            );
+          }
+          prevLocalizacao = item.localizacao;
+        }
+      }
+    }
 
     if (periodos.length === 0) return;
 

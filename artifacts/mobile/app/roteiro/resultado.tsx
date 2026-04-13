@@ -84,6 +84,21 @@ function navigateToItem(item: SavedItem) {
   });
 }
 
+// ── Travel time chip ──────────────────────────────────────────────────────────
+
+type TravelData = { distance_km: number; travel_time_minutes: number };
+
+function TravelChip({ travel }: { travel: TravelData }) {
+  return (
+    <View style={sc.travelChip}>
+      <Feather name="navigation" size={8} color="rgba(212,175,55,0.32)" />
+      <Text style={sc.travelChipText}>
+        {travel.travel_time_minutes} min · {travel.distance_km.toFixed(1)} km
+      </Text>
+    </View>
+  );
+}
+
 // ── Item thumbnail ─────────────────────────────────────────────────────────────
 
 function ItemThumb({ image }: { image: { uri: string } | null | unknown }) {
@@ -218,35 +233,42 @@ function DayCard({
                 <View style={sc.periodoDivider} />
               </View>
 
-              {periodo.items.map((item, idx) => (
-                <Pressable
-                  key={`${item.source_table ?? item.categoria}_${item.id}_${idx}`}
-                  style={({ pressed }) => [sc.itemRow, pressed && { opacity: 0.78 }]}
-                  onPress={() => navigateToItem(item)}
-                >
-                  <View style={sc.timeCol}>
-                    <Text style={sc.timeLabel}>{getItemTime(periodo.periodo, idx)}</Text>
-                  </View>
+              {periodo.items.map((item, idx) => {
+                const travel = (item as any).travel_from_previous as TravelData | undefined;
+                return (
+                  <React.Fragment key={`${item.source_table ?? item.categoria}_${item.id}_${idx}`}>
+                    {travel && (
+                      <TravelChip travel={travel} />
+                    )}
+                    <Pressable
+                      style={({ pressed }) => [sc.itemRow, pressed && { opacity: 0.78 }]}
+                      onPress={() => navigateToItem(item)}
+                    >
+                      <View style={sc.timeCol}>
+                        <Text style={sc.timeLabel}>{getItemTime(periodo.periodo, idx)}</Text>
+                      </View>
 
-                  <View style={sc.connectorCol}>
-                    <View style={sc.connectorDot} />
-                    {idx < periodo.items.length - 1 && <View style={sc.connectorLine} />}
-                  </View>
+                      <View style={sc.connectorCol}>
+                        <View style={sc.connectorDot} />
+                        {idx < periodo.items.length - 1 && <View style={sc.connectorLine} />}
+                      </View>
 
-                  <View style={sc.itemCard}>
-                    <View style={sc.thumb}>
-                      <ItemThumb image={item.image ?? null} />
-                    </View>
-                    <View style={sc.itemInfo}>
-                      <Text style={sc.itemTitle} numberOfLines={2}>{item.titulo}</Text>
-                      <Text style={sc.itemBairro} numberOfLines={1}>
-                        {item.localizacao || dia.bairro}
-                      </Text>
-                    </View>
-                    <Feather name="chevron-right" size={13} color="rgba(255,255,255,0.30)" />
-                  </View>
-                </Pressable>
-              ))}
+                      <View style={sc.itemCard}>
+                        <View style={sc.thumb}>
+                          <ItemThumb image={item.image ?? null} />
+                        </View>
+                        <View style={sc.itemInfo}>
+                          <Text style={sc.itemTitle} numberOfLines={2}>{item.titulo}</Text>
+                          <Text style={sc.itemBairro} numberOfLines={1}>
+                            {item.localizacao || dia.bairro}
+                          </Text>
+                        </View>
+                        <Feather name="chevron-right" size={13} color="rgba(255,255,255,0.30)" />
+                      </View>
+                    </Pressable>
+                  </React.Fragment>
+                );
+              })}
             </View>
           ))}
         </View>
@@ -687,6 +709,23 @@ const sc = StyleSheet.create({
     fontSize:   11,
     color:      "rgba(255,255,255,0.45)",
     marginTop:  2,
+  },
+
+  // Travel chip — appears before each item that has travel_from_previous
+  travelChip: {
+    flexDirection:   "row",
+    alignItems:      "center",
+    gap:             5,
+    paddingLeft:     51,   // 42 (timeCol.width) + 9 (half of connectorCol.width=18) = 51
+    paddingVertical: 3,
+    marginTop:       -2,
+    marginBottom:    2,
+  },
+  travelChipText: {
+    fontFamily:    "Inter_400Regular",
+    fontSize:      9,
+    color:         "rgba(255,255,255,0.22)",
+    letterSpacing: 0.5,
   },
 
   // Image placeholder — shown when no photo_url from Supabase
