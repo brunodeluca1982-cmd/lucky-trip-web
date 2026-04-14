@@ -48,6 +48,12 @@ function navigateHeroRoute(route: HeroRoute) {
         params: { id: route.id },
       });
       break;
+    case "comingsoon":
+      router.push({
+        pathname: "/comingsoon/[slug]",
+        params: { slug: route.slug },
+      });
+      break;
   }
 }
 
