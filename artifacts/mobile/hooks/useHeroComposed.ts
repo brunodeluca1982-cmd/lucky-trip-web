@@ -109,26 +109,12 @@ function buildRio(row: any): HeroComposedItem {
 
 // ── Carolina Dieckmann (MANDATORY — [1]) ──────────────────────────────────────
 
-async function fetchFriend(): Promise<HeroComposedItem | null> {
-  // Primary: first active friend by sort_order (= Carolina Dieckmann)
-  const { data, error } = await supabase
-    .from("friends")
-    .select("id, slug, display_name, profile_photo_url, cover_photo_url")
-    .eq("is_active", true)
-    .order("sort_order")
-    .limit(1)
-    .single();
-
-  if (!error && data) return buildFriend(data, "friends");
-  return null;
-}
-
 /**
- * Forced injection — called if fetchFriend() returned null.
- * Tries friend_guides first, then friends, both by slug = "carolina-dieckmann".
+ * PRIMARY fetch for Carolina — uses friend_guides.photo_url (correct image column).
+ * Tries by slug first, then by sort_order/first row.
  */
-async function forceCarolina(): Promise<HeroComposedItem | null> {
-  // Try friend_guides table (canonical source per spec)
+async function fetchFriend(): Promise<HeroComposedItem | null> {
+  // Primary: friend_guides by slug (photo_url is the canonical image field)
   const { data: fg } = await supabase
     .from("friend_guides")
     .select("id, slug, display_name, photo_url")
@@ -138,7 +124,35 @@ async function forceCarolina(): Promise<HeroComposedItem | null> {
 
   if (fg) return buildFriendGuide(fg);
 
-  // Fallback: friends table by slug
+  // Secondary: first row of friend_guides
+  const { data: fg2 } = await supabase
+    .from("friend_guides")
+    .select("id, slug, display_name, photo_url")
+    .not("photo_url", "is", null)
+    .order("id")
+    .limit(1)
+    .single();
+
+  if (fg2) return buildFriendGuide(fg2);
+
+  // Tertiary: friends table by is_active + sort_order
+  const { data: fr } = await supabase
+    .from("friends")
+    .select("id, slug, display_name, profile_photo_url, cover_photo_url")
+    .eq("is_active", true)
+    .order("sort_order")
+    .limit(1)
+    .single();
+
+  if (fr) return buildFriend(fr, "friends");
+  return null;
+}
+
+/**
+ * Forced injection — called only if fetchFriend() returned null.
+ * Last-resort fetch: friends by slug.
+ */
+async function forceCarolina(): Promise<HeroComposedItem | null> {
   const { data: fr } = await supabase
     .from("friends")
     .select("id, slug, display_name, profile_photo_url, cover_photo_url")
@@ -150,12 +164,13 @@ async function forceCarolina(): Promise<HeroComposedItem | null> {
   return null;
 }
 
-function buildFriend(row: any, table: HeroSourceTable): HeroComposedItem {
-  // photo: prefer profile_photo_url → cover_photo_url
-  const photo = sanitizePhotoUrl(row.profile_photo_url ?? row.cover_photo_url ?? null);
+function buildFriendGuide(row: any): HeroComposedItem {
+  // PART 2 + PART 3: Carolina MUST use photo_url from friend_guides — log it
+  const photo = sanitizePhotoUrl(row.photo_url ?? null);
+  console.log(`[CAROLINA IMAGE] photo_url: ${row.photo_url ?? "null"}`);
   return {
     id:           String(row.id),
-    source_table: table,
+    source_table: "friend_guides",
     titulo:       row.display_name ?? "Guia especial",
     localizacao:  "Rio de Janeiro",
     badge:        "Guia exclusivo",
@@ -164,12 +179,13 @@ function buildFriend(row: any, table: HeroSourceTable): HeroComposedItem {
   };
 }
 
-function buildFriendGuide(row: any): HeroComposedItem {
-  // PART 2: Carolina MUST use photo_url from friend_guides
-  const photo = sanitizePhotoUrl(row.photo_url ?? null);
+function buildFriend(row: any, table: HeroSourceTable): HeroComposedItem {
+  // Fallback: friends table (profile_photo_url → cover_photo_url)
+  const photo = sanitizePhotoUrl(row.profile_photo_url ?? row.cover_photo_url ?? null);
+  console.log(`[CAROLINA IMAGE] photo_url (friends fallback): ${photo ?? "null"}`);
   return {
     id:           String(row.id),
-    source_table: "friend_guides",
+    source_table: table,
     titulo:       row.display_name ?? "Guia especial",
     localizacao:  "Rio de Janeiro",
     badge:        "Guia exclusivo",
