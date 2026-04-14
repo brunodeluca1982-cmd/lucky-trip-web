@@ -251,20 +251,35 @@ export function useHeroComposed(): State {
 
       if (cancelled) return;
 
-      // Build ordered list — skip failed/null slots
-      const slots = [restaurante, oQueFazer, lucky, friend, rio];
+      // ── Extract resolved values (null-safe) ────────────────────────────────
+      const resolve = (r: PromiseSettledResult<HeroComposedItem | null>) => {
+        if (r.status === "rejected") {
+          console.warn("[HERO ITEM] slot failed:", r.reason);
+          return null;
+        }
+        return r.value;
+      };
+
+      const rioItem       = resolve(rio);
+      const carolinaItem  = resolve(friend);
+      const restauranteItem = resolve(restaurante);
+      const oQueFazerItem = resolve(oQueFazer);
+      const luckyItem     = resolve(lucky);
+
+      // ── Mandatory items ALWAYS come first: Rio [0], Carolina [1] ───────────
+      // Then append other slots in their original order, skipping nulls.
       const items: HeroComposedItem[] = [];
 
-      for (const result of slots) {
-        if (result.status === "fulfilled" && result.value) {
-          logHeroItem(result.value);
-          items.push(result.value);
-        } else if (result.status === "rejected") {
-          console.warn("[HERO ITEM] slot failed:", result.reason);
-        }
-      }
+      if (rioItem)       items.push(rioItem);
+      if (carolinaItem)  items.push(carolinaItem);
+      if (restauranteItem) items.push(restauranteItem);
+      if (oQueFazerItem) items.push(oQueFazerItem);
+      if (luckyItem)     items.push(luckyItem);
 
-      console.log(`[HERO] composed ${items.length}/5 slots from Supabase`);
+      // Log each included item
+      for (const item of items) logHeroItem(item);
+
+      console.log(`[HERO] composed ${items.length}/5 slots — Rio:${!!rioItem} Carolina:${!!carolinaItem}`);
       setState({ items, loading: false });
     }
 
