@@ -23,11 +23,26 @@ export type EntityImageSource = { uri: string } | null;
 export function sanitizePhotoUrl(url: string | null | undefined): string | null {
   if (!url || !url.trim()) return null;
   const cleaned = url.trim();
-  if (cleaned.includes("googleusercontent") || cleaned.includes("lh3.google")) {
-    console.log("[IMAGE PIPELINE] source: google (cached via Supabase):", cleaned.slice(0, 80));
-  } else if (cleaned.includes("supabase.co") || cleaned.includes("res.cloudinary")) {
-    console.log("[IMAGE PIPELINE] source: supabase");
+
+  // BLOCK: Google image URLs must never render on the frontend
+  if (cleaned.includes("googleusercontent.com") || cleaned.includes("lh3.google")) {
+    console.log("[IMAGE PIPELINE] BLOCKED google URL:", cleaned.slice(0, 80));
+    return null;
   }
+
+  // ALLOW: Cloudinary — first-class image source (video frames + hero images)
+  if (cleaned.includes("res.cloudinary.com")) {
+    console.log("[IMAGE PIPELINE] source: cloudinary:", cleaned.slice(0, 80));
+    return cleaned;
+  }
+
+  // ALLOW: Supabase Storage
+  if (cleaned.includes("supabase.co")) {
+    console.log("[IMAGE PIPELINE] source: supabase");
+    return cleaned;
+  }
+
+  // ALLOW: all other CDN sources (Unsplash, etc.)
   return cleaned;
 }
 

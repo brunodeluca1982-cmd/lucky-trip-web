@@ -406,13 +406,45 @@ export function useHeroComposed(): State {
       if (oQueFazerItem)    items.push(oQueFazerItem);
       if (luckyItem)        items.push(luckyItem);
 
-      for (const item of items) logHeroItem(item);
-
-      console.log(
-        `[HERO] composed ${items.length} slots — Rio:${!!rioItem} Kyoto:✓ Santorini:✓ Carolina:${!!carolinaItem}`
+      // ── FINAL ARRAY FIX: Rio ALWAYS first ─────────────────────────────────
+      // STEP 1 — check if Rio is present
+      let heroItems = items;
+      const hasRio = heroItems.some(
+        item =>
+          item.source_table === "destinos" &&
+          (item.titulo === "Rio de Janeiro" || item.id === "rio-de-janeiro")
       );
 
-      if (!cancelled) setState({ items, loading: false });
+      if (!hasRio) {
+        // STEP 2 — fetch Rio from destinos
+        const { data: rioData } = await supabase
+          .from("destinos")
+          .select("*")
+          .eq("slug", "rio-de-janeiro")
+          .single();
+
+        if (rioData) {
+          // STEP 3 — map to hero item  STEP 4 — force insert at front
+          heroItems = [buildRio(rioData), ...heroItems];
+          console.log("[HERO FIX] Rio force-inserted via final array check");
+        }
+      } else if (heroItems[0]?.source_table !== "destinos") {
+        // STEP 5 — Rio exists but not first — move it
+        const found = heroItems.find(item => item.source_table === "destinos");
+        if (found) {
+          heroItems = [found, ...heroItems.filter(item => item !== found)];
+          console.log("[HERO FIX] Rio moved to first position");
+        }
+      }
+      // ── End final array fix ────────────────────────────────────────────────
+
+      for (const item of heroItems) logHeroItem(item);
+
+      console.log(
+        `[HERO] composed ${heroItems.length} slots — Rio:${!!rioItem} Kyoto:✓ Santorini:✓ Carolina:${!!carolinaItem}`
+      );
+
+      if (!cancelled) setState({ items: heroItems, loading: false });
     }
 
     load();
