@@ -3,17 +3,23 @@
  *
  * Single global source of truth for the app's atmospheric background system.
  *
- * Architecture:
- *   - Pool is fetched ONCE per session from Supabase (home_hero_items, rio-de-janeiro)
- *   - Cloudinary frame extraction: so_1 = frame at 1 second, portrait crop
- *   - If Supabase returns empty / errors → lock to LOCAL_FALLBACK immediately
- *   - One global 12-second timer drives rotation for the ENTIRE app
- *   - All screens share the same pool, currentIdx, nextIdx, and nextOpacity
- *   - Navigating between screens never resets the index or restarts the timer
- *   - Image.prefetch is called on current + next before each transition
+ * Data source: v_rio_hero_media_public (Supabase view)
+ *   - Rows contain: bucket_id, object_path, mimetype, media_kind, sort_order, public_url
+ *   - Videos → Cloudinary fetch to extract frame at second 1 (so_1)
+ *   - Images → public_url used directly
  *
- * Destination Home (cidade/[id].tsx with id="rio") is the visual engine.
- * All other screens (Home, Lucky, Destinos, Roteiro, Perfil) are mirrors.
+ * Architecture:
+ *   - Pool fetched ONCE per session, sorted by sort_order
+ *   - LOCAL_FALLBACK PNGs used if Supabase returns empty / errors
+ *   - One global 12-second timer drives rotation for the ENTIRE app
+ *   - All screens share the same pool, currentIdx, nextIdx, nextOpacity
+ *   - Navigating between screens never resets the index or restarts the timer
+ *   - Image.prefetch called on current + next before each transition
+ *
+ * Screens that use RotatingBackground (all share this pool):
+ *   Home · Destinos · Viagem · Lucky · Perfil
+ *
+ * PART 6: Hero card uses destinos.hero_image_url (unchanged) — NOT this pool.
  */
 
 import React, {
@@ -34,8 +40,8 @@ const LOCAL_FALLBACK: ImageSourcePropType[] = [
   require("@/assets/images/cristo.png"),
 ];
 
-// ── Cloudinary transform — frame at 1 second, portrait crop ─────────────────
-const CLOUDINARY_BASE =
+// ── Cloudinary — extract frame at second 1 from a remote video URL ───────────
+const CLOUDINARY_FETCH =
   "https://res.cloudinary.com/dufxamwaf/video/fetch/so_1,w_1080,h_1920,c_fill,g_auto,q_80,f_jpg";
 
 const INTERVAL      = 12_000; // 12 seconds between transitions
@@ -48,7 +54,6 @@ interface BackgroundCtxValue {
   currentIdx:   number;
   nextIdx:      number;
   nextOpacity:  Animated.Value;
-  /** Call from any RotatingBackground onLoad to propagate the first-image signal. */
   onImageLoaded: () => void;
 }
 
@@ -58,7 +63,6 @@ const BackgroundContext = createContext<BackgroundCtxValue | null>(null);
 
 interface ProviderProps {
   children:      React.ReactNode;
-  /** Fired globally once when the first background image is displayed anywhere in the app. */
   onFirstImage?: () => void;
 }
 
@@ -67,17 +71,13 @@ export function BackgroundProvider({ children, onFirstImage }: ProviderProps) {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [nextIdx,    setNextIdx]    = useState(1);
 
-  // Single shared Animated.Value — referenced by every RotatingBackground instance.
-  // Being a ref, it is the SAME object across all renders: animations are global.
-  const nextOpacity = useRef(new Animated.Value(0)).current;
-
-  // Guards — prevent repeated fetch and repeated first-image fire
-  const fetchedRef = useRef(false);
+  const nextOpacity   = useRef(new Animated.Value(0)).current;
+  const fetchedRef    = useRef(false);
   const firstFiredRef = useRef(false);
 
-  // ── One-time Supabase fetch ───────────────────────────────────────────────
+  // ── One-time fetch from v_rio_hero_media_public ───────────────────────────
   useEffect(() => {
-    if (fetchedRef.current) return; // never re-fetch on remount or tab change
+    if (fetchedRef.current) return;
     fetchedRef.current = true;
 
     let cancelled = false;
@@ -85,36 +85,44 @@ export function BackgroundProvider({ children, onFirstImage }: ProviderProps) {
     (async () => {
       try {
         const { data, error } = await supabase
-          .from("home_hero_items")
-          .select("video_url")
-          .eq("is_active", true)
-          .eq("destination_slug", "rio-de-janeiro")
-          .order("sort_order", { ascending: true })
-          .limit(8);
+          .from("v_rio_hero_media_public")
+          .select("public_url, media_kind, sort_order")
+          .order("sort_order", { ascending: true });
 
         if (cancelled) return;
+        if (error || !data || data.length === 0) {
+          console.log("[RIO BACKGROUND] Supabase returned empty — using LOCAL_FALLBACK");
+          return;
+        }
 
-        // Atomic fallback: any failure or empty result → keep LOCAL_FALLBACK
-        if (error || !data || data.length === 0) return;
+        const remote: ImageSourcePropType[] = [];
+        for (const row of data) {
+          if (!row.public_url) continue;
+          if (row.media_kind === "video") {
+            // Cloudinary fetch extracts a frame at second 1
+            remote.push({ uri: `${CLOUDINARY_FETCH}/${encodeURIComponent(row.public_url)}` });
+          } else {
+            // Image: use public_url directly from Supabase Storage
+            remote.push({ uri: row.public_url });
+          }
+        }
 
-        const remote = data
-          .map((row) =>
-            row.video_url
-              ? { uri: `${CLOUDINARY_BASE}/${row.video_url as string}` }
-              : null,
-          )
-          .filter(Boolean) as ImageSourcePropType[];
+        if (remote.length === 0) {
+          console.log("[RIO BACKGROUND] No usable items — using LOCAL_FALLBACK");
+          return;
+        }
 
-        if (remote.length === 0) return; // atomic fallback
+        console.log(
+          `[RIO BACKGROUND ACTIVE] items: ${remote.length} | loop: running | interval: ${INTERVAL / 1000}s`
+        );
 
         setPool(remote);
         setCurrentIdx(0);
         setNextIdx(1 % remote.length);
-
-        // Prefetch first two frames immediately after pool is set
         prefetchSources(remote, 0, 1 % remote.length);
-      } catch {
-        // Atomic fallback: keep LOCAL_FALLBACK, same global sync behaviour
+
+      } catch (err) {
+        console.warn("[RIO BACKGROUND] fetch failed, using LOCAL_FALLBACK:", err);
       }
     })();
 
@@ -122,9 +130,8 @@ export function BackgroundProvider({ children, onFirstImage }: ProviderProps) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Global 12-second rotation timer ──────────────────────────────────────
-  // Re-creates only when the pool reference changes (once, after Supabase loads).
   useEffect(() => {
-    if (pool.length <= 1) return; // nothing to rotate
+    if (pool.length <= 1) return;
 
     const timer = setInterval(() => {
       Animated.timing(nextOpacity, {
@@ -138,7 +145,7 @@ export function BackgroundProvider({ children, onFirstImage }: ProviderProps) {
           const next      = (c + 1) % pool.length;
           const afterNext = (next + 1) % pool.length;
           setNextIdx(afterNext);
-          prefetchSources(pool, next, afterNext); // preload before switch
+          prefetchSources(pool, next, afterNext);
           return next;
         });
 
@@ -149,7 +156,6 @@ export function BackgroundProvider({ children, onFirstImage }: ProviderProps) {
     return () => clearInterval(timer);
   }, [pool, nextOpacity]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── First-image signal — fired once globally ──────────────────────────────
   function onImageLoaded() {
     if (!firstFiredRef.current) {
       firstFiredRef.current = true;
@@ -178,7 +184,6 @@ export function useBackground(): BackgroundCtxValue {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Prefetch remote URI sources at the given pool indices. No-op for local assets. */
 function prefetchSources(
   pool:    ImageSourcePropType[],
   ...idxs: number[]
