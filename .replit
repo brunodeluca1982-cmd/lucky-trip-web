@@ -29,7 +29,7 @@ timeoutMs = 20000
 
 [nix]
 channel = "stable-25_05"
-packages = ["supabase-cli", "ppp"]
+packages = ["supabase-cli", "ppp", "nano"]
 
 [userenv]
 
