@@ -450,6 +450,19 @@ export function useHeroComposed(): State {
         slug:   (i as any).slug,
       })));
 
+      // FINAL ENFORCEMENT — DO NOT REMOVE
+      const rioIndex = heroItems.findIndex(
+        item =>
+          item.source_table === "destinos" &&
+          item.titulo === "Rio de Janeiro"
+      );
+
+      if (rioIndex > -1) {
+        const [rioItem] = heroItems.splice(rioIndex, 1);
+        heroItems.unshift(rioItem);
+        console.log("[HERO FINAL FIX] Rio forced to index 0");
+      }
+
       if (!cancelled) setState({ items: heroItems, loading: false });
     }
 
