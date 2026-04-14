@@ -31,7 +31,14 @@ const TIPO_COLORS: Record<string, string> = {
   Conforto: "#C4704A",
 };
 
-export function HotelCard({ id, nome, localizacao, tipo, image, onPress }: HotelCardProps) {
+export function HotelCard({
+  id,
+  nome,
+  localizacao,
+  tipo,
+  image,
+  onPress,
+}: HotelCardProps) {
   const tipoColor = TIPO_COLORS[tipo] ?? C.terracotta;
 
   return (
@@ -42,7 +49,15 @@ export function HotelCard({ id, nome, localizacao, tipo, image, onPress }: Hotel
         pressed && { opacity: 0.92, transform: [{ scale: 0.97 }] },
       ]}
     >
-      {image != null && <Image source={image} style={styles.image} resizeMode="cover" />}
+      <Image
+        source={
+          image ?? {
+            uri: "https://images.unsplash.com/photo-1501117716987-c8e1ecb210b9",
+          }
+        }
+        style={styles.image}
+        resizeMode="cover"
+      />
       <LinearGradient
         colors={["transparent", "rgba(0,0,0,0.78)"]}
         style={styles.gradient}
