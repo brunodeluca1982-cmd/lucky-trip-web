@@ -133,79 +133,101 @@ const SANTORINI_ITEM: HeroComposedItem = {
   route: { type: "comingsoon", slug: "santorini", nome: "Santorini" },
 };
 
-// ── [3] Carolina Dieckmann (MANDATORY — friend_guides.photo_url) ──────────────
+// ── [3] Carolina Dieckmann (MANDATORY — friend_guides.cover_photo_url) ──────────
+//
+// SCHEMA REALITY (verified via Supabase API):
+//   friend_guides: cover_photo_url (TEXT) — the correct image column
+//                  hero_video_url (TEXT)   — also exists, may hold same url
+//                  NO "photo_url" column   — that column does NOT exist
+//   friends:       profile_photo_url (null), cover_photo_url (null) — both empty
+//
+// CORRECT STRATEGY:
+//   1. Fetch friend_guides WHERE status='published' + cover_photo_url IS NOT NULL
+//   2. Join to friends via friend_id to get slug (for navigation)
+//   3. Navigate to /friend/[friends.slug]
 
 async function fetchFriend(): Promise<HeroComposedItem | null> {
-  // Primary: friend_guides by slug (canonical image = photo_url)
-  const { data: fg } = await supabase
+  // Step 1: First published friend guide with a real image (cover_photo_url)
+  const { data: fg, error: fgErr } = await supabase
     .from("friend_guides")
-    .select("id, slug, display_name, photo_url")
-    .eq("slug", "carolina-dieckmann")
-    .limit(1)
-    .single();
-
-  if (fg) return buildFriendGuide(fg);
-
-  // Secondary: first friend_guides row with photo
-  const { data: fg2 } = await supabase
-    .from("friend_guides")
-    .select("id, slug, display_name, photo_url")
-    .not("photo_url", "is", null)
-    .order("id")
-    .limit(1)
-    .single();
-
-  if (fg2) return buildFriendGuide(fg2);
-
-  // Tertiary: friends table by sort_order
-  const { data: fr } = await supabase
-    .from("friends")
-    .select("id, slug, display_name, profile_photo_url, cover_photo_url")
-    .eq("is_active", true)
+    .select("id, friend_id, cover_photo_url")
+    .eq("status", "published")
+    .not("cover_photo_url", "is", null)
     .order("sort_order")
     .limit(1)
     .single();
 
-  if (fr) return buildFriend(fr, "friends");
-  return null;
-}
+  if (fgErr || !fg?.cover_photo_url) {
+    console.warn("[CAROLINA IMAGE] friend_guides query failed or no cover_photo_url:", fgErr?.message);
+    return null;
+  }
 
-async function forceCarolina(): Promise<HeroComposedItem | null> {
-  const { data: fr } = await supabase
+  // Step 2: Get friend details (slug for navigation, display_name for title)
+  const { data: fr, error: frErr } = await supabase
     .from("friends")
-    .select("id, slug, display_name, profile_photo_url, cover_photo_url")
-    .eq("slug", "carolina-dieckmann")
-    .limit(1)
+    .select("id, slug, display_name")
+    .eq("id", fg.friend_id)
     .single();
-  if (fr) return buildFriend(fr, "friends");
-  return null;
-}
 
-function buildFriendGuide(row: any): HeroComposedItem {
-  const photo = sanitizePhotoUrl(row.photo_url ?? null);
-  console.log(`[CAROLINA IMAGE] photo_url: ${row.photo_url ?? "null"}`);
+  if (frErr || !fr) {
+    console.warn("[CAROLINA IMAGE] could not resolve friend from friend_id:", fg.friend_id);
+    // Still render with the image, use a fallback slug
+    const photo = sanitizePhotoUrl(fg.cover_photo_url);
+    console.log(`[CAROLINA IMAGE] source: friend_guides | cover_photo_url: ${fg.cover_photo_url}`);
+    return {
+      id:           String(fg.id),
+      source_table: "friend_guides",
+      titulo:       "Guia exclusivo",
+      localizacao:  "Rio de Janeiro",
+      badge:        "Guia exclusivo",
+      photo_url:    photo,
+      route:        { type: "friend", slug: "carolina-dieckmann" },
+    };
+  }
+
+  const photo = sanitizePhotoUrl(fg.cover_photo_url);
+  console.log(
+    `[CAROLINA IMAGE] source: friend_guides | cover_photo_url: ${fg.cover_photo_url}`
+  );
   return {
-    id:           String(row.id),
+    id:           String(fr.id),
     source_table: "friend_guides",
-    titulo:       row.display_name ?? "Guia especial",
+    titulo:       fr.display_name ?? "Guia exclusivo",
     localizacao:  "Rio de Janeiro",
     badge:        "Guia exclusivo",
     photo_url:    photo,
-    route: { type: "friend", slug: row.slug },
+    route:        { type: "friend", slug: fr.slug },
   };
 }
 
-function buildFriend(row: any, table: HeroSourceTable): HeroComposedItem {
-  const photo = sanitizePhotoUrl(row.profile_photo_url ?? row.cover_photo_url ?? null);
-  console.log(`[CAROLINA IMAGE] photo_url (friends fallback): ${photo ?? "null"}`);
+async function forceCarolina(): Promise<HeroComposedItem | null> {
+  // Last-resort: try any friend_guides row regardless of status, with cover_photo_url
+  const { data: fg } = await supabase
+    .from("friend_guides")
+    .select("id, friend_id, cover_photo_url")
+    .not("cover_photo_url", "is", null)
+    .order("sort_order")
+    .limit(1)
+    .single();
+
+  if (!fg?.cover_photo_url) return null;
+
+  const { data: fr } = await supabase
+    .from("friends")
+    .select("id, slug, display_name")
+    .eq("id", fg.friend_id)
+    .single();
+
+  const photo = sanitizePhotoUrl(fg.cover_photo_url);
+  console.log(`[CAROLINA IMAGE] force-injected | cover_photo_url: ${fg.cover_photo_url}`);
   return {
-    id:           String(row.id),
-    source_table: table,
-    titulo:       row.display_name ?? "Guia especial",
+    id:           String(fr?.id ?? fg.id),
+    source_table: "friend_guides",
+    titulo:       fr?.display_name ?? "Guia exclusivo",
     localizacao:  "Rio de Janeiro",
     badge:        "Guia exclusivo",
     photo_url:    photo,
-    route: { type: "friend", slug: row.slug },
+    route:        { type: "friend", slug: fr?.slug ?? "carolina-dieckmann" },
   };
 }
 
