@@ -444,6 +444,12 @@ export function useHeroComposed(): State {
         `[HERO] composed ${heroItems.length} slots — Rio:${!!rioItem} Kyoto:✓ Santorini:✓ Carolina:${!!carolinaItem}`
       );
 
+      console.log("[HERO DEBUG]", heroItems.map(i => ({
+        titulo: i.titulo,
+        source: i.source_table,
+        slug:   (i as any).slug,
+      })));
+
       if (!cancelled) setState({ items: heroItems, loading: false });
     }
 
