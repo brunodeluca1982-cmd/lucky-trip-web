@@ -3,6 +3,7 @@ import {
   Dimensions,
   FlatList,
   Image,
+  ImageSourcePropType,
   Pressable,
   StyleSheet,
   Text,
@@ -13,6 +14,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import Colors from "@/constants/colors";
 import type { HeroComposedItem, HeroRoute } from "@/hooks/useHeroComposed";
+import { useBackground } from "@/context/BackgroundContext";
 
 const C = Colors.light;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -58,10 +60,17 @@ function navigateHeroRoute(route: HeroRoute) {
 }
 
 // ── Single slide ──────────────────────────────────────────────────────────────
-function HeroSlide({ item }: { item: HeroComposedItem }) {
-  // Image: use entity's own photo_url (REAL Supabase data).
-  // null → premium dark placeholder (never blank/black).
-  const imageSource = item.photo_url ? { uri: item.photo_url } : null;
+function HeroSlide({
+  item,
+  overrideSource,
+}: {
+  item: HeroComposedItem;
+  overrideSource?: ImageSourcePropType;
+}) {
+  // overrideSource: used for the Rio card to sync with the background pool frame.
+  // Fallback: entity's own photo_url. null → premium dark placeholder.
+  const imageSource: ImageSourcePropType | null =
+    overrideSource ?? (item.photo_url ? { uri: item.photo_url } : null);
 
   return (
     <Pressable
@@ -105,6 +114,7 @@ function HeroSlide({ item }: { item: HeroComposedItem }) {
 
 // ── Carousel ──────────────────────────────────────────────────────────────────
 export function HeroCarousel({ items, onIndexChange }: HeroCarouselProps) {
+  const { pool, currentIdx } = useBackground();
   const [activeIndex, setActiveIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const autoplayRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -150,7 +160,16 @@ export function HeroCarousel({ items, onIndexChange }: HeroCarouselProps) {
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        renderItem={({ item }) => <HeroSlide item={item} />}
+        renderItem={({ item, index }) => (
+          <HeroSlide
+            item={item}
+            overrideSource={
+              index === 0 && item.source_table === "destinos"
+                ? pool[currentIdx]
+                : undefined
+            }
+          />
+        )}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         scrollEventThrottle={16}
