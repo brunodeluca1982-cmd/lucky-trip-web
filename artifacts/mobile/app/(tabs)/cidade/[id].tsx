@@ -1,6 +1,4 @@
 import React from "react";
-import { getImageForEntity } from "@/utils/getImageForEntity";
-import { useDestinoImages } from "@/hooks/useDestinoImages";
 import {
   ActivityIndicator,
   Dimensions,
@@ -21,18 +19,19 @@ import { HorizontalScroll } from "@/components/HorizontalScroll";
 import { PlaceCard } from "@/components/PlaceCard";
 import { SectionHeader } from "@/components/SectionHeader";
 import { RotatingBackground } from "@/components/RotatingBackground";
-import { destinos, detectPeriodo } from "@/data/mockData";
+import {
+  destinos,
+  detectPeriodo,
+} from "@/data/mockData";
 import { RestauranteCard } from "@/components/RestauranteCard";
 import { HotelCard } from "@/components/HotelCard";
 import { useOQueFazer } from "@/hooks/useOQueFazer";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import { useNeighborhoods } from "@/hooks/useNeighborhoods";
-import { getImageForEntity } from "@/utils/getImageForEntity";
+import { sanitizePhotoUrl } from "@/utils/getImageForEntity";
 
 const C = Colors.light;
-const SCREEN = Dimensions.get("window");
-const SCREEN_WIDTH = SCREEN.width;
-const SCREEN_HEIGHT = SCREEN.height;
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 // "Agora no/em/na" — preposition + city label for the real-time card eyebrow
 const AGORA_LABEL: Record<string, string> = {
@@ -65,92 +64,82 @@ const ESSENTIALS: Record<string, string> = {
   ilhabela: "de Ilhabela",
 };
 
-// const AGORA: Record<string, Record<string, string>> = {
-//   rio: {
-//     manha: "Café da manhã em Ipanema",
-//     tarde: "Praia no Leblon",
-//     noite: "Drinks em Botafogo",
-//   },
-//   santorini: {
-//     manha: "Nascer do sol no Aegeu",
-//     tarde: "Vinho na caldera ao entardecer",
-//     noite: "Jantar com vista para o vulcão",
-//   },
-//   kyoto: {
-//     manha: "Cerimônia do chá em Gion",
-//     tarde: "Passeio pelos templos dourados",
-//     noite: "Izakaya no Pontocho",
-//   },
-//   paris: {
-//     manha: "Café da manhã em Montmartre",
-//     tarde: "Musée d'Orsay sem fila",
-//     noite: "Jantar perto do Sena",
-//   },
-//   "nova-york": {
-//     manha: "Café no West Village",
-//     tarde: "Hora dourada no High Line",
-//     noite: "Bar no terraço em Manhattan",
-//   },
-//   toquio: {
-//     manha: "Sakura no Shinjuku Gyoen",
-//     tarde: "Tsukiji e sushi fresco",
-//     noite: "Izakaya no Shinjuku",
-//   },
-//   lisboa: {
-//     manha: "Pastel de nata em Belém",
-//     tarde: "Elétrico 28 pelo Alfama",
-//     noite: "Fado ao cair da noite",
-//   },
-//   miami: {
-//     manha: "Corrida na praia de South Beach",
-//     tarde: "Passeio pela Art Deco District",
-//     noite: "Wynwood Walls à noite",
-//   },
-//   bali: {
-//     manha: "Yoga ao amanhecer em Ubud",
-//     tarde: "Arrozais de Tegallalang",
-//     noite: "Ritual ao pôr do sol em Uluwatu",
-//   },
-//   amsterdam: {
-//     manha: "Mercado de flores Bloemenmarkt",
-//     tarde: "Canal ao entardecer de bicicleta",
-//     noite: "Jenever nos bares do Jordaan",
-//   },
-//   marrakech: {
-//     manha: "Mercado de especiarias na medina",
-//     tarde: "Riads escondidos no souk",
-//     noite: "Pôr do sol no deserto de Agafay",
-//   },
-//   ilhabela: {
-//     manha: "Trilha para a cachoeira do Gato",
-//     tarde: "Snorkel nas praias do sul",
-//     noite: "Frutos do mar na Vila",
-//   },
-// };
+const AGORA: Record<string, Record<Periodo, string>> = {
+  rio: {
+    manha: "Café da manhã em Ipanema",
+    tarde: "Praia no Leblon",
+    noite: "Drinks em Botafogo",
+  },
+  santorini: {
+    manha: "Nascer do sol no Aegeu",
+    tarde: "Vinho na caldera ao entardecer",
+    noite: "Jantar com vista para o vulcão",
+  },
+  kyoto: {
+    manha: "Cerimônia do chá em Gion",
+    tarde: "Passeio pelos templos dourados",
+    noite: "Izakaya no Pontocho",
+  },
+  paris: {
+    manha: "Café da manhã em Montmartre",
+    tarde: "Musée d'Orsay sem fila",
+    noite: "Jantar perto do Sena",
+  },
+  "nova-york": {
+    manha: "Café no West Village",
+    tarde: "Hora dourada no High Line",
+    noite: "Bar no terraço em Manhattan",
+  },
+  toquio: {
+    manha: "Sakura no Shinjuku Gyoen",
+    tarde: "Tsukiji e sushi fresco",
+    noite: "Izakaya no Shinjuku",
+  },
+  lisboa: {
+    manha: "Pastel de nata em Belém",
+    tarde: "Elétrico 28 pelo Alfama",
+    noite: "Fado ao cair da noite",
+  },
+  miami: {
+    manha: "Corrida na praia de South Beach",
+    tarde: "Passeio pela Art Deco District",
+    noite: "Wynwood Walls à noite",
+  },
+  bali: {
+    manha: "Yoga ao amanhecer em Ubud",
+    tarde: "Arrozais de Tegallalang",
+    noite: "Ritual ao pôr do sol em Uluwatu",
+  },
+  amsterdam: {
+    manha: "Mercado de flores Bloemenmarkt",
+    tarde: "Canal ao entardecer de bicicleta",
+    noite: "Jenever nos bares do Jordaan",
+  },
+  marrakech: {
+    manha: "Mercado de especiarias na medina",
+    tarde: "Riads escondidos no souk",
+    noite: "Pôr do sol no deserto de Agafay",
+  },
+  ilhabela: {
+    manha: "Trilha para a cachoeira do Gato",
+    tarde: "Snorkel nas praias do sul",
+    noite: "Frutos do mar na Vila",
+  },
+};
 
 // Editorial microcopy for non-launched destinations — shown in place of content modules
 const COMING_SOON_COPY: Record<string, string> = {
-  santorini:
-    "Santorini está sendo mapeada com o mesmo cuidado que merece o seu pôr-do-sol. Em breve, cada calçada branca e cada vinho local estará aqui.",
-  kyoto:
-    "Kyoto exige paciência — a mesma que os monges que varreram seus templos por séculos. Estamos preparando algo à altura da cidade.",
-  lisboa:
-    "Lisboa está quase pronta: os becos do Alfama, os pastéis de Belém e o fado que só se entende de perto.",
-  buenosaires:
-    "Buenos Aires é urgente — tango, bifes e uma arquitectura que te faz parar a cada esquina. A nossa curadoria chega em breve.",
-  floripa:
-    "Florianópolis tem 42 praias. Estamos visitando cada uma delas antes de te recomendar qualquer coisa.",
-  paraty:
-    "Paraty é pequena e profunda. Estamos conversando com moradores, cozinheiras e barqueiros para te dar o que os guias convencionais nunca vão ter.",
-  gramado:
-    "Gramado tem o charme de um segredo de família. A nossa curadoria chega com chocolate, fondue e tudo o que a Serra Gaúcha guarda de melhor.",
-  miami:
-    "Miami vive fast — mas a nossa curadoria vai devagar, encontrando o que existe entre South Beach e Little Havana.",
-  paris:
-    "Paris não precisa de apresentação. Mas precisa de um guia que te tire dos caminhos óbvios. Em breve.",
-  bali: "Bali é um estado de espírito antes de ser um destino. Estamos encontrando os templos, os rituais e os warungs que valem o voo longo.",
-  ilhabela:
-    "Ilhabela é cachoeira, vento e mar aberto. Estamos mapeando trilhas e ancoradouros que poucos conhecem.",
+  santorini:   "Santorini está sendo mapeada com o mesmo cuidado que merece o seu pôr-do-sol. Em breve, cada calçada branca e cada vinho local estará aqui.",
+  kyoto:       "Kyoto exige paciência — a mesma que os monges que varreram seus templos por séculos. Estamos preparando algo à altura da cidade.",
+  lisboa:      "Lisboa está quase pronta: os becos do Alfama, os pastéis de Belém e o fado que só se entende de perto.",
+  buenosaires: "Buenos Aires é urgente — tango, bifes e uma arquitectura que te faz parar a cada esquina. A nossa curadoria chega em breve.",
+  floripa:     "Florianópolis tem 42 praias. Estamos visitando cada uma delas antes de te recomendar qualquer coisa.",
+  paraty:      "Paraty é pequena e profunda. Estamos conversando com moradores, cozinheiras e barqueiros para te dar o que os guias convencionais nunca vão ter.",
+  gramado:     "Gramado tem o charme de um segredo de família. A nossa curadoria chega com chocolate, fondue e tudo o que a Serra Gaúcha guarda de melhor.",
+  miami:       "Miami vive fast — mas a nossa curadoria vai devagar, encontrando o que existe entre South Beach e Little Havana.",
+  paris:       "Paris não precisa de apresentação. Mas precisa de um guia que te tire dos caminhos óbvios. Em breve.",
+  bali:       "Bali é um estado de espírito antes de ser um destino. Estamos encontrando os templos, os rituais e os warungs que valem o voo longo.",
+  ilhabela:    "Ilhabela é cachoeira, vento e mar aberto. Estamos mapeando trilhas e ancoradouros que poucos conhecem.",
 };
 
 function GlassButton({
@@ -184,7 +173,6 @@ export default function CidadeScreen() {
   const insets = useSafeAreaInsets();
 
   const destino = destinos.find((d) => d.id === id) ?? destinos[0];
-  const images = useDestinoImages(destino.id);
   const isRio = destino.id === "rio";
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
@@ -196,42 +184,29 @@ export default function CidadeScreen() {
   const { restaurantes: restos, loading: loadingRestos } = useRestaurants();
   const { neighborhoods, loading: loadingHoteis } = useNeighborhoods();
   const allHotels = neighborhoods.flatMap((n) =>
-    (n.hotels ?? []).map((h) => ({ ...h, localizacao: n.neighborhood_name })),
+    (n.hotels ?? []).map((h) => ({ ...h, localizacao: n.neighborhood_name }))
   );
   // Derive "Agora" label from Supabase atividades (first item with a matching momento_ideal)
   const experience = React.useMemo(() => {
     const match = atividades.find(
-      (a) =>
-        typeof a.momento_ideal === "string" &&
-        a.momento_ideal.toLowerCase() === periodo,
+      (a) => typeof a.momento_ideal === "string" && a.momento_ideal.toLowerCase() === periodo
     );
     return match?.titulo ?? atividades[0]?.titulo ?? "Descoberta local";
   }, [atividades, periodo]);
   const agoraLabel = AGORA_LABEL[destino.id] ?? `Agora em ${destino.cidade}`;
   const essentialRef = ESSENTIALS[destino.id] ?? `de ${destino.cidade}`;
 
-  const agoraItems = atividades || [];
-  const firstAgoraItem = agoraItems[0];
-
   return (
     <View style={s.root}>
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* ── Fullscreen background — Rio: global rotating pool; others: static image ── */}
-      {images.length > 0 ? (
-        <Image
-          source={{ uri: images[0] }}
-          style={s.bgImage}
-          resizeMode="cover"
-        />
+      {isRio ? (
+        <View style={s.bgImage} pointerEvents="none">
+          <RotatingBackground />
+        </View>
       ) : (
-        <Image
-          source={{
-            uri: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d",
-          }}
-          style={s.bgImage}
-          resizeMode="cover"
-        />
+        <Image source={destino.image} style={s.bgImage} resizeMode="cover" />
       )}
 
       {/* ── Cinematic gradient overlay — full screen, fixed ──
@@ -247,7 +222,7 @@ export default function CidadeScreen() {
           "rgba(0,0,0,0.72)",
           "rgba(0,0,0,0.96)",
         ]}
-        locations={[0, 0.2, 0.42, 0.62, 1]}
+        locations={[0, 0.20, 0.42, 0.62, 1]}
         style={StyleSheet.absoluteFill}
       />
 
@@ -278,7 +253,7 @@ export default function CidadeScreen() {
         </View>
 
         {/* Spacer — pushes buttons into the dark lower zone, prevents collision */}
-        <View style={{ height: SCREEN_HEIGHT * 0.1 }} />
+        <View style={{ height: SCREEN_HEIGHT * 0.10 }} />
 
         {/* ── Action buttons — normal flow inside scroll ── */}
         <View style={s.menu}>
@@ -287,10 +262,7 @@ export default function CidadeScreen() {
             bright
             style={s.btnPrimary}
             onPress={() =>
-              router.push({
-                pathname: "/essencial/[id]",
-                params: { id: destino.id },
-              })
+              router.push({ pathname: "/essencial/[id]", params: { id: destino.id } })
             }
           >
             <View style={s.btnPrimaryInner}>
@@ -331,10 +303,7 @@ export default function CidadeScreen() {
           <GlassButton
             style={s.btnStandard}
             onPress={() =>
-              router.push({
-                pathname: "/ondeFicar/[id]",
-                params: { id: destino.id },
-              })
+              router.push({ pathname: "/ondeFicar/[id]", params: { id: destino.id } })
             }
           >
             <View style={s.btnStandardInner}>
@@ -347,10 +316,7 @@ export default function CidadeScreen() {
           <GlassButton
             style={s.btnStandard}
             onPress={() =>
-              router.push({
-                pathname: "/comerBem/[id]",
-                params: { id: destino.id },
-              })
+              router.push({ pathname: "/comerBem/[id]", params: { id: destino.id } })
             }
           >
             <View style={s.btnStandardInner}>
@@ -363,18 +329,11 @@ export default function CidadeScreen() {
           <GlassButton
             style={s.btnStandard}
             onPress={() =>
-              router.push({
-                pathname: "/oQueFazer/[id]",
-                params: { id: destino.id },
-              })
+              router.push({ pathname: "/oQueFazer/[id]", params: { id: destino.id } })
             }
           >
             <View style={s.btnStandardInner}>
-              <Feather
-                name="compass"
-                size={16}
-                color="rgba(255,255,255,0.70)"
-              />
+              <Feather name="compass" size={16} color="rgba(255,255,255,0.70)" />
               <Text style={s.btnStandardLabel}>O que fazer</Text>
             </View>
           </GlassButton>
@@ -383,10 +342,7 @@ export default function CidadeScreen() {
           <GlassButton
             style={[s.btnStandard, s.btnLucky]}
             onPress={() =>
-              router.push({
-                pathname: "/luckyList/[id]",
-                params: { id: destino.id },
-              })
+              router.push({ pathname: "/luckyList/[id]", params: { id: destino.id } })
             }
           >
             <View style={s.btnStandardInner}>
@@ -398,19 +354,10 @@ export default function CidadeScreen() {
           {/* 7. Como chegar */}
           <GlassButton
             style={s.btnStandard}
-            onPress={() =>
-              router.push({
-                pathname: "/comoChegar/[cityId]",
-                params: { cityId: destino?.id ?? "rio" },
-              })
-            }
+            onPress={() => router.push({ pathname: "/comoChegar/[cityId]", params: { cityId: destino?.id ?? "rio" } })}
           >
             <View style={s.btnStandardInner}>
-              <Feather
-                name="map-pin"
-                size={16}
-                color="rgba(255,255,255,0.70)"
-              />
+              <Feather name="map-pin" size={16} color="rgba(255,255,255,0.70)" />
               <Text style={s.btnStandardLabel}>Como chegar</Text>
             </View>
           </GlassButton>
@@ -427,10 +374,7 @@ export default function CidadeScreen() {
                   subtitle={`Experiências imperdíveis em ${destino.cidade}.`}
                 />
                 {loadingAtiv ? (
-                  <ActivityIndicator
-                    color="#C9A84C"
-                    style={{ marginVertical: 16 }}
-                  />
+                  <ActivityIndicator color="#C9A84C" style={{ marginVertical: 16 }} />
                 ) : (
                   <HorizontalScroll>
                     {atividades.slice(0, 8).map((item) => (
@@ -440,27 +384,12 @@ export default function CidadeScreen() {
                         saveCategoria="oQueFazer"
                         titulo={item.titulo}
                         localizacao={item.localizacao}
-                        image={
-                          item.image && item.image.uri
-                            ? item.image
-                            : getImageForEntity(
-                                "activity",
-                                item.titulo,
-                                item.localizacao,
-                                item.photo_url,
-                              )
-                        }
+                        image={item.image}
                         size="medium"
-                        onPress={() =>
-                          router.push({
-                            pathname: "/lugar/[cityId]/[placeId]",
-                            params: {
-                              cityId: "rio",
-                              placeId: item.id,
-                              source_table: "o_que_fazer_rio_v2",
-                            },
-                          })
-                        }
+                        onPress={() => router.push({
+                          pathname: "/lugar/[cityId]/[placeId]",
+                          params: { cityId: "rio", placeId: item.id, source_table: "o_que_fazer_rio_v2" },
+                        })}
                       />
                     ))}
                   </HorizontalScroll>
@@ -476,10 +405,7 @@ export default function CidadeScreen() {
                   subtitle={`Restaurantes com alma em ${destino.cidade}.`}
                 />
                 {loadingRestos ? (
-                  <ActivityIndicator
-                    color="#C9A84C"
-                    style={{ marginVertical: 16 }}
-                  />
+                  <ActivityIndicator color="#C9A84C" style={{ marginVertical: 16 }} />
                 ) : (
                   <HorizontalScroll>
                     {restos.slice(0, 8).map((r) => (
@@ -489,26 +415,11 @@ export default function CidadeScreen() {
                         nome={r.nome}
                         bairro={r.bairro}
                         categoria={r.categoria}
-                        image={
-                          r.resolvedPhotoUri
-                            ? { uri: r.resolvedPhotoUri }
-                            : getImageForEntity(
-                                "restaurant",
-                                r.nome,
-                                r.bairro,
-                                r.photo_url,
-                              )
-                        }
-                        onPress={() =>
-                          router.push({
-                            pathname: "/lugar/[cityId]/[placeId]",
-                            params: {
-                              cityId: "rio",
-                              placeId: String(r.id),
-                              source_table: "restaurantes",
-                            },
-                          })
-                        }
+                        image={r.resolvedPhotoUri ? { uri: r.resolvedPhotoUri } : null}
+                        onPress={() => router.push({
+                          pathname: "/lugar/[cityId]/[placeId]",
+                          params: { cityId: "rio", placeId: String(r.id), source_table: "restaurantes" },
+                        })}
                       />
                     ))}
                   </HorizontalScroll>
@@ -533,22 +444,15 @@ export default function CidadeScreen() {
                           nome={h.hotel_name}
                           localizacao={h.localizacao}
                           tipo={h.hotel_category}
-                          image={getImageForEntity(
-                            "hotel",
-                            h.hotel_name,
-                            h.localizacao,
-                            h.photo_url,
-                          )}
-                          onPress={() =>
-                            router.push({
-                              pathname: "/lugar/[cityId]/[placeId]",
-                              params: {
-                                cityId: "rio",
-                                placeId: h.id,
-                                source_table: "stay_hotels",
-                              },
-                            })
+                          image={
+                            sanitizePhotoUrl(h.photo_url)
+                              ? { uri: sanitizePhotoUrl(h.photo_url)! }
+                              : null
                           }
+                          onPress={() => router.push({
+                            pathname: "/lugar/[cityId]/[placeId]",
+                            params: { cityId: "rio", placeId: h.id, source_table: "stay_hotels" },
+                          })}
                         />
                       ))}
                     </HorizontalScroll>
@@ -562,17 +466,11 @@ export default function CidadeScreen() {
             <View style={s.comingSoonBlock}>
               <Text style={s.comingSoonEyebrow}>Em breve</Text>
               <Text style={s.comingSoonCopy}>
-                {COMING_SOON_COPY[destino.id] ??
-                  `${destino.cidade} está sendo preparada com o cuidado que ela merece.`}
+                {COMING_SOON_COPY[destino.id] ?? `${destino.cidade} está sendo preparada com o cuidado que ela merece.`}
               </Text>
               <Pressable
                 style={s.comingSoonCta}
-                onPress={() =>
-                  router.replace({
-                    pathname: "/cidade/[id]",
-                    params: { id: "rio" },
-                  })
-                }
+                onPress={() => router.replace({ pathname: "/cidade/[id]", params: { id: "rio" } })}
               >
                 <Text style={s.comingSoonCtaText}>Explorar o Rio agora</Text>
                 <Feather name="arrow-right" size={14} color="#C9A84C" />

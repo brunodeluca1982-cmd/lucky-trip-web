@@ -119,7 +119,7 @@ export function HeroCarousel({ items, onIndexChange }: HeroCarouselProps) {
   const flatListRef = useRef<FlatList>(null);
   const autoplayRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onIndexChangeRef = useRef(onIndexChange);
-onIndexChangeRef.current = onIndexChange;
+  onIndexChangeRef.current = onIndexChange;
 
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
