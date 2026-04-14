@@ -151,11 +151,22 @@ export function HeroCarousel({ items, onIndexChange }: HeroCarouselProps) {
 
   if (items.length === 0) return null;
 
+  const finalItems = [...items];
+  const rioIndex = finalItems.findIndex(
+    item =>
+      item.source_table === "destinos" &&
+      item.titulo === "Rio de Janeiro"
+  );
+  if (rioIndex > -1) {
+    const [rioItem] = finalItems.splice(rioIndex, 1);
+    finalItems.unshift(rioItem);
+  }
+
   return (
     <View style={styles.container}>
       <FlatList
         ref={flatListRef}
-        data={items}
+        data={finalItems}
         keyExtractor={(item) => `${item.source_table}-${item.id}`}
         horizontal
         pagingEnabled
@@ -180,7 +191,7 @@ export function HeroCarousel({ items, onIndexChange }: HeroCarouselProps) {
         })}
       />
       <View style={styles.dots}>
-        {items.map((item, i) => (
+        {finalItems.map((item, i) => (
           <View
             key={`dot-${item.source_table}-${item.id}`}
             style={[styles.dot, i === activeIndex && styles.dotActive]}
