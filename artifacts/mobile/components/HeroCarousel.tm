@@ -151,28 +151,20 @@ export function HeroCarousel({ items, onIndexChange }: HeroCarouselProps) {
 
   if (items.length === 0) return null;
 
-  let safeItems = [...items];
+  const finalItems = [...items]// FORCE RIO FIRST (FINAL FIX)
 
-  const hasRio = safeItems.some(
-    item =>
-      item.source_table === "destinos" &&
-      item.titulo === "Rio de Janeiro"
-  );
+const finalItems = [...items];
 
-  if (!hasRio) {
-    safeItems.unshift({
-      id:           "rio-fixed",
-      titulo:       "Rio de Janeiro",
-      source_table: "destinos",
-      localizacao:  "Brasil",
-      badge:        "Destino",
-      photo_url:    null,
-      route:        { type: "cidade", id: "rio-de-janeiro" },
-    });
-    console.log("[HERO FIX] Rio injected manually");
-  }
+const rioIndex = finalItems.findIndex(
+  (item) =>
+    item.source_table === "destinos" &&
+    item.titulo === "Rio de Janeiro"
+);
 
-  const finalItems = [...safeItems];
+if (rioIndex !== -1) {
+  const [rioItem] = finalItems.splice(rioIndex, 1);
+  finalItems.unshift(rioItem);
+};
   const rioIndex = finalItems.findIndex(
     item =>
       item.source_table === "destinos" &&
@@ -320,3 +312,4 @@ const styles = StyleSheet.create({
     borderRadius: 2.5,
   },
 });
+
