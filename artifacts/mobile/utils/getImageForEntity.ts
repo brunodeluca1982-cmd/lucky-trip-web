@@ -24,10 +24,10 @@ export function sanitizePhotoUrl(url: string | null | undefined): string | null 
   if (!url || !url.trim()) return null;
   const cleaned = url.trim();
 
-  // BLOCK: Google image URLs must never render on the frontend
+  // ALLOW: Google image URLs (cached via Supabase) — valid for entity images
   if (cleaned.includes("googleusercontent.com") || cleaned.includes("lh3.google")) {
-    console.log("[IMAGE PIPELINE] BLOCKED google URL:", cleaned.slice(0, 80));
-    return null;
+    console.log("[IMAGE PIPELINE] source: google", cleaned.slice(0, 80));
+    return cleaned;
   }
 
   // ALLOW: Cloudinary — first-class image source (video frames + hero images)
