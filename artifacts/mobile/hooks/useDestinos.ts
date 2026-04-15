@@ -24,8 +24,9 @@ export function useDestinos() {
           .from("destinos")
           .select("id, nome, pais, lancado, descricao, slug")
           .not("slug", "is", null)
-          .order("priority", { ascending: false })
           .order("nome", { ascending: true });
+
+        console.log("DESTINOS DATA:", data, "DESTINOS ERROR:", err);
 
         if (err) throw err;
 

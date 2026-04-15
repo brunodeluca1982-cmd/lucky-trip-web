@@ -133,11 +133,12 @@ export default function DestinosScreen() {
   useEffect(() => {
     let cancelled = false;
     supabase
-      .from("destinos")
+      .from("v_destinos_mvp")
       .select("slug, hero_image_url, mobile_hero_image_url, photo_url")
       .not("slug", "is", null)
       .limit(MAX_ITEMS)
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) console.log("[DESTINOS IMAGES ERROR]", error.message);
         if (cancelled || !data) return;
         const map: Record<string, string | null> = {};
         let missing = 0;
