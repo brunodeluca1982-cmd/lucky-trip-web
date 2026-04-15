@@ -35,23 +35,11 @@ import { destinos } from "@/data/mockData";
 import { useNeighborhoods } from "@/hooks/useNeighborhoods";
 import type { Hotel } from "@/lib/supabase";
 import { getNeighborhoodHero } from "@/utils/neighborhoodHero";
+import { HotelCard } from "@/components/HotelCard";
 
 const C = Colors.light;
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const HERO_H = Math.round(SCREEN_HEIGHT * 0.46);
-
-const CATEGORY_LABEL: Record<string, string> = {
-  luxo:     "LUXO",
-  boutique: "BOUTIQUE",
-  design:   "DESIGN",
-  ícone:    "ÍCONE",
-  icone:    "ÍCONE",
-  pousada:  "POUSADA",
-  budget:   "ECONÔMICO",
-};
-function categoryLabel(raw: string): string {
-  return CATEGORY_LABEL[raw?.toLowerCase()] ?? raw?.toUpperCase() ?? "HOTEL";
-}
 
 function formatLevel(val: string): string {
   const m: Record<string, string> = {
@@ -259,20 +247,26 @@ export default function BairroDetailScreen() {
               </View>
             )}
 
-            {(neighborhood.hotels ?? []).map((hotel, idx) => (
-              <HotelCard
-                key={hotel.id}
-                hotel={hotel}
-                index={idx}
-                neighborhoodName={neighborhood.neighborhood_name}
-                onPress={() =>
-                  router.push({
-                    pathname: "/ondeFicar/hotel/[hotelId]",
-                    params: { hotelId: hotel.id },
-                  })
-                }
-              />
-            ))}
+            {(neighborhood.hotels ?? []).map((hotel) => {
+              const imageUrl = hotel.photo_url ?? null;
+              console.log("HOTEL CARD:", hotel.hotel_name, imageUrl);
+              return (
+                <HotelCard
+                  key={hotel.id}
+                  id={String(hotel.id)}
+                  nome={hotel.hotel_name}
+                  localizacao={neighborhood.neighborhood_name}
+                  tipo={hotel.hotel_category}
+                  image={imageUrl ? { uri: imageUrl } : null}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/ondeFicar/hotel/[hotelId]",
+                      params: { hotelId: hotel.id },
+                    })
+                  }
+                />
+              );
+            })}
           </View>
 
           {/* ── Google Maps CTA ── */}
@@ -307,70 +301,6 @@ function StatPill({ label, value }: { label: string; value: string }) {
       <Text style={s.statLabel}>{label}</Text>
       <Text style={s.statValue}>{value}</Text>
     </View>
-  );
-}
-
-// ── HotelCard ─────────────────────────────────────────────────────────────────
-
-function HotelCard({
-  hotel,
-  index,
-  neighborhoodName,
-  onPress,
-}: {
-  hotel: Hotel;
-  index: number;
-  neighborhoodName: string;
-  onPress: () => void;
-}) {
-  const rawView = hotel.my_view ?? "";
-  const firstLine = rawView
-    .replace(/\r\n/g, "\n")
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean)[0] ?? "";
-  const preview = firstLine.length > 120 ? firstLine.slice(0, 117) + "…" : firstLine;
-
-  return (
-    <Pressable style={hc.card} onPress={onPress}>
-      <View style={hc.header}>
-        <View style={hc.headerLeft}>
-          <Text style={hc.category}>{categoryLabel(hotel.hotel_category)}</Text>
-          <Text style={hc.name}>{hotel.hotel_name}</Text>
-        </View>
-        <Text style={hc.index}>{String(index + 1).padStart(2, "0")}</Text>
-      </View>
-
-      {preview ? <Text style={hc.preview}>{preview}</Text> : null}
-
-      <View style={hc.badgeRow}>
-        {hotel.front_beach && (
-          <View style={hc.badge}><Text style={hc.badgeTxt}>Frente ao mar</Text></View>
-        )}
-        {hotel.rooftop && (
-          <View style={hc.badge}><Text style={hc.badgeTxt}>Terraço</Text></View>
-        )}
-      </View>
-
-      <View style={hc.footer}>
-        <View style={hc.locRow}>
-          <Feather name="map-pin" size={10} color="rgba(255,255,255,0.32)" />
-          <Text style={hc.locText}>{neighborhoodName}</Text>
-        </View>
-        {hotel.reserve_url ? (
-          <Pressable
-            style={hc.reserveBtn}
-            onPress={(e) => {
-              e.stopPropagation?.();
-              Linking.openURL(hotel.reserve_url);
-            }}
-          >
-            <Feather name="external-link" size={11} color={C.gold} />
-            <Text style={hc.reserveTxt}>Reservar</Text>
-          </Pressable>
-        ) : null}
-      </View>
-    </Pressable>
   );
 }
 
@@ -647,94 +577,5 @@ const s = StyleSheet.create({
     lineHeight: 22,
     maxWidth: 260,
     fontStyle: "italic",
-  },
-});
-
-const hc = StyleSheet.create({
-  card: {
-    backgroundColor: "rgba(255,255,255,0.03)",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.07)",
-    marginBottom: 16,
-    padding: 18,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 10,
-  },
-  headerLeft: { flex: 1, marginRight: 12 },
-  category: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 9,
-    color: "rgba(255,255,255,0.38)",
-    letterSpacing: 1.6,
-    marginBottom: 4,
-  },
-  name: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 18,
-    color: C.white,
-    lineHeight: 24,
-    letterSpacing: -0.2,
-  },
-  index: {
-    fontFamily: "PlayfairDisplay_400Regular",
-    fontSize: 11,
-    color: "rgba(255,255,255,0.20)",
-    letterSpacing: 0.8,
-    marginTop: 2,
-  },
-  preview: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: "rgba(255,255,255,0.52)",
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  badgeRow: { flexDirection: "row", gap: 7, marginBottom: 14, flexWrap: "wrap" },
-  badge: {
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-  badgeTxt: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 10,
-    color: "rgba(255,255,255,0.45)",
-    letterSpacing: 0.2,
-  },
-  footer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  locRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  locText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    color: "rgba(255,255,255,0.28)",
-  },
-  reserveBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    borderWidth: 1,
-    borderColor: "rgba(201,168,76,0.22)",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    backgroundColor: "rgba(201,168,76,0.04)",
-  },
-  reserveTxt: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 12,
-    color: C.gold,
-    letterSpacing: 0.1,
   },
 });
