@@ -30,7 +30,7 @@ export function useLuckyList(): State {
       setError(null);
 
       const { data, error: err } = await supabase
-        .from("lucky_list_rio")
+        .from("lucky_list_rio_v2")
         .select("*")
         .order("nome");
 

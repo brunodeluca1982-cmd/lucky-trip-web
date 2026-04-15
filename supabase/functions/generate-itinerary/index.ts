@@ -185,12 +185,12 @@ async function enrichPlaces(
   // Parallel fetch from all three sources
   const [oqResult, luckyResult, restResult] = await Promise.all([
     oqIds.length > 0
-      ? supa.from("o_que_fazer_rio")
+      ? supa.from("o_que_fazer_rio_v2")
           .select("id,nome,bairro,categoria,tags_ia,momento_ideal,vibe,energia,duracao_media,photo_url,meu_olhar")
           .in("id", oqIds)
       : Promise.resolve({ data: [] }),
     luckyIds.length > 0
-      ? supa.from("lucky_list_rio")
+      ? supa.from("lucky_list_rio_v2")
           .select("id,nome,bairro,tipo,tags_ia,momento_ideal,photo_url,meu_olhar")
           .in("id", luckyIds)
       : Promise.resolve({ data: [] }),
@@ -345,7 +345,7 @@ async function fetchComplementaryContent(
   // A high-preference item in zone 5 or 6 can still win (no hard filtering).
   if (needActs > 0) {
     const { data: luckyRows } = await supa
-      .from("lucky_list_rio")
+      .from("lucky_list_rio_v2")
       .select("id,nome,bairro,tipo,tags_ia,momento_ideal,photo_url,meu_olhar")
       .limit(Math.min(60, (needActs + 5) * 3));
 
@@ -402,7 +402,7 @@ async function fetchComplementaryContent(
   );
   if (stillNeedActs > 0) {
     const { data: oqRows } = await supa
-      .from("o_que_fazer_rio")
+      .from("o_que_fazer_rio_v2")
       .select("id,nome,bairro,tags_ia,momento_ideal,vibe,energia,duracao_media,photo_url,meu_olhar")
       .limit(Math.min(75, (stillNeedActs + 8) * 3));
 
@@ -1156,8 +1156,8 @@ function categoriaToTable(cat: SavedCategory): string {
   switch (cat) {
     case "restaurante": return "restaurantes";
     case "hotel":       return "stay_hotels";
-    case "oQueFazer":   return "o_que_fazer_rio";
-    case "lucky":       return "lucky_list_rio";
+    case "oQueFazer":   return "o_que_fazer_rio_v2";
+    case "lucky":       return "lucky_list_rio_v2";
   }
 }
 

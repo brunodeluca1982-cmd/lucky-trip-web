@@ -18,6 +18,7 @@ import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useDestinos } from "@/hooks/useDestinos";
 import { RotatingBackground } from "@/components/RotatingBackground";
+import { useRioHeroMedia } from "@/hooks/useHeroMedia";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -117,6 +118,7 @@ export default function DestinosScreen() {
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === "web" ? 67 : insets.top + 12;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const rioHero = useRioHeroMedia("image");
 
   const { destinos, loading } = useDestinos();
   const [query, setQuery] = React.useState("");
@@ -138,7 +140,11 @@ export default function DestinosScreen() {
     <View style={s.root}>
       {/* Full-screen atmospheric background */}
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        <RotatingBackground pool={DESTINOS_BG_POOL} />
+        <RotatingBackground
+          pool={rioHero && rioHero.length > 0
+            ? rioHero.map((item) => ({ uri: item.public_url }))
+            : DESTINOS_BG_POOL}
+        />
         <LinearGradient
           colors={["rgba(0,0,0,0.74)", "rgba(0,0,0,0.66)", "rgba(0,0,0,0.86)"]}
           locations={[0, 0.5, 1]}

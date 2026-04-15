@@ -15,6 +15,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { RotatingBackground } from "@/components/RotatingBackground";
+import { useRioHeroMedia } from "@/hooks/useHeroMedia";
 import {
   Alert,
   Animated,
@@ -2813,6 +2814,7 @@ export default function RoteiroScreen() {
   const insets    = useSafeAreaInsets();
   const topPad    = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const rioHero   = useRioHeroMedia("image");
 
   const params      = useLocalSearchParams<{ contextual?: string }>();
   const isContextual = params.contextual === "1";
@@ -3251,7 +3253,9 @@ export default function RoteiroScreen() {
       {/* ── Cinematic background — rotating pool, hotel image pinned as first if saved ── */}
       <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}>
         <RotatingBackground
-          pool={ROTEIRO_BG_POOL}
+          pool={rioHero && rioHero.length > 0
+            ? rioHero.map((item) => ({ uri: item.public_url }))
+            : ROTEIRO_BG_POOL}
           firstSource={hotelItem?.image ?? null}
         />
         <LinearGradient

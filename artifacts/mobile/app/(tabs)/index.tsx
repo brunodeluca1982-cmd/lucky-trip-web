@@ -14,6 +14,8 @@ import {
 } from "react-native";
 import { notifyHeroReady } from "@/lib/splashGate";
 import { RotatingBackground } from "@/components/RotatingBackground";
+import { VideoBackground } from "@/components/VideoBackground";
+import { useHomeHeroMedia } from "@/hooks/useHeroMedia";
 
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -204,6 +206,7 @@ function getCurrentMomento(): MomentoTab {
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const heroItems = useHomeHeroMedia();
   const { viagem } = useGuia();
   const agoraTitle = getAgoraTitle(viagem.destino || undefined);
   const { lugares: atividades, loading: loadingAtividades } = useOQueFazer();
@@ -224,8 +227,11 @@ export default function HomeScreen() {
   // overlayAnim starts at 0 so the dark editorial overlay is invisible until
   // the hero image is actually displayed — content always lands on a warm bg.
   const overlayAnim = useRef(new Animated.Value(0)).current;
+  const heroReadyFired = useRef(false);
 
   function handleHeroDisplay() {
+    if (heroReadyFired.current) return;
+    heroReadyFired.current = true;
     notifyHeroReady();                         // release the splash gate
     Animated.timing(overlayAnim, {
       toValue: 1,
@@ -234,14 +240,26 @@ export default function HomeScreen() {
     }).start();
   }
 
+  // When video data arrives from Supabase, release the splash gate immediately.
+  React.useEffect(() => {
+    if (heroItems && heroItems.length > 0) handleHeroDisplay();
+  }, [heroItems]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <View style={s.root}>
-      {/* ── Rotating background — editorial Rio pool ── */}
+      {/* ── Background — video from Supabase, falls back to local pool ── */}
       <View style={[s.bgImage, { backgroundColor: "#1A0E04" }]} pointerEvents="none">
-        <RotatingBackground
-          pool={HOME_BG_POOL}
-          onFirstImageDisplay={handleHeroDisplay}
-        />
+        {heroItems && heroItems.length > 0 ? (
+          <VideoBackground
+            videoUrl={heroItems[0].video_url}
+            fallbackPool={HOME_BG_POOL}
+          />
+        ) : (
+          <RotatingBackground
+            pool={HOME_BG_POOL}
+            onFirstImageDisplay={handleHeroDisplay}
+          />
+        )}
       </View>
       {/* Editorial overlay fades in WITH the image — never darkens a black canvas */}
       <Animated.View

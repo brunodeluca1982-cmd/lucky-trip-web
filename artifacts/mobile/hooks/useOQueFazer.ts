@@ -30,7 +30,7 @@ export function useOQueFazer(): State {
       setError(null);
 
       const { data, error: err } = await supabase
-        .from("o_que_fazer_rio")
+        .from("o_que_fazer_rio_v2")
         .select("*")
         .order("nome");
 

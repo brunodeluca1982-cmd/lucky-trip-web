@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { RotatingBackground } from "@/components/RotatingBackground";
+import { useRioHeroMedia } from "@/hooks/useHeroMedia";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -58,6 +59,7 @@ export default function LuckyScreen() {
   const insets    = useSafeAreaInsets();
   const topPad    = Platform.OS === "web" ? 67 : insets.top + 16;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const rioHero   = useRioHeroMedia("image");
 
   const scrollRef = useRef<ScrollView>(null);
 
@@ -226,7 +228,11 @@ export default function LuckyScreen() {
 
   return (
     <View style={styles.bg}>
-      <RotatingBackground pool={LUCKY_BG_POOL} />
+      <RotatingBackground
+        pool={rioHero && rioHero.length > 0
+          ? rioHero.map((item) => ({ uri: item.public_url }))
+          : LUCKY_BG_POOL}
+      />
       <View style={styles.overlay}>
         <KeyboardAvoidingView
           style={{ flex: 1 }}
