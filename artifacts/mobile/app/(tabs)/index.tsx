@@ -31,6 +31,7 @@ import { SectionHeader } from "@/components/SectionHeader";
 import Colors from "@/constants/colors";
 import { heroDestinos } from "@/data/mockData";
 import { useGuia } from "@/context/GuiaContext";
+import { useDestinos } from "@/hooks/useDestinos";
 import { useLuckyList } from "@/hooks/useLuckyList";
 import { useOQueFazer } from "@/hooks/useOQueFazer";
 import { useRestaurants } from "@/hooks/useRestaurants";
@@ -207,12 +208,26 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
   const heroItems = useHomeHeroMedia();
+  const { destinos } = useDestinos();
   const { viagem } = useGuia();
   const agoraTitle = getAgoraTitle(viagem.destino || undefined);
   const { lugares: atividades, loading: loadingAtividades } = useOQueFazer();
   const { restaurantes: restos, loading: loadingRestos } = useRestaurants();
   const { friends, loading: loadingFriends } = useFriends();
   const momentoTab = getCurrentMomento();
+
+  const carouselItems = React.useMemo(() => {
+    const launched = destinos.filter((d) => d.lancado);
+    if (launched.length === 0) return heroDestinos;
+    return launched.map((d) => ({
+      id: d.id,
+      cidade: d.cidade,
+      pais: d.pais,
+      badge: d.cidade,
+      image: d.image,
+      cityId: d.id,
+    }));
+  }, [destinos]);
 
   const filteredAtividades = React.useMemo(() => {
     if (!atividades.length) return [];
@@ -282,7 +297,7 @@ export default function HomeScreen() {
       >
 
         {/* ── 1. HERO CAROUSEL ── */}
-        <HeroCarousel items={heroDestinos} />
+        <HeroCarousel items={carouselItems} />
 
         {/* ── 2. O QUE FAZER NO RIO ── Supabase: o_que_fazer_rio */}
         <View style={s.section}>
