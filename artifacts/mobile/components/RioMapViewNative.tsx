@@ -1,21 +1,17 @@
 /**
- * RioMapViewNative — react-native-maps implementation for iOS/Android.
+ * RioMapViewNative — WebView-based Leaflet map for iOS/Android.
+ * Renders the EXACT same styled map as the web iframe version.
  * Loaded lazily by RioMapView on non-web platforms.
+ *
+ * buildLeafletHTML uses window.parent.postMessage() for marker clicks.
+ * In a WebView there is no parent frame, so we shim window.parent before
+ * the page script runs, forwarding every postMessage call to the React
+ * Native bridge via window.ReactNativeWebView.postMessage(JSON.stringify).
  */
 import React from "react";
-import { StyleSheet, type StyleProp, type ViewStyle } from "react-native";
-import MapView, { Marker, type Region } from "react-native-maps";
-import { RIO_NEIGHBORHOODS } from "./RioMapView";
-import Colors from "@/constants/colors";
-
-const C = Colors.light;
-
-const RIO_REGION: Region = {
-  latitude: -22.9768,
-  longitude: -43.2100,
-  latitudeDelta: 0.18,
-  longitudeDelta: 0.12,
-};
+import { View, StyleSheet, type StyleProp, type ViewStyle } from "react-native";
+import { WebView } from "react-native-webview";
+import { buildLeafletHTML, RIO_NEIGHBORHOODS } from "./RioMapView";
 
 type Props = {
   selectedNeighborhood: string | null;
@@ -23,41 +19,45 @@ type Props = {
   style?: StyleProp<ViewStyle>;
 };
 
+const PARENT_SHIM = `
+  (function() {
+    window.parent = {
+      postMessage: function(data) {
+        if (window.ReactNativeWebView) {
+          window.ReactNativeWebView.postMessage(JSON.stringify(data));
+        }
+      }
+    };
+  })();
+  true;
+`;
+
 export default function RioMapViewNative({ selectedNeighborhood, onNeighborhoodPress, style }: Props) {
+  const html = buildLeafletHTML(selectedNeighborhood, RIO_NEIGHBORHOODS);
+
   return (
-    <MapView
-      style={[s.map, style]}
-      initialRegion={RIO_REGION}
-      onPress={() => onNeighborhoodPress(null)}
-    >
-      {RIO_NEIGHBORHOODS.map((n) => (
-        <Marker
-          key={n.name}
-          coordinate={{ latitude: n.lat, longitude: n.lng }}
-          title={n.name}
-          pinColor={
-            !n.clickable
-              ? "rgba(255,255,255,0.3)"
-              : n.name === selectedNeighborhood
-              ? C.gold
-              : C.terracotta
-          }
-          onPress={
-            n.clickable
-              ? () =>
-                  onNeighborhoodPress(
-                    n.name === selectedNeighborhood ? null : n.name,
-                  )
-              : undefined
-          }
-        />
-      ))}
-    </MapView>
+    <View style={[styles.container, style]}>
+      <WebView
+        originWhitelist={["*"]}
+        source={{ html }}
+        style={styles.webview}
+        javaScriptEnabled
+        domStorageEnabled
+        injectedJavaScriptBeforeContentLoaded={PARENT_SHIM}
+        onMessage={(event) => {
+          try {
+            const data = JSON.parse(event.nativeEvent.data);
+            if (data.type === "neighborhoodClick") {
+              onNeighborhoodPress(data.name ?? null);
+            }
+          } catch {}
+        }}
+      />
+    </View>
   );
 }
 
-const s = StyleSheet.create({
-  map: {
-    flex: 1,
-  },
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  webview: { flex: 1 },
 });

@@ -15,6 +15,7 @@
 
 import React, { useEffect, useRef } from "react";
 import {
+  Platform,
   StyleSheet,
   View,
   type StyleProp,
@@ -51,7 +52,7 @@ export const RIO_NEIGHBORHOODS: RioNeighborhood[] = [
 
 // ── Leaflet HTML generator ────────────────────────────────────────────────────
 
-function buildLeafletHTML(
+export function buildLeafletHTML(
   selected: string | null,
   neighborhoods: RioNeighborhood[],
 ): string {
@@ -317,7 +318,10 @@ function RioMapViewNative({ selectedNeighborhood, onNeighborhoodPress, style }: 
 // ── Exported component ────────────────────────────────────────────────────────
 
 export default function RioMapView(props: MapProps) {
-  return <RioMapViewWeb {...props} />;
+  if (Platform.OS === "web") {
+    return <RioMapViewWeb {...props} />;
+  }
+  return <RioMapViewNative {...props} />;
 }
 
 const s = StyleSheet.create({
