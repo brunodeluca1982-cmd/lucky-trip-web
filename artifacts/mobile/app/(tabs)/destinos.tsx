@@ -56,7 +56,11 @@ const DestCard = memo(function DestCard({
   }, [id]);
 
   const imageUrl = heroImageUrl ?? null;
-  console.log("IMAGE CHECK:", id, imageUrl);
+
+  if (!imageUrl) {
+    console.log("❌ MISSING IMAGE:", id);
+  }
+  console.log("✅ FINAL IMAGE:", id, imageUrl);
 
   return (
     <Pressable
@@ -68,12 +72,16 @@ const DestCard = memo(function DestCard({
         pressed && { opacity: 0.88, transform: [{ scale: 0.97 }] },
       ]}
     >
-      <Image
-        source={imageUrl ? { uri: imageUrl } : undefined}
-        style={[s.cardImage, !lancado && { opacity: 0.68 }]}
-        resizeMode="cover"
-        onError={() => console.log(`[IMAGE] load error for ${id}`)}
-      />
+      {imageUrl ? (
+        <Image
+          source={{ uri: imageUrl }}
+          style={[{ width: "100%", height: "100%" }, !lancado && { opacity: 0.68 }]}
+          resizeMode="cover"
+          onError={() => console.log(`[IMAGE] load error for ${id}`)}
+        />
+      ) : (
+        <View style={{ width: "100%", height: "100%", backgroundColor: "#000" }} />
+      )}
 
       {/* Bottom gradient — bottom 45% only */}
       <LinearGradient
