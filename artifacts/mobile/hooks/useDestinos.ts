@@ -6,7 +6,7 @@ export interface Destino {
   cidade: string;
   pais: string;
   descricao: string;
-  image: null;
+  image: string | null;
   lancado: boolean;
 }
 
@@ -21,27 +21,28 @@ export function useDestinos() {
     async function load() {
       try {
         const { data, error: err } = await supabase
-          .from("destinos")
-          .select("id, nome, pais, lancado, descricao, slug")
+          .from("v_destinos_mvp")
+          .select("slug, nome, pais, lancado, descricao, hero_image_url_effective")
           .not("slug", "is", null)
           .order("nome", { ascending: true });
 
-        console.log("DESTINOS DATA:", data, "DESTINOS ERROR:", err);
+        console.log("DESTINOS RAW:", data, "ERROR:", err);
 
         if (err) throw err;
 
-        const rows: Destino[] = (data ?? []).map((row) => ({
-          id:        row.slug as string,
-          cidade:    row.nome,
-          pais:      row.pais,
-          descricao: row.descricao ?? "",
-          image:     null,
-          lancado:   row.lancado ?? false,
+        const normalized: Destino[] = (data ?? []).map((item) => ({
+          id:        item.slug as string,
+          cidade:    item.nome,
+          pais:      item.pais,
+          descricao: item.descricao ?? "",
+          image:     (item as any).hero_image_url_effective ?? null,
+          lancado:   item.lancado ?? false,
         }));
 
-        if (!cancelled) setDestinos(rows);
+        if (!cancelled) setDestinos(normalized);
       } catch (e: any) {
         if (!cancelled) {
+          console.log("DESTINOS LOAD ERROR:", e.message);
           setError(e.message ?? "Erro ao carregar destinos");
           setDestinos([]);
         }

@@ -1,8 +1,7 @@
-import React, { memo, useCallback, useEffect, useState } from "react";
+import React, { memo, useCallback } from "react";
 import {
   Dimensions,
   Image,
-  ImageSourcePropType,
   Platform,
   Pressable,
   ScrollView,
@@ -17,7 +16,6 @@ import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useDestinos } from "@/hooks/useDestinos";
 import { RotatingBackground } from "@/components/RotatingBackground";
-import { supabase } from "@/lib/supabase";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -57,6 +55,9 @@ const DestCard = memo(function DestCard({
     router.push({ pathname: "/cidade/[id]", params: { id } });
   }, [id]);
 
+  const imageUrl = heroImageUrl ?? null;
+  console.log("IMAGE CHECK:", id, imageUrl);
+
   return (
     <Pressable
       onPress={handlePress}
@@ -67,21 +68,12 @@ const DestCard = memo(function DestCard({
         pressed && { opacity: 0.88, transform: [{ scale: 0.97 }] },
       ]}
     >
-      {heroImageUrl != null ? (
-        <Image
-          source={{ uri: heroImageUrl }}
-          style={[s.cardImage, !lancado && { opacity: 0.68 }]}
-          resizeMode="cover"
-          onError={() => console.log(`[IMAGE] source: fallback (load error for ${heroImageUrl.slice(0, 60)})`)}
-        />
-      ) : (
-        // Premium placeholder — branded dark warm gradient (never black void)
-        <LinearGradient
-          colors={["#1A0E04", "#2C1A0A", "#1A0E04"]}
-          locations={[0, 0.5, 1]}
-          style={s.cardImage}
-        />
-      )}
+      <Image
+        source={imageUrl ? { uri: imageUrl } : undefined}
+        style={[s.cardImage, !lancado && { opacity: 0.68 }]}
+        resizeMode="cover"
+        onError={() => console.log(`[IMAGE] load error for ${id}`)}
+      />
 
       {/* Bottom gradient — bottom 45% only */}
       <LinearGradient
@@ -125,42 +117,6 @@ export default function DestinosScreen() {
 
   const { destinos, loading } = useDestinos();
   const [query, setQuery] = React.useState("");
-
-  // Fetch hero images for each destino (keyed by slug).
-  // Pipeline: mobile_hero_image_url → hero_image_url → photo_url → null
-  // Stored as a single resolved string per slug to keep DestCard simple.
-  const [heroImages, setHeroImages] = useState<Record<string, string | null>>({});
-  useEffect(() => {
-    let cancelled = false;
-    supabase
-      .from("v_destinos_mvp")
-      .select("slug, hero_image_url, mobile_hero_image_url, photo_url")
-      .not("slug", "is", null)
-      .limit(MAX_ITEMS)
-      .then(({ data, error }) => {
-        if (error) console.log("[DESTINOS IMAGES ERROR]", error.message);
-        if (cancelled || !data) return;
-        const map: Record<string, string | null> = {};
-        let missing = 0;
-        for (const row of data) {
-          if (!row.slug) continue;
-          const mobile = (row as any).mobile_hero_image_url as string | null | undefined;
-          const hero   = (row as any).hero_image_url as string | null | undefined;
-          const photo  = (row as any).photo_url as string | null | undefined;
-          // Pipeline: mobile → hero → photo_url → null
-          const resolved =
-            (Platform.OS !== "web" && mobile) ? mobile :
-            hero  ? hero  :
-            photo ? photo :
-            null;
-          map[row.slug as string] = resolved;
-          if (!resolved) missing++;
-        }
-        console.log(`[DESTINOS] loaded ${data.length} destinations, missing_images: ${missing}`);
-        setHeroImages(map);
-      });
-    return () => { cancelled = true; };
-  }, []);
 
   const filtered = (
     query.trim()
@@ -250,7 +206,7 @@ export default function DestinosScreen() {
                     id={d.id}
                     cidade={d.cidade}
                     pais={d.pais}
-                    heroImageUrl={heroImages[d.id] ?? null}
+                    heroImageUrl={d.image}
                     selected={d.id === SELECTED_ID}
                     lancado={d.lancado}
                   />
