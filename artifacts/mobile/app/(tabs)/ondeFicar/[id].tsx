@@ -11,7 +11,6 @@ import {
   ActivityIndicator,
   Dimensions,
   Image,
-  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -28,6 +27,7 @@ import { destinos } from "@/data/mockData";
 import { useNeighborhoods } from "@/hooks/useNeighborhoods";
 import type { Hotel, Neighborhood } from "@/lib/supabase";
 import RioMapView from "@/components/RioMapView";
+import { HotelCard } from "@/components/HotelCard";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const MAP_H = Math.round(SCREEN_HEIGHT * 0.50);
@@ -35,20 +35,6 @@ const MAP_H = Math.round(SCREEN_HEIGHT * 0.50);
 const C = Colors.light;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-const CATEGORY_LABEL: Record<string, string> = {
-  luxo:     "LUXO",
-  boutique: "BOUTIQUE",
-  design:   "DESIGN",
-  ícone:    "ÍCONE",
-  icone:    "ÍCONE",
-  pousada:  "POUSADA",
-  budget:   "ECONÔMICO",
-};
-
-function categoryLabel(raw: string): string {
-  return CATEGORY_LABEL[raw?.toLowerCase()] ?? raw?.toUpperCase() ?? "HOTEL";
-}
 
 type FlatHotel = Hotel & { localizacao: string; neighborhood: Neighborhood };
 
@@ -174,19 +160,26 @@ export default function OndeFicarScreen() {
             </View>
           )}
 
-          {!loading && !error && allHotels.map((hotel, idx) => (
-            <HotelCard
-              key={hotel.id}
-              hotel={hotel}
-              index={idx}
-              onPress={() =>
-                router.push({
-                  pathname: "/ondeFicar/hotel/[hotelId]",
-                  params: { hotelId: hotel.id },
-                })
-              }
-            />
-          ))}
+          {!loading && !error && allHotels.map((hotel) => {
+            const imageUrl = hotel.photo_url ?? null;
+            console.log("HOTEL CARD:", hotel.hotel_name, imageUrl);
+            return (
+              <HotelCard
+                key={hotel.id}
+                id={String(hotel.id)}
+                nome={hotel.hotel_name}
+                localizacao={hotel.localizacao}
+                tipo={hotel.hotel_category}
+                image={imageUrl ? { uri: imageUrl } : null}
+                onPress={() =>
+                  router.push({
+                    pathname: "/ondeFicar/hotel/[hotelId]",
+                    params: { hotelId: hotel.id },
+                  })
+                }
+              />
+            );
+          })}
         </View>
 
         {/* Footer */}
@@ -198,94 +191,6 @@ export default function OndeFicarScreen() {
         </View>
       </ScrollView>
     </View>
-  );
-}
-
-// ── Hotel card ────────────────────────────────────────────────────────────────
-
-const GRAD_BY_CATEGORY: Record<string, string> = {
-  luxo:     "#2A1410",
-  boutique: "#1A1820",
-  design:   "#0F1A18",
-};
-
-function HotelCard({
-  hotel,
-  index,
-  onPress,
-}: {
-  hotel: FlatHotel;
-  index: number;
-  onPress: () => void;
-}) {
-  const gradStart = GRAD_BY_CATEGORY[hotel.hotel_category] ?? "#1C120A";
-  const rawView = hotel.my_view ?? "";
-  const firstLine = rawView
-    .replace(/\r\n/g, "\n")
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean)[0] ?? "";
-  const preview = firstLine.length > 130 ? firstLine.slice(0, 127) + "…" : firstLine;
-
-  return (
-    <Pressable style={s.card} onPress={onPress}>
-      <LinearGradient
-        colors={[gradStart, "#000000"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={s.cardTop}
-      >
-        <View style={s.badgeRow}>
-          {hotel.front_beach && (
-            <View style={s.badge}>
-              <Text style={s.badgeTxt}>Frente ao mar</Text>
-            </View>
-          )}
-          {hotel.rooftop && (
-            <View style={s.badge}>
-              <Text style={s.badgeTxt}>Terraço</Text>
-            </View>
-          )}
-        </View>
-        <Text style={s.watermark} numberOfLines={1}>
-          {hotel.localizacao}
-        </Text>
-        <View style={s.cardTopBottom}>
-          <Text style={s.orderNum}>{String(index + 1).padStart(2, "0")}</Text>
-          {hotel.featured_restaurant && (
-            <View style={s.restBadge}>
-              <Feather name="coffee" size={9} color="rgba(201,168,76,0.65)" />
-              <Text style={s.restTxt}>{hotel.featured_restaurant}</Text>
-            </View>
-          )}
-        </View>
-      </LinearGradient>
-
-      <View style={s.cardBody}>
-        <View style={s.cardMeta}>
-          <Text style={s.cardCat}>{categoryLabel(hotel.hotel_category)}</Text>
-          <View style={s.cardLoc}>
-            <Feather name="map-pin" size={10} color={C.warmGray} />
-            <Text style={s.cardLocTxt}>{hotel.localizacao}</Text>
-          </View>
-        </View>
-        <Text style={s.cardName}>{hotel.hotel_name}</Text>
-        <Text style={s.cardDesc}>{preview}</Text>
-
-        {hotel.reserve_url ? (
-          <Pressable
-            style={s.reserveBtn}
-            onPress={(e) => {
-              e.stopPropagation?.();
-              Linking.openURL(hotel.reserve_url);
-            }}
-          >
-            <Feather name="external-link" size={13} color={C.gold} />
-            <Text style={s.reserveTxt}>Reservar</Text>
-          </Pressable>
-        ) : null}
-      </View>
-    </Pressable>
   );
 }
 
@@ -423,126 +328,6 @@ const s = StyleSheet.create({
     fontSize: 13,
     color: "rgba(255,255,255,0.20)",
     textAlign: "center",
-  },
-
-  card: {
-    backgroundColor: "#1C1410",
-    borderRadius: 18,
-    overflow: "hidden",
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
-  },
-  cardTop: {
-    height: 144,
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 14,
-    justifyContent: "space-between",
-  },
-  badgeRow: { flexDirection: "row", gap: 7, justifyContent: "flex-end" },
-  badge: {
-    backgroundColor: "rgba(196,112,74,0.20)",
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: "rgba(196,112,74,0.30)",
-  },
-  badgeTxt: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 10,
-    color: C.terracotta,
-    letterSpacing: 0.3,
-  },
-  watermark: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 36,
-    color: "rgba(255,255,255,0.055)",
-    letterSpacing: -1,
-    position: "absolute",
-    bottom: 32,
-    left: 14,
-    right: 14,
-  },
-  cardTopBottom: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  orderNum: {
-    fontFamily: "PlayfairDisplay_400Regular",
-    fontSize: 12,
-    color: "rgba(255,255,255,0.28)",
-    letterSpacing: 1,
-  },
-  restBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    backgroundColor: "rgba(201,168,76,0.09)",
-    borderRadius: 20,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: "rgba(201,168,76,0.18)",
-  },
-  restTxt: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 10,
-    color: "rgba(201,168,76,0.72)",
-    letterSpacing: 0.2,
-  },
-  cardBody: { padding: 18, paddingTop: 16 },
-  cardMeta: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 6,
-  },
-  cardCat: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 10,
-    color: C.terracotta,
-    letterSpacing: 1.4,
-  },
-  cardLoc: { flexDirection: "row", alignItems: "center", gap: 4 },
-  cardLocTxt: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    color: C.warmGray,
-  },
-  cardName: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 19,
-    color: C.white,
-    lineHeight: 26,
-    letterSpacing: -0.2,
-    marginBottom: 6,
-  },
-  cardDesc: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: "rgba(255,255,255,0.55)",
-    lineHeight: 20,
-    marginBottom: 14,
-  },
-  reserveBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
-    borderWidth: 1,
-    borderColor: "rgba(201,168,76,0.22)",
-    borderRadius: 10,
-    paddingVertical: 11,
-    backgroundColor: "rgba(201,168,76,0.04)",
-  },
-  reserveTxt: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 13,
-    color: C.gold,
-    letterSpacing: 0.1,
   },
 
   footer: {
