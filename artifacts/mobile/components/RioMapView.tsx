@@ -15,7 +15,6 @@
 
 import React, { useEffect, useRef } from "react";
 import {
-  Platform,
   StyleSheet,
   View,
   type StyleProp,
@@ -318,10 +317,7 @@ function RioMapViewNative({ selectedNeighborhood, onNeighborhoodPress, style }: 
 // ── Exported component ────────────────────────────────────────────────────────
 
 export default function RioMapView(props: MapProps) {
-  if (Platform.OS === "web") {
-    return <RioMapViewWeb {...props} />;
-  }
-  return <RioMapViewNative {...props} />;
+  return <RioMapViewWeb {...props} />;
 }
 
 const s = StyleSheet.create({
