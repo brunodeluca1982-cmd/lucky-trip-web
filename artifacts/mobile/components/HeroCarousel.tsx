@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
+import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 
 const C = Colors.light;
@@ -89,6 +90,13 @@ function HeroSlide({ item }: { item: HeroItem }) {
         </View>
         <Text style={styles.cidade}>{item.cidade}</Text>
         <Text style={styles.pais}>{item.pais}</Text>
+        {/* "Conferir agora" CTA — shown for actionable cards only */}
+        {(item.type === "destino" || item.type === "guia") && (
+          <View style={styles.ctaBtn}>
+            <Text style={styles.ctaBtnText}>Conferir agora</Text>
+            <Feather name="arrow-right" size={12} color="#000" style={{ marginLeft: 4 }} />
+          </View>
+        )}
       </View>
     </Pressable>
   );
@@ -220,12 +228,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "rgba(255,255,255,0.80)",
     marginTop: 6,
-    marginBottom: 24,
+    marginBottom: 18,
     letterSpacing: 3,
     textTransform: "uppercase",
     textShadowColor: "rgba(0,0,0,0.70)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 6,
+  },
+  ctaBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#D4AF37",
+    borderRadius: 22,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  ctaBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: "#000000",
+    letterSpacing: 0.3,
   },
   dots: {
     position: "absolute",
