@@ -146,6 +146,7 @@ export default function OndeFicarScreen() {
               Onde você dorme define como você acorda. No Rio, cada bairro tem
               um ritmo próprio — escolher bem o hotel muda toda a experiência.
             </Text>
+            <Text style={s.byline}>Por Bruno de Luca</Text>
             <View style={s.introMeta}>
               <View style={s.introDot} />
               <Text style={s.introMetaText}>
@@ -395,6 +396,14 @@ const s = StyleSheet.create({
     fontSize: 12,
     color: "rgba(255,255,255,0.35)",
     letterSpacing: 0.5,
+  },
+  byline: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11.5,
+    color: "#D4AF37",
+    letterSpacing: 0.6,
+    marginBottom: 10,
+    opacity: 0.85,
   },
 
   listSection: {

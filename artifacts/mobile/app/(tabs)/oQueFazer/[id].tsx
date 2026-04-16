@@ -118,6 +118,7 @@ export default function OQueFazerScreen() {
           <View style={[s.intro, s.introAbsolute]}>
             <Text style={s.introTitle}>O que fazer em {destino.cidade}</Text>
             <Text style={s.introPara}>{descricao[0]}</Text>
+            <Text style={s.byline}>Por Bruno de Luca</Text>
             <View style={s.introMeta}>
               <View style={s.introDot} />
               <Text style={s.introMetaText}>
@@ -330,6 +331,14 @@ const s = StyleSheet.create({
     fontSize: 12,
     color: "rgba(255,255,255,0.35)",
     letterSpacing: 0.5,
+  },
+  byline: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11.5,
+    color: "#D4AF37",
+    letterSpacing: 0.6,
+    marginBottom: 10,
+    opacity: 0.85,
   },
 
   listSection: {
