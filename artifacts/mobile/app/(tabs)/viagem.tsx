@@ -154,7 +154,6 @@ function ActionArea({ hasSaved }: { hasSaved: boolean }) {
       <View style={act.socialRow}>
         <SocialChip icon="instagram" label="Instagram" onPress={() => {}} />
         <SocialChip icon="video"     label="TikTok"    onPress={() => {}} />
-        <SocialChip icon="link-2"    label="Link"      onPress={() => {}} />
       </View>
 
       {/* Row 2 — primary AI CTA (dark glass panel, gold accent) */}
@@ -362,45 +361,65 @@ function SavedSection({
   saved: SavedItem[];
   onRemove: (id: string) => void;
 }) {
+  // Group saved items by city (cityId field, default "rio")
+  const groups = React.useMemo(() => {
+    const map = new Map<string, { label: string; items: SavedItem[] }>();
+    for (const item of saved) {
+      const city = (item as any).cityId ?? "rio";
+      const label = (item as any).cityLabel ?? "Rio de Janeiro";
+      if (!map.has(city)) map.set(city, { label, items: [] });
+      map.get(city)!.items.push(item);
+    }
+    return Array.from(map.values());
+  }, [saved]);
+
   return (
     <View style={ss.wrap}>
-      <View style={ss.labelRow}>
-        <Text style={ss.label}>
-          {saved.length === 1 ? "1 lugar salvo" : `${saved.length} lugares salvos`}
-        </Text>
-        <View style={ss.dot} />
-        <Text style={ss.sublabel}>toque para ver</Text>
-      </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={ss.scroll}
-        decelerationRate="fast"
-      >
-        {saved.map((item) => (
-          <SavedCard key={item.id} item={item} onRemove={onRemove} />
-        ))}
-      </ScrollView>
+      {groups.map((group, gi) => (
+        <View key={gi} style={ss.group}>
+          {/* Destination header */}
+          <View style={ss.destRow}>
+            <Feather name="map-pin" size={11} color={GOLD} />
+            <Text style={ss.destLabel}>{group.label}</Text>
+            <View style={ss.dot} />
+            <Text style={ss.sublabel}>
+              {group.items.length === 1 ? "1 lugar" : `${group.items.length} lugares`}
+            </Text>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={ss.scroll}
+            decelerationRate="fast"
+          >
+            {group.items.map((item) => (
+              <SavedCard key={item.id} item={item} onRemove={onRemove} />
+            ))}
+          </ScrollView>
+        </View>
+      ))}
     </View>
   );
 }
 
 const ss = StyleSheet.create({
   wrap: {
-    gap: 12,
+    gap: 20,
     marginBottom: 4,
   },
-  labelRow: {
+  group: {
+    gap: 10,
+  },
+  destRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
   },
-  label: {
+  destLabel: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 11,
-    color: "rgba(255,255,255,0.55)",
-    letterSpacing: 1.4,
-    textTransform: "uppercase",
+    fontSize: 12,
+    color: "rgba(255,255,255,0.72)",
+    letterSpacing: 0.3,
   },
   dot: {
     width: 3,

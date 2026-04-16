@@ -144,6 +144,7 @@ export default function DestinosScreen() {
           pool={rioHero && rioHero.length > 0
             ? rioHero.map((item) => ({ uri: item.public_url }))
             : DESTINOS_BG_POOL}
+          blurRadius={22}
         />
         <LinearGradient
           colors={["rgba(0,0,0,0.74)", "rgba(0,0,0,0.66)", "rgba(0,0,0,0.86)"]}

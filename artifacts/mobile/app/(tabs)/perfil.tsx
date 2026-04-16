@@ -151,6 +151,7 @@ function HeroBackground() {
         source={resolvedPool[currentIdx]}
         style={StyleSheet.absoluteFill}
         resizeMode="cover"
+        blurRadius={20}
         pointerEvents="none"
       />
       {/* Next image fades in on top */}
@@ -158,6 +159,7 @@ function HeroBackground() {
         source={resolvedPool[nextIdx]}
         style={[StyleSheet.absoluteFill, { opacity: nextOpacity }]}
         resizeMode="cover"
+        blurRadius={20}
         pointerEvents="none"
       />
       {/* Gradient overlay for text legibility */}

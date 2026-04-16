@@ -7,6 +7,7 @@ type Props = {
   fadeDuration?: number;
   firstSource?: ImageSourcePropType | { uri: string } | null;
   onFirstImageDisplay?: () => void;
+  blurRadius?: number;
 };
 
 export function RotatingBackground({
@@ -15,6 +16,7 @@ export function RotatingBackground({
   fadeDuration = 1500,
   firstSource = null,
   onFirstImageDisplay,
+  blurRadius = 0,
 }: Props) {
   const resolvedPool = firstSource
     ? [firstSource as ImageSourcePropType, ...pool]
@@ -60,6 +62,7 @@ export function RotatingBackground({
         source={resolvedPool[currentIdx]}
         style={styles.fill}
         resizeMode="cover"
+        blurRadius={blurRadius}
         pointerEvents="none"
         onLoad={handleFirstLoad}
       />
@@ -67,6 +70,7 @@ export function RotatingBackground({
         source={resolvedPool[nextIdx]}
         style={[styles.fill, { opacity: nextOpacity }]}
         resizeMode="cover"
+        blurRadius={blurRadius}
         pointerEvents="none"
       />
     </>

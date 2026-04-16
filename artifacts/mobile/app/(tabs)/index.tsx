@@ -23,7 +23,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, Ionicons } from "@expo/vector-icons";
 
 import { AppHeader } from "@/components/AppHeader";
-import { HeroCarousel } from "@/components/HeroCarousel";
+import { HeroCarousel, type HeroItem } from "@/components/HeroCarousel";
 import { HorizontalScroll } from "@/components/HorizontalScroll";
 import { PlaceCard } from "@/components/PlaceCard";
 import { RestauranteCard } from "@/components/RestauranteCard";
@@ -36,6 +36,23 @@ import { useLuckyList } from "@/hooks/useLuckyList";
 import { useOQueFazer } from "@/hooks/useOQueFazer";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import { useFriends, type FriendCard } from "@/hooks/useFriends";
+
+// ── Creative "Em Breve" copy for carousel cards ───────────────────────────────
+// Each entry: [badge label, short tagline for Alert popup]
+const EM_BREVE_COPY: Record<string, { badge: string; copy: string }> = {
+  santorini:     { badge: "EM BREVE",   copy: "Santorini chega quando o vinho estiver na temperatura certa. Muy pronto." },
+  kyoto:         { badge: "EM BREVE",   copy: "Kyoto exige paciência. A mesma dos monges. Logo, logo." },
+  paris:         { badge: "EM BREVE",   copy: "Paris não precisa de apresentação. Mas precisa do guia certo. Bientôt." },
+  miami:         { badge: "EM BREVE",   copy: "Miami vive fast — mas a nossa curadoria vai devagar. Soon." },
+  "nova-york":   { badge: "EM BREVE",   copy: "Nova York: 8 milhões de pessoas, mil segredos. Coming soon." },
+  bali:          { badge: "EM BREVE",   copy: "Bali é um estado de espírito. O nosso chega logo." },
+  lisboa:        { badge: "EM BREVE",   copy: "Os becos do Alfama e o pastel de Belém merecem capítulo próprio. Em breve." },
+  "sao-paulo":   { badge: "EM BREVE",   copy: "SP nunca para. A gente está correndo pra acompanhar. Em breve." },
+  jericoacoara:  { badge: "EM BREVE",   copy: "Jeri só tem sentido sem pressa. Estamos preparando com calma." },
+  ibiza:         { badge: "EM BREVE",   copy: "Ibiza não é só balada — mas também é. Muy pronto, amigos." },
+  amsterdam:     { badge: "EM BREVE",   copy: "Canais, bicicletas e um segredo por esquina. Quase lá." },
+  marrakech:     { badge: "EM BREVE",   copy: "O souk, os riads, o chá de hortelã. Bientôt, habibi." },
+};
 
 // ── Context-aware "O que fazer agora" title ───────────────────────────────────
 // Prepositions for known destinations (Portuguese grammar)
@@ -216,18 +233,85 @@ export default function HomeScreen() {
   const { friends, loading: loadingFriends } = useFriends();
   const momentoTab = getCurrentMomento();
 
-  const carouselItems = React.useMemo(() => {
-    const launched = destinos.filter((d) => d.lancado);
-    if (launched.length === 0) return heroDestinos;
-    return launched.map((d) => ({
-      id: d.id,
-      cidade: d.cidade,
-      pais: d.pais,
-      badge: d.cidade,
-      image: d.image,
-      cityId: d.id,
-    }));
-  }, [destinos]);
+  const carouselItems = React.useMemo((): HeroItem[] => {
+    const launched  = destinos.filter((d) => d.lancado);
+    const teasers   = destinos.filter((d) => !d.lancado);
+
+    if (launched.length === 0 && friends.length === 0) {
+      // Pure fallback: static Rio card
+      return heroDestinos.map((h) => ({ ...h, type: "destino" as const, badge: "DESTINO" }));
+    }
+
+    const items: HeroItem[] = [];
+
+    // 1. Launched destinations first
+    launched.forEach((d) => {
+      items.push({
+        id:     d.id,
+        cidade: d.cidade,
+        pais:   d.pais,
+        badge:  "DESTINO",
+        image:  d.image,
+        type:   "destino",
+        cityId: d.id,
+      });
+    });
+
+    // 2. First friend (Guia Exclusivo) after the first destination
+    if (friends.length > 0) {
+      const f = friends[0];
+      const img = f.profile_photo_url
+        ? { uri: f.profile_photo_url }
+        : f.cover_photo_url
+        ? { uri: f.cover_photo_url }
+        : require("../../assets/images/carol-dieckmann.jpg");
+      items.splice(1, 0, {
+        id:          `guia-${f.id}`,
+        cidade:      f.display_name,
+        pais:        "RIO DE JANEIRO",
+        badge:       "GUIA EXCLUSIVO",
+        image:       img,
+        type:        "guia",
+        friendSlug:  f.slug,
+      });
+    }
+
+    // 3. Teaser destinations (Em Breve) — up to 4
+    teasers.slice(0, 4).forEach((d) => {
+      const meta = EM_BREVE_COPY[d.id];
+      items.push({
+        id:               `teaser-${d.id}`,
+        cidade:           d.cidade,
+        pais:             d.pais.toUpperCase(),
+        badge:            meta?.badge ?? "EM BREVE",
+        image:            d.image,
+        type:             "em_breve",
+        cityId:           d.id,
+        comingSoonCopy:   meta?.copy,
+      });
+    });
+
+    // 4. Second friend if available
+    if (friends.length > 1) {
+      const f = friends[1];
+      const img = f.profile_photo_url
+        ? { uri: f.profile_photo_url }
+        : f.cover_photo_url
+        ? { uri: f.cover_photo_url }
+        : require("../../assets/images/carol-dieckmann.jpg");
+      items.push({
+        id:          `guia-${f.id}`,
+        cidade:      f.display_name,
+        pais:        "RIO DE JANEIRO",
+        badge:       "GUIA EXCLUSIVO",
+        image:       img,
+        type:        "guia",
+        friendSlug:  f.slug,
+      });
+    }
+
+    return items;
+  }, [destinos, friends]);
 
   const filteredAtividades = React.useMemo(() => {
     if (!atividades.length) return [];

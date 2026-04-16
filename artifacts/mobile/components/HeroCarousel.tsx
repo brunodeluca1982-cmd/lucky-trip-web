@@ -19,14 +19,19 @@ const C = Colors.light;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const HERO_HEIGHT = Math.round(SCREEN_WIDTH * 1.1);
 
-interface HeroItem {
+export type HeroCardType = "destino" | "em_breve" | "guia" | "dica";
+
+export interface HeroItem {
   id: string;
-  cidade: string;
-  pais: string;
-  badge: string;
+  cidade: string;         // city name OR friend name
+  pais: string;           // country OR city (for guides)
+  badge: string;          // "DESTINO" | "EM BREVE" | "GUIA EXCLUSIVO" | category label
   image: ImageSourcePropType;
-  cityId?: string;
-  route?: string;
+  type?: HeroCardType;    // determines tap behaviour
+  cityId?: string;        // for destino/em_breve
+  friendSlug?: string;    // for guia
+  route?: string;         // custom route override
+  comingSoonCopy?: string; // shown in Alert for EM BREVE cards
 }
 
 interface HeroCarouselProps {
@@ -34,26 +39,42 @@ interface HeroCarouselProps {
   onIndexChange?: (index: number) => void;
 }
 
+function handleSlidePress(item: HeroItem) {
+  const type = item.type ?? (item.cityId === "rio" ? "destino" : item.cityId ? "em_breve" : undefined);
+
+  if (type === "guia" && item.friendSlug) {
+    router.push({ pathname: "/friend/[slug]", params: { slug: item.friendSlug } });
+    return;
+  }
+
+  if (type === "em_breve") {
+    Alert.alert(
+      item.cidade,
+      item.comingSoonCopy ?? "Estamos preparando esse destino com o cuidado do The Lucky Trip.",
+      [{ text: "OK" }]
+    );
+    return;
+  }
+
+  if (type === "destino" || item.cityId === "rio") {
+    if (item.route) {
+      router.push(item.route as any);
+    } else if (item.cityId) {
+      router.push({ pathname: "/cidade/[id]", params: { id: item.cityId } });
+    }
+    return;
+  }
+
+  if (item.route) {
+    router.push(item.route as any);
+  }
+}
+
 function HeroSlide({ item }: { item: HeroItem }) {
   return (
     <Pressable
       style={({ pressed }) => [styles.slide, pressed && { opacity: 0.94 }]}
-      onPress={() => {
-        if (!item.cityId) return;
-        if (item.cityId !== "rio") {
-          Alert.alert(
-            "Em breve disponível",
-            "Estamos preparando esse destino com o cuidado do The Lucky Trip",
-            [{ text: "OK" }]
-          );
-          return;
-        }
-        if (item.route) {
-          router.push(item.route as any);
-        } else {
-          router.push({ pathname: "/cidade/[id]", params: { id: item.cityId } });
-        }
-      }}
+      onPress={() => handleSlidePress(item)}
     >
       <Image source={item.image} style={styles.image} resizeMode="cover" />
       <View style={styles.dimOverlay} />

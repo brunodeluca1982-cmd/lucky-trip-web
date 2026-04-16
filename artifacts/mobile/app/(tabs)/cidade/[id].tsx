@@ -1,8 +1,10 @@
 import React from "react";
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   Image,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -227,6 +229,38 @@ export default function CidadeScreen() {
         <Feather name="arrow-left" size={20} color={C.white} />
       </Pressable>
 
+      {/* ── Media buttons — fixed top-right (Play + Music) ── */}
+      <View style={[s.mediaButtons, { top: topInset + 12 }]}>
+        <Pressable
+          hitSlop={8}
+          style={({ pressed }) => [s.mediaBtn, pressed && { opacity: 0.70 }]}
+          onPress={() => {
+            const videoUrl = (destino as any).video_url;
+            if (videoUrl) {
+              Linking.openURL(videoUrl);
+            } else {
+              Alert.alert("Vídeos em breve", "Os vídeos de " + destino.cidade + " chegam em breve.");
+            }
+          }}
+        >
+          <Feather name="play" size={15} color={C.white} />
+        </Pressable>
+        <Pressable
+          hitSlop={8}
+          style={({ pressed }) => [s.mediaBtn, pressed && { opacity: 0.70 }]}
+          onPress={() => {
+            const spotifyUrl = (destino as any).spotify_url;
+            if (spotifyUrl) {
+              Linking.openURL(spotifyUrl);
+            } else {
+              Alert.alert("Trilha sonora em breve", "A playlist de " + destino.cidade + " no Spotify chega em breve.");
+            }
+          }}
+        >
+          <Feather name="music" size={15} color={C.white} />
+        </Pressable>
+      </View>
+
       {/* ── Scrollable content — transparent, floats over the fixed image ──
           Everything here is in normal vertical flow: title → spacing → buttons.
           No absolute positioning between siblings → no overlap possible. */}
@@ -273,12 +307,11 @@ export default function CidadeScreen() {
           {/* 2. EXPERIENCE */}
           <GlassButton
             style={s.btnExperience}
-            onPress={() =>
-              router.push({
-                pathname: "/agoraNoRio/[id]",
-                params: { id: destino.id, pinnedId: firstAgoraItem?.id },
-              })
-            }
+            onPress={() => {
+              const params: Record<string, string> = { id: destino.id };
+              if (firstAgoraItem?.id) params.pinnedId = firstAgoraItem.id;
+              router.push({ pathname: "/agoraNoRio/[id]", params });
+            }}
           >
             <View style={s.btnExperienceInner}>
               <View style={s.expIconWrap}>
@@ -498,6 +531,25 @@ const s = StyleSheet.create({
     position: "absolute",
     left: 20,
     zIndex: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.38)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  // Media buttons row — fixed top-right
+  mediaButtons: {
+    position: "absolute",
+    right: 20,
+    zIndex: 20,
+    flexDirection: "row",
+    gap: 10,
+  },
+  mediaBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,

@@ -232,6 +232,7 @@ export default function LuckyScreen() {
         pool={rioHero && rioHero.length > 0
           ? rioHero.map((item) => ({ uri: item.public_url }))
           : LUCKY_BG_POOL}
+        blurRadius={14}
       />
       <View style={styles.overlay}>
         <KeyboardAvoidingView
