@@ -12,11 +12,12 @@ import {
 } from "@expo-google-fonts/playfair-display";
 import { DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, router } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
 import React, { useEffect } from "react";
 import { Platform, StyleSheet, View } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { notifyFontsReady } from "@/lib/splashGate";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -51,7 +52,17 @@ const AppTheme = {
   },
 };
 
+const ONBOARDING_KEY = "@luckytrip/onboarding_seen";
+
 function RootLayoutNav() {
+  // Check once on mount whether onboarding has been seen.
+  // AsyncStorage is fast (<50ms) and the SplashOverlay covers the UI anyway.
+  useEffect(() => {
+    AsyncStorage.getItem(ONBOARDING_KEY).then((seen) => {
+      if (!seen) router.replace("/onboarding" as any);
+    });
+  }, []);
+
   return (
     <ThemeProvider value={AppTheme}>
       <Stack
@@ -62,6 +73,7 @@ function RootLayoutNav() {
         }}
       >
         <Stack.Screen name="(tabs)"              options={{ headerShown: false, contentStyle: { backgroundColor: ROOT_BG } }} />
+        <Stack.Screen name="onboarding/index"    options={{ headerShown: false, contentStyle: { backgroundColor: "#000" }, animation: "fade" }} />
         <Stack.Screen name="auth/callback"       options={{ headerShown: false, contentStyle: { backgroundColor: ROOT_BG }, animation: "fade" }} />
         <Stack.Screen name="friend/[slug]"       options={{ headerShown: false, contentStyle: { backgroundColor: ROOT_BG }, animation: "slide_from_right" }} />
         <Stack.Screen name="friend/guide/[slug]" options={{ headerShown: false, contentStyle: { backgroundColor: ROOT_BG }, animation: "slide_from_right" }} />
