@@ -477,6 +477,52 @@ export default function HomeScreen() {
 
         <Divider />
 
+        {/* ── 5. CIDADES MAIS BUSCADAS — Supabase: destinos ── */}
+        <View style={s.section}>
+          <SectionHeader
+            title="Vai pra onde?"
+            uppercase
+            subtitle="Destinos com curadoria do Bruno de Luca."
+            dark
+          />
+          <View style={s.cityGrid}>
+            {destinos.slice(0, 6).map((d) => (
+              <Pressable
+                key={d.id}
+                style={({ pressed }) => [s.cityCard, pressed && { opacity: 0.82, transform: [{ scale: 0.97 }] }]}
+                onPress={() =>
+                  router.push({ pathname: "/(tabs)/cidade/[id]", params: { id: d.id } })
+                }
+              >
+                <Image source={d.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                <LinearGradient
+                  colors={["transparent", "rgba(0,0,0,0.74)"]}
+                  locations={[0.3, 1]}
+                  style={StyleSheet.absoluteFill}
+                />
+                {!d.lancado && (
+                  <View style={s.cityCardBadge}>
+                    <Text style={s.cityCardBadgeText}>EM BREVE</Text>
+                  </View>
+                )}
+                <View style={s.cityCardInfo}>
+                  <Text style={s.cityCardName} numberOfLines={1}>{d.cidade}</Text>
+                  <Text style={s.cityCardPais} numberOfLines={1}>{d.pais}</Text>
+                </View>
+              </Pressable>
+            ))}
+          </View>
+          <Pressable
+            style={({ pressed }) => [s.verTodosBtnRow, pressed && { opacity: 0.70 }]}
+            onPress={() => router.push("/(tabs)/destinos")}
+          >
+            <Text style={s.verTodosText}>Ver todos os destinos</Text>
+            <Feather name="arrow-right" size={13} color="rgba(255,255,255,0.40)" />
+          </Pressable>
+        </View>
+
+        <Divider />
+
         {/* ── 8. VIAJE COMO ELES — Supabase: friends ── */}
         <View style={s.section}>
           <SectionHeader
@@ -590,6 +636,77 @@ const s = StyleSheet.create({
     flexWrap: "wrap",
     paddingHorizontal: 24,
     gap: 12,
+  },
+
+  // ── City grid (Cidades mais buscadas) ──
+  cityGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    paddingHorizontal: 24,
+    gap: 10,
+  },
+  cityCard: {
+    width: CARD_W,
+    height: CARD_W * 0.72,
+    borderRadius: 16,
+    overflow: "hidden",
+    backgroundColor: "#1A1208",
+    justifyContent: "flex-end",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+  cityCardBadge: {
+    position: "absolute",
+    top: 8,
+    left: 8,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+  },
+  cityCardBadgeText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 8,
+    color: "rgba(255,255,255,0.60)",
+    letterSpacing: 1.4,
+    textTransform: "uppercase",
+  },
+  cityCardInfo: {
+    paddingHorizontal: 10,
+    paddingBottom: 10,
+    gap: 1,
+  },
+  cityCardName: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 15,
+    color: "#FFFFFF",
+    lineHeight: 20,
+  },
+  cityCardPais: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10.5,
+    color: "rgba(255,255,255,0.45)",
+    letterSpacing: 0.4,
+  },
+  verTodosBtnRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 12,
+    marginHorizontal: 24,
+    marginTop: 6,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+  },
+  verTodosText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.40)",
   },
 
   // ── Lucky List highlight ──
