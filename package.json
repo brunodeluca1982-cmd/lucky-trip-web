@@ -10,10 +10,12 @@
   },
   "private": true,
   "devDependencies": {
+    "@types/react": "~19.2.10",
     "prettier": "^3.8.1",
     "typescript": "~5.9.2"
   },
   "dependencies": {
+    "expo": "^55.0.15",
     "stripe": "^22.0.0",
     "stripe-replit-sync": "^1.0.0"
   }
