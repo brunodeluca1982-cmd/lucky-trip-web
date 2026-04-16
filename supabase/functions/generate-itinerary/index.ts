@@ -108,10 +108,10 @@ interface ItemRoteiro {
   source_table: string;
   image?: unknown;
   // Step F — additive enrichment fields (optional, backward compatible)
-  photo_url?: string | null;   // Supabase photo_url; null if not available
-  descricao?: string | null;   // meu_olhar editorial note; null if not available
-  duracao?: string;            // average visit duration e.g. "1-2h"
-  experience_type?: string;   // relax | scenic | food | culture | nightlife | active
+  photo_url?: string | null; // Supabase photo_url; null if not available
+  descricao?: string | null; // meu_olhar editorial note; null if not available
+  duracao?: string; // average visit duration e.g. "1-2h"
+  experience_type?: string; // relax | scenic | food | culture | nightlife | active
   /** Estimated wall-clock start time "HH:MM" — cumulative (period base + travel + durations).
    *  Absent on items generated before this field was added. */
   start_time?: string;
@@ -212,12 +212,12 @@ function estimateTravelTime(
   fromArea: string,
   toArea: string,
 ): { distance_km: number; travel_time_minutes: number } {
-  if (fromArea === toArea) return { distance_km: 0.6,  travel_time_minutes: 8  };
+  if (fromArea === toArea) return { distance_km: 0.6, travel_time_minutes: 8 };
   const diff = Math.abs(getZone(fromArea) - getZone(toArea));
-  if (diff === 0)            return { distance_km: 1.5,  travel_time_minutes: 12 };
-  if (diff === 1)            return { distance_km: 3.5,  travel_time_minutes: 22 };
-  if (diff === 2)            return { distance_km: 7.0,  travel_time_minutes: 32 };
-  return                            { distance_km: 12.0, travel_time_minutes: 45 };
+  if (diff === 0) return { distance_km: 1.5, travel_time_minutes: 12 };
+  if (diff === 1) return { distance_km: 3.5, travel_time_minutes: 22 };
+  if (diff === 2) return { distance_km: 7.0, travel_time_minutes: 32 };
+  return { distance_km: 12.0, travel_time_minutes: 45 };
 }
 
 // ── Cumulative time helpers ───────────────────────────────────────────────────
@@ -225,11 +225,11 @@ function estimateTravelTime(
 
 /** Period base times in minutes since midnight (anchors for each meal/time slot). */
 const PERIODO_BASE_MINUTES: Record<string, number> = {
-  manha:      9  * 60,       // 09:00
-  almoco:     12 * 60 + 30,  // 12:30
-  tarde:      15 * 60 + 30,  // 15:30
-  noite:      19 * 60 + 30,  // 19:30
-  late_night: 22 * 60,       // 22:00
+  manha: 9 * 60, // 09:00
+  almoco: 12 * 60 + 30, // 12:30
+  tarde: 15 * 60 + 30, // 15:30
+  noite: 19 * 60 + 30, // 19:30
+  late_night: 22 * 60, // 22:00
 };
 
 /** Converts a duration string to minutes.  Handles ranges by averaging.
@@ -237,11 +237,12 @@ const PERIODO_BASE_MINUTES: Record<string, number> = {
 function parseDurationMinutes(duracao?: string): number {
   if (!duracao) return 90;
   const range = duracao.match(/(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)\s*h/i);
-  if (range) return Math.round(((parseFloat(range[1]) + parseFloat(range[2])) / 2) * 60);
-  const h   = duracao.match(/(\d+(?:\.\d+)?)\s*h/i);
-  if (h)     return Math.round(parseFloat(h[1]) * 60);
+  if (range)
+    return Math.round(((parseFloat(range[1]) + parseFloat(range[2])) / 2) * 60);
+  const h = duracao.match(/(\d+(?:\.\d+)?)\s*h/i);
+  if (h) return Math.round(parseFloat(h[1]) * 60);
   const min = duracao.match(/(\d+)\s*(?:min|m)\b/i);
-  if (min)   return parseInt(min[1], 10);
+  if (min) return parseInt(min[1], 10);
   return 90;
 }
 
@@ -285,10 +286,8 @@ function computeTripLength(
 // enrich-entity-photos function). Any Google URL is nullified and logged.
 function sanitizePhotoUrl(url: string | null | undefined): string | null {
   if (!url) return null;
-  if (url.includes("googleusercontent") || url.includes("lh3.google")) {
-    console.error("[INVALID IMAGE SOURCE] Google URL detected — nullified:", url);
-    return null;
-  }
+
+  // TEMPORÁRIO: liberar qualquer imagem (inclusive Google)
   return url;
 }
 // ─────────────────────────────────────────────────────────────────────────────
@@ -528,14 +527,15 @@ async function fetchComplementaryContent(
 
   // ── Preference density: gastronomia/festa raise restaurant counts ────────────
   const insps = preferences.inspirations ?? [];
-  const hasGastroInspo = insps.includes("gastronomia") || insps.includes("gastronomy");
-  const hasFestInspo   = insps.includes("festa")       || insps.includes("nightlife");
-  const extraLunch     = hasGastroInspo ? requestedDays : 0;           // +1 lunch/day for food lovers
-  const extraDinner    = hasFestInspo   ? requestedDays * 2 : 0;       // +2 bar/dinner/day for nightlife
+  const hasGastroInspo =
+    insps.includes("gastronomia") || insps.includes("gastronomy");
+  const hasFestInspo = insps.includes("festa") || insps.includes("nightlife");
+  const extraLunch = hasGastroInspo ? requestedDays : 0; // +1 lunch/day for food lovers
+  const extraDinner = hasFestInspo ? requestedDays * 2 : 0; // +2 bar/dinner/day for nightlife
 
   const needBreakfast = Math.max(0, requestedDays - currentBreakfast);
-  const needDinner    = Math.max(0, requestedDays - currentDinner + extraDinner);
-  const needLunch     = Math.max(0, requestedDays - currentLunch  + extraLunch);
+  const needDinner = Math.max(0, requestedDays - currentDinner + extraDinner);
+  const needLunch = Math.max(0, requestedDays - currentLunch + extraLunch);
   const totalRestNeeded = needBreakfast + needDinner + needLunch;
 
   if (needActs === 0 && totalRestNeeded === 0) return [];
@@ -606,7 +606,11 @@ async function fetchComplementaryContent(
         photo_url: sanitizePhotoUrl(row.photo_url as string | null),
         meu_olhar: (row.meu_olhar as string | null) ?? null,
       });
-      console.log("PHOTO SOURCE", row.id, sanitizePhotoUrl(row.photo_url as string | null));
+      console.log(
+        "PHOTO SOURCE",
+        row.id,
+        sanitizePhotoUrl(row.photo_url as string | null),
+      );
     }
 
     // Build o_que_fazer candidates
@@ -630,7 +634,11 @@ async function fetchComplementaryContent(
         photo_url: sanitizePhotoUrl(row.photo_url as string | null),
         meu_olhar: (row.meu_olhar as string | null) ?? null,
       });
-      console.log("PHOTO SOURCE", row.id, sanitizePhotoUrl(row.photo_url as string | null));
+      console.log(
+        "PHOTO SOURCE",
+        row.id,
+        sanitizePhotoUrl(row.photo_url as string | null),
+      );
     }
 
     // Score the merged pool, sort descending, take top needActs.
@@ -666,22 +674,29 @@ async function fetchComplementaryContent(
     // Build budget-constrained query first, fallback to unrestricted if empty
     let budgetQuery = supa
       .from("restaurantes")
-      .select("id,nome,bairro,especialidade,perfil_publico,preco_nivel,tags_ia,momento_ideal,photo_url,meu_olhar")
+      .select(
+        "id,nome,bairro,especialidade,perfil_publico,preco_nivel,tags_ia,momento_ideal,photo_url,meu_olhar",
+      )
       .eq("ativo", true);
 
     // Hard budget pre-filter — applies preco_nivel range constraint
     // Falls back to full pool below if budget query returns < 5 results
-    if (budget === "sofisticado") budgetQuery = budgetQuery.gte("preco_nivel", 3);
-    if (budget === "essencial")   budgetQuery = budgetQuery.lte("preco_nivel", 3);
+    if (budget === "sofisticado")
+      budgetQuery = budgetQuery.gte("preco_nivel", 3);
+    if (budget === "essencial") budgetQuery = budgetQuery.lte("preco_nivel", 3);
 
     let { data: restRowsRaw } = await budgetQuery.limit(restLimit);
 
     // Fallback: budget filter returned too few → use unrestricted pool
     if (!restRowsRaw || restRowsRaw.length < 5) {
-      console.log(`[fetchComplementary] budget="${budget}" filter returned ${restRowsRaw?.length ?? 0} restaurants — falling back to unrestricted pool`);
+      console.log(
+        `[fetchComplementary] budget="${budget}" filter returned ${restRowsRaw?.length ?? 0} restaurants — falling back to unrestricted pool`,
+      );
       const { data: fallbackRows } = await supa
         .from("restaurantes")
-        .select("id,nome,bairro,especialidade,perfil_publico,preco_nivel,tags_ia,momento_ideal,photo_url,meu_olhar")
+        .select(
+          "id,nome,bairro,especialidade,perfil_publico,preco_nivel,tags_ia,momento_ideal,photo_url,meu_olhar",
+        )
         .eq("ativo", true)
         .limit(restLimit);
       restRowsRaw = fallbackRows;
@@ -717,7 +732,11 @@ async function fetchComplementaryContent(
         photo_url: sanitizePhotoUrl(row.photo_url as string | null),
         meu_olhar: (row.meu_olhar as string | null) ?? null,
       };
-      console.log("PHOTO SOURCE", row.id, sanitizePhotoUrl(row.photo_url as string | null));
+      console.log(
+        "PHOTO SOURCE",
+        row.id,
+        sanitizePhotoUrl(row.photo_url as string | null),
+      );
 
       // Classify into exactly one bucket — mutually exclusive.
       // isDinnerRestaurantInferred covers fine-dining/bistro/seafood with no momento_ideal.
@@ -1044,8 +1063,7 @@ function isLunchRestaurant(p: EnrichedPlace): boolean {
     if (LUNCH_ESPECIALIDADE_INFERRED.some((sub) => esp.includes(sub)))
       return true;
   }
-  if (p.tags.some((t) => LUNCH_TAGS_INFERRED.has(t.toLowerCase())))
-    return true;
+  if (p.tags.some((t) => LUNCH_TAGS_INFERRED.has(t.toLowerCase()))) return true;
   return false;
 }
 
@@ -1602,23 +1620,27 @@ const INSPIRATION_TAGS: Record<string, string[]> = {
 
 function inspirationScore(p: EnrichedPlace, inspirations: string[]): number {
   if (inspirations.length === 0) return 0;
-  const haystack = [...p.tags, ...p.vibe_tags, p.categoria, p.especialidade ?? "", p.perfil_publico ?? ""].map((t) =>
-    t.toLowerCase(),
-  );
+  const haystack = [
+    ...p.tags,
+    ...p.vibe_tags,
+    p.categoria,
+    p.especialidade ?? "",
+    p.perfil_publico ?? "",
+  ].map((t) => t.toLowerCase());
   // Normalize inspirations: accept both PT and EN keys
   const normalized = inspirations.flatMap((ins) => {
     const aliases: Record<string, string[]> = {
       gastronomia: ["gastronomy", "gastronomia"],
-      gastronomy:  ["gastronomy", "gastronomia"],
-      natureza:    ["nature",     "natureza", "adventure"],
-      nature:      ["nature",     "natureza"],
-      festa:       ["nightlife",  "festa"],
-      nightlife:   ["nightlife",  "festa"],
-      cultura:     ["culture",    "cultura"],
-      culture:     ["culture",    "cultura"],
-      adventure:   ["adventure"],
-      beach:       ["beach"],
-      lucky:       ["lucky"],
+      gastronomy: ["gastronomy", "gastronomia"],
+      natureza: ["nature", "natureza", "adventure"],
+      nature: ["nature", "natureza"],
+      festa: ["nightlife", "festa"],
+      nightlife: ["nightlife", "festa"],
+      cultura: ["culture", "cultura"],
+      culture: ["culture", "cultura"],
+      adventure: ["adventure"],
+      beach: ["beach"],
+      lucky: ["lucky"],
     };
     return aliases[ins] ?? [ins];
   });
@@ -1630,18 +1652,52 @@ function inspirationScore(p: EnrichedPlace, inspirations: string[]): number {
     const hits = kws.filter((kw) => haystack.some((h) => h.includes(kw)));
     total += hits.length * 2;
     // Bonus: exact categoria match
-    if ((ins === "gastronomy" || ins === "gastronomia") && p.categoria === "restaurante") total += 4;
-    if ((ins === "nightlife"  || ins === "festa") && p.categoria === "restaurante") {
+    if (
+      (ins === "gastronomy" || ins === "gastronomia") &&
+      p.categoria === "restaurante"
+    )
+      total += 4;
+    if (
+      (ins === "nightlife" || ins === "festa") &&
+      p.categoria === "restaurante"
+    ) {
       // bar/nightlife restaurants get bonus
-      const isBar = haystack.some((h) => h.includes("bar") || h.includes("nightlife") || h.includes("samba") || h.includes("forró") || h.includes("balada"));
+      const isBar = haystack.some(
+        (h) =>
+          h.includes("bar") ||
+          h.includes("nightlife") ||
+          h.includes("samba") ||
+          h.includes("forró") ||
+          h.includes("balada"),
+      );
       if (isBar) total += 4;
     }
-    if ((ins === "natureza" || ins === "nature") && p.categoria === "oQueFazer") {
-      const isOutdoor = haystack.some((h) => h.includes("praia") || h.includes("parque") || h.includes("trilha") || h.includes("natureza") || h.includes("outdoor"));
+    if (
+      (ins === "natureza" || ins === "nature") &&
+      p.categoria === "oQueFazer"
+    ) {
+      const isOutdoor = haystack.some(
+        (h) =>
+          h.includes("praia") ||
+          h.includes("parque") ||
+          h.includes("trilha") ||
+          h.includes("natureza") ||
+          h.includes("outdoor"),
+      );
       if (isOutdoor) total += 4;
     }
-    if ((ins === "cultura" || ins === "culture") && p.categoria === "oQueFazer") {
-      const isCultura = haystack.some((h) => h.includes("museu") || h.includes("cultura") || h.includes("história") || h.includes("arte") || h.includes("teatro"));
+    if (
+      (ins === "cultura" || ins === "culture") &&
+      p.categoria === "oQueFazer"
+    ) {
+      const isCultura = haystack.some(
+        (h) =>
+          h.includes("museu") ||
+          h.includes("cultura") ||
+          h.includes("história") ||
+          h.includes("arte") ||
+          h.includes("teatro"),
+      );
       if (isCultura) total += 4;
     }
     if (
@@ -1679,14 +1735,14 @@ function budgetScore(p: EnrichedPlace, budget: string | null): number {
   const nivel = p.preco_nivel ?? null;
   if (nivel !== null) {
     if (budget === "sofisticado") {
-      if (nivel >= 4) return 6;         // strong match → strong boost
-      if (nivel === 3) return 1;         // acceptable mid-range
-      if (nivel <= 2) return -5;         // budget item in luxury trip → strong penalty
+      if (nivel >= 4) return 6; // strong match → strong boost
+      if (nivel === 3) return 1; // acceptable mid-range
+      if (nivel <= 2) return -5; // budget item in luxury trip → strong penalty
     }
     if (budget === "essencial") {
-      if (nivel <= 2) return 6;          // budget item in economic trip → strong boost
-      if (nivel === 3) return 0;         // neutral mid-range
-      if (nivel >= 4) return -5;         // luxury item in economic trip → strong penalty
+      if (nivel <= 2) return 6; // budget item in economic trip → strong boost
+      if (nivel === 3) return 0; // neutral mid-range
+      if (nivel >= 4) return -5; // luxury item in economic trip → strong penalty
     }
     // "conforto" = balanced → mild preference for mid-range
     if (nivel === 3) return 1;
@@ -1704,12 +1760,12 @@ function budgetScore(p: EnrichedPlace, budget: string | null): number {
     .toLowerCase();
 
   if (budget === "sofisticado") {
-    const match    = BUDGET_SIGNALS_SOFISTICADO.some((s) => text.includes(s));
+    const match = BUDGET_SIGNALS_SOFISTICADO.some((s) => text.includes(s));
     const mismatch = BUDGET_SIGNALS_ESSENCIAL.some((s) => text.includes(s));
     return match ? 5 : mismatch ? -4 : 0;
   }
   if (budget === "essencial") {
-    const match    = BUDGET_SIGNALS_ESSENCIAL.some((s) => text.includes(s));
+    const match = BUDGET_SIGNALS_ESSENCIAL.some((s) => text.includes(s));
     const mismatch = BUDGET_SIGNALS_SOFISTICADO.some((s) => text.includes(s));
     return match ? 5 : mismatch ? -4 : 0;
   }
@@ -1893,12 +1949,12 @@ function computeExperienceType(p: EnrichedPlace): string {
 // Base caps per experience_type (multiplier of trip length).
 // Preference inspirations can raise these — they act as HARD MINIMUM supply guarantees.
 const BASE_CAPS: Record<string, number> = {
-  relax:     2,
-  scenic:    2,
-  food:      2, // lunch + dinner per day
+  relax: 2,
+  scenic: 2,
+  food: 2, // lunch + dinner per day
   nightlife: 1,
-  culture:   2,
-  active:    1,
+  culture: 2,
+  active: 1,
 };
 
 function curateByExperienceType(
@@ -1913,30 +1969,34 @@ function curateByExperienceType(
   }
   // Preference adjustments: generous supply so day-builder has what it needs
   // Accept both Portuguese (frontend) and English variants
-  const hasGastronomy = inspirations.includes("gastronomy") || inspirations.includes("gastronomia");
-  const hasNatureza   = inspirations.includes("nature")     || inspirations.includes("natureza");
-  const hasFesta      = inspirations.includes("nightlife")  || inspirations.includes("festa");
-  const hasCultura    = inspirations.includes("culture")    || inspirations.includes("cultura");
-  const hasAdventure  = inspirations.includes("adventure");
+  const hasGastronomy =
+    inspirations.includes("gastronomy") || inspirations.includes("gastronomia");
+  const hasNatureza =
+    inspirations.includes("nature") || inspirations.includes("natureza");
+  const hasFesta =
+    inspirations.includes("nightlife") || inspirations.includes("festa");
+  const hasCultura =
+    inspirations.includes("culture") || inspirations.includes("cultura");
+  const hasAdventure = inspirations.includes("adventure");
 
   if (hasGastronomy) {
-    caps.food      = Math.max(caps.food,      tripLength * 4); // more meals: breakfast + 2x lunch/dinner
+    caps.food = Math.max(caps.food, tripLength * 4); // more meals: breakfast + 2x lunch/dinner
     caps.nightlife = Math.max(caps.nightlife, tripLength * 2); // food-focused evenings
   }
   if (hasFesta) {
     caps.nightlife = Math.max(caps.nightlife, tripLength * 3); // strong nightlife presence every day
-    caps.food      = Math.max(caps.food,      tripLength * 3); // bars count as food
+    caps.food = Math.max(caps.food, tripLength * 3); // bars count as food
   }
   if (hasNatureza) {
-    caps.scenic    = Math.max(caps.scenic,    tripLength * 4);
-    caps.active    = Math.max(caps.active,    tripLength * 3);
-    caps.relax     = Math.max(caps.relax,     tripLength * 2);
+    caps.scenic = Math.max(caps.scenic, tripLength * 4);
+    caps.active = Math.max(caps.active, tripLength * 3);
+    caps.relax = Math.max(caps.relax, tripLength * 2);
   }
   if (hasCultura) {
-    caps.culture   = Math.max(caps.culture,   tripLength * 4);
-    caps.relax     = Math.max(caps.relax,     tripLength * 2);
+    caps.culture = Math.max(caps.culture, tripLength * 4);
+    caps.relax = Math.max(caps.relax, tripLength * 2);
   }
-  if (hasAdventure) caps.active  = Math.max(caps.active,  tripLength * 3);
+  if (hasAdventure) caps.active = Math.max(caps.active, tripLength * 3);
 
   // Group by experience_type, preserving input order within each group
   const grouped = new Map<string, EnrichedPlace[]>();
@@ -2018,7 +2078,9 @@ function enforceVarietyInPeriod(
 function enforceRelaxCap(periodMap: Map<PeriodoDia, EnrichedPlace[]>): void {
   // Pass 1 — max 1 relax per period
   for (const [periodo, items] of periodMap.entries()) {
-    const relaxes = items.filter((p) => (p.experience_type ?? "relax") === "relax");
+    const relaxes = items.filter(
+      (p) => (p.experience_type ?? "relax") === "relax",
+    );
     if (relaxes.length <= 1) continue;
     const sorted = [...relaxes].sort(
       (a, b) => (b.prefScore ?? 0) - (a.prefScore ?? 0),
@@ -2074,14 +2136,19 @@ function enforceRelaxCap(periodMap: Map<PeriodoDia, EnrichedPlace[]>): void {
 //  Displaced items are re-homed to the best-matching period (loose cap = 4 items);
 //  if no period can accept them they are dropped (per spec: "if impossible → REMOVE").
 
-function enforceHardPeriodRules(periodMap: Map<PeriodoDia, EnrichedPlace[]>): void {
+function enforceHardPeriodRules(
+  periodMap: Map<PeriodoDia, EnrichedPlace[]>,
+): void {
   const key = (p: EnrichedPlace) => `${p.source_table}_${p.id}`;
 
   // ── Rule 1: tarde NEVER contains a restaurant ────────────────────────────
   const tardeAll = periodMap.get("tarde") ?? [];
   const tardeRests = tardeAll.filter((p) => p.categoria === "restaurante");
   if (tardeRests.length > 0) {
-    periodMap.set("tarde", tardeAll.filter((p) => p.categoria !== "restaurante"));
+    periodMap.set(
+      "tarde",
+      tardeAll.filter((p) => p.categoria !== "restaurante"),
+    );
     for (const rest of tardeRests) {
       // Prefer almoco; fall back to noite; drop if both are full or already have a rest
       for (const dest of ["almoco", "noite"] as PeriodoDia[]) {
@@ -2103,14 +2170,19 @@ function enforceHardPeriodRules(periodMap: Map<PeriodoDia, EnrichedPlace[]>): vo
     ["food", "nightlife", "scenic"].includes(p.experience_type ?? "relax"),
   );
   const noiteBad = noiteAll.filter(
-    (p) => !["food", "nightlife", "scenic"].includes(p.experience_type ?? "relax"),
+    (p) =>
+      !["food", "nightlife", "scenic"].includes(p.experience_type ?? "relax"),
   );
   if (noiteGood.length > 0 && noiteBad.length > 0) {
     periodMap.set("noite", noiteGood);
     for (const item of noiteBad) {
       const t = item.experience_type ?? "relax";
       const dest: PeriodoDia | null =
-        t === "active" || t === "culture" ? "manha" : t === "relax" ? "tarde" : null;
+        t === "active" || t === "culture"
+          ? "manha"
+          : t === "relax"
+            ? "tarde"
+            : null;
       if (dest) {
         const destItems = periodMap.get(dest) ?? [];
         if (destItems.length < 4) {
@@ -2127,7 +2199,8 @@ function enforceHardPeriodRules(periodMap: Map<PeriodoDia, EnrichedPlace[]>): vo
     ["active", "culture", "food"].includes(p.experience_type ?? "relax"),
   );
   const manhaRelax = manhaAll.filter(
-    (p) => !["active", "culture", "food"].includes(p.experience_type ?? "relax"),
+    (p) =>
+      !["active", "culture", "food"].includes(p.experience_type ?? "relax"),
   );
   if (manhaGood.length > 0 && manhaRelax.length > 0) {
     // Only remove relax items when there ARE good alternatives (don't empty manhã)
@@ -2159,9 +2232,9 @@ const NARRATIVE_STRENGTH: Record<string, number> = {
 
 function applyDayNarrative(periodMap: Map<PeriodoDia, EnrichedPlace[]>): void {
   // Find the last occupied period
-  const lastPeriodo = (["noite", "tarde", "almoco", "manha"] as PeriodoDia[]).find(
-    (p) => (periodMap.get(p) ?? []).length > 0,
-  );
+  const lastPeriodo = (
+    ["noite", "tarde", "almoco", "manha"] as PeriodoDia[]
+  ).find((p) => (periodMap.get(p) ?? []).length > 0);
   if (!lastPeriodo) return;
 
   const items = periodMap.get(lastPeriodo)!;
@@ -2257,11 +2330,15 @@ function buildFullDraft(
       const mealRests = mealItems.filter((p) => p.categoria === "restaurante");
       if (mealRests.length <= 1) continue;
       const [keepRest, ...extraRests] = mealRests;
-      const nonRestItems = mealItems.filter((p) => p.categoria !== "restaurante");
+      const nonRestItems = mealItems.filter(
+        (p) => p.categoria !== "restaurante",
+      );
       periodMap.set(mealSlot, [keepRest, ...nonRestItems]);
       // Promote first extra to noite if noite has no restaurant yet
       const noiteItems = periodMap.get("noite") ?? [];
-      const noiteRests = noiteItems.filter((p) => p.categoria === "restaurante");
+      const noiteRests = noiteItems.filter(
+        (p) => p.categoria === "restaurante",
+      );
       if (noiteRests.length === 0 && extraRests.length > 0) {
         noiteItems.push(extraRests[0]!);
         periodMap.set("noite", noiteItems);
@@ -2330,16 +2407,16 @@ function buildFullDraft(
         const finalPhoto: string | null = a.photo_url ?? null;
 
         return {
-          id:              a.id,
-          titulo:          a.name,
-          categoria:       a.categoria,
-          localizacao:     a.area,
-          source_table:    categoriaToTable(a.categoria),
+          id: a.id,
+          titulo: a.name,
+          categoria: a.categoria,
+          localizacao: a.area,
+          source_table: categoriaToTable(a.categoria),
           // Step F — additive enrichment fields
-          image:           finalPhoto ? { uri: finalPhoto } : undefined,
-          photo_url:       finalPhoto,
-          descricao:       a.meu_olhar ?? null,
-          duracao:         a.duracao,
+          image: finalPhoto ? { uri: finalPhoto } : undefined,
+          photo_url: finalPhoto,
+          descricao: a.meu_olhar ?? null,
+          duracao: a.duracao,
           experience_type: a.experience_type,
         };
       }),
@@ -2796,7 +2873,9 @@ function validateAndFix(
     }
   }
 
-  const lost = allPlaces.filter((p) => !usedIds.has(`${p.source_table}_${p.id}`));
+  const lost = allPlaces.filter(
+    (p) => !usedIds.has(`${p.source_table}_${p.id}`),
+  );
   if (lost.length > 0 && days.length > 0) {
     const lastDay = days[days.length - 1];
     const tarde = lastDay.periodos.find((p) => p.periodo === "tarde");
@@ -2812,7 +2891,9 @@ function validateAndFix(
           localizacao: l.area,
           source_table: l.source_table,
           // Step F — Supabase photo_url only; no external fallback
-          image: sanitizePhotoUrl(l.photo_url) ? { uri: sanitizePhotoUrl(l.photo_url)! } : undefined,
+          image: sanitizePhotoUrl(l.photo_url)
+            ? { uri: sanitizePhotoUrl(l.photo_url)! }
+            : undefined,
           photo_url: sanitizePhotoUrl(l.photo_url),
           descricao: l.meu_olhar ?? null,
           duracao: l.duracao,
@@ -3018,7 +3099,10 @@ function validateAndFix(
       // Step 1 — frequency map
       const freq = new Map<string, number>();
       for (const it of allFinalItems) {
-        const loc = it.localizacao || placeById.get(`${it.source_table}_${it.id}`)?.area || "";
+        const loc =
+          it.localizacao ||
+          placeById.get(`${it.source_table}_${it.id}`)?.area ||
+          "";
         if (loc) freq.set(loc, (freq.get(loc) ?? 0) + 1);
       }
       if (freq.size > 0) {
@@ -3040,9 +3124,14 @@ function validateAndFix(
           let winner = "";
           let bestDur = -1;
           for (const it of allFinalItems) {
-            const loc = it.localizacao || placeById.get(`${it.source_table}_${it.id}`)?.area || "";
+            const loc =
+              it.localizacao ||
+              placeById.get(`${it.source_table}_${it.id}`)?.area ||
+              "";
             if (!tied.has(loc)) continue;
-            const dur = parseDur(placeById.get(`${it.source_table}_${it.id}`)?.duracao);
+            const dur = parseDur(
+              placeById.get(`${it.source_table}_${it.id}`)?.duracao,
+            );
             if (dur > bestDur) {
               bestDur = dur;
               winner = loc;
@@ -3102,11 +3191,29 @@ function validateAndFix(
 
 const IDENTITY_STOP_WORDS = new Set<string>([
   // Descriptors listed in the product spec
-  "melhor", "vista", "experiencia", "experience", "top", "best",
-  "tarde", "manha",
+  "melhor",
+  "vista",
+  "experiencia",
+  "experience",
+  "top",
+  "best",
+  "tarde",
+  "manha",
   // Portuguese prepositions / articles that modify rather than name a place
-  "do", "da", "de", "dos", "das", "no", "na", "nos", "nas", "em", "ao", "aos",
-  "um", "uma",
+  "do",
+  "da",
+  "de",
+  "dos",
+  "das",
+  "no",
+  "na",
+  "nos",
+  "nas",
+  "em",
+  "ao",
+  "aos",
+  "um",
+  "uma",
 ]);
 
 function placeIdentity(name: string): string {
@@ -3114,7 +3221,7 @@ function placeIdentity(name: string): string {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "") // strip diacritics  ã→a  é→e  etc.
-    .replace(/[^a-z0-9 ]/g, " ")    // replace punctuation / special chars
+    .replace(/[^a-z0-9 ]/g, " ") // replace punctuation / special chars
     .split(/\s+/)
     .filter((w) => w.length > 1 && !IDENTITY_STOP_WORDS.has(w))
     .join(" ")
@@ -3127,7 +3234,7 @@ function deduplicateByPlaceIdentity(places: EnrichedPlace[]): EnrichedPlace[] {
   const seen = new Set<string>();
   return places.filter((p) => {
     const identity = placeIdentity(p.name);
-    if (!identity) return true;       // no usable identity — always keep
+    if (!identity) return true; // no usable identity — always keep
     if (seen.has(identity)) return false; // semantic duplicate — drop
     seen.add(identity);
     return true;
@@ -3146,28 +3253,47 @@ function deduplicateByPlaceIdentity(places: EnrichedPlace[]): EnrichedPlace[] {
 
 const PREFERENCE_NEIGHBORHOODS: Record<string, string[]> = {
   gastronomia: ["ipanema", "leblon", "botafogo", "jardim botânico", "humaitá"],
-  gastronomy:  ["ipanema", "leblon", "botafogo", "jardim botânico", "humaitá"],
-  natureza:    ["barra da tijuca", "recreio", "santa teresa", "urca", "lagoa"],
-  nature:      ["barra da tijuca", "recreio", "santa teresa", "urca", "lagoa"],
-  festa:       ["lapa", "botafogo", "santa teresa", "flamengo"],
-  nightlife:   ["lapa", "botafogo", "santa teresa", "flamengo"],
-  cultura:     ["santa teresa", "centro", "glória", "catete", "botafogo"],
-  culture:     ["santa teresa", "centro", "glória", "catete", "botafogo"],
-  beach:       ["ipanema", "copacabana", "barra da tijuca", "leblon"],
+  gastronomy: ["ipanema", "leblon", "botafogo", "jardim botânico", "humaitá"],
+  natureza: ["barra da tijuca", "recreio", "santa teresa", "urca", "lagoa"],
+  nature: ["barra da tijuca", "recreio", "santa teresa", "urca", "lagoa"],
+  festa: ["lapa", "botafogo", "santa teresa", "flamengo"],
+  nightlife: ["lapa", "botafogo", "santa teresa", "flamengo"],
+  cultura: ["santa teresa", "centro", "glória", "catete", "botafogo"],
+  culture: ["santa teresa", "centro", "glória", "catete", "botafogo"],
+  beach: ["ipanema", "copacabana", "barra da tijuca", "leblon"],
 };
 
 // Budget → preferred hotel.categoria signals
 const BUDGET_HOTEL_SIGNALS: Record<string, string[]> = {
-  sofisticado: ["luxo", "luxury", "boutique", "design", "premium", "5 estrelas", "5-estrelas"],
-  essencial:   ["econômico", "hostel", "pousada", "simples", "básico", "budget"],
-  conforto:    ["boutique", "comfort", "4 estrelas", "4-estrelas", "contemporâneo"],
+  sofisticado: [
+    "luxo",
+    "luxury",
+    "boutique",
+    "design",
+    "premium",
+    "5 estrelas",
+    "5-estrelas",
+  ],
+  essencial: ["econômico", "hostel", "pousada", "simples", "básico", "budget"],
+  conforto: [
+    "boutique",
+    "comfort",
+    "4 estrelas",
+    "4-estrelas",
+    "contemporâneo",
+  ],
 };
 
 async function selectAutoHotel(
   preferences: Preferences,
   itineraryPlaces: EnrichedPlace[],
   supa: ReturnType<typeof createClient>,
-): Promise<{ id: string; nome: string; bairro: string; photo_url: string | null } | null> {
+): Promise<{
+  id: string;
+  nome: string;
+  bairro: string;
+  photo_url: string | null;
+} | null> {
   const { data: hotels } = await supa
     .from("stay_hotels")
     .select("id,nome,bairro,categoria,photo_url")
@@ -3178,42 +3304,49 @@ async function selectAutoHotel(
     return null;
   }
 
-  const budget         = preferences.budget ?? null;
-  const inspirations   = preferences.inspirations ?? [];
-  const itinerarZones  = new Set(itineraryPlaces.map((p) => p.zone));
+  const budget = preferences.budget ?? null;
+  const inspirations = preferences.inspirations ?? [];
+  const itinerarZones = new Set(itineraryPlaces.map((p) => p.zone));
 
   // Build preferred neighborhood set from inspirations
   const preferredNeighborhoods = new Set<string>();
   for (const ins of inspirations) {
-    for (const nb of (PREFERENCE_NEIGHBORHOODS[ins] ?? [])) {
+    for (const nb of PREFERENCE_NEIGHBORHOODS[ins] ?? []) {
       preferredNeighborhoods.add(nb.toLowerCase());
     }
   }
 
   // Budget signals for matching
-  const budgetSignals      = budget ? (BUDGET_HOTEL_SIGNALS[budget] ?? []) : [];
-  const antiBudgetSignals  = budget === "sofisticado" ? BUDGET_HOTEL_SIGNALS.essencial
-                           : budget === "essencial"   ? BUDGET_HOTEL_SIGNALS.sofisticado
-                           : [];
+  const budgetSignals = budget ? (BUDGET_HOTEL_SIGNALS[budget] ?? []) : [];
+  const antiBudgetSignals =
+    budget === "sofisticado"
+      ? BUDGET_HOTEL_SIGNALS.essencial
+      : budget === "essencial"
+        ? BUDGET_HOTEL_SIGNALS.sofisticado
+        : [];
 
   const scored = (hotels as Record<string, unknown>[]).map((h) => {
-    const bairro   = ((h.bairro as string) ?? "").toLowerCase();
-    const categ    = ((h.categoria as string) ?? "").toLowerCase();
-    const zone     = getZone((h.bairro as string) ?? "");
-    let score      = 0;
+    const bairro = ((h.bairro as string) ?? "").toLowerCase();
+    const categ = ((h.categoria as string) ?? "").toLowerCase();
+    const zone = getZone((h.bairro as string) ?? "");
+    let score = 0;
 
     // Budget match
-    if (budgetSignals.some((s) => categ.includes(s)))      score += 5;
-    if (antiBudgetSignals.some((s) => categ.includes(s)))  score -= 4;
+    if (budgetSignals.some((s) => categ.includes(s))) score += 5;
+    if (antiBudgetSignals.some((s) => categ.includes(s))) score -= 4;
 
     // Preference neighborhood match
-    if ([...preferredNeighborhoods].some((nb) => bairro.includes(nb))) score += 4;
+    if ([...preferredNeighborhoods].some((nb) => bairro.includes(nb)))
+      score += 4;
 
     // Zone proximity to itinerary cluster
-    if (itinerarZones.has(zone))                                score += 3;
+    if (itinerarZones.has(zone)) score += 3;
     else {
       for (const iz of itinerarZones) {
-        if (Math.abs(zone - iz) === 1) { score += 1; break; }
+        if (Math.abs(zone - iz) === 1) {
+          score += 1;
+          break;
+        }
       }
     }
 
@@ -3224,17 +3357,19 @@ async function selectAutoHotel(
   const best = scored[0]?.h;
   if (!best) return null;
 
-  console.log(`[selectAutoHotel] auto-selected "${best.nome}" (bairro=${best.bairro}, categoria=${best.categoria}, score=${scored[0].score})`);
+  console.log(
+    `[selectAutoHotel] auto-selected "${best.nome}" (bairro=${best.bairro}, categoria=${best.categoria}, score=${scored[0].score})`,
+  );
 
   return {
-    id:        String(best.id),
-    nome:      (best.nome as string) || "Hotel",
-    bairro:    (best.bairro as string) || "",
+    id: String(best.id),
+    nome: (best.nome as string) || "Hotel",
+    bairro: (best.bairro as string) || "",
     photo_url: sanitizePhotoUrl(best.photo_url as string | null),
   };
 }
 
-// ── Main handler ──────────────────────────────────────────────────────────────
+// ── Main handler ──────────────es�───────────────────────────────────────────────
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -3401,26 +3536,42 @@ serve(async (req) => {
     const savedIds = new Set(savedPlaces.map((p) => p.id));
     places = scoreAndSortPool(places, preferences, savedIds);
 
-    console.log("AFTER SORT", places.map((p) => p.name));
+    console.log(
+      "AFTER SORT",
+      places.map((p) => p.name),
+    );
 
     // ── Step 3c: Semantic dedup — same real-world place, different label ──────
     // "Arpoador" + "Melhor tarde do Arpoador" → identity "arpoador" → keep one.
     // Runs after scoring so the first (best-ranked) occurrence always wins.
     // Runs before geographic clustering and buildFullDraft slot assignment.
-    places = deduplicateByPlaceIdentity(places);
+    places = safeDedup(places);
 
     // ── Step 3c-variety: stamp experience_type on every place (in-memory only) ─
     // Must run after dedup so we don't waste work on dropped duplicates.
     // Must run before groupByGeography so dayGroups carry the field into buildFullDraft.
-    places = places.map((p) => ({ ...p, experience_type: computeExperienceType(p) }));
+    places = places.map((p) => ({
+      ...p,
+      experience_type: computeExperienceType(p),
+    }));
 
-    console.log("AFTER DEDUP", places.map((p) => p.name));
-    console.log("IDENTITIES", places.map((p) => ({ name: p.name, identity: placeIdentity(p.name) })));
+    console.log(
+      "AFTER DEDUP",
+      places.map((p) => p.name),
+    );
+    console.log(
+      "IDENTITIES",
+      places.map((p) => ({ name: p.name, identity: placeIdentity(p.name) })),
+    );
 
     // ── Step 3d: Experience curation — global caps per type, BEFORE clustering ─
     // Reduces the pool to a balanced set so Step 4 and 5 start clean.
     // Inspirations raise caps for preferred types (gastronomy → more food slots, etc.).
-    places = curateByExperienceType(places, tripLength, preferences.inspirations ?? []);
+    places = curateByExperienceType(
+      places,
+      tripLength,
+      preferences.inspirations ?? [],
+    );
 
     // ── Step 4: Macro-region clustering (oeste + norte isolated from centro + sul)
     const { dayGroups, dayRestaurants } = groupByGeography(
@@ -3431,7 +3582,12 @@ serve(async (req) => {
     );
 
     // ── Step 5: Build fully populated DiaRoteiro[] with morning load balancing
-    let days = buildFullDraft(dayGroups, dayRestaurants, vibe, preferences.inspirations ?? []);
+    let days = buildFullDraft(
+      dayGroups,
+      dayRestaurants,
+      vibe,
+      preferences.inspirations ?? [],
+    );
 
     // ── Step 6: Gemini refinement — only reorders within existing períodos ─────
     days = await refineWithGemini(days, dest, preferences, places);
@@ -3449,7 +3605,12 @@ serve(async (req) => {
     // This injection runs AFTER validateAndFix so it can never be removed by it.
     const primaryHotel = hotelItems[0];
 
-    let resolvedHotelRow: { id: string; nome: string; bairro: string; photo_url: string | null } | null = null;
+    let resolvedHotelRow: {
+      id: string;
+      nome: string;
+      bairro: string;
+      photo_url: string | null;
+    } | null = null;
 
     if (primaryHotel) {
       // Scenario A: user saved a hotel
@@ -3461,9 +3622,9 @@ serve(async (req) => {
 
       if (hotelRow) {
         resolvedHotelRow = {
-          id:        String(hotelRow.id),
-          nome:      (hotelRow.nome as string)   || primaryHotel.titulo,
-          bairro:    (hotelRow.bairro as string) || primaryHotel.localizacao || "",
+          id: String(hotelRow.id),
+          nome: (hotelRow.nome as string) || primaryHotel.titulo,
+          bairro: (hotelRow.bairro as string) || primaryHotel.localizacao || "",
           photo_url: sanitizePhotoUrl(hotelRow.photo_url as string | null),
         };
       }
@@ -3480,19 +3641,21 @@ serve(async (req) => {
       const hotelPhoto = resolvedHotelRow.photo_url;
       console.log("PHOTO SOURCE hotel", resolvedHotelRow.id, hotelPhoto);
       const hotelBlock: ItemRoteiro = {
-        id:           resolvedHotelRow.id,
-        titulo:       resolvedHotelRow.nome,
-        categoria:    "hotel",
-        localizacao:  resolvedHotelRow.bairro,
+        id: resolvedHotelRow.id,
+        titulo: resolvedHotelRow.nome,
+        categoria: "hotel",
+        localizacao: resolvedHotelRow.bairro,
         source_table: "stay_hotels",
-        image:        hotelPhoto ? { uri: hotelPhoto } : undefined,
-        photo_url:    hotelPhoto,
+        image: hotelPhoto ? { uri: hotelPhoto } : undefined,
+        photo_url: hotelPhoto,
       };
       for (const day of days) {
         day.hotel = hotelBlock;
       }
     } else {
-      console.error("[Step 7b] CRITICAL: Could not assign any hotel — stay_hotels may be empty");
+      console.error(
+        "[Step 7b] CRITICAL: Could not assign any hotel — stay_hotels may be empty",
+      );
     }
 
     // ── FINAL SAFETY PASS — guarantee photo_url: string|null on every item ──────
@@ -3505,12 +3668,18 @@ serve(async (req) => {
           // Force undefined → null
           if (item.photo_url === undefined) {
             console.warn("MISSING photo_url — forcing null", {
-              id: item.id, source: item.source_table, titulo: item.titulo,
+              id: item.id,
+              source: item.source_table,
+              titulo: item.titulo,
             });
             item.photo_url = null;
           }
           // RULE 4 — HARD VALIDATION: reject Google URLs
-          if (item.photo_url && (item.photo_url.includes("googleusercontent") || item.photo_url.includes("lh3.google"))) {
+          if (
+            item.photo_url &&
+            (item.photo_url.includes("googleusercontent") ||
+              item.photo_url.includes("lh3.google"))
+          ) {
             console.error("[INVALID IMAGE SOURCE]", item.id, item.photo_url);
             item.photo_url = null;
           }
@@ -3527,7 +3696,11 @@ serve(async (req) => {
           console.warn("MISSING hotel photo_url — forcing null", { id: h.id });
           h.photo_url = null;
         }
-        if (h.photo_url && (h.photo_url.includes("googleusercontent") || h.photo_url.includes("lh3.google"))) {
+        if (
+          h.photo_url &&
+          (h.photo_url.includes("googleusercontent") ||
+            h.photo_url.includes("lh3.google"))
+        ) {
           console.error("[INVALID IMAGE SOURCE] hotel", h.id, h.photo_url);
           h.photo_url = null;
         }
@@ -3537,6 +3710,134 @@ serve(async (req) => {
     }
 
     console.log("FINAL DAYS", JSON.stringify(days));
+    // ─────────────────────────────────────────────
+    // FINAL SAFETY LAYER — DO NOT MOVE THIS BLOCK
+    // ─────────────────────────────────────────────
+
+    // 1. Se o pool ficou pequeno demais, reconstrói
+    if (!places || places.length < tripLength * 2) {
+      console.warn("POOL TOO SMALL — restoring");
+
+      const rawFallback = [...savedPlaces, ...complementaryPlaces];
+      const seen = new Set<string>();
+
+      places = rawFallback.filter((p) => {
+        const key = `${p.source_table}_${p.id}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
+
+    // 2. Dedup seguro (não destrói categorias)
+    function safeDedup(places) {
+      const seen = new Set();
+      return places.filter((p) => {
+        const key = placeIdentity(p.name) + "_" + p.categoria;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
+
+    places = safeDedup(places);
+
+    // 3. Re-score após dedup
+    places = scoreAndSortPool(
+      places,
+      preferences,
+      new Set(savedPlaces.map((p) => p.id)),
+    );
+
+    // 4. Garantir experience_type
+    places = places.map((p) => ({
+      ...p,
+      experience_type: p.experience_type ?? computeExperienceType(p),
+    }));
+
+    // 5. Fallback de emergência
+    function fallbackItinerary(places) {
+      const fallbackItems = places.slice(0, 6);
+
+      return [
+        {
+          numero: 1,
+          bairro: fallbackItems[0]?.area || "Rio de Janeiro",
+          periodos: [
+            {
+              periodo: "manha",
+              items: fallbackItems.slice(0, 2).map(toItem),
+            },
+            {
+              periodo: "tarde",
+              items: fallbackItems.slice(2, 4).map(toItem),
+            },
+            {
+              periodo: "noite",
+              items: fallbackItems.slice(4, 6).map(toItem),
+            },
+          ],
+        },
+      ];
+    }
+
+    function toItem(p) {
+      return {
+        id: p.id,
+        titulo: p.name,
+        categoria: p.categoria,
+        localizacao: p.area,
+        source_table: p.source_table,
+        photo_url: p.photo_url ?? null,
+        image: p.photo_url ? { uri: p.photo_url } : undefined,
+        descricao: p.meu_olhar ?? null,
+        duracao: p.duracao,
+        experience_type: p.experience_type,
+      };
+    }
+
+    // 6. Nunca deixar days vazio
+    if (!days || days.length === 0) {
+      console.error("EMPTY DAYS — fallback aplicado");
+      days = fallbackItinerary(places);
+    }
+
+    // 7. Corrigir dias vazios
+    for (const day of days) {
+      if (!day.periodos || day.periodos.length === 0) {
+        day.periodos = [
+          {
+            periodo: "tarde",
+            items: places.slice(0, 2).map(toItem),
+          },
+        ];
+      }
+    }
+
+    // 8. Limpar períodos vazios
+    for (const day of days) {
+      day.periodos = day.periodos.filter((p) => p.items && p.items.length > 0);
+    }
+
+    // 9. Garantir pelo menos 1 período
+    for (const day of days) {
+      if (day.periodos.length === 0) {
+        day.periodos = [
+          {
+            periodo: "tarde",
+            items: places.slice(0, 2).map(toItem),
+          },
+        ];
+      }
+    }
+
+    // 10. Log real de qualidade
+    console.log("QUALITY CHECK", {
+      totalDays: days.length,
+      totalPlaces: places.length,
+      totalItems: days.flatMap((d) => d.periodos).flatMap((p) => p.items)
+        .length,
+    });
 
     const result: ItineraryResult = {
       destination: dest,
