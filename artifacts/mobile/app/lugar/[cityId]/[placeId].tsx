@@ -533,6 +533,9 @@ export default function LugarDetailScreen() {
         {/* ── Content card ── */}
         <View style={s.contentCard}>
 
+          {/* Drag handle — iOS bottom sheet visual cue */}
+          <View style={s.dragHandle} />
+
           {/* Guide attribution badge — only when entered from a friend guide */}
           {from_guide_slug ? (
             <View style={s.guideBadge}>
@@ -718,11 +721,19 @@ const s = StyleSheet.create({
     backgroundColor: "#000000",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    paddingTop: 28,
+    paddingTop: 14,
     paddingHorizontal: 22,
     paddingBottom: 12,
     borderTopWidth: 1,
     borderTopColor: "rgba(255,255,255,0.06)",
+  },
+  dragHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.20)",
+    alignSelf: "center",
+    marginBottom: 20,
   },
 
   // ── Guide attribution badge ──
