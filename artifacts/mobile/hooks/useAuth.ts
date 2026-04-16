@@ -30,22 +30,15 @@ function webCleanup() {
 }
 
 export interface AuthState {
-  user: User | null;
-  session: Session | null;
-  loading: boolean;
-  signInWithPassword: (
-    email: string,
-    password: string,
-  ) => Promise<{ error: string | null }>;
-  signUp: (
-    email: string,
-    password: string,
-    name?: string,
-  ) => Promise<{ error: string | null; needsConfirmation: boolean }>;
-  sendPasswordReset: (email: string) => Promise<{ error: string | null }>;
-  signInWithOtp: (email: string) => Promise<{ error: string | null }>;
-  signInWithGoogle: () => Promise<{ error: string | null }>;
-  signOut: () => Promise<void>;
+  user:               User | null;
+  session:            Session | null;
+  loading:            boolean;
+  signInWithPassword: (email: string, password: string) => Promise<{ error: string | null }>;
+  signUp:             (email: string, password: string, name?: string) => Promise<{ error: string | null; needsConfirmation: boolean }>;
+  sendPasswordReset:  (email: string) => Promise<{ error: string | null }>;
+  signInWithOtp:      (email: string) => Promise<{ error: string | null }>;
+  signInWithGoogle:   () => Promise<{ error: string | null }>;
+  signOut:            () => Promise<void>;
 }
 
 export function useAuth(): AuthState {
@@ -58,24 +51,18 @@ export function useAuth(): AuthState {
       setLoading(false);
     });
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  async function signInWithPassword(
-    email: string,
-    password: string,
-  ): Promise<{ error: string | null }> {
+  // ── Email + Password login ─────────────────────────────────────────────────
+
+  async function signInWithPassword(email: string, password: string): Promise<{ error: string | null }> {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
       webCleanup();
       if (error) return { error: error.message };
       return { error: null };
@@ -84,6 +71,10 @@ export function useAuth(): AuthState {
       return { error: e?.message ?? "Erro inesperado." };
     }
   }
+
+  // ── Email + Password signup ────────────────────────────────────────────────
+  // Returns needsConfirmation=true when Supabase requires email verification
+  // before the session is activated (depends on project settings).
 
   async function signUp(
     email: string,
@@ -98,20 +89,18 @@ export function useAuth(): AuthState {
       });
       webCleanup();
       if (error) return { error: error.message, needsConfirmation: false };
+      // session is null when email confirmation is required
       const needsConfirmation = data.session === null && data.user !== null;
       return { error: null, needsConfirmation };
     } catch (e: any) {
       webCleanup();
-      return {
-        error: e?.message ?? "Erro inesperado.",
-        needsConfirmation: false,
-      };
+      return { error: e?.message ?? "Erro inesperado.", needsConfirmation: false };
     }
   }
 
-  async function sendPasswordReset(
-    email: string,
-  ): Promise<{ error: string | null }> {
+  // ── Password reset ────────────────────────────────────────────────────────
+
+  async function sendPasswordReset(email: string): Promise<{ error: string | null }> {
     try {
       const redirectTo = Platform.OS === "web" ? callbackUrl() : undefined;
 
@@ -128,9 +117,9 @@ export function useAuth(): AuthState {
     }
   }
 
-  async function signInWithOtp(
-    email: string,
-  ): Promise<{ error: string | null }> {
+  // ── Email OTP (magic link — kept as fallback) ──────────────────────────────
+
+  async function signInWithOtp(email: string): Promise<{ error: string | null }> {
     try {
       const emailRedirectTo = Platform.OS === "web" ? callbackUrl() : undefined;
 
@@ -147,6 +136,8 @@ export function useAuth(): AuthState {
       return { error: e?.message ?? "Erro inesperado." };
     }
   }
+
+  // ── Google OAuth ───────────────────────────────────────────────────────────
 
   async function signInWithGoogle(): Promise<{ error: string | null }> {
     if (Platform.OS === "web") {
@@ -176,23 +167,16 @@ export function useAuth(): AuthState {
         return { error: error?.message ?? "OAuth error" };
       }
 
-      const result = await WebBrowser.openAuthSessionAsync(
-        data.url,
-        redirectTo,
-      );
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
 
       if (result.type === "success") {
-        const parsed = Linking.parse(result.url);
-        const accessToken = parsed.queryParams?.access_token as
-          | string
-          | undefined;
-        const refreshToken = parsed.queryParams?.refresh_token as
-          | string
-          | undefined;
+        const parsed       = Linking.parse(result.url);
+        const accessToken  = parsed.queryParams?.access_token  as string | undefined;
+        const refreshToken = parsed.queryParams?.refresh_token as string | undefined;
 
         if (accessToken && refreshToken) {
           const { error: sessionErr } = await supabase.auth.setSession({
-            access_token: accessToken,
+            access_token:  accessToken,
             refresh_token: refreshToken,
           });
           if (sessionErr) return { error: sessionErr.message };
@@ -205,6 +189,8 @@ export function useAuth(): AuthState {
     }
   }
 
+  // ── Sign out ───────────────────────────────────────────────────────────────
+
   async function signOut(): Promise<void> {
     try {
       await supabase.auth.signOut({ scope: "local" });
@@ -213,7 +199,7 @@ export function useAuth(): AuthState {
   }
 
   return {
-    user: session?.user ?? null,
+    user:               session?.user ?? null,
     session,
     loading,
     signInWithPassword,
