@@ -77,6 +77,12 @@ const BUDGETS: { id: BudgetStyle; label: string; desc: string }[] = [
   { id: "sofisticado", label: "Sofisticado", desc: "Melhor do Rio · exclusivo e premium" },
 ];
 
+const BUDGET_TO_VIBE: Record<BudgetStyle, Vibe> = {
+  essencial:   "tranquilo",
+  conforto:    "moderado",
+  sofisticado: "intenso",
+};
+
 const CATEGORY_LABEL: Record<SavedCategory, string> = {
   oQueFazer:   "O Que Fazer",
   restaurante: "Restaurante",
@@ -638,7 +644,7 @@ function StandardFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) =>
             (departureDate.getTime() - arrivalDate.getTime()) / 86400000,
           ))
         : 3;
-    setTimeout(() => onGenerate({ nights: n, travelVibe, inspirations, budget: b, vibe: "moderado" }), 300);
+    setTimeout(() => onGenerate({ nights: n, travelVibe, inspirations, budget: b, vibe: BUDGET_TO_VIBE[b] }), 300);
   }
 
   function toggleInspiration(id: Inspiration) {
@@ -731,7 +737,7 @@ function ContextualFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) 
       travelVibe: travelVibe ?? "amigos",
       inspirations,
       budget: b,
-      vibe: "moderado",
+      vibe: BUDGET_TO_VIBE[b],
     }), 300);
   }
 
@@ -1847,21 +1853,24 @@ function LoadingPhase() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface ResultPhaseProps {
-  result:         ItineraryResult;
-  hotelItem:      SavedItem | null;
-  totalPlaces:    number;
-  editMode:       boolean;
-  onToggleEdit:   () => void;
-  onReplaceItem:  (diaNum: number, itemId: string, newItem: SavedItem) => void;
-  onShareResult:  () => void;
-  onExport:       () => void;
-  isExporting:    boolean;
-  scrollRef:      React.RefObject<ScrollView>;
+  result:          ItineraryResult;
+  hotelItem:       SavedItem | null;
+  /** Supabase-fetched fallback shown when no hotel is in saved places. */
+  suggestedHotel?: SavedItem | null;
+  totalPlaces:     number;
+  editMode:        boolean;
+  onToggleEdit:    () => void;
+  onReplaceItem:   (diaNum: number, itemId: string, newItem: SavedItem) => void;
+  onShareResult:   () => void;
+  onExport:        () => void;
+  isExporting:     boolean;
+  scrollRef:       React.RefObject<ScrollView>;
 }
 
 function ResultPhase({
   result,
   hotelItem,
+  suggestedHotel,
   totalPlaces,
   editMode,
   onToggleEdit,
@@ -1871,6 +1880,8 @@ function ResultPhase({
   isExporting,
   scrollRef,
 }: ResultPhaseProps) {
+  // Use user's saved hotel first; fall back to Supabase-suggested hotel
+  const displayHotel = hotelItem ?? suggestedHotel ?? null;
   const { totalDays, totalItems } = result.summary;
   const [dayOffsets, setDayOffsets]     = React.useState<Record<number, number>>({});
   const [activeDayChip, setActiveDayChip] = React.useState<number | null>(null);
@@ -1968,14 +1979,14 @@ function ResultPhase({
       )}
 
       {/* ── Hotel card ── */}
-      {hotelItem && (
+      {displayHotel && (
         <Pressable
           style={re.hotelCard}
-          onPress={() => router.push({ pathname: "/ondeFicar/hotel/[hotelId]", params: { hotelId: hotelItem.id } })}
+          onPress={() => router.push({ pathname: "/ondeFicar/hotel/[hotelId]", params: { hotelId: displayHotel.id } })}
         >
           {/* Thumbnail */}
           <View style={re.hotelThumb}>
-            <Image source={hotelItem.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            <Image source={displayHotel.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
             <LinearGradient
               colors={["transparent", "rgba(0,0,0,0.38)"]}
               style={StyleSheet.absoluteFill}
@@ -1983,12 +1994,12 @@ function ResultPhase({
           </View>
           {/* Content */}
           <View style={re.hotelContent}>
-            <Text style={re.hotelLabel}>✦ Hotel recomendado</Text>
-            <Text style={re.hotelName} numberOfLines={1}>{hotelItem.titulo}</Text>
-            {hotelItem.localizacao ? (
+            <Text style={re.hotelLabel}>{hotelItem ? "✦ Hotel selecionado" : "✦ Sugestão de hospedagem"}</Text>
+            <Text style={re.hotelName} numberOfLines={1}>{displayHotel.titulo}</Text>
+            {displayHotel.localizacao ? (
               <View style={re.hotelLocRow}>
                 <Feather name="map-pin" size={9} color={`${GOLD}90`} />
-                <Text style={re.hotelLoc} numberOfLines={1}>{hotelItem.localizacao}</Text>
+                <Text style={re.hotelLoc} numberOfLines={1}>{displayHotel.localizacao}</Text>
               </View>
             ) : null}
           </View>
@@ -2828,6 +2839,8 @@ export default function RoteiroScreen() {
   const [replacingItem,     setReplacingItem]     = useState<{ item: SavedItem; diaNum: number } | null>(null);
   /** ID of the auto-saved user_itineraries row — set after generation, used by Share/Export to update rather than re-insert. */
   const [savedItineraryId,  setSavedItineraryId]  = useState<string | null>(null);
+  /** Hotel suggestion fetched from Supabase when user has no hotel in their saved list. */
+  const [suggestedHotel,    setSuggestedHotel]    = useState<SavedItem | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
   function replaceItem(diaNum: number, itemId: string, newItem: SavedItem) {
@@ -3091,11 +3104,57 @@ export default function RoteiroScreen() {
   const hotelItem   = saved.find((s) => s.categoria === "hotel") ?? null;
   const totalPlaces = saved.filter((s) => s.categoria !== "hotel").length;
 
+  /** Fetches a hotel recommendation from Supabase when the user has none saved. */
+  async function fetchSuggestedHotel(budget: BudgetStyle) {
+    try {
+      const { data } = await supabase
+        .from("v_stay_neighborhoods_with_hotels")
+        .select("neighborhood_name, neighborhood_slug, hotels")
+        .eq("active", true)
+        .order("display_order", { ascending: true })
+        .limit(8);
+
+      if (!data || data.length === 0) return;
+
+      type HotelRow = { id: string; hotel_name: string; hotel_category: string; photo_url: string | null; neighborhood_slug: string | null; display_order: number };
+      const allHotels: (HotelRow & { neighborhood_name: string })[] = (data as any[]).flatMap((n) =>
+        ((n.hotels ?? []) as HotelRow[]).map((h) => ({ ...h, neighborhood_name: n.neighborhood_name as string }))
+      );
+
+      if (allHotels.length === 0) return;
+
+      // Budget-matching heuristic using hotel_category keywords
+      const luxuryKeywords  = ["luxo", "luxury", "resort", "grand", "palace"];
+      const budgetKeywords  = ["hostel", "pousada", "budget", "econom"];
+
+      let selected: typeof allHotels[0] | undefined;
+      if (budget === "sofisticado") {
+        selected = allHotels.find((h) => luxuryKeywords.some((k) => h.hotel_category?.toLowerCase().includes(k)));
+      } else if (budget === "essencial") {
+        selected = allHotels.find((h) => budgetKeywords.some((k) => h.hotel_category?.toLowerCase().includes(k)));
+      }
+      // conforto (or no match): use first curated hotel by display_order
+      if (!selected) selected = allHotels[0];
+
+      setSuggestedHotel({
+        id:           selected.id,
+        titulo:       selected.hotel_name,
+        localizacao:  selected.neighborhood_name,
+        image:        selected.photo_url ? { uri: selected.photo_url } : require("@/assets/images/rio-aerial-clean.png"),
+        categoria:    "hotel",
+        source_table: "stay_hotels",
+      });
+    } catch { /* silent — hotel suggestion is optional */ }
+  }
+
   async function handleGenerate({
     nights, travelVibe, inspirations, budget, vibe,
   }: JourneyGenerateProps) {
     if (generating) return;
     setGenerating(true);
+
+    // Fetch a hotel suggestion in the background when user has none saved
+    if (!hotelItem) fetchSuggestedHotel(budget);
 
     try {
       const serializableItems = saved.map((s) => ({
@@ -3256,7 +3315,7 @@ export default function RoteiroScreen() {
           pool={rioHero && rioHero.length > 0
             ? rioHero.map((item) => ({ uri: item.public_url }))
             : ROTEIRO_BG_POOL}
-          firstSource={hotelItem?.image ?? null}
+          firstSource={(hotelItem ?? suggestedHotel)?.image ?? null}
         />
         <LinearGradient
           colors={["rgba(0,0,0,0.05)", "rgba(0,0,0,0.28)", "rgba(0,0,0,0.60)"]}
@@ -3297,6 +3356,7 @@ export default function RoteiroScreen() {
           <ResultPhase
             result={result!}
             hotelItem={hotelItem}
+            suggestedHotel={suggestedHotel}
             totalPlaces={totalPlaces}
             editMode={editMode}
             onToggleEdit={() => setEditMode((v) => !v)}
