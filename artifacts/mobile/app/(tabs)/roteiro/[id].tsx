@@ -9,9 +9,10 @@
  * Navigation target: from Home RoteiroCard onPress.
  */
 
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import {
   Animated,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -134,6 +135,83 @@ function DiaCard({ dia }: { dia: DiaRoteiro }) {
   );
 }
 
+// ── Day navigation chips ──────────────────────────────────────────────────────
+
+function DayNav({
+  dias,
+  activeDay,
+  onSelect,
+}: {
+  dias: DiaRoteiro[];
+  activeDay: number | null;
+  onSelect: (n: number | null) => void;
+}) {
+  if (dias.length <= 1) return null;
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={dn.row}
+    >
+      {dias.map((d) => {
+        const active = activeDay === d.numero;
+        return (
+          <Pressable
+            key={d.numero}
+            style={[dn.chip, active && dn.chipActive]}
+            onPress={() => onSelect(d.numero)}
+          >
+            <Text style={[dn.chipText, active && dn.chipTextActive]}>
+              Dia {d.numero}
+            </Text>
+            {active && (
+              <Text style={dn.bairroText} numberOfLines={1}>{d.bairro}</Text>
+            )}
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
+const dn = StyleSheet.create({
+  row: {
+    flexDirection: "row",
+    gap: 8,
+    paddingBottom: 4,
+    paddingRight: 8,
+  },
+  chip: {
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 24,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+  },
+  chipActive: {
+    backgroundColor: `${GOLD}18`,
+    borderColor: `${GOLD}50`,
+    flexDirection: "row",
+    gap: 6,
+    alignItems: "center",
+  },
+  chipText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.55)",
+  },
+  chipTextActive: {
+    color: GOLD,
+  },
+  bairroText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: `${GOLD}80`,
+    maxWidth: 90,
+  },
+});
+
 // ── Main screen ────────────────────────────────────────────────────────────────
 
 export default function RoteiroDetailScreen() {
@@ -141,6 +219,7 @@ export default function RoteiroDetailScreen() {
   const insets    = useSafeAreaInsets();
   const topPad    = Platform.OS === "web" ? 67 : insets.top + 12;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const [activeDay, setActiveDay] = useState<number | null>(1);
 
   // Overlay starts invisible — fades in once expo-image displays the background.
   const overlayAnim = useRef(new Animated.Value(0)).current;
@@ -235,6 +314,15 @@ export default function RoteiroDetailScreen() {
         {/* ── Thin rule ── */}
         <View style={s.rule} />
 
+        {/* ── Day navigation chips ── */}
+        <View style={s.dayNavWrap}>
+          <DayNav
+            dias={dias}
+            activeDay={activeDay}
+            onSelect={setActiveDay}
+          />
+        </View>
+
         {/* ── Itinerary — same day cards as generated roteiro ── */}
         <View style={rot.wrap}>
           <View style={rot.titleRow}>
@@ -245,10 +333,36 @@ export default function RoteiroDetailScreen() {
               </Text>
             </View>
           </View>
-          {dias.map((dia) => (
-            <DiaCard key={dia.numero} dia={dia} />
-          ))}
+          {dias
+            .filter((d) => activeDay === null || d.numero === activeDay)
+            .map((dia) => (
+              <DiaCard key={dia.numero} dia={dia} />
+            ))}
+          {dias.length > 1 && (
+            <Pressable
+              style={({ pressed }) => [s.verTodosDias, pressed && { opacity: 0.65 }]}
+              onPress={() => setActiveDay(activeDay === null ? 1 : null)}
+            >
+              <Text style={s.verTodosDiasText}>
+                {activeDay === null ? "Ver um dia por vez" : "Ver todos os dias"}
+              </Text>
+            </Pressable>
+          )}
         </View>
+
+        {/* ── WhatsApp refine button ── */}
+        <Pressable
+          style={({ pressed }) => [s.whatsapp, pressed && { opacity: 0.82 }]}
+          onPress={() => {
+            const msg = encodeURIComponent(
+              `Olá! Quero refinar meu roteiro "${roteiro.titulo}" no The Lucky Trip.`
+            );
+            Linking.openURL(`https://wa.me/5521999999999?text=${msg}`);
+          }}
+        >
+          <Feather name="message-circle" size={18} color="#FFFFFF" />
+          <Text style={s.whatsappText}>Refinar no WhatsApp</Text>
+        </Pressable>
 
       </ScrollView>
     </View>
@@ -317,7 +431,36 @@ const s = StyleSheet.create({
   rule: {
     height: 1,
     backgroundColor: "rgba(255,255,255,0.08)",
-    marginBottom: 22,
+    marginBottom: 16,
+  },
+  dayNavWrap: {
+    marginBottom: 20,
+  },
+  verTodosDias: {
+    marginTop: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  verTodosDiasText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.38)",
+  },
+  whatsapp: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    marginTop: 24,
+    marginBottom: 8,
+    paddingVertical: 15,
+    borderRadius: 14,
+    backgroundColor: "#25D366",
+  },
+  whatsappText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: "#FFFFFF",
   },
 });
 

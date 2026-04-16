@@ -123,7 +123,8 @@ export default function TabLayout() {
         <Tabs.Screen name="cidade/[id]"      options={{ href: null }} />
         <Tabs.Screen name="comerBem/[id]"    options={{ href: null }} />
         <Tabs.Screen name="ondeFicar/[id]"   options={{ href: null }} />
-        <Tabs.Screen name="oQueFazer/[id]"   options={{ href: null }} />
+        <Tabs.Screen name="oQueFazer/[id]"             options={{ href: null }} />
+        <Tabs.Screen name="oQueFazer/categorias/[id]" options={{ href: null }} />
         <Tabs.Screen name="essencial/[id]"   options={{ href: null }} />
         <Tabs.Screen name="agoraNoRio/[id]"  options={{ href: null }} />
         <Tabs.Screen name="luckyList/[id]"   options={{ href: null }} />
