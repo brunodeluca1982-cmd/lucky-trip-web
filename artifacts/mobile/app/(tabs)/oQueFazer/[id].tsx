@@ -46,8 +46,18 @@ const DEFAULT_DESCRICAO = [
   "A verdadeira experiência começa quando você abandona o roteiro previsível e segue o instinto.",
 ];
 
+// Human-readable labels for each category id
+const CATEGORIA_LABELS: Record<string, string> = {
+  praias:     "Praias",
+  museus:     "Museus",
+  parques:    "Parques",
+  baladas:    "Baladas",
+  aventuras:  "Aventuras",
+  exposicoes: "Exposições",
+};
+
 export default function OQueFazerScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, categoria } = useLocalSearchParams<{ id: string; categoria?: string }>();
   const insets    = useSafeAreaInsets();
   const topInset  = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
@@ -56,6 +66,13 @@ export default function OQueFazerScreen() {
   const { lugares: allLugares, loading: lugaresLoading } = useOQueFazer();
   const descricao  = DESCRICOES[destino.id] ?? DEFAULT_DESCRICAO;
   const { save, unsave, isSaved } = useGuia();
+
+  // Filter by categoria if provided (case-insensitive: Supabase stores uppercase)
+  const filtered = categoria
+    ? allLugares.filter((l) => l.categoria?.toLowerCase() === categoria.toLowerCase())
+    : allLugares;
+
+  const categoriaLabel = categoria ? (CATEGORIA_LABELS[categoria.toLowerCase()] ?? categoria) : null;
 
   const listRef = useRef<ScrollView>(null);
 
@@ -86,7 +103,7 @@ export default function OQueFazerScreen() {
           <View style={s.pill}>
             <View style={s.badgeDot} />
             <Text style={s.pillText}>
-              {lugaresLoading ? "carregando…" : `${allLugares.length} locais`}
+              {lugaresLoading ? "carregando…" : `${filtered.length} locais`}
             </Text>
           </View>
         </View>
@@ -122,20 +139,42 @@ export default function OQueFazerScreen() {
             <View style={s.introMeta}>
               <View style={s.introDot} />
               <Text style={s.introMetaText}>
-                Seleção curada · {allLugares.length} lugar{allLugares.length !== 1 ? "es" : ""}
+                Seleção curada · {filtered.length} lugar{filtered.length !== 1 ? "es" : ""}
               </Text>
             </View>
           </View>
         </View>
 
         <View style={s.listSection}>
-          <Text style={s.listLabel}>Experiências selecionadas</Text>
+          {/* Active filter badge + "Ver todas" */}
+          {categoriaLabel ? (
+            <View style={s.filterRow}>
+              <View style={s.filterBadge}>
+                <Text style={s.filterBadgeText}>{categoriaLabel.toUpperCase()} · {filtered.length} lugar{filtered.length !== 1 ? "es" : ""}</Text>
+              </View>
+              <Pressable
+                hitSlop={8}
+                onPress={() =>
+                  router.replace({
+                    pathname: "/oQueFazer/[id]",
+                    params: { id: destino.id },
+                  })
+                }
+              >
+                <Text style={s.verTodasText}>Ver todas ×</Text>
+              </Pressable>
+            </View>
+          ) : null}
+
+          <Text style={s.listLabel}>
+            {categoriaLabel ? `${categoriaLabel} selecionadas` : "Experiências selecionadas"}
+          </Text>
 
           {descricao.slice(1).map((para, i) => (
             <Text key={i} style={s.descPara}>{para}</Text>
           ))}
 
-          {allLugares.map((place, index) => (
+          {filtered.map((place, index) => (
             <Pressable
               key={place.id}
               style={s.card}
@@ -477,6 +516,34 @@ const s = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 13,
     color: "rgba(255,255,255,0.65)",
+    letterSpacing: 0.2,
+  },
+
+  filterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 14,
+  },
+  filterBadge: {
+    backgroundColor: "rgba(212,175,55,0.14)",
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: "rgba(212,175,55,0.35)",
+  },
+  filterBadgeText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+    color: GOLD,
+    letterSpacing: 1.4,
+    textTransform: "uppercase",
+  },
+  verTodasText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: "rgba(255,255,255,0.45)",
     letterSpacing: 0.2,
   },
 
