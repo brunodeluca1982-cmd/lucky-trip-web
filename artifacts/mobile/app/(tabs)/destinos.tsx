@@ -80,7 +80,7 @@ const DestCard = memo(function DestCard({
           onError={() => console.log(`[IMAGE] load error for ${id}`)}
         />
       ) : (
-        <View style={{ width: "100%", height: "100%", backgroundColor: "#000" }} />
+        <View style={{ width: "100%", height: "100%", backgroundColor: "#1c1c1e" }} />
       )}
 
       {/* Bottom gradient — bottom 45% only */}

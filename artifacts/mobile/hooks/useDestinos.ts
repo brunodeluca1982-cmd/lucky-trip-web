@@ -21,21 +21,41 @@ export function useDestinos() {
     async function load() {
       try {
         const { data, error: err } = await supabase
-          .from("v_destinos_mvp")
-          .select("slug, nome, pais, lancado, descricao, hero_image_url_effective")
-          .not("slug", "is", null)
-          .order("nome", { ascending: true });
+          .from("destinos")
+          .select("slug, nome, pais, lancado, descricao, priority, sort_order, hero_image_url, mobile_hero_image_url")
+          .not("slug", "is", null);
 
         console.log("DESTINOS RAW:", data, "ERROR:", err);
 
         if (err) throw err;
 
-        const normalized: Destino[] = (data ?? []).map((item) => ({
+        // Ordem obrigatória:
+        // 1. Rio primeiro (slug = 'rio' → 0, resto → 1)
+        // 2. priority desc
+        // 3. sort_order asc
+        // 4. nome asc
+        const sorted = (data ?? []).slice().sort((a, b) => {
+          const rioA = a.slug === "rio" ? 0 : 1;
+          const rioB = b.slug === "rio" ? 0 : 1;
+          if (rioA !== rioB) return rioA - rioB;
+
+          const priA = a.priority ?? 0;
+          const priB = b.priority ?? 0;
+          if (priB !== priA) return priB - priA;
+
+          const sortA = a.sort_order ?? 0;
+          const sortB = b.sort_order ?? 0;
+          if (sortA !== sortB) return sortA - sortB;
+
+          return (a.nome ?? "").localeCompare(b.nome ?? "");
+        });
+
+        const normalized: Destino[] = sorted.map((item) => ({
           id:        item.slug as string,
           cidade:    item.nome,
           pais:      item.pais,
           descricao: item.descricao ?? "",
-          image:     (item as any).hero_image_url_effective ?? null,
+          image:     item.mobile_hero_image_url?.trim() || item.hero_image_url?.trim() || null,
           lancado:   item.lancado ?? false,
         }));
 
