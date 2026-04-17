@@ -3,6 +3,7 @@ import { Image, Platform, Pressable, StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 
 const C = Colors.light;
@@ -41,10 +42,13 @@ export function AppHeader({ transparent = false }: AppHeaderProps) {
         />
         <Pressable
           style={styles.avatarBtn}
-          onPress={() => router.push("/(tabs)/perfil")}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push("/(tabs)/perfil");
+          }}
           hitSlop={8}
         >
-          <Feather name="user" size={18} color={C.white} />
+          <Feather name="music" size={16} color={C.white} />
         </Pressable>
       </View>
     </View>

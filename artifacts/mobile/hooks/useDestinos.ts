@@ -44,21 +44,29 @@ export function useDestinos() {
       try {
         const { data, error: err } = await supabase
           .from("destinos")
-          .select("id, nome, pais, lancado, descricao, slug")
+          .select("id, nome, pais, lancado, descricao, slug, image_url, photo_url, cover_url")
           .not("slug", "is", null)
           .order("lancado", { ascending: false })
           .order("nome");
 
         if (err) throw err;
 
-        const rows: Destino[] = (data ?? []).map((row) => ({
-          id:        row.slug as string,
-          cidade:    row.nome,
-          pais:      row.pais,
-          descricao: row.descricao ?? "",
-          image:     destinoImage(row.slug as string, row.nome),
-          lancado:   row.lancado ?? false,
-        }));
+        const rows: Destino[] = (data ?? []).map((row) => {
+          // Use the first available remote image from Supabase if present
+          const remoteUrl: string | null =
+            row.image_url || row.photo_url || row.cover_url || null;
+
+          return {
+            id:        row.slug as string,
+            cidade:    row.nome,
+            pais:      row.pais,
+            descricao: row.descricao ?? "",
+            image:     remoteUrl
+              ? { uri: remoteUrl }
+              : destinoImage(row.slug as string, row.nome),
+            lancado:   row.lancado ?? false,
+          };
+        });
 
         if (!cancelled) setDestinos(rows.length > 0 ? rows : STATIC_RIO_FALLBACK);
       } catch (e: any) {

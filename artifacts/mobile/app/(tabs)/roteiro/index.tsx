@@ -395,9 +395,10 @@ function FlowPage1({
 
   function handleArrival(d: Date) {
     onArrivalChange(d);
-    // Next Best Step: auto-advance departure calendar to the following month
-    setDeptInitMonth(new Date(d.getFullYear(), d.getMonth() + 1, 1));
+    // Open departure calendar on the same month as arrival
+    setDeptInitMonth(new Date(d.getFullYear(), d.getMonth(), 1));
     setOpenCal("departure");
+    // Clear departure if it's now before the new arrival
     if (departureDate && !isBeforeDay(d, departureDate)) {
       onDepartureChange(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1));
     }
@@ -800,6 +801,11 @@ function ContextualFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) 
               value={openCal === "arrival" ? arrivalDate : departureDate}
               minDate={openCal === "departure" && arrivalDate ? arrivalDate : new Date()}
               onSelect={openCal === "arrival" ? handleArrival : handleDeparture}
+              initialMonth={
+                openCal === "departure" && arrivalDate
+                  ? new Date(arrivalDate.getFullYear(), arrivalDate.getMonth(), 1)
+                  : undefined
+              }
             />
           )}
 
@@ -3010,6 +3016,20 @@ export default function RoteiroScreen() {
    */
   async function handleExport() {
     if (!result || isExporting) return;
+
+    // Require authentication to export
+    if (!user) {
+      Alert.alert(
+        "Faça login para exportar",
+        "Crie uma conta gratuita para salvar e compartilhar seus roteiros.",
+        [
+          { text: "Entrar", onPress: () => router.push("/(tabs)/perfil") },
+          { text: "Agora não", style: "cancel" },
+        ]
+      );
+      return;
+    }
+
     setIsExporting(true);
     let exportUrl: string | undefined;
 
@@ -3024,8 +3044,9 @@ export default function RoteiroScreen() {
           .update({ is_public: true, share_slug: slug })
           .eq("id", savedItineraryId);
         if (!error) exportUrl = `https://theluckytrip.app/r/${slug}`;
+        else console.error("[Export] update error:", error.message);
       } else {
-        // Unauthenticated fallback — full insert (preserves existing behavior)
+        // Insert for users where auto-save didn't run
         const { data: itinerary, error: itinErr } = await supabase
           .from("user_itineraries")
           .insert({
@@ -3067,42 +3088,54 @@ export default function RoteiroScreen() {
           );
           await supabase.from("roteiro_itens").insert(roteiroItens);
           exportUrl = `https://theluckytrip.app/r/${slug}`;
+        } else if (itinErr) {
+          console.error("[Export] insert error:", itinErr.message);
         }
       }
-    } catch { /* Supabase unavailable — proceed without URL */ }
+    } catch (e) {
+      console.error("[Export] unexpected error:", e);
+    }
 
-    const urlToShow = exportUrl ?? "Roteiro ainda não salvo. Tente novamente.";
+    // 2. Surface the URL
+    if (!exportUrl) {
+      Alert.alert(
+        "Erro ao exportar",
+        "Não foi possível gerar o link. Tente novamente.",
+        [{ text: "OK" }]
+      );
+      setIsExporting(false);
+      return;
+    }
 
-    // 2. Surface the URL — copy on web, share prompt on native
     if (Platform.OS === "web") {
       try {
-        if (exportUrl) await navigator.clipboard.writeText(exportUrl);
+        await navigator.clipboard.writeText(exportUrl);
       } catch { /* clipboard not available */ }
       Alert.alert(
-        exportUrl ? "Link copiado!" : "Exportar roteiro",
-        `${urlToShow}\n\nCompartilhe este link para acessar o roteiro no navegador.`,
+        "Link copiado!",
+        `${exportUrl}\n\nCompartilhe este link para acessar o roteiro em qualquer dispositivo.`,
         [{ text: "OK" }]
       );
     } else {
       Alert.alert(
-        "Link do roteiro",
-        urlToShow,
-        exportUrl
-          ? [
-              {
-                text: "Compartilhar link",
-                onPress: () => Share.share({ message: exportUrl, url: exportUrl, title: "Roteiro Rio de Janeiro — The Lucky Trip" }),
-              },
-              { text: "Fechar", style: "cancel" },
-            ]
-          : [{ text: "OK" }]
+        "Roteiro exportado",
+        "Link pronto para compartilhar:",
+        [
+          {
+            text: "Compartilhar",
+            onPress: () => Share.share({ message: exportUrl!, url: exportUrl, title: "Roteiro Rio de Janeiro — The Lucky Trip" }),
+          },
+          { text: "Fechar", style: "cancel" },
+        ]
       );
     }
     setIsExporting(false);
   }
 
   const hotelItem   = saved.find((s) => s.categoria === "hotel") ?? null;
-  const totalPlaces = saved.filter((s) => s.categoria !== "hotel").length;
+  const totalPlaces = result
+    ? result.days.reduce((n, d) => n + d.periodos.reduce((m, p) => m + p.items.length, 0), 0)
+    : saved.filter((s) => s.categoria !== "hotel").length;
 
   /** Fetches a hotel recommendation from Supabase when the user has none saved. */
   async function fetchSuggestedHotel(budget: BudgetStyle) {
@@ -3316,9 +3349,14 @@ export default function RoteiroScreen() {
             ? rioHero.map((item) => ({ uri: item.public_url }))
             : ROTEIRO_BG_POOL}
           firstSource={(hotelItem ?? suggestedHotel)?.image ?? null}
+          blurRadius={phase === "result" ? 14 : 0}
         />
         <LinearGradient
-          colors={["rgba(0,0,0,0.05)", "rgba(0,0,0,0.28)", "rgba(0,0,0,0.60)"]}
+          colors={
+            phase === "result"
+              ? ["rgba(10,8,5,0.50)", "rgba(10,8,5,0.72)", "rgba(10,8,5,0.92)"]
+              : ["rgba(0,0,0,0.05)", "rgba(0,0,0,0.28)", "rgba(0,0,0,0.60)"]
+          }
           locations={[0, 0.35, 1]}
           style={StyleSheet.absoluteFill}
         />

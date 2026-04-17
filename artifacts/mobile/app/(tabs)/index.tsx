@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   Animated,
   ActivityIndicator,
@@ -12,6 +12,7 @@ import {
   Text,
   View,
 } from "react-native";
+import * as Haptics from "expo-haptics";
 import { notifyHeroReady } from "@/lib/splashGate";
 import { RotatingBackground } from "@/components/RotatingBackground";
 import { VideoBackground } from "@/components/VideoBackground";
@@ -192,7 +193,13 @@ function RoteiroCTA() {
       <Text style={s.ctaSub}>
         Use nosso planejador intuitivo para criar experiências únicas no seu destino.
       </Text>
-      <Pressable style={s.ctaBtn} onPress={() => router.push("/roteiro")}>
+      <Pressable
+        style={s.ctaBtn}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          router.push("/roteiro");
+        }}
+      >
         <Feather name="plus" size={15} color={C.white} />
         <Text style={s.ctaBtnText}>Criar roteiro</Text>
       </Pressable>
@@ -231,7 +238,7 @@ export default function HomeScreen() {
   const { lugares: atividades, loading: loadingAtividades } = useOQueFazer();
   const { restaurantes: restos, loading: loadingRestos } = useRestaurants();
   const { friends, loading: loadingFriends } = useFriends();
-  const momentoTab = getCurrentMomento();
+  const [momentoTab, setMomentoTab] = React.useState<MomentoTab>(getCurrentMomento);
 
   const carouselItems = React.useMemo((): HeroItem[] => {
     const launched  = destinos.filter((d) => d.lancado);
@@ -325,8 +332,14 @@ export default function HomeScreen() {
   // ── Hero background animation ─────────────────────────────────────────────
   // overlayAnim starts at 0 so the dark editorial overlay is invisible until
   // the hero image is actually displayed — content always lands on a warm bg.
+  const scrollRef = useRef<ScrollView>(null);
   const overlayAnim = useRef(new Animated.Value(0)).current;
   const heroReadyFired = useRef(false);
+
+  // Ensure the page always starts at the top (prevents web scroll restoration)
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, []);
 
   function handleHeroDisplay() {
     if (heroReadyFired.current) return;
@@ -375,6 +388,7 @@ export default function HomeScreen() {
       <AppHeader transparent />
 
       <ScrollView
+        ref={scrollRef}
         style={s.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: bottomPad + 80 }}
@@ -397,9 +411,14 @@ export default function HomeScreen() {
             {MOMENTO_TABS.map((tab) => {
               const active = momentoTab === tab.key;
               return (
-                <View
+                <Pressable
                   key={tab.key}
-                  style={[s.momentoTab, active && s.momentoTabActive]}
+                  onPress={() => setMomentoTab(tab.key)}
+                  style={({ pressed }) => [
+                    s.momentoTab,
+                    active && s.momentoTabActive,
+                    pressed && { opacity: 0.75 },
+                  ]}
                 >
                   <Ionicons
                     name={tab.icon}
@@ -410,7 +429,7 @@ export default function HomeScreen() {
                   <Text style={[s.momentoTabText, active && s.momentoTabTextActive]}>
                     {tab.label}
                   </Text>
-                </View>
+                </Pressable>
               );
             })}
           </View>

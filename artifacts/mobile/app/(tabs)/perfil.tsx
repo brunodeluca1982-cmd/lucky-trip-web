@@ -18,6 +18,7 @@ import {
   Image,
   Linking,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -33,6 +34,7 @@ import { useGuia } from "@/context/GuiaContext";
 import { useRioHeroMedia } from "@/hooks/useHeroMedia";
 import type { User } from "@supabase/supabase-js";
 import AuthScreen from "@/app/auth";
+import { supabase } from "@/lib/supabase";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -180,6 +182,86 @@ function ProfileHeader({ user, badge }: { user: User; badge: React.ReactNode }) 
   );
 }
 
+// ── Meus Roteiros ──────────────────────────────────────────────────────────────
+
+interface SavedRoteiro {
+  id: string;
+  destination_name: string;
+  days_count: number;
+  items_count: number;
+  created_at: string;
+  share_slug: string | null;
+}
+
+function MeusRoteiros({ userId }: { userId: string }) {
+  const [roteiros, setRoteiros] = useState<SavedRoteiro[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase
+      .from("user_itineraries")
+      .select("id, destination_name, days_count, items_count, created_at, share_slug")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(10)
+      .then(({ data, error }) => {
+        if (!error && data) setRoteiros(data as SavedRoteiro[]);
+        setLoading(false);
+      });
+  }, [userId]);
+
+  return (
+    <>
+      <Text style={s.sectionLabel} suppressHighlighting>MEUS ROTEIROS</Text>
+      <View style={s.menuCard}>
+        {loading ? (
+          <ActivityIndicator color={GOLD} style={{ margin: 16 }} />
+        ) : roteiros.length === 0 ? (
+          <View style={s.roteiroEmpty}>
+            <Feather name="map" size={20} color="rgba(255,255,255,0.25)" />
+            <Text style={s.roteiroEmptyText}>Nenhum roteiro salvo ainda</Text>
+            <Pressable onPress={() => router.push("/(tabs)/roteiro")} style={s.roteiroCreateBtn}>
+              <Text style={s.roteiroCreateBtnText}>Criar meu primeiro roteiro</Text>
+              <Feather name="arrow-right" size={13} color={GOLD} />
+            </Pressable>
+          </View>
+        ) : (
+          <>
+            {roteiros.map((r, idx) => (
+              <React.Fragment key={r.id}>
+                {idx > 0 && <View style={s.menuDivider} />}
+                <Pressable
+                  style={({ pressed }) => [s.roteiroItem, pressed && { opacity: 0.75 }]}
+                  onPress={() => router.push("/(tabs)/roteiro")}
+                >
+                  <View style={s.roteiroIcon}>
+                    <Feather name="map" size={16} color={GOLD} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.roteiroItemTitle} numberOfLines={1}>{r.destination_name}</Text>
+                    <Text style={s.roteiroItemSub}>
+                      {r.days_count} {r.days_count === 1 ? "dia" : "dias"} · {r.items_count} {r.items_count === 1 ? "item" : "itens"}
+                    </Text>
+                  </View>
+                  <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.30)" />
+                </Pressable>
+              </React.Fragment>
+            ))}
+            <View style={s.menuDivider} />
+            <Pressable
+              style={({ pressed }) => [s.roteiroNewBtn, pressed && { opacity: 0.75 }]}
+              onPress={() => router.push("/(tabs)/roteiro")}
+            >
+              <Feather name="plus" size={15} color={GOLD} />
+              <Text style={s.roteiroNewBtnText}>Criar novo roteiro</Text>
+            </Pressable>
+          </>
+        )}
+      </View>
+    </>
+  );
+}
+
 // ── Free Profile ───────────────────────────────────────────────────────────────
 
 function FreeProfileScreen({ user, signOut }: { user: User; signOut: () => void }) {
@@ -206,6 +288,8 @@ function FreeProfileScreen({ user, signOut }: { user: User; signOut: () => void 
           </View>
           <Feather name="arrow-right" size={16} color="#000" />
         </TouchableOpacity>
+
+        <MeusRoteiros userId={user.id} />
 
         <Text style={s.sectionLabel} suppressHighlighting>MINHA VIAGEM</Text>
         <View style={s.menuCard}>
@@ -274,6 +358,8 @@ function ProProfileScreen({ user, signOut }: { user: User; signOut: () => void }
             <Text style={s.manageBtnText} suppressHighlighting>Gerenciar assinatura</Text>
           </TouchableOpacity>
         </View>
+
+        <MeusRoteiros userId={user.id} />
 
         <Text style={s.sectionLabel} suppressHighlighting>MINHA VIAGEM</Text>
         <View style={s.menuCard}>
@@ -485,5 +571,65 @@ const s = StyleSheet.create({
     height: 1,
     backgroundColor: "rgba(255,255,255,0.07)",
     marginLeft: 56,
+  },
+  roteiroEmpty: {
+    alignItems: "center",
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  roteiroEmptyText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.35)",
+  },
+  roteiroCreateBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 4,
+  },
+  roteiroCreateBtnText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: GOLD,
+  },
+  roteiroItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 12,
+  },
+  roteiroIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: "rgba(212,175,55,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  roteiroItemTitle: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    color: "#FFFFFF",
+  },
+  roteiroItemSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: "rgba(255,255,255,0.40)",
+    marginTop: 2,
+  },
+  roteiroNewBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 10,
+  },
+  roteiroNewBtnText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: GOLD,
   },
 });

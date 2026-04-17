@@ -14,6 +14,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 
 const C = Colors.light;
@@ -41,6 +42,7 @@ interface HeroCarouselProps {
 }
 
 function handleSlidePress(item: HeroItem) {
+  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   const type = item.type ?? (item.cityId === "rio" ? "destino" : item.cityId ? "em_breve" : undefined);
 
   if (type === "guia" && item.friendSlug) {
@@ -127,7 +129,7 @@ export function HeroCarousel({ items, onIndexChange }: HeroCarouselProps) {
         onIndexChange?.(next);
         return next;
       });
-    }, 4000);
+    }, 11000);
     return () => {
       if (autoplayRef.current) clearInterval(autoplayRef.current);
     };
