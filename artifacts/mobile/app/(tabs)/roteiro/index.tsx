@@ -1855,6 +1855,241 @@ function LoadingPhase() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Item menu sheet — tap on itinerary item → info + 4 actions
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface ItemMenuSheetProps {
+  item:         SavedItem;
+  diaNum:       number;
+  onClose:      () => void;
+  onReplace:    () => void;
+  onDelete:     () => void;
+  onShare:      () => void;
+  onSeeDetails: () => void;
+}
+
+function ItemMenuSheet({
+  item, diaNum, onClose, onReplace, onDelete, onShare, onSeeDetails,
+}: ItemMenuSheetProps) {
+  return (
+    <View style={ms.overlay} pointerEvents="box-none">
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      <View style={ms.sheet}>
+        <View style={ms.handle} />
+
+        {/* Info row */}
+        <View style={ms.info}>
+          <View style={ms.infoThumb}>
+            <ItemThumb image={item.image} categoria={item.categoria} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={ms.infoEyebrow}>DIA {diaNum}</Text>
+            <Text style={ms.infoTitle} numberOfLines={2}>{item.titulo}</Text>
+            {item.localizacao ? (
+              <View style={ms.infoLocRow}>
+                <Feather name="map-pin" size={10} color={`${GOLD}90`} />
+                <Text style={ms.infoLoc} numberOfLines={1}>{item.localizacao}</Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+
+        <Pressable
+          style={({ pressed }) => [ms.seeDetails, pressed && { opacity: 0.80 }]}
+          onPress={onSeeDetails}
+        >
+          <Feather name="external-link" size={13} color={GOLD} />
+          <Text style={ms.seeDetailsText}>Ver detalhes</Text>
+        </Pressable>
+
+        {/* Primary CTA */}
+        <Pressable
+          style={({ pressed }) => [ms.primaryCta, pressed && { opacity: 0.85 }]}
+          onPress={() => {
+            Alert.alert(
+              "Em breve",
+              "A compra de ingresso estará disponível em breve.",
+            );
+          }}
+        >
+          <Feather name="tag" size={14} color="#1A1109" />
+          <Text style={ms.primaryCtaText}>Comprar ingresso</Text>
+        </Pressable>
+
+        {/* Secondary actions */}
+        <View style={ms.actionsCol}>
+          <Pressable
+            style={({ pressed }) => [ms.action, pressed && { opacity: 0.75 }]}
+            onPress={onShare}
+          >
+            <Feather name="share-2" size={15} color={GOLD} />
+            <Text style={ms.actionText}>Compartilhar atração</Text>
+            <Feather name="chevron-right" size={14} color={`${GOLD}50`} />
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [ms.action, pressed && { opacity: 0.75 }]}
+            onPress={onReplace}
+          >
+            <Feather name="refresh-cw" size={15} color={GOLD} />
+            <Text style={ms.actionText}>Substituir atração</Text>
+            <Feather name="chevron-right" size={14} color={`${GOLD}50`} />
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [ms.action, pressed && { opacity: 0.75 }]}
+            onPress={() => {
+              Alert.alert(
+                "Remover atração",
+                `Remover "${item.titulo}" do Dia ${diaNum}?`,
+                [
+                  { text: "Cancelar", style: "cancel" },
+                  { text: "Remover", style: "destructive", onPress: onDelete },
+                ],
+              );
+            }}
+          >
+            <Feather name="trash-2" size={15} color="#E85C5C" />
+            <Text style={[ms.actionText, { color: "#E85C5C" }]}>Excluir</Text>
+            <Feather name="chevron-right" size={14} color="#E85C5C60" />
+          </Pressable>
+        </View>
+
+        <Pressable onPress={onClose} style={ms.closeBtn}>
+          <Text style={ms.closeText}>Fechar</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+const ms = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "flex-end",
+    zIndex: 90,
+  },
+  sheet: {
+    backgroundColor: "#15120E",
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    borderTopWidth: 1,
+    borderColor: "rgba(212,175,55,0.22)",
+    paddingTop: 10,
+    paddingHorizontal: 18,
+    paddingBottom: 28,
+    gap: 12,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.20)",
+    alignSelf: "center",
+    marginBottom: 6,
+  },
+  info: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 6,
+  },
+  infoThumb: {
+    width: 70,
+    height: 70,
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: "rgba(0,0,0,0.35)",
+  },
+  infoEyebrow: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 9,
+    color: `${GOLD}B0`,
+    letterSpacing: 1.1,
+  },
+  infoTitle: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 16,
+    color: "#F5EFE0",
+    lineHeight: 20,
+    marginTop: 2,
+  },
+  infoLocRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 3,
+  },
+  infoLoc: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: "rgba(255,255,255,0.55)",
+    flex: 1,
+  },
+  seeDetails: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(212,175,55,0.22)",
+    backgroundColor: "rgba(212,175,55,0.06)",
+  },
+  seeDetailsText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: GOLD,
+  },
+  primaryCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: GOLD,
+  },
+  primaryCtaText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+    color: "#1A1109",
+    letterSpacing: 0.3,
+  },
+  actionsCol: {
+    gap: 2,
+    marginTop: 4,
+  },
+  action: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+  actionText: {
+    flex: 1,
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: "#F5EFE0",
+  },
+  closeBtn: {
+    alignItems: "center",
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  closeText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: "rgba(255,255,255,0.45)",
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Result phase — day-by-day itinerary
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1867,10 +2102,67 @@ interface ResultPhaseProps {
   editMode:        boolean;
   onToggleEdit:    () => void;
   onReplaceItem:   (diaNum: number, itemId: string, newItem: SavedItem) => void;
+  onOpenItemMenu:  (diaNum: number, item: SavedItem) => void;
   onShareResult:   () => void;
   onExport:        () => void;
   isExporting:     boolean;
   scrollRef:       React.RefObject<ScrollView>;
+}
+
+// Rough per-person cost estimate derived from vibe + item counts.
+// Numbers are per-night hotel, per-meal, per-activity in BRL.
+function estimateCost(result: ItineraryResult): {
+  low: number; high: number; perDayLow: number; perDayHigh: number;
+} {
+  const vibe: Vibe = result.preferences?.vibe ?? "moderado";
+  const days   = Math.max(1, result.summary.totalDays);
+  const nights = Math.max(0, days - 1);
+
+  const HOTEL: Record<Vibe, [number, number]> = {
+    tranquilo: [180, 320],
+    moderado:  [400, 750],
+    intenso:   [900, 2200],
+  };
+  const MEAL: Record<Vibe, [number, number]> = {
+    tranquilo: [40, 80],
+    moderado:  [100, 180],
+    intenso:   [250, 550],
+  };
+  const ACTIVITY: Record<Vibe, [number, number]> = {
+    tranquilo: [0, 40],
+    moderado:  [30, 120],
+    intenso:   [100, 300],
+  };
+
+  let restaurants = 0;
+  let activities  = 0;
+  for (const dia of result.days) {
+    for (const periodo of dia.periodos) {
+      for (const item of periodo.items) {
+        if (item.categoria === "restaurante")       restaurants++;
+        else if (item.categoria === "oQueFazer" ||
+                 item.categoria === "lucky")         activities++;
+      }
+    }
+  }
+  const meals = Math.max(restaurants, days * 2);
+
+  const [hLo, hHi] = HOTEL[vibe];
+  const [mLo, mHi] = MEAL[vibe];
+  const [aLo, aHi] = ACTIVITY[vibe];
+
+  const low  = nights * hLo + meals * mLo + activities * aLo;
+  const high = nights * hHi + meals * mHi + activities * aHi;
+
+  return {
+    low, high,
+    perDayLow:  Math.round(low  / days),
+    perDayHigh: Math.round(high / days),
+  };
+}
+
+function formatBRL(n: number): string {
+  return n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
 }
 
 function ResultPhase({
@@ -1881,6 +2173,7 @@ function ResultPhase({
   editMode,
   onToggleEdit,
   onReplaceItem,
+  onOpenItemMenu,
   onShareResult,
   onExport,
   isExporting,
@@ -2062,10 +2355,36 @@ function ResultPhase({
           dia={dia}
           editMode={editMode}
           onReplaceItem={onReplaceItem}
+          onOpenItemMenu={onOpenItemMenu}
           onLayout={(y) => setDayOffsets((prev) => ({ ...prev, [dia.numero]: y }))}
         />
       ))}
+
+      {/* ── Custo estimado ── */}
+      <CustoFooter result={result} />
     </>
+  );
+}
+
+function CustoFooter({ result }: { result: ItineraryResult }) {
+  const est = estimateCost(result);
+  return (
+    <View style={re.custoCard}>
+      <View style={re.custoHeader}>
+        <Feather name="dollar-sign" size={13} color={GOLD} />
+        <Text style={re.custoLabel}>CUSTO ESTIMADO</Text>
+      </View>
+      <Text style={re.custoValue}>
+        ~R$ {formatBRL(est.low)}–{formatBRL(est.high)}
+      </Text>
+      <Text style={re.custoSub}>
+        por pessoa · ~R$ {formatBRL(est.perDayLow)}–{formatBRL(est.perDayHigh)}/dia
+      </Text>
+      <Text style={re.custoNote}>
+        Estimativa do estilo escolhido — hospedagem, refeições e atrações.
+        Lucky pode refinar com base no seu perfil.
+      </Text>
+    </View>
   );
 }
 
@@ -2164,12 +2483,14 @@ function ResultDayCard({
   dia,
   editMode,
   onReplaceItem,
+  onOpenItemMenu,
   onLayout,
 }: {
-  dia:           DiaRoteiro;
-  editMode:      boolean;
-  onReplaceItem: (diaNum: number, itemId: string, newItem: SavedItem) => void;
-  onLayout?:     (y: number) => void;
+  dia:            DiaRoteiro;
+  editMode:       boolean;
+  onReplaceItem:  (diaNum: number, itemId: string, newItem: SavedItem) => void;
+  onOpenItemMenu: (diaNum: number, item: SavedItem) => void;
+  onLayout?:      (y: number) => void;
 }) {
   const weather = getDayWeather(dia.numero);
   const allItems = dia.periodos.flatMap((p) => p.items);
@@ -2247,9 +2568,10 @@ function ResultDayCard({
                         if (editMode) {
                           onReplaceItem(dia.numero, item.id, item);
                         } else {
-                          navigateToItem(item);
+                          onOpenItemMenu(dia.numero, item);
                         }
                       }}
+                      onLongPress={() => navigateToItem(item)}
                     >
                       {/* Left: time */}
                       <View style={re.timeCol}>
@@ -2821,6 +3143,48 @@ const re = StyleSheet.create({
     fontSize: 12,
     color: `${GOLD}CC`,
   },
+
+  // ── Custo estimado footer ────────────────────────────────────────────────
+  custoCard: {
+    backgroundColor: GLASS_BG,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(212,175,55,0.22)",
+    padding: 18,
+    marginTop: 6,
+    marginBottom: 20,
+    gap: 4,
+  },
+  custoHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 4,
+  },
+  custoLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+    color: `${GOLD}CC`,
+    letterSpacing: 1.2,
+  },
+  custoValue: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 24,
+    color: CREAM,
+    lineHeight: 30,
+  },
+  custoSub: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: "rgba(255,255,255,0.70)",
+  },
+  custoNote: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: "rgba(255,255,255,0.40)",
+    lineHeight: 16,
+    marginTop: 8,
+  },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2843,11 +3207,38 @@ export default function RoteiroScreen() {
   const [editMode,          setEditMode]          = useState(false);
   const [isExporting,       setIsExporting]       = useState(false);
   const [replacingItem,     setReplacingItem]     = useState<{ item: SavedItem; diaNum: number } | null>(null);
+  /** Open item menu sheet — set when user taps an itinerary row outside of editMode. */
+  const [menuItem,          setMenuItem]          = useState<{ item: SavedItem; diaNum: number } | null>(null);
   /** ID of the auto-saved user_itineraries row — set after generation, used by Share/Export to update rather than re-insert. */
   const [savedItineraryId,  setSavedItineraryId]  = useState<string | null>(null);
   /** Hotel suggestion fetched from Supabase when user has no hotel in their saved list. */
   const [suggestedHotel,    setSuggestedHotel]    = useState<SavedItem | null>(null);
   const scrollRef = useRef<ScrollView>(null);
+
+  function removeItem(diaNum: number, itemId: string) {
+    setResult((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        summary: { ...prev.summary, totalItems: Math.max(0, prev.summary.totalItems - 1) },
+        days: prev.days.map((dia) => {
+          if (dia.numero !== diaNum) return dia;
+          return {
+            ...dia,
+            periodos: dia.periodos.map((periodo) => ({
+              ...periodo,
+              items: periodo.items.filter((it) => it.id !== itemId),
+            })),
+          };
+        }),
+      };
+    });
+  }
+
+  function shareSingleItem(item: SavedItem) {
+    const msg = `Olha essa dica do The Lucky Trip:\n✦ ${item.titulo}${item.localizacao ? ` — ${item.localizacao}` : ""}`;
+    Share.share({ message: msg }).catch(() => {});
+  }
 
   function replaceItem(diaNum: number, itemId: string, newItem: SavedItem) {
     setResult((prev) => {
@@ -3399,12 +3790,30 @@ export default function RoteiroScreen() {
             editMode={editMode}
             onToggleEdit={() => setEditMode((v) => !v)}
             onReplaceItem={openReplaceSheet}
+            onOpenItemMenu={(diaNum, item) => setMenuItem({ item, diaNum })}
             onShareResult={handleShare}
             onExport={handleExport}
             isExporting={isExporting}
             scrollRef={scrollRef}
           />
         </ScrollView>
+      )}
+
+      {/* ── Assistente Lucky (FAB) — only in result phase ── */}
+      {phase === "result" && !replacingItem && !menuItem && (
+        <Pressable
+          style={({ pressed }) => [
+            sc.luckyFab,
+            { bottom: bottomPad + 24 },
+            pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] },
+          ]}
+          onPress={() => {
+            router.push("/lucky");
+          }}
+        >
+          <Text style={sc.luckyFabIcon}>✦</Text>
+          <Text style={sc.luckyFabLabel}>Lucky</Text>
+        </Pressable>
       )}
 
       {/* ── Replace sheet overlay ── */}
@@ -3416,6 +3825,34 @@ export default function RoteiroScreen() {
           onReplace={(diaNum, itemId, newItem) => {
             replaceItem(diaNum, itemId, newItem);
             setReplacingItem(null);
+          }}
+        />
+      )}
+
+      {/* ── Item menu sheet ── */}
+      {menuItem && (
+        <ItemMenuSheet
+          item={menuItem.item}
+          diaNum={menuItem.diaNum}
+          onClose={() => setMenuItem(null)}
+          onSeeDetails={() => {
+            const it = menuItem.item;
+            setMenuItem(null);
+            navigateToItem(it);
+          }}
+          onShare={() => {
+            shareSingleItem(menuItem.item);
+            setMenuItem(null);
+          }}
+          onReplace={() => {
+            const { item, diaNum } = menuItem;
+            setMenuItem(null);
+            openReplaceSheet(diaNum, item.id, item);
+          }}
+          onDelete={() => {
+            const { item, diaNum } = menuItem;
+            removeItem(diaNum, item.id);
+            setMenuItem(null);
           }}
         />
       )}
@@ -3498,6 +3935,38 @@ const sc = StyleSheet.create({
     height: 7,
     borderRadius: 3.5,
     backgroundColor: GOLD,
+  },
+
+  // ── Lucky FAB (result phase) ─────────────────────────────────────────────
+  luckyFab: {
+    position: "absolute",
+    right: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: GOLD,
+    paddingVertical: 12,
+    paddingLeft: 14,
+    paddingRight: 16,
+    borderRadius: 28,
+    shadowColor: "#000",
+    shadowOpacity: 0.35,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 14,
+    elevation: 10,
+    zIndex: 80,
+  },
+  luckyFabIcon: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 18,
+    color: "#1A1109",
+    lineHeight: 20,
+  },
+  luckyFabLabel: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+    color: "#1A1109",
+    letterSpacing: 0.3,
   },
 });
 
