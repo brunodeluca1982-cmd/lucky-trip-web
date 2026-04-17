@@ -324,7 +324,10 @@ export default function HomeScreen() {
     if (!atividades.length) return [];
     const filtered = atividades.filter((a) => {
       const m = a.momento_ideal;
-      return typeof m === "string" && m.toLowerCase() === momentoTab;
+      if (!m) return false;
+      if (typeof m === "string") return m.toLowerCase() === momentoTab;
+      if (Array.isArray(m)) return (m as string[]).some((v) => v.toLowerCase() === momentoTab);
+      return false;
     });
     return filtered.length > 0 ? filtered : atividades.slice(0, 10);
   }, [atividades, momentoTab]);

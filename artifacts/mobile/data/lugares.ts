@@ -33,7 +33,7 @@ export interface LugarPlace {
   instagram_url?: string | null;
   booking_url?: string | null;
   tipo_item?: "hotel" | "restaurante" | "experiencia";
-  momento_ideal?: string | null;
+  momento_ideal?: string | string[] | null;
 }
 
 // ── Neighborhood zone table ───────────────────────────────────────────────────

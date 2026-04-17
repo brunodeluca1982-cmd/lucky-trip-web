@@ -59,7 +59,7 @@ export function useOQueFazer(): State {
           xPct:          pin.xPct,
           yPct:          pin.yPct,
           tipo_item:     "experiencia",
-          momento_ideal: (row.momento_ideal as string | null) ?? null,
+          momento_ideal: row.momento_ideal ?? null,
         };
       });
 

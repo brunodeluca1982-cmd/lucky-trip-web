@@ -44,7 +44,7 @@ export function useDestinos() {
       try {
         const { data, error: err } = await supabase
           .from("destinos")
-          .select("id, nome, pais, lancado, descricao, slug, image_url, photo_url, cover_url")
+          .select("id, nome, pais, lancado, descricao, slug, hero_image_url, mobile_hero_image_url")
           .not("slug", "is", null)
           .order("lancado", { ascending: false })
           .order("nome");
@@ -54,7 +54,7 @@ export function useDestinos() {
         const rows: Destino[] = (data ?? []).map((row) => {
           // Use the first available remote image from Supabase if present
           const remoteUrl: string | null =
-            row.image_url || row.photo_url || row.cover_url || null;
+            row.mobile_hero_image_url || row.hero_image_url || null;
 
           return {
             id:        row.slug as string,
