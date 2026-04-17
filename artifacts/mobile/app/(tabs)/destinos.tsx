@@ -1,4 +1,4 @@
-import React, { memo, useCallback } from "react";
+import React, { memo, useCallback, useState } from "react";
 import {
   Dimensions,
   Image,
@@ -55,12 +55,12 @@ const DestCard = memo(function DestCard({
     router.push({ pathname: "/cidade/[id]", params: { id } });
   }, [id]);
 
-  const imageUrl = heroImageUrl ?? null;
+  const [imageError, setImageError] = useState(false);
 
-  if (!imageUrl) {
-    console.log("❌ MISSING IMAGE:", id);
-  }
-  console.log("✅ FINAL IMAGE:", id, imageUrl);
+  const imageUri =
+    heroImageUrl?.trim() || null;
+
+  const showImage = !!imageUri && !imageError;
 
   return (
     <Pressable
@@ -72,12 +72,15 @@ const DestCard = memo(function DestCard({
         pressed && { opacity: 0.88, transform: [{ scale: 0.97 }] },
       ]}
     >
-      {imageUrl ? (
+      {showImage ? (
         <Image
-          source={{ uri: imageUrl }}
+          source={{ uri: imageUri! }}
           style={[{ width: "100%", height: "100%" }, !lancado && { opacity: 0.68 }]}
           resizeMode="cover"
-          onError={() => console.log(`[IMAGE] load error for ${id}`)}
+          onError={() => {
+            console.log(`[IMAGE] load error for ${id}`);
+            setImageError(true);
+          }}
         />
       ) : (
         <View style={{ width: "100%", height: "100%", backgroundColor: "#1c1c1e" }} />
