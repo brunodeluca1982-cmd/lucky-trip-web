@@ -49,8 +49,9 @@ import {
   type Vibe,
 } from "@/utils/buildItinerary";
 import { PERIODO_LABEL, PERIODO_ICON } from "@/utils/buildRoteiro";
-import type { DiaRoteiro } from "@/utils/buildRoteiro";
+import type { DiaRoteiro, PeriodoDia } from "@/utils/buildRoteiro";
 import { useInspirationPhotos, type InspirationPhotoMap } from "@/hooks/useInspirationPhotos";
+import { haversineKm, bairroCoord, formatTravel, walkMinutes } from "@/utils/haversine";
 
 const C          = Colors.light;
 const GOLD       = "#D4AF37";
@@ -196,7 +197,15 @@ function parseDuracao(dur: string | undefined | null): number {
 //   This gives correct sequencing for arcs like:
 //     Teatro 19:30 (anchor) → Samba 21:00 (19:30 + 90 min)
 //   instead of a collision at 19:30 for both.
-function getItemTime(periodo: string, items: SavedItem[], idx: number): string {
+function getItemTime(
+  periodo: string,
+  items: SavedItem[],
+  idx: number,
+  overrides?: Record<string, number>,
+): string {
+  const dur = (item: SavedItem) =>
+    overrides?.[item.id] ?? parseDuracao(item.duracao);
+
   let refMinutes = PERIODO_TIME[periodo] ?? 9 * 60;
   let refIdx     = -1;
 
@@ -209,12 +218,10 @@ function getItemTime(periodo: string, items: SavedItem[], idx: number): string {
     }
   }
 
-  // Elapsed = anchor item's own duration (if any) + durations of items between
-  // the anchor and the current item.
   let elapsed = 0;
-  if (refIdx >= 0) elapsed += parseDuracao(items[refIdx].duracao);
+  if (refIdx >= 0) elapsed += dur(items[refIdx]);
   for (let i = Math.max(refIdx + 1, 0); i < idx; i++) {
-    elapsed += parseDuracao(items[i].duracao);
+    elapsed += dur(items[i]);
   }
 
   return _fmt(refMinutes + elapsed);
@@ -1855,6 +1862,140 @@ function LoadingPhase() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Add-item menu — "+" button per day → 7 options sheet
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface AddItemMenuProps {
+  diaNum:        number;
+  onClose:       () => void;
+  onPickCategory:(categoria: SavedCategory) => void;
+  onTempoLivre:  () => void;
+  onVoltarHotel: () => void;
+  onSugerir:     () => void;
+  onManual:      () => void;
+}
+
+const ADD_MENU_OPTIONS: {
+  id: string;
+  label: string;
+  icon: string;
+  danger?: boolean;
+}[] = [
+  { id: "atrativo",   label: "Atrativo",              icon: "star"     },
+  { id: "gastronomia",label: "Gastronomia",            icon: "coffee"   },
+  { id: "tour",       label: "Tour com agência",       icon: "compass"  },
+  { id: "manual",     label: "Adicionar manualmente",  icon: "edit-3"   },
+  { id: "livre",      label: "Tempo livre",            icon: "sunset"   },
+  { id: "hotel",      label: "Voltar ao hotel",        icon: "home"     },
+  { id: "sugerir",    label: "Sugerir automaticamente",icon: "zap"      },
+];
+
+function AddItemMenu({
+  diaNum, onClose, onPickCategory, onTempoLivre, onVoltarHotel, onSugerir, onManual,
+}: AddItemMenuProps) {
+  function handleOption(id: string) {
+    if (id === "atrativo")    { onPickCategory("oQueFazer"); onClose(); return; }
+    if (id === "gastronomia") { onPickCategory("restaurante"); onClose(); return; }
+    if (id === "tour")        { onPickCategory("lucky"); onClose(); return; }
+    if (id === "manual")      { onManual(); onClose(); return; }
+    if (id === "livre")       { onTempoLivre(); onClose(); return; }
+    if (id === "hotel")       { onVoltarHotel(); onClose(); return; }
+    if (id === "sugerir")     { onSugerir(); onClose(); return; }
+  }
+
+  return (
+    <View style={am.overlay} pointerEvents="box-none">
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      <View style={am.sheet}>
+        <View style={am.handle} />
+        <Text style={am.title}>Adicionar ao Dia {diaNum}</Text>
+
+        {ADD_MENU_OPTIONS.map((opt) => (
+          <Pressable
+            key={opt.id}
+            style={({ pressed }) => [am.option, pressed && { opacity: 0.75 }]}
+            onPress={() => handleOption(opt.id)}
+          >
+            <View style={am.optIcon}>
+              <Feather name={opt.icon as any} size={16} color={GOLD} />
+            </View>
+            <Text style={am.optLabel}>{opt.label}</Text>
+            <Feather name="chevron-right" size={14} color={`${GOLD}50`} />
+          </Pressable>
+        ))}
+
+        <Pressable onPress={onClose} style={am.closeBtn}>
+          <Feather name="x" size={18} color="rgba(255,255,255,0.50)" />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+const am = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "flex-end",
+    zIndex: 92,
+  },
+  sheet: {
+    backgroundColor: "#15120E",
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    borderTopWidth: 1,
+    borderColor: "rgba(212,175,55,0.22)",
+    paddingTop: 10,
+    paddingHorizontal: 18,
+    paddingBottom: 32,
+    gap: 2,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.20)",
+    alignSelf: "center",
+    marginBottom: 10,
+  },
+  title: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    color: `${GOLD}B0`,
+    letterSpacing: 1.1,
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  option: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    paddingVertical: 15,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+  optIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: "rgba(212,175,55,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  optLabel: {
+    flex: 1,
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    color: "#F5EFE0",
+  },
+  closeBtn: {
+    alignItems: "center",
+    paddingVertical: 14,
+    marginTop: 4,
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Item menu sheet — tap on itinerary item → info + 4 actions
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2103,6 +2244,7 @@ interface ResultPhaseProps {
   onToggleEdit:    () => void;
   onReplaceItem:   (diaNum: number, itemId: string, newItem: SavedItem) => void;
   onOpenItemMenu:  (diaNum: number, item: SavedItem) => void;
+  onAddItem:       (diaNum: number) => void;
   onShareResult:   () => void;
   onExport:        () => void;
   isExporting:     boolean;
@@ -2174,6 +2316,7 @@ function ResultPhase({
   onToggleEdit,
   onReplaceItem,
   onOpenItemMenu,
+  onAddItem,
   onShareResult,
   onExport,
   isExporting,
@@ -2356,6 +2499,7 @@ function ResultPhase({
           editMode={editMode}
           onReplaceItem={onReplaceItem}
           onOpenItemMenu={onOpenItemMenu}
+          onAddItem={onAddItem}
           onLayout={(y) => setDayOffsets((prev) => ({ ...prev, [dia.numero]: y }))}
         />
       ))}
@@ -2484,14 +2628,26 @@ function ResultDayCard({
   editMode,
   onReplaceItem,
   onOpenItemMenu,
+  onAddItem,
   onLayout,
 }: {
   dia:            DiaRoteiro;
   editMode:       boolean;
   onReplaceItem:  (diaNum: number, itemId: string, newItem: SavedItem) => void;
   onOpenItemMenu: (diaNum: number, item: SavedItem) => void;
+  onAddItem:      (diaNum: number) => void;
   onLayout?:      (y: number) => void;
 }) {
+  // per-item duration overrides (minutes) — keys are item.id
+  const [durationOverrides, setDurationOverrides] = React.useState<Record<string, number>>({});
+
+  function adjustDuration(itemId: string, baseDur: string | undefined, delta: number) {
+    setDurationOverrides((prev) => {
+      const current = prev[itemId] ?? parseDuracao(baseDur);
+      const next = Math.max(15, current + delta);
+      return { ...prev, [itemId]: next };
+    });
+  }
   const weather = getDayWeather(dia.numero);
   const allItems = dia.periodos.flatMap((p) => p.items);
   const travelMinTotal = allItems.reduce((sum, it) => sum + parseDuracao(it.duracao), 0) || 90;
@@ -2556,9 +2712,21 @@ function ResultDayCard({
 
               {/* Items */}
               {periodo.items.map((item, idx) => {
-                const timeStr = getItemTime(periodo.periodo, periodo.items, idx);
-                const travelMin = 10 + ((dia.numero * 7 + idx * 5) % 22);
-                const travelKm  = (1.8 + (dia.numero + idx) * 1.3).toFixed(1);
+                const timeStr   = getItemTime(periodo.periodo, periodo.items, idx, durationOverrides);
+                const curDurMin = durationOverrides[item.id] ?? parseDuracao(item.duracao);
+                const nextItem  = periodo.items[idx + 1];
+                let travelLabel = "";
+                if (nextItem) {
+                  const aCoord = item.lat && item.lng
+                    ? { lat: item.lat, lng: item.lng }
+                    : bairroCoord(item.localizacao ?? dia.bairro);
+                  const bCoord = nextItem.lat && nextItem.lng
+                    ? { lat: nextItem.lat, lng: nextItem.lng }
+                    : bairroCoord(nextItem.localizacao ?? dia.bairro);
+                  const km  = haversineKm(aCoord, bCoord);
+                  const min = walkMinutes(km);
+                  travelLabel = formatTravel(km, min);
+                }
 
                 return (
                   <React.Fragment key={item.id}>
@@ -2612,26 +2780,66 @@ function ResultDayCard({
                         </View>
                       ) : (
                         <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.22)" />
-                    )}
-                  </Pressable>
+                      )}
+                    </Pressable>
 
-                  {/* Travel connector between items */}
-                  {idx < periodo.items.length - 1 && (
-                    <View style={re.travelConnector}>
-                      <View style={re.timeColSpacer} />
-                      <View style={re.connectorPill}>
-                        <Feather name="truck" size={9} color="rgba(255,255,255,0.40)" />
-                        <Text style={re.connectorText}>
-                          Carro · {travelMin} min · {travelKm} km
-                        </Text>
+                    {/* Duration controls */}
+                    {!editMode && (
+                      <View style={re.durationRow}>
+                        <View style={re.timeColSpacer} />
+                        <View style={re.durationPill}>
+                          <Pressable
+                            style={re.durBtn}
+                            onPress={() => adjustDuration(item.id, item.duracao, -15)}
+                            hitSlop={6}
+                          >
+                            <Text style={re.durBtnText}>−</Text>
+                          </Pressable>
+                          <Feather name="clock" size={9} color="rgba(255,255,255,0.45)" />
+                          <Text style={re.durLabel}>
+                            {curDurMin >= 60
+                              ? `${Math.floor(curDurMin / 60)}h${curDurMin % 60 > 0 ? String(curDurMin % 60).padStart(2, "0") : ""}`
+                              : `${curDurMin}min`}
+                          </Text>
+                          <Pressable
+                            style={re.durBtn}
+                            onPress={() => adjustDuration(item.id, item.duracao, +15)}
+                            hitSlop={6}
+                          >
+                            <Text style={re.durBtnText}>+</Text>
+                          </Pressable>
+                        </View>
                       </View>
-                    </View>
-                  )}
-                </React.Fragment>
-              );
-            })}
+                    )}
+
+                    {/* Travel connector between items */}
+                    {idx < periodo.items.length - 1 && (
+                      <View style={re.travelConnector}>
+                        <View style={re.timeColSpacer} />
+                        <View style={re.connectorPill}>
+                          <Feather name="navigation" size={9} color="rgba(255,255,255,0.40)" />
+                          <Text style={re.connectorText}>
+                            Deslocamento · {travelLabel}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+                  </React.Fragment>
+                );
+              })}
           </View>
         ))}
+
+        {/* ── Add item button ── */}
+        <Pressable
+          style={({ pressed }) => [re.addItemBtn, pressed && { opacity: 0.75 }]}
+          onPress={() => onAddItem(dia.numero)}
+        >
+          <View style={re.addItemBtnIcon}>
+            <Feather name="plus" size={14} color={GOLD} />
+          </View>
+          <Text style={re.addItemBtnText}>Adicionar ao Dia {dia.numero}</Text>
+        </Pressable>
 
         {/* ── Per-day map button ── */}
         <Pressable
@@ -3144,6 +3352,75 @@ const re = StyleSheet.create({
     color: `${GOLD}CC`,
   },
 
+  // ── Duration controls ────────────────────────────────────────────────────
+  durationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 2,
+  },
+  durationPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    backgroundColor: "rgba(212,175,55,0.08)",
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: "rgba(212,175,55,0.14)",
+  },
+  durBtn: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(212,175,55,0.14)",
+  },
+  durBtnText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+    color: GOLD,
+    lineHeight: 18,
+  },
+  durLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    color: "rgba(255,255,255,0.65)",
+    minWidth: 38,
+    textAlign: "center",
+  },
+
+  // ── Add item button (per day) ────────────────────────────────────────────
+  addItemBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 4,
+    marginBottom: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: "rgba(212,175,55,0.30)",
+    backgroundColor: "rgba(212,175,55,0.04)",
+  },
+  addItemBtnIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(212,175,55,0.14)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addItemBtnText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: `${GOLD}CC`,
+    flex: 1,
+  },
+
   // ── Custo estimado footer ────────────────────────────────────────────────
   custoCard: {
     backgroundColor: GLASS_BG,
@@ -3209,6 +3486,8 @@ export default function RoteiroScreen() {
   const [replacingItem,     setReplacingItem]     = useState<{ item: SavedItem; diaNum: number } | null>(null);
   /** Open item menu sheet — set when user taps an itinerary row outside of editMode. */
   const [menuItem,          setMenuItem]          = useState<{ item: SavedItem; diaNum: number } | null>(null);
+  /** Day number for the "+" add-item menu — null when closed. */
+  const [addMenuDay,        setAddMenuDay]        = useState<number | null>(null);
   /** ID of the auto-saved user_itineraries row — set after generation, used by Share/Export to update rather than re-insert. */
   const [savedItineraryId,  setSavedItineraryId]  = useState<string | null>(null);
   /** Hotel suggestion fetched from Supabase when user has no hotel in their saved list. */
@@ -3238,6 +3517,54 @@ export default function RoteiroScreen() {
   function shareSingleItem(item: SavedItem) {
     const msg = `Olha essa dica do The Lucky Trip:\n✦ ${item.titulo}${item.localizacao ? ` — ${item.localizacao}` : ""}`;
     Share.share({ message: msg }).catch(() => {});
+  }
+
+  function addItemToDay(diaNum: number, item: SavedItem, periodo: PeriodoDia = "tarde") {
+    setResult((prev): ItineraryResult | null => {
+      if (!prev) return prev;
+      const updatedDays = prev.days.map((dia) => {
+        if (dia.numero !== diaNum) return dia;
+        const existsPeriodo = dia.periodos.find((p) => p.periodo === periodo);
+        return {
+          ...dia,
+          periodos: existsPeriodo
+            ? dia.periodos.map((p) =>
+                p.periodo === periodo ? { ...p, items: [...p.items, item] } : p
+              )
+            : [...dia.periodos, { periodo, items: [item] }],
+        };
+      });
+      return {
+        ...prev,
+        summary: { ...prev.summary, totalItems: prev.summary.totalItems + 1 },
+        days: updatedDays,
+      };
+    });
+  }
+
+  function handleTempoLivre(diaNum: number) {
+    const item: SavedItem = {
+      id:          `livre-${diaNum}-${Date.now()}`,
+      categoria:   "oQueFazer",
+      titulo:      "Tempo livre",
+      localizacao: "Rio de Janeiro",
+      image:       require("@/assets/images/hero-rio.png"),
+      duracao:     "60min",
+    };
+    addItemToDay(diaNum, item);
+  }
+
+  function handleVoltarHotel(diaNum: number) {
+    const hotel = hotelItem ?? suggestedHotel;
+    const item: SavedItem = {
+      id:          `hotel-${diaNum}-${Date.now()}`,
+      categoria:   "hotel",
+      titulo:      hotel ? `Voltar — ${hotel.titulo}` : "Voltar ao hotel",
+      localizacao: hotel?.localizacao ?? "Rio de Janeiro",
+      image:       hotel?.image ?? require("@/assets/images/hotel1.png"),
+      duracao:     "30min",
+    };
+    addItemToDay(diaNum, item, "noite" as PeriodoDia);
   }
 
   function replaceItem(diaNum: number, itemId: string, newItem: SavedItem) {
@@ -3791,6 +4118,7 @@ export default function RoteiroScreen() {
             onToggleEdit={() => setEditMode((v) => !v)}
             onReplaceItem={openReplaceSheet}
             onOpenItemMenu={(diaNum, item) => setMenuItem({ item, diaNum })}
+            onAddItem={(diaNum) => setAddMenuDay(diaNum)}
             onShareResult={handleShare}
             onExport={handleExport}
             isExporting={isExporting}
@@ -3800,7 +4128,7 @@ export default function RoteiroScreen() {
       )}
 
       {/* ── Assistente Lucky (FAB) — only in result phase ── */}
-      {phase === "result" && !replacingItem && !menuItem && (
+      {phase === "result" && !replacingItem && !menuItem && !addMenuDay && (
         <Pressable
           style={({ pressed }) => [
             sc.luckyFab,
@@ -3853,6 +4181,38 @@ export default function RoteiroScreen() {
             const { item, diaNum } = menuItem;
             removeItem(diaNum, item.id);
             setMenuItem(null);
+          }}
+        />
+      )}
+
+      {/* ── Add item menu ── */}
+      {addMenuDay !== null && (
+        <AddItemMenu
+          diaNum={addMenuDay}
+          onClose={() => setAddMenuDay(null)}
+          onPickCategory={(categoria) => {
+            const diaNum = addMenuDay;
+            setAddMenuDay(null);
+            setReplacingItem({ item: {
+              id: `new-${diaNum}-${Date.now()}`,
+              categoria,
+              titulo: "",
+              localizacao: "",
+              image: require("@/assets/images/hero-rio.png"),
+            }, diaNum });
+          }}
+          onTempoLivre={() => handleTempoLivre(addMenuDay)}
+          onVoltarHotel={() => handleVoltarHotel(addMenuDay)}
+          onSugerir={() => {
+            setAddMenuDay(null);
+            router.push("/lucky");
+          }}
+          onManual={() => {
+            setAddMenuDay(null);
+            Alert.alert(
+              "Em breve",
+              "Busca manual com Google Maps estará disponível em breve.",
+            );
           }}
         />
       )}
