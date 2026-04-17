@@ -44,6 +44,14 @@ import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import type { ItineraryResult } from "@/utils/buildItinerary";
 
+// ── Date helpers ───────────────────────────────────────────────────────────────
+
+function safeDate(value: unknown): Date | null {
+  if (!value) return null;
+  const date = new Date(value as any);
+  return isNaN(date.getTime()) ? null : date;
+}
+
 // ── Storage keys ───────────────────────────────────────────────────────────────
 
 const STORAGE_KEY  = "@luckytrip/saved_v1";
@@ -332,8 +340,8 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
       const metadata  = freshUser?.app_metadata as Record<string, any> | undefined;
       const validPlan = metadata?.plan_type === "premium" || metadata?.plan_type === "vip";
       // null access_until = lifetime / no expiry — treat as valid; only deny when explicitly expired
-      const notExpired = !metadata?.access_until
-        || new Date(metadata.access_until) > new Date();
+      const _until = safeDate(metadata?.access_until);
+      const notExpired = !metadata?.access_until || (_until !== null && _until > new Date());
 
       if (validPlan && notExpired) {
         setIsPremium(true);

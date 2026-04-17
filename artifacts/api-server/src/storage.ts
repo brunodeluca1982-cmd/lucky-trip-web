@@ -323,7 +323,8 @@ export class Storage {
     }
   ): Promise<void> {
     // null or 0 → lifetime access (e.g. 100% coupon with no_payment_required)
-    const accessUntil = (accessUntilMs && accessUntilMs > 0) ? new Date(accessUntilMs) : null;
+    const _accessUntilDate = (accessUntilMs && accessUntilMs > 0) ? new Date(accessUntilMs) : null;
+    const accessUntil = (_accessUntilDate && !isNaN(_accessUntilDate.getTime())) ? _accessUntilDate : null;
     const planType = interval === "year" ? "annual" : interval === "month" ? "monthly" : (interval ?? "premium");
 
     // 1. Update auth app_metadata

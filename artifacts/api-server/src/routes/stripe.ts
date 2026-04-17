@@ -376,7 +376,8 @@ router.get(
           return res.json({ synced: false, reason: "no_active_subscription" }) as any;
         }
         // Provision from trialing subscription
-        const periodEndMs = trialSub.current_period_end * 1000;
+        const _trialEnd   = trialSub.current_period_end;
+        const periodEndMs = (_trialEnd && _trialEnd > 0) ? _trialEnd * 1000 : null;
         const interval    = trialSub.items.data[0]?.price?.recurring?.interval;
         await storage.upsertUserSubscription(req.user.id, {
           stripe_customer_id:     sub.stripe_customer_id,
@@ -394,7 +395,8 @@ router.get(
       }
 
       // Provision from active subscription
-      const periodEndMs = activeSub.current_period_end * 1000;
+      const _activeEnd  = activeSub.current_period_end;
+      const periodEndMs = (_activeEnd && _activeEnd > 0) ? _activeEnd * 1000 : null;
       const interval    = activeSub.items.data[0]?.price?.recurring?.interval;
 
       await storage.upsertUserSubscription(req.user.id, {

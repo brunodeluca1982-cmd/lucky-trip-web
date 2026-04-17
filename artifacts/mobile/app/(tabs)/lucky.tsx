@@ -117,7 +117,8 @@ export default function LuckyScreen() {
         const validPlan  = meta?.plan_type === "premium" || meta?.plan_type === "vip";
         // null access_until = lifetime / no expiry — treat as valid; deny only when explicitly expired.
         // BUG-FIX: previously `meta?.access_until ? ... : false` treated null as expired (wrong).
-        const notExpired = !meta?.access_until || new Date(meta.access_until) > new Date();
+        const _until     = (() => { if (!meta?.access_until) return null; const d = new Date(meta.access_until); return isNaN(d.getTime()) ? null : d; })();
+        const notExpired = !meta?.access_until || (_until !== null && _until > new Date());
         if (validPlan && notExpired) {
           setIsPremium(true);
           await AsyncStorage.setItem(IS_PREMIUM_KEY, "true");
