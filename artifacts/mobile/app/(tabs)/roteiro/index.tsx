@@ -52,6 +52,7 @@ import { PERIODO_LABEL, PERIODO_ICON } from "@/utils/buildRoteiro";
 import type { DiaRoteiro, PeriodoDia } from "@/utils/buildRoteiro";
 import { useInspirationPhotos, type InspirationPhotoMap } from "@/hooks/useInspirationPhotos";
 import { haversineKm, bairroCoord, formatTravel, walkMinutes } from "@/utils/haversine";
+import { PlaceSearchModal, type SelectedPlace } from "@/components/PlaceSearchModal";
 
 const C          = Colors.light;
 const GOLD       = "#D4AF37";
@@ -3488,6 +3489,10 @@ export default function RoteiroScreen() {
   const [menuItem,          setMenuItem]          = useState<{ item: SavedItem; diaNum: number } | null>(null);
   /** Day number for the "+" add-item menu — null when closed. */
   const [addMenuDay,        setAddMenuDay]        = useState<number | null>(null);
+  /** Google Places search modal — open via "Busca manual" in AddItemMenu. */
+  const [placeSearchVisible, setPlaceSearchVisible] = useState(false);
+  /** Day number targeted by the place search modal. */
+  const [placeSearchDay,     setPlaceSearchDay]     = useState<number | null>(null);
   /** ID of the auto-saved user_itineraries row — set after generation, used by Share/Export to update rather than re-insert. */
   const [savedItineraryId,  setSavedItineraryId]  = useState<string | null>(null);
   /** Hotel suggestion fetched from Supabase when user has no hotel in their saved list. */
@@ -4208,14 +4213,41 @@ export default function RoteiroScreen() {
             router.push("/lucky");
           }}
           onManual={() => {
+            const day = addMenuDay;
             setAddMenuDay(null);
-            Alert.alert(
-              "Em breve",
-              "Busca manual com Google Maps estará disponível em breve.",
-            );
+            setPlaceSearchDay(day);
+            setPlaceSearchVisible(true);
           }}
         />
       )}
+
+      {/* ── Google Places search modal ("Busca manual") ── */}
+      <PlaceSearchModal
+        visible={placeSearchVisible}
+        onClose={() => {
+          setPlaceSearchVisible(false);
+          setPlaceSearchDay(null);
+        }}
+        onSelectPlace={(place: SelectedPlace) => {
+          setPlaceSearchVisible(false);
+          if (!placeSearchDay || !result) return;
+          const newItem: SavedItem = {
+            id:          place.place_id,
+            titulo:      place.titulo,
+            localizacao: place.localizacao,
+            categoria:   "oQueFazer",
+            source_table:"o_que_fazer_rio",
+            image:       getItemFallbackImage("oQueFazer"),
+            isExternal:  true,
+            placeId:     place.place_id,
+            address:     place.localizacao,
+            lat:         place.lat,
+            lng:         place.lng,
+          };
+          addItemToDay(newItem, placeSearchDay);
+          setPlaceSearchDay(null);
+        }}
+      />
     </View>
   );
 }
