@@ -89,6 +89,7 @@ interface ItineraryPlace {
   nome: string;
   bairro: string | null;
   categoria: string | null;
+  photo_url: string | null;
   meu_olhar: string | null;
   source_table: string | null;
   source_id: string | null;
@@ -183,7 +184,7 @@ export default function FriendGuideScreen() {
 
           supabase
             .from("friend_guide_places")
-            .select("id, nome, bairro, categoria, meu_olhar, source_table, source_id, place_canonical_id")
+            .select("id, nome, bairro, categoria, photo_url, meu_olhar, source_table, source_id, place_canonical_id")
             .eq("guide_id", guideId),
         ]);
 
@@ -481,6 +482,8 @@ function ItemRow({ item, isLast, guideCtx }: { item: ItineraryItem; isLast: bool
     );
   }
 
+  const thumbSrc = item.place.photo_url ? { uri: item.place.photo_url } : null;
+
   return (
     <Pressable
       onPress={handlePress}
@@ -510,8 +513,16 @@ function ItemRow({ item, isLast, guideCtx }: { item: ItineraryItem; isLast: bool
         {item.is_optional ? <Text style={ir.optional}>opcional</Text> : null}
       </View>
 
-      {/* Chevron */}
-      <Feather name="chevron-right" size={13} color="rgba(255,255,255,0.25)" />
+      {/* Thumbnail */}
+      {thumbSrc ? (
+        <ExpoImage
+          source={thumbSrc}
+          style={ir.thumb}
+          contentFit="cover"
+        />
+      ) : (
+        <Feather name="chevron-right" size={13} color="rgba(255,255,255,0.25)" />
+      )}
     </Pressable>
   );
 }
@@ -803,6 +814,14 @@ const ir = StyleSheet.create({
     fontStyle: "italic",
     marginTop: 3,
     letterSpacing: 0.3,
+  },
+
+  thumb: {
+    width: 60,
+    height: 60,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    flexShrink: 0,
   },
 
   // Locked item styles
