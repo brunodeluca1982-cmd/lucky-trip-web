@@ -181,6 +181,52 @@ type EventoAtivo = {
   icone: string | null;
 };
 
+type EventoItem = {
+  id: string;
+  titulo: string;
+  subtitulo: string | null;
+  categoria: string | null;
+  icone: string | null;
+  link_externo: string | null;
+  ordem: number;
+};
+
+// ── Evento items horizontal card ──────────────────────────────────────────────
+
+function EventoItemCard({
+  item,
+  color,
+}: {
+  item: EventoItem;
+  color: string;
+}) {
+  return (
+    <Pressable
+      style={({ pressed }) => [evs.card, pressed && { opacity: 0.80 }]}
+      onPress={() => {
+        if (item.link_externo) Linking.openURL(item.link_externo);
+      }}
+    >
+      <View style={[evs.iconCircle, { backgroundColor: color + "22", borderColor: color + "44" }]}>
+        <Feather name={(item.icone as any) ?? "star"} size={15} color={color} />
+      </View>
+      <Text style={[evs.categoria, { color: color + "CC" }]}>
+        {item.categoria?.toUpperCase() ?? "DICA"}
+      </Text>
+      <Text style={evs.titulo} numberOfLines={2}>{item.titulo}</Text>
+      {item.subtitulo ? (
+        <Text style={evs.subtitulo} numberOfLines={2}>{item.subtitulo}</Text>
+      ) : null}
+      {item.link_externo ? (
+        <View style={[evs.linkChip, { borderColor: color + "55" }]}>
+          <Feather name="external-link" size={10} color={color} />
+          <Text style={[evs.linkText, { color }]}>Ver</Text>
+        </View>
+      ) : null}
+    </Pressable>
+  );
+}
+
 export default function CidadeScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
@@ -193,8 +239,9 @@ export default function CidadeScreen() {
   const periodo = detectPeriodo();
 
   // Modo Evento — destination-specific, activated via Supabase `eventos` table
-  const [evento,     setEvento]     = React.useState<EventoAtivo | null>(null);
-  const [eventoOn,   setEventoOn]   = React.useState(false);
+  const [evento,      setEvento]      = React.useState<EventoAtivo | null>(null);
+  const [eventoOn,    setEventoOn]    = React.useState(false);
+  const [eventoItens, setEventoItens] = React.useState<EventoItem[]>([]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -206,6 +253,16 @@ export default function CidadeScreen() {
         .eq("is_active", true)
         .maybeSingle();
       if (!cancelled) setEvento(data ?? null);
+
+      // Eagerly load items so they appear instantly when toggle is flipped
+      if (data?.id && !cancelled) {
+        const { data: itens } = await supabase
+          .from("eventos_itens")
+          .select("id, titulo, subtitulo, categoria, icone, link_externo, ordem")
+          .eq("evento_id", data.id)
+          .order("ordem");
+        if (!cancelled) setEventoItens(itens ?? []);
+      }
     }
     fetchEvento();
     return () => { cancelled = true; };
@@ -441,6 +498,31 @@ export default function CidadeScreen() {
             </View>
           </GlassButton>
         </View>
+
+        {/* ── Evento section — appears when toggle is ON and items exist ── */}
+        {eventoOn && evento && eventoItens.length > 0 && (
+          <View style={evs.section}>
+            <View style={evs.header}>
+              {evento.icone ? (
+                <Feather name={evento.icone as any} size={13} color={eventoColor} />
+              ) : (
+                <Text style={[evs.headerStar, { color: eventoColor }]}>✦</Text>
+              )}
+              <Text style={[evs.headerTitle, { color: eventoColor }]}>
+                {evento.nome} · O que não perder
+              </Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={evs.scrollContent}
+            >
+              {eventoItens.map((item) => (
+                <EventoItemCard key={item.id} item={item} color={eventoColor} />
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         {/* ── Editorial content — cream section, scrolls naturally below ── */}
         <View style={s.editorial}>
@@ -879,5 +961,86 @@ const s = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 14,
     letterSpacing: 0.2,
+  },
+});
+
+// ── Evento items section styles ───────────────────────────────────────────────
+
+const evs = StyleSheet.create({
+  section: {
+    marginTop: 16,
+    marginBottom: 4,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  headerStar: {
+    fontSize: 13,
+    lineHeight: 15,
+  },
+  headerTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    letterSpacing: 1.4,
+    textTransform: "uppercase",
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    gap: 10,
+  },
+  card: {
+    width: 150,
+    backgroundColor: "rgba(0,0,0,0.38)",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.13)",
+    padding: 14,
+    gap: 6,
+  },
+  iconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  categoria: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 9,
+    letterSpacing: 1.6,
+  },
+  titulo: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.92)",
+    lineHeight: 18,
+  },
+  subtitulo: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: "rgba(255,255,255,0.52)",
+    lineHeight: 16,
+  },
+  linkChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 4,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    alignSelf: "flex-start",
+  },
+  linkText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 10,
+    letterSpacing: 0.3,
   },
 });
