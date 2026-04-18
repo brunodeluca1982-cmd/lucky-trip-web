@@ -3,15 +3,32 @@
 -- =============================================================================
 -- Cole no SQL Editor do Supabase e execute.
 -- Script idempotente — usa INSERT ... ON CONFLICT (slug) DO UPDATE.
--- Ajuste as bios e URLs de foto antes de rodar.
 -- =============================================================================
 -- Amigos confirmados:
---   Isabeli Fontana · Ana Clara Lima · Celina Loks
+--   Carolina Dieckmann · Isabeli Fontana · Ana Clara Lima · Celina Loks
 --   Di Ferrero · Ronald Domingues · Bruno De Luca
+-- =============================================================================
+-- ATENÇÃO: substitua SEU_PROJETO_URL pela URL base do seu Supabase:
+--   Supabase → Settings → API → Project URL
+--   Ex: https://abcdefghijkl.supabase.co
+--
+-- E substitua NOME_DO_BUCKET pelo nome do bucket onde estão as fotos.
+--   Ex: lucky-trip  ou  media  ou  public
+-- =============================================================================
 -- =============================================================================
 
 INSERT INTO friends (slug, display_name, full_name, bio, profile_photo_url, cover_photo_url)
 VALUES
+
+  -- ── Carolina Dieckmann ──────────────────────────────────────────────────
+  (
+    'carolina-dieckmann',
+    'Carol',
+    'Carolina Dieckmann',
+    'O Rio é a minha cidade — conheço cada cantinho, cada restaurante escondido, cada praia que só quem é daqui sabe. Aqui estão os lugares que eu amo de verdade, os que eu levo meus amigos quando visitam, os que eu nunca enjoo. Rio com o meu olhar.',
+    'https://SEU_PROJETO_URL.supabase.co/storage/v1/object/public/NOME_DO_BUCKET/CAROLINA/carolina2.jpg',
+    'https://SEU_PROJETO_URL.supabase.co/storage/v1/object/public/NOME_DO_BUCKET/CAROLINA/carolina2.jpg'
+  ),
 
   -- ── Isabeli Fontana ─────────────────────────────────────────────────────
   (
