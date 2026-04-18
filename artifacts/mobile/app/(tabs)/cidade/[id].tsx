@@ -184,12 +184,33 @@ type EventoAtivo = {
 type EventoItem = {
   id: string;
   titulo: string;
-  subtitulo: string | null;
-  categoria: string | null;
-  icone: string | null;
-  link_externo: string | null;
+  tipo: string;
+  descricao: string | null;
+  local_nome: string | null;
+  bairro: string | null;
+  google_maps_url: string | null;
+  instagram: string | null;
   ordem: number;
 };
+
+// Map evento tipo → Feather icon
+function tipoIcon(tipo: string): keyof typeof Feather.glyphMap {
+  const map: Record<string, keyof typeof Feather.glyphMap> = {
+    show:        "music",
+    ingresso:    "tag",
+    hospedagem:  "home",
+    hotel:       "home",
+    restaurante: "coffee",
+    gastronomia: "coffee",
+    transporte:  "navigation",
+    dica:        "star",
+    copa:        "award",
+    esporte:     "award",
+    festival:    "headphones",
+    compra:      "shopping-bag",
+  };
+  return map[tipo.toLowerCase()] ?? "star";
+}
 
 // ── Evento items horizontal card ──────────────────────────────────────────────
 
@@ -200,27 +221,38 @@ function EventoItemCard({
   item: EventoItem;
   color: string;
 }) {
+  const primaryLink = item.google_maps_url ?? item.instagram ?? null;
+  const linkIcon: keyof typeof Feather.glyphMap =
+    item.google_maps_url ? "map-pin" : "instagram";
+
   return (
     <Pressable
       style={({ pressed }) => [evs.card, pressed && { opacity: 0.80 }]}
       onPress={() => {
-        if (item.link_externo) Linking.openURL(item.link_externo);
+        if (primaryLink) Linking.openURL(primaryLink);
       }}
     >
       <View style={[evs.iconCircle, { backgroundColor: color + "22", borderColor: color + "44" }]}>
-        <Feather name={(item.icone as any) ?? "star"} size={15} color={color} />
+        <Feather name={tipoIcon(item.tipo)} size={15} color={color} />
       </View>
       <Text style={[evs.categoria, { color: color + "CC" }]}>
-        {item.categoria?.toUpperCase() ?? "DICA"}
+        {item.tipo.toUpperCase()}
       </Text>
       <Text style={evs.titulo} numberOfLines={2}>{item.titulo}</Text>
-      {item.subtitulo ? (
-        <Text style={evs.subtitulo} numberOfLines={2}>{item.subtitulo}</Text>
+      {item.local_nome ? (
+        <Text style={evs.subtitulo} numberOfLines={1}>{item.local_nome}</Text>
+      ) : item.descricao ? (
+        <Text style={evs.subtitulo} numberOfLines={2}>{item.descricao}</Text>
       ) : null}
-      {item.link_externo ? (
+      {item.bairro ? (
+        <Text style={[evs.bairro, { color: color + "88" }]}>{item.bairro}</Text>
+      ) : null}
+      {primaryLink ? (
         <View style={[evs.linkChip, { borderColor: color + "55" }]}>
-          <Feather name="external-link" size={10} color={color} />
-          <Text style={[evs.linkText, { color }]}>Ver</Text>
+          <Feather name={linkIcon} size={10} color={color} />
+          <Text style={[evs.linkText, { color }]}>
+            {item.google_maps_url ? "Ver no mapa" : "Instagram"}
+          </Text>
         </View>
       ) : null}
     </Pressable>
@@ -257,9 +289,10 @@ export default function CidadeScreen() {
       // Eagerly load items so they appear instantly when toggle is flipped
       if (data?.id && !cancelled) {
         const { data: itens } = await supabase
-          .from("eventos_itens")
-          .select("id, titulo, subtitulo, categoria, icone, link_externo, ordem")
+          .from("evento_itens")
+          .select("id, titulo, tipo, descricao, local_nome, bairro, google_maps_url, instagram, ordem")
           .eq("evento_id", data.id)
+          .eq("ativo", true)
           .order("ordem");
         if (!cancelled) setEventoItens(itens ?? []);
       }
@@ -1026,6 +1059,12 @@ const evs = StyleSheet.create({
     fontSize: 11,
     color: "rgba(255,255,255,0.52)",
     lineHeight: 16,
+  },
+  bairro: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 9,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
   },
   linkChip: {
     flexDirection: "row",

@@ -1,198 +1,110 @@
 -- =============================================================================
--- SEED: eventos + eventos_itens
+-- SEED: eventos + evento_itens
+-- Schema real da tabela evento_itens (confirmado pelo Bruno):
+--   id, evento_id, slug, titulo, tipo, descricao, local_nome, bairro,
+--   google_maps_url, instagram, data_inicio, data_fim, ordem, ativo, tags
 -- =============================================================================
--- Cole este arquivo no SQL Editor do Supabase e execute.
--- As tabelas já existem — este script só insere dados.
+-- Cole no SQL Editor do Supabase e execute.
 -- Todos os eventos começam com is_active = false.
 -- Para ativar: UPDATE eventos SET is_active = true WHERE nome = 'Modo Shakira';
+-- Script idempotente — pode rodar várias vezes sem duplicar dados.
 -- =============================================================================
 
--- Helper para manter o script idempotente: remove eventos existentes com
--- os mesmos nomes antes de recriar, assim você pode rodar quantas vezes quiser.
-DELETE FROM eventos_itens
+DELETE FROM evento_itens
 WHERE evento_id IN (
   SELECT id FROM eventos
-  WHERE nome IN (
-    'Modo Shakira',
-    'Modo Copa do Mundo',
-    'Modo Feriadão',
-    'Modo Rock in Rio'
-  )
+  WHERE nome IN ('Modo Shakira','Modo Copa do Mundo','Modo Feriadão','Modo Rock in Rio')
 );
 DELETE FROM eventos
-WHERE nome IN (
-  'Modo Shakira',
-  'Modo Copa do Mundo',
-  'Modo Feriadão',
-  'Modo Rock in Rio'
-);
+WHERE nome IN ('Modo Shakira','Modo Copa do Mundo','Modo Feriadão','Modo Rock in Rio');
 
 -- =============================================================================
--- 1. MODO SHAKIRA — Rio de Janeiro
--- Maracanã, shows previstos para novembro 2026
+-- 1. MODO SHAKIRA — Rio de Janeiro (Maracanã, Nov 2026)
 -- =============================================================================
 WITH ev AS (
   INSERT INTO eventos (cidade_id, nome, tipo, cor_destaque, icone, is_active, data_inicio, data_fim)
-  VALUES (
-    'rio',
-    'Modo Shakira',
-    'show',
-    '#9B59B6',   -- roxo Shakira
-    'music',
-    false,
-    '2026-11-14 00:00:00+00',
-    '2026-11-16 23:59:59+00'
-  )
+  VALUES ('rio','Modo Shakira','show','#9B59B6','music',false,
+          '2026-11-14 00:00:00+00','2026-11-16 23:59:59+00')
   RETURNING id
 )
-INSERT INTO eventos_itens (evento_id, titulo, subtitulo, categoria, icone, link_externo, ordem)
-SELECT
-  ev.id,
-  titulo, subtitulo, categoria, icone, link_externo, ordem
-FROM ev,
-(VALUES
-  ('Ingresso Shakira',        'Comprar ingresso oficial antes que esgote', 'ingresso',    'ticket',       'https://www.ticketmaster.com.br', 1),
-  ('Hotéis perto do Maracanã','Ficar a pé do show sem stress de transporte','hospedagem',  'home',         null,                             2),
-  ('Jantar antes do show',    'Restaurantes no Maracanã/Tijuca que não lotam','restaurante','coffee',       null,                             3),
-  ('Como chegar ao Maracanã', 'Metrô linha 2 — estação Maracanã (mais fácil)','transporte','navigation',   null,                             4),
-  ('Fan zone Flamengo',       'Concentração de fãs antes do show, beers e música','dica', 'star',          null,                             5),
-  ('Evite Uber pós-show',     'Saída: use metrô — Uber triplica de preço','dica',         'alert-triangle',null,                             6)
-) AS t(titulo, subtitulo, categoria, icone, link_externo, ordem);
+INSERT INTO evento_itens (evento_id, slug, titulo, tipo, descricao, local_nome, bairro, google_maps_url, instagram, ordem, ativo, tags)
+SELECT ev.id, slug, titulo, tipo, descricao, local_nome, bairro, google_maps_url, instagram, ordem, true, tags
+FROM ev, (VALUES
+  ('shakira-ingresso',  'Ingressos Shakira',          'ingresso',   'Compre no site oficial antes que esgotem',   null,                   null,     'https://www.ticketmaster.com.br', null,              1, ARRAY['show','ingresso']),
+  ('shakira-hotel',     'Hotéis perto do Maracanã',   'hospedagem', 'Fique a pé do show, sem stress de transfer', 'Tijuca / Maracanã',    'Tijuca', null,                             null,              2, ARRAY['hospedagem']),
+  ('shakira-jantar',    'Onde jantar antes do show',  'restaurante','Restaurantes no Maracanã que não lotam',     null,                   'Tijuca', null,                             null,              3, ARRAY['gastronomia']),
+  ('shakira-metro',     'Como chegar ao Maracanã',    'transporte', 'Metrô Linha 2 — estação Maracanã (mais fácil)',null,                  null,     'https://maps.app.goo.gl/maraca', null,              4, ARRAY['transporte']),
+  ('shakira-fan-zone',  'Fan Zone pré-show',          'dica',       'Concentração de fãs antes do show com música e drinks',null,          'Maracanã',null,                           null,              5, ARRAY['dica','show']),
+  ('shakira-pos-show',  'Após o show — evite Uber',   'dica',       'Pós-show: use o metrô. Uber triplica de preço na saída',null,         null,     null,                             null,              6, ARRAY['dica','transporte'])
+) AS t(slug, titulo, tipo, descricao, local_nome, bairro, google_maps_url, instagram, ordem, tags);
 
 -- =============================================================================
--- 2. MODO COPA DO MUNDO — Miami
--- Copa do Mundo FIFA 2026, jogos em Miami (Hard Rock Stadium)
--- Fase de grupos: Jun–Jul 2026
+-- 2. MODO COPA DO MUNDO — Miami (Copa FIFA 2026, Jun–Jul 2026)
 -- =============================================================================
 WITH ev AS (
   INSERT INTO eventos (cidade_id, nome, tipo, cor_destaque, icone, is_active, data_inicio, data_fim)
-  VALUES (
-    'miami',
-    'Modo Copa do Mundo',
-    'copa',
-    '#009C3B',   -- verde Brasil
-    'award',
-    false,
-    '2026-06-11 00:00:00+00',
-    '2026-07-19 23:59:59+00'
-  )
+  VALUES ('miami','Modo Copa do Mundo','copa','#009C3B','award',false,
+          '2026-06-11 00:00:00+00','2026-07-19 23:59:59+00')
   RETURNING id
 )
-INSERT INTO eventos_itens (evento_id, titulo, subtitulo, categoria, icone, link_externo, ordem)
-SELECT
-  ev.id,
-  titulo, subtitulo, categoria, icone, link_externo, ordem
-FROM ev,
-(VALUES
-  ('Ingressos FIFA',           'Comprar pacotes de jogos no site oficial FIFA', 'ingresso',   'ticket',        'https://www.fifa.com/tickets',  1),
-  ('Fan Zone em Miami',        'Fort Lauderdale e Miami Beach — festa oficial da Copa','dica','map-pin',       null,                            2),
-  ('Hotéis perto do estádio',  'Hard Rock Stadium em Miami Gardens — fique perto','hospedagem','home',         null,                            3),
-  ('Bares para assistir',      'Os melhores sports bars de South Beach','restaurante',       'tv',            null,                            4),
-  ('Transport ao estádio',     'Uber/Lyft ou shuttles oficiais da FIFA','transporte',         'navigation',    null,                            5),
-  ('Dica do Bruno',            'Chegue 2h antes — segurança da FIFA demora','dica',            'star',          null,                            6)
-) AS t(titulo, subtitulo, categoria, icone, link_externo, ordem);
+INSERT INTO evento_itens (evento_id, slug, titulo, tipo, descricao, local_nome, bairro, google_maps_url, instagram, ordem, ativo, tags)
+SELECT ev.id, slug, titulo, tipo, descricao, local_nome, bairro, google_maps_url, instagram, ordem, true, tags
+FROM ev, (VALUES
+  ('copa-ingresso',    'Ingressos FIFA',               'ingresso',   'Pacotes de jogos no site oficial da FIFA',      null,                     null,             'https://www.fifa.com/tickets',          null, 1, ARRAY['copa','ingresso']),
+  ('copa-fan-zone',    'Fan Zone Miami',               'dica',       'Fort Lauderdale e Miami Beach — festa oficial', 'Bayfront Park Fan Zone', 'Downtown Miami', 'https://maps.app.goo.gl/miami-fz',      null, 2, ARRAY['copa','evento']),
+  ('copa-hotel',       'Hotéis perto do estádio',      'hospedagem', 'Hard Rock Stadium em Miami Gardens',            null,                     'Miami Gardens',  null,                                    null, 3, ARRAY['hospedagem']),
+  ('copa-bares',       'Sports bars em South Beach',   'restaurante','Os melhores lugares para assistir os jogos',    null,                     'South Beach',    null,                                    null, 4, ARRAY['gastronomia']),
+  ('copa-transporte',  'Transport ao estádio',         'transporte', 'Uber/Lyft ou shuttles oficiais da FIFA',        null,                     null,             null,                                    null, 5, ARRAY['transporte']),
+  ('copa-dica-bruno',  'Dica do Bruno',                'dica',       'Chegue 2h antes — a segurança da FIFA demora muito',null,               null,             null,                                    null, 6, ARRAY['dica'])
+) AS t(slug, titulo, tipo, descricao, local_nome, bairro, google_maps_url, instagram, ordem, tags);
 
 -- =============================================================================
--- 3. MODO FERIADÃO — Rio de Janeiro
--- Template para feriados prolongados (Tiradentes, Corpus Christi, etc.)
--- Duplique este bloco e mude cidade_id + datas para outras cidades
+-- 3. MODO FERIADÃO — Rio de Janeiro (template Tiradentes Apr 2026)
+-- Para outros feriados: duplique e ajuste as datas no INSERT de eventos
 -- =============================================================================
 WITH ev AS (
   INSERT INTO eventos (cidade_id, nome, tipo, cor_destaque, icone, is_active, data_inicio, data_fim)
-  VALUES (
-    'rio',
-    'Modo Feriadão',
-    'feriado',
-    '#F39C12',   -- laranja/dourado
-    'sun',
-    false,
-    '2026-04-21 00:00:00+00',  -- Tiradentes
-    '2026-04-26 23:59:59+00'
-  )
+  VALUES ('rio','Modo Feriadão','feriado','#F39C12','sun',false,
+          '2026-04-21 00:00:00+00','2026-04-26 23:59:59+00')
   RETURNING id
 )
-INSERT INTO eventos_itens (evento_id, titulo, subtitulo, categoria, icone, link_externo, ordem)
-SELECT
-  ev.id,
-  titulo, subtitulo, categoria, icone, link_externo, ordem
-FROM ev,
-(VALUES
-  ('Roteiro 3 dias no Rio',    'O melhor do Rio em um feriadão perfeito',    'dica',        'map',           null, 1),
-  ('Reserve antes — lotará',   'Hotéis e restaurantes esgotam no feriadão',  'dica',        'alert-circle',  null, 2),
-  ('Praia na semana',          'Vá de segunda a quarta — menos gente',       'dica',        'sun',           null, 3),
-  ('Evite Barra na volta',     'Domingo à noite — trânsito infernal na Linha Amarela','transporte','navigation',null, 4),
-  ('Passeio de barco',         'Feriadão é a época perfeita para Ilha Grande','oQueFazer',  'anchor',        null, 5),
-  ('Onde ficar lotado — evite','Copacabana fica caótico — prefira Ipanema ou Santa Teresa','hospedagem','home',null, 6)
-) AS t(titulo, subtitulo, categoria, icone, link_externo, ordem);
+INSERT INTO evento_itens (evento_id, slug, titulo, tipo, descricao, local_nome, bairro, google_maps_url, instagram, ordem, ativo, tags)
+SELECT ev.id, slug, titulo, tipo, descricao, local_nome, bairro, google_maps_url, instagram, ordem, true, tags
+FROM ev, (VALUES
+  ('feriado-rio-roteiro',    'Roteiro 3 dias no Rio',      'dica',       'O melhor do Rio em um feriadão perfeito',         null,             null,          null, null, 1, ARRAY['dica','roteiro']),
+  ('feriado-rio-reserve',    'Reserve antes — vai lotar',  'dica',       'Hotéis e restaurantes esgotam cedo no feriadão',  null,             null,          null, null, 2, ARRAY['dica']),
+  ('feriado-rio-praia',      'Praia de segunda a quarta',  'dica',       'Evite fins de semana — menos gente, mais paz',    null,             'Ipanema',     null, null, 3, ARRAY['dica','praia']),
+  ('feriado-rio-transito',   'Evite Barra no domingo',     'transporte', 'Volta: trânsito infernal na Linha Amarela à noite',null,            null,          null, null, 4, ARRAY['transporte']),
+  ('feriado-rio-ilha',       'Passeio de barco',           'oQueFazer',  'Feriadão é perfeito para Ilha Grande',            null,             'Angra/Mangaratiba','https://maps.app.goo.gl/ilha-grande', null, 5, ARRAY['passeio']),
+  ('feriado-rio-bairro',     'Ipanema > Copacabana',       'dica',       'Copacabana fica caótica — prefira Ipanema e Santa Teresa',null,     'Ipanema',     null, null, 6, ARRAY['dica'])
+) AS t(slug, titulo, tipo, descricao, local_nome, bairro, google_maps_url, instagram, ordem, tags);
 
 -- =============================================================================
--- 3b. MODO FERIADÃO — Florianópolis (duplicate do template acima)
+-- 4. MODO ROCK IN RIO — Rio de Janeiro (Set 2026)
 -- =============================================================================
 WITH ev AS (
   INSERT INTO eventos (cidade_id, nome, tipo, cor_destaque, icone, is_active, data_inicio, data_fim)
-  VALUES (
-    'floripa',
-    'Modo Feriadão',
-    'feriado',
-    '#F39C12',
-    'sun',
-    false,
-    '2026-04-21 00:00:00+00',
-    '2026-04-26 23:59:59+00'
-  )
+  VALUES ('rio','Modo Rock in Rio','festival','#E74C3C','headphones',false,
+          '2026-09-18 00:00:00+00','2026-09-27 23:59:59+00')
   RETURNING id
 )
-INSERT INTO eventos_itens (evento_id, titulo, subtitulo, categoria, icone, link_externo, ordem)
-SELECT
-  ev.id,
-  titulo, subtitulo, categoria, icone, link_externo, ordem
-FROM ev,
-(VALUES
-  ('Praias do Norte',          'Santinho e Ingleses — mais tranquilas no feriadão','dica',   'map-pin',       null, 1),
-  ('Reserve com antecedência', 'Floripa esgota MUITO antes — reserve já',          'dica',   'alert-circle',  null, 2),
-  ('Lagoa da Conceição',       'Baladinhas e restaurantes à beira da lagoa',        'restaurante','coffee',   null, 3),
-  ('Evite voo sexta à noite',  'Congestionamento brutal no Hercílio Luz',           'transporte','navigation',null, 4),
-  ('Cachoeiras no interior',   'Fuja das praias — trilhas são incríveis',           'oQueFazer', 'wind',      null, 5),
-  ('Mercado Público',          'Almoço clássico em Floripa — sempre vale',          'restaurante','coffee',   null, 6)
-) AS t(titulo, subtitulo, categoria, icone, link_externo, ordem);
+INSERT INTO evento_itens (evento_id, slug, titulo, tipo, descricao, local_nome, bairro, google_maps_url, instagram, ordem, ativo, tags)
+SELECT ev.id, slug, titulo, tipo, descricao, local_nome, bairro, google_maps_url, instagram, ordem, true, tags
+FROM ev, (VALUES
+  ('rir-ingresso',    'Ingresso Rock in Rio',        'ingresso',   '1º lote é sempre o mais barato — compre cedo',   null,               null,       'https://rockinrio.com',            '@rockinrio', 1, ARRAY['festival','ingresso']),
+  ('rir-hotel',       'Hospedagem na Barra',         'hospedagem', 'Mais perto da Cidade do Rock sem transfer',       null,               'Barra',    null,                               null,         2, ARRAY['hospedagem']),
+  ('rir-shuttle',     'Shuttle oficial',             'transporte', 'Use o transporte oficial — parking é caótico',    null,               null,       null,                               null,         3, ARRAY['transporte']),
+  ('rir-jantar',      'Onde jantar antes',           'restaurante','VillageMall e Downtown — perto do festival',      'VillageMall',      'Barra',    'https://maps.app.goo.gl/vilagem',  null,         4, ARRAY['gastronomia']),
+  ('rir-dias',        'Melhor dia para ir',          'dica',       'Quinta e domingo têm menos fila que o sábado',    null,               null,       null,                               null,         5, ARRAY['dica']),
+  ('rir-kit',         'Kit essencial',               'dica',       'Protetor solar, garrafa d''água e powerbank',     null,               null,       null,                               null,         6, ARRAY['dica'])
+) AS t(slug, titulo, tipo, descricao, local_nome, bairro, google_maps_url, instagram, ordem, tags);
 
 -- =============================================================================
--- 4. MODO ROCK IN RIO — Rio de Janeiro
--- Rock in Rio 2026 (datas a confirmar — tipicamente Set/Out)
+-- VERIFICAÇÃO — descomente para checar
 -- =============================================================================
-WITH ev AS (
-  INSERT INTO eventos (cidade_id, nome, tipo, cor_destaque, icone, is_active, data_inicio, data_fim)
-  VALUES (
-    'rio',
-    'Modo Rock in Rio',
-    'festival',
-    '#E74C3C',   -- vermelho festival
-    'headphones',
-    false,
-    '2026-09-18 00:00:00+00',
-    '2026-09-27 23:59:59+00'
-  )
-  RETURNING id
-)
-INSERT INTO eventos_itens (evento_id, titulo, subtitulo, categoria, icone, link_externo, ordem)
-SELECT
-  ev.id,
-  titulo, subtitulo, categoria, icone, link_externo, ordem
-FROM ev,
-(VALUES
-  ('Ingresso Rock in Rio',     'Venda em lotes — compre no 1º lote (mais barato)','ingresso', 'ticket',       'https://rockinrio.com',         1),
-  ('Hospedagem na Barra',      'Mais perto da Cidade do Rock — Barra e Recreio',  'hospedagem','home',         null,                            2),
-  ('Shuttle oficial',          'Use o transporte oficial — parking é caótico',    'transporte','navigation',  null,                            3),
-  ('Restaurantes da Barra',    'Jantar antes do show — Downtown e VillageMall',   'restaurante','coffee',      null,                            4),
-  ('Dias menos movimentados',  'Quinta e domingo têm menos gente que sábado',     'dica',      'users',        null,                            5),
-  ('Look do festival',         'Leve protetor solar, garrafa d''água e carregador','dica',      'star',         null,                            6)
-) AS t(titulo, subtitulo, categoria, icone, link_externo, ordem);
-
--- =============================================================================
--- VERIFICAÇÃO — rode para confirmar os dados inseridos
--- =============================================================================
--- SELECT e.nome, e.cidade_id, e.is_active, e.cor_destaque, COUNT(ei.id) AS itens
+-- SELECT e.nome, e.cidade_id, e.is_active, e.cor_destaque,
+--        COUNT(ei.id) AS itens
 -- FROM eventos e
--- LEFT JOIN eventos_itens ei ON ei.evento_id = e.id
+-- LEFT JOIN evento_itens ei ON ei.evento_id = e.id AND ei.ativo = true
 -- GROUP BY e.id, e.nome, e.cidade_id, e.is_active, e.cor_destaque
 -- ORDER BY e.nome, e.cidade_id;
