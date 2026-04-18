@@ -9,6 +9,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from "react-native";
@@ -32,6 +33,7 @@ import { useOQueFazer } from "@/hooks/useOQueFazer";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import { useNeighborhoods } from "@/hooks/useNeighborhoods";
 import { getNeighborhoodImage } from "@/data/neighborhoodImages";
+import { supabase } from "@/lib/supabase";
 
 const C = Colors.light;
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -171,6 +173,14 @@ function GlassButton({
   );
 }
 
+type EventoAtivo = {
+  id: string;
+  nome: string;
+  tipo: string | null;
+  cor_destaque: string | null;
+  icone: string | null;
+};
+
 export default function CidadeScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
@@ -181,6 +191,27 @@ export default function CidadeScreen() {
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
   const periodo = detectPeriodo();
+
+  // Modo Evento — destination-specific, activated via Supabase `eventos` table
+  const [evento,     setEvento]     = React.useState<EventoAtivo | null>(null);
+  const [eventoOn,   setEventoOn]   = React.useState(false);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    async function fetchEvento() {
+      const { data } = await supabase
+        .from("eventos")
+        .select("id, nome, tipo, cor_destaque, icone")
+        .eq("cidade_id", destino.id)
+        .eq("is_active", true)
+        .maybeSingle();
+      if (!cancelled) setEvento(data ?? null);
+    }
+    fetchEvento();
+    return () => { cancelled = true; };
+  }, [destino.id]);
+
+  const eventoColor = evento?.cor_destaque ?? "#D4AF37";
 
   // Supabase data
   const { lugares: atividades, loading: loadingAtiv } = useOQueFazer();
@@ -277,6 +308,29 @@ export default function CidadeScreen() {
           <Text style={s.pais}>{destino.pais}</Text>
           <Text style={s.cidade}>{destino.cidade}</Text>
         </View>
+
+        {/* Modo Evento toggle — visible only when an active event exists for this city */}
+        {evento && (
+          <View style={[s.eventoRow, eventoOn && { borderColor: eventoColor + "60" }]}>
+            <View style={s.eventoLeft}>
+              {evento.icone ? (
+                <Feather name={evento.icone as any} size={15} color={eventoColor} />
+              ) : (
+                <Text style={[s.eventoStar, { color: eventoColor }]}>✦</Text>
+              )}
+              <Text style={[s.eventoLabel, { color: eventoOn ? eventoColor : "rgba(255,255,255,0.80)" }]}>
+                {evento.nome}
+              </Text>
+            </View>
+            <Switch
+              value={eventoOn}
+              onValueChange={setEventoOn}
+              trackColor={{ false: "rgba(255,255,255,0.18)", true: eventoColor + "A0" }}
+              thumbColor={eventoOn ? eventoColor : "rgba(255,255,255,0.70)"}
+              ios_backgroundColor="rgba(255,255,255,0.18)"
+            />
+          </View>
+        )}
 
         {/* Spacer — pushes buttons into the dark lower zone, prevents collision */}
         <View style={{ height: SCREEN_HEIGHT * 0.10 }} />
@@ -796,6 +850,34 @@ const s = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 14,
     color: "#C9A84C",
+    letterSpacing: 0.2,
+  },
+
+  // ── Modo Evento toggle ──────────────────────────────────────────────────
+  eventoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "rgba(0,0,0,0.30)",
+  },
+  eventoLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+  },
+  eventoStar: {
+    fontSize: 16,
+    lineHeight: 18,
+  },
+  eventoLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
     letterSpacing: 0.2,
   },
 });

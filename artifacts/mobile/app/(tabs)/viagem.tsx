@@ -14,6 +14,8 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Animated,
   Dimensions,
   ImageSourcePropType,
@@ -22,6 +24,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
@@ -34,6 +37,8 @@ import { useGuia, sourceTableFromCategoria } from "@/context/GuiaContext";
 import type { SavedCategory, SavedItem } from "@/context/GuiaContext";
 import { buildRoteiro, PERIODO_LABEL, PERIODO_ICON } from "@/utils/buildRoteiro";
 import type { DiaRoteiro, DiaPeriodo } from "@/utils/buildRoteiro";
+import { supabase } from "@/lib/supabase";
+import { getNeighborhoodImage } from "@/data/neighborhoodImages";
 
 const C    = Colors.light;
 const GOLD = "#D4AF37";
@@ -147,13 +152,212 @@ function SocialChip({
   );
 }
 
-function ActionArea({ hasSaved }: { hasSaved: boolean }) {
+// ─────────────────────────────────────────────────────────────────────────────
+// URL paste sheet — user pastes an Instagram/TikTok URL → edge function extracts location
+// ─────────────────────────────────────────────────────────────────────────────
+
+function UrlPasteSheet({
+  source,
+  onClose,
+  onAdd,
+}: {
+  source:  "instagram" | "tiktok";
+  onClose: () => void;
+  onAdd:   (item: SavedItem) => void;
+}) {
+  const [url,     setUrl]     = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const placeholder = source === "instagram"
+    ? "https://www.instagram.com/p/..."
+    : "https://vm.tiktok.com/...";
+
+  const isValidUrl = url.trim().startsWith("http");
+
+  async function handleSubmit() {
+    const trimmed = url.trim();
+    if (!trimmed.startsWith("http")) {
+      Alert.alert("URL inválida", "Cole o link completo do post (começa com https://).");
+      return;
+    }
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("lucky-trip-ai", {
+        body: { url: trimmed, source },
+      });
+      if (error || !data?.titulo) throw new Error(error?.message ?? "sem resposta");
+      const item: SavedItem = {
+        id:          data.id ?? `ext-${Date.now()}`,
+        categoria:   (data.categoria as SavedCategory) ?? "oQueFazer",
+        titulo:      data.titulo,
+        localizacao: data.bairro ?? data.localizacao ?? "Rio de Janeiro",
+        image:       data.photo_url
+          ? { uri: data.photo_url }
+          : getNeighborhoodImage(data.bairro ?? ""),
+      };
+      onAdd(item);
+      onClose();
+    } catch {
+      Alert.alert(
+        "Não consegui identificar o local",
+        "Verifique se o link é público e tente novamente. Se o problema persistir, adicione o lugar manualmente.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <View style={up.overlay} pointerEvents="box-none">
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      <View style={up.sheet}>
+        <View style={up.handle} />
+        <View style={up.header}>
+          <Feather
+            name={source === "instagram" ? "instagram" : "video"}
+            size={16}
+            color={GOLD}
+          />
+          <Text style={up.title}>
+            {source === "instagram" ? "Colar link do Instagram" : "Colar link do TikTok"}
+          </Text>
+        </View>
+        <Text style={up.hint}>
+          Abra o post no {source === "instagram" ? "Instagram" : "TikTok"}, copie o link e cole abaixo. A Lucky extrai automaticamente o lugar.
+        </Text>
+        <TextInput
+          style={up.input}
+          value={url}
+          onChangeText={setUrl}
+          placeholder={placeholder}
+          placeholderTextColor="rgba(255,255,255,0.30)"
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+          autoFocus
+        />
+        <Pressable
+          style={({ pressed }) => [
+            up.submitBtn,
+            (!isValidUrl || loading) && up.submitBtnDisabled,
+            pressed && isValidUrl && { opacity: 0.85 },
+          ]}
+          onPress={handleSubmit}
+          disabled={!isValidUrl || loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#1A1109" size="small" />
+          ) : (
+            <>
+              <Feather name="search" size={14} color="#1A1109" />
+              <Text style={up.submitText}>Identificar lugar</Text>
+            </>
+          )}
+        </Pressable>
+        <Pressable onPress={onClose} style={up.cancelBtn}>
+          <Text style={up.cancelText}>Cancelar</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+const up = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.60)",
+    justifyContent: "flex-end",
+    zIndex: 90,
+  },
+  sheet: {
+    backgroundColor: "#15120E",
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    borderTopWidth: 1,
+    borderColor: "rgba(212,175,55,0.22)",
+    paddingTop: 10,
+    paddingHorizontal: 20,
+    paddingBottom: 32,
+    gap: 12,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.20)",
+    alignSelf: "center",
+    marginBottom: 4,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  title: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: "#F5EFE0",
+  },
+  hint: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.55)",
+    lineHeight: 19,
+  },
+  input: {
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: "#F5EFE0",
+  },
+  submitBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: GOLD,
+    paddingVertical: 14,
+    borderRadius: 14,
+  },
+  submitBtnDisabled: {
+    opacity: 0.45,
+  },
+  submitText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+    color: "#1A1109",
+  },
+  cancelBtn: {
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  cancelText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: "rgba(255,255,255,0.40)",
+  },
+});
+
+function ActionArea({
+  hasSaved,
+  onInstagram,
+  onTikTok,
+}: {
+  hasSaved: boolean;
+  onInstagram: () => void;
+  onTikTok:    () => void;
+}) {
   return (
     <View style={act.wrap}>
       {/* Row 1 — social import chips */}
       <View style={act.socialRow}>
-        <SocialChip icon="instagram" label="Instagram" onPress={() => {}} />
-        <SocialChip icon="video"     label="TikTok"    onPress={() => {}} />
+        <SocialChip icon="instagram" label="Instagram" onPress={onInstagram} />
+        <SocialChip icon="video"     label="TikTok"    onPress={onTikTok} />
       </View>
 
       {/* Row 2 — primary AI CTA (dark glass panel, gold accent) */}
@@ -666,10 +870,13 @@ export default function MinhaViagemScreen() {
   const topPad    = Platform.OS === "web" ? 67 : insets.top + 12;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
-  const { saved, unsave } = useGuia();
-  const totalSaved        = saved.length;
-  const bgImages          = saved.map((s) => s.image);
-  const dias              = buildRoteiro(saved);
+  const { saved, unsave, save } = useGuia();
+  const totalSaved              = saved.length;
+  const bgImages                = saved.map((s) => s.image);
+  const dias                    = buildRoteiro(saved);
+
+  // URL paste sheet — "instagram" | "tiktok" | null
+  const [pasteSource, setPasteSource] = useState<"instagram" | "tiktok" | null>(null);
 
   return (
     <View style={s.root}>
@@ -709,7 +916,11 @@ export default function MinhaViagemScreen() {
         <View style={s.rule} />
 
         {/* ── Actions (social chips → AI CTA) ── */}
-        <ActionArea hasSaved={totalSaved > 0} />
+        <ActionArea
+          hasSaved={totalSaved > 0}
+          onInstagram={() => setPasteSource("instagram")}
+          onTikTok={() => setPasteSource("tiktok")}
+        />
 
         {/* ── Saved places or empty hint ── */}
         {totalSaved > 0 ? (
@@ -722,6 +933,15 @@ export default function MinhaViagemScreen() {
         <RoteiroSection dias={dias} />
 
       </ScrollView>
+
+      {/* ── URL paste sheet (Instagram / TikTok) ── */}
+      {pasteSource && (
+        <UrlPasteSheet
+          source={pasteSource}
+          onClose={() => setPasteSource(null)}
+          onAdd={(item) => { save(item); }}
+        />
+      )}
     </View>
   );
 }
