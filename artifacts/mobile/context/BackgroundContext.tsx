@@ -34,26 +34,31 @@ import { supabase } from "@/lib/supabase";
 
 // ── Local fallback pool — always available, no network required ──────────────
 const LOCAL_FALLBACK: ImageSourcePropType[] = [
-  require("@/assets/images/ipanema.png"),
-  require("@/assets/images/lapa.png"),
-  require("@/assets/images/pao-acucar.png"),
-  require("@/assets/images/cristo.png"),
+  {
+    uri: "https://lsibzflaaqzvtzjlvrxw.supabase.co/storage/v1/object/public/media/rio-de-janeiro/6Y6A0193.jpg",
+  },
+  {
+    uri: "https://lsibzflaaqzvtzjlvrxw.supabase.co/storage/v1/object/public/media/rio-de-janeiro/6Y6A0200.jpg",
+  },
+  {
+    uri: "https://lsibzflaaqzvtzjlvrxw.supabase.co/storage/v1/object/public/media/rio-de-janeiro/6Y6A0214.jpg",
+  },
 ];
 
 // ── Cloudinary — extract frame at second 1 from a remote video URL ───────────
 const CLOUDINARY_FETCH =
   "https://res.cloudinary.com/dufxamwaf/video/fetch/so_1,w_1080,h_1920,c_fill,g_auto,q_80,f_jpg";
 
-const INTERVAL      = 12_000; // 12 seconds between transitions
-const FADE_DURATION = 1_500;  // 1.5-second cross-fade
+const INTERVAL = 12_000; // 12 seconds between transitions
+const FADE_DURATION = 1_500; // 1.5-second cross-fade
 
 // ── Context shape ────────────────────────────────────────────────────────────
 
 interface BackgroundCtxValue {
-  pool:         ImageSourcePropType[];
-  currentIdx:   number;
-  nextIdx:      number;
-  nextOpacity:  Animated.Value;
+  pool: ImageSourcePropType[];
+  currentIdx: number;
+  nextIdx: number;
+  nextOpacity: Animated.Value;
   onImageLoaded: () => void;
 }
 
@@ -62,17 +67,17 @@ const BackgroundContext = createContext<BackgroundCtxValue | null>(null);
 // ── Provider ─────────────────────────────────────────────────────────────────
 
 interface ProviderProps {
-  children:      React.ReactNode;
+  children: React.ReactNode;
   onFirstImage?: () => void;
 }
 
 export function BackgroundProvider({ children, onFirstImage }: ProviderProps) {
-  const [pool,       setPool]       = useState<ImageSourcePropType[]>(LOCAL_FALLBACK);
+  const [pool, setPool] = useState<ImageSourcePropType[]>(LOCAL_FALLBACK);
   const [currentIdx, setCurrentIdx] = useState(0);
-  const [nextIdx,    setNextIdx]    = useState(1);
+  const [nextIdx, setNextIdx] = useState(1);
 
-  const nextOpacity   = useRef(new Animated.Value(0)).current;
-  const fetchedRef    = useRef(false);
+  const nextOpacity = useRef(new Animated.Value(0)).current;
+  const fetchedRef = useRef(false);
   const firstFiredRef = useRef(false);
 
   // ── One-time fetch from v_rio_hero_media_public ───────────────────────────
@@ -91,7 +96,9 @@ export function BackgroundProvider({ children, onFirstImage }: ProviderProps) {
 
         if (cancelled) return;
         if (error || !data || data.length === 0) {
-          console.log("[RIO BACKGROUND] Supabase returned empty — using LOCAL_FALLBACK");
+          console.log(
+            "[RIO BACKGROUND] Supabase returned empty — using LOCAL_FALLBACK",
+          );
           return;
         }
 
@@ -100,7 +107,9 @@ export function BackgroundProvider({ children, onFirstImage }: ProviderProps) {
           if (!row.public_url) continue;
           if (row.media_kind === "video") {
             // Cloudinary fetch extracts a frame at second 1
-            remote.push({ uri: `${CLOUDINARY_FETCH}/${encodeURIComponent(row.public_url)}` });
+            remote.push({
+              uri: `${CLOUDINARY_FETCH}/${encodeURIComponent(row.public_url)}`,
+            });
           } else {
             // Image: use public_url directly from Supabase Storage
             remote.push({ uri: row.public_url });
@@ -108,25 +117,31 @@ export function BackgroundProvider({ children, onFirstImage }: ProviderProps) {
         }
 
         if (remote.length === 0) {
-          console.log("[RIO BACKGROUND] No usable items — using LOCAL_FALLBACK");
+          console.log(
+            "[RIO BACKGROUND] No usable items — using LOCAL_FALLBACK",
+          );
           return;
         }
 
         console.log(
-          `[RIO BACKGROUND ACTIVE] items: ${remote.length} | loop: running | interval: ${INTERVAL / 1000}s`
+          `[RIO BACKGROUND ACTIVE] items: ${remote.length} | loop: running | interval: ${INTERVAL / 1000}s`,
         );
 
         setPool(remote);
         setCurrentIdx(0);
         setNextIdx(1 % remote.length);
         prefetchSources(remote, 0, 1 % remote.length);
-
       } catch (err) {
-        console.warn("[RIO BACKGROUND] fetch failed, using LOCAL_FALLBACK:", err);
+        console.warn(
+          "[RIO BACKGROUND] fetch failed, using LOCAL_FALLBACK:",
+          err,
+        );
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Global 12-second rotation timer ──────────────────────────────────────
@@ -135,14 +150,14 @@ export function BackgroundProvider({ children, onFirstImage }: ProviderProps) {
 
     const timer = setInterval(() => {
       Animated.timing(nextOpacity, {
-        toValue:         1,
-        duration:        FADE_DURATION,
+        toValue: 1,
+        duration: FADE_DURATION,
         useNativeDriver: true,
       }).start(({ finished }) => {
         if (!finished) return;
 
         setCurrentIdx((c) => {
-          const next      = (c + 1) % pool.length;
+          const next = (c + 1) % pool.length;
           const afterNext = (next + 1) % pool.length;
           setNextIdx(afterNext);
           prefetchSources(pool, next, afterNext);
@@ -184,10 +199,7 @@ export function useBackground(): BackgroundCtxValue {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function prefetchSources(
-  pool:    ImageSourcePropType[],
-  ...idxs: number[]
-): void {
+function prefetchSources(pool: ImageSourcePropType[], ...idxs: number[]): void {
   for (const idx of idxs) {
     const src = pool[idx];
     if (src && typeof src === "object" && "uri" in src) {

@@ -50,7 +50,6 @@ Locate where destinations are fetched.
 
 Search for:
 
-supabase.from("destinos")
 supabase.from("v_destinos_mvp")
 
 -----------------------------------
@@ -70,6 +69,7 @@ NOT "destinos"
 Immediately after fetch, ADD:
 
 console.log("DESTINOS RAW:", data);
+console.log("ERROR:", error);
 
 -----------------------------------
 
