@@ -1,13 +1,14 @@
 /**
  * app/auth/callback.tsx
  *
- * Handles Supabase email auth returns:
+ * Handles Supabase auth returns:
  * - Email confirmation → session auto-set → redirect to home
  * - Password reset (type=recovery) → show set-new-password form
+ * - OAuth callback (native) → extract tokens from URL and set session
  *
  * Supabase places tokens in the URL hash (#access_token=...&type=recovery).
- * detectSessionInUrl:true in supabase.ts processes them automatically;
- * we only need to react to the resulting auth state events.
+ * On web, detectSessionInUrl:true in supabase.ts processes them automatically.
+ * On native, we need to manually extract tokens from the deep link URL.
  */
 
 import React, { useEffect, useState } from "react";
@@ -21,7 +22,8 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { router, Stack } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
+import * as Linking from "expo-linking";
 import { supabase } from "@/lib/supabase";
 
 const GOLD = "#D4AF37";
@@ -36,6 +38,61 @@ export default function AuthCallback() {
   const [errorMsg, setErrorMsg]   = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // Handle OAuth tokens from deep link URL (native only)
+  async function handleNativeOAuthCallback() {
+    if (Platform.OS === "web") return;
+
+    try {
+      const url = await Linking.getInitialURL();
+      if (!url) return;
+
+      // Check if URL contains OAuth tokens in fragment
+      const hashIndex = url.indexOf("#");
+      if (hashIndex === -1) return;
+
+      const fragment = url.substring(hashIndex + 1);
+      const params = new URLSearchParams(fragment);
+      const accessToken = params.get("access_token");
+      const refreshToken = params.get("refresh_token");
+      const type = params.get("type");
+
+      // Handle password recovery
+      if (type === "recovery") {
+        setMode("recovery");
+        return;
+      }
+
+      // Handle OAuth sign-in
+      if (accessToken && refreshToken) {
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+
+        if (error) {
+          console.error("[AuthCallback] setSession error:", error);
+          setMode("error");
+          setErrorMsg(error.message);
+        } else {
+          setMode("confirmed");
+          setTimeout(() => router.replace("/"), 1800);
+        }
+        return;
+      }
+
+      // Check for error in fragment
+      const errorParam = params.get("error");
+      if (errorParam) {
+        const errorDesc = params.get("error_description");
+        console.error("[AuthCallback] OAuth error:", errorParam, errorDesc);
+        setMode("error");
+        setErrorMsg(errorDesc ?? errorParam);
+      }
+    } catch (e) {
+      console.error("[AuthCallback] handleNativeOAuthCallback error:", e);
+    }
+  }
+
   useEffect(() => {
     // On web, peek at the hash immediately so we can switch to the recovery
     // form before onAuthStateChange fires (avoids the "loading" flash).
@@ -46,13 +103,16 @@ export default function AuthCallback() {
       }
     }
 
+    // On native, handle OAuth tokens from deep link
+    handleNativeOAuthCallback();
+
     // Listen to Supabase auth events from the URL token.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (event === "PASSWORD_RECOVERY") {
           setMode("recovery");
         } else if (event === "SIGNED_IN" && session) {
-          // Email confirmation or magic link — session is ready, go home.
+          // Email confirmation, magic link, or OAuth — session is ready, go home.
           setMode("confirmed");
           setTimeout(() => router.replace("/"), 1800);
         }

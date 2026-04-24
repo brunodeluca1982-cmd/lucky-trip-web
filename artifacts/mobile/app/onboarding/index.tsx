@@ -163,7 +163,7 @@ function SlideView({
               style={({ pressed }) => [sv.ctaText, pressed && { opacity: 0.55 }]}
               onPress={() => done("home")}
             >
-              <Text style={sv.ctaTextLabel}>Explorar sem conta</Text>
+              <Text style={sv.ctaTextLabel}>Continuar sem conta</Text>
             </Pressable>
           </View>
         )}
@@ -264,12 +264,12 @@ const sv = StyleSheet.create({
   ctaPrimary: {
     backgroundColor: GOLD,
     borderRadius: 14,
-    paddingVertical: 16,
+    paddingVertical: 10,
     alignItems: "center",
   },
   ctaPrimaryText: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 16,
+    fontSize: 14,
     color: "#000000",
     letterSpacing: 0.1,
   },
@@ -277,7 +277,7 @@ const sv = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1.5,
     borderColor: "rgba(255,255,255,0.50)",
-    paddingVertical: 15,
+    paddingVertical: 10,
     alignItems: "center",
   },
   ctaOutlineText: {

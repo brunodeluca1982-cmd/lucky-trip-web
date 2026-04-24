@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase, type Restaurante } from "@/lib/supabase";
+import { buildMediaUrl } from "@/lib/mediaUrl";
 
 type State = {
   restaurantes: Restaurante[];
@@ -75,7 +76,7 @@ export function useRestaurants(cidadeId?: string): State {
       // ── 3. Render immediately with Supabase / place_photos ────────────────
       const merged: Restaurante[] = rawRows.map((r) => ({
         ...r,
-        resolvedPhotoUri: r.photo_url ?? photoMap[String(r.id)] ?? null,
+        resolvedPhotoUri: buildMediaUrl(r.photo_url ?? photoMap[String(r.id)]) || null,
       }));
 
       setRestaurantes(merged);

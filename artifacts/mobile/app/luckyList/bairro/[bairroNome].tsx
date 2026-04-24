@@ -58,8 +58,17 @@ export default function LuckyListBairroScreen() {
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
   const destino    = destinos.find((d) => d.id === (cityId ?? "rio")) ?? destinos[0];
-  const { lugares: allLugares, loading: lugaresLoading } = useLuckyList();
-  const filtered   = allLugares.filter((p) => p.localizacao === bairroNome);
+  const { luckyList, loading: lugaresLoading } = useLuckyList();
+  const FALLBACK_IMG = require("../../../assets/images/ipanema.png");
+  const allLugares = (luckyList?.itens ?? []).map((item: any) => ({
+    id: item.lugar.id,
+    titulo: item.lugar.nome,
+    localizacao: item.lugar.bairro_nome ?? "",
+    descricao: item.lugar.meu_olhar ?? "",
+    categoria: "lucky",
+    image: FALLBACK_IMG,
+  }));
+  const filtered   = allLugares.filter((p: any) => p.localizacao === bairroNome);
 
   const { save, unsave, isSaved } = useGuia();
 

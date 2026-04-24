@@ -253,13 +253,13 @@ const styles = StyleSheet.create({
   cta: {
     backgroundColor: GOLD,
     borderRadius:    14,
-    paddingVertical: 16,
+    paddingVertical: 10,
     alignItems:      "center",
     marginBottom:    12,
   },
   ctaText: {
     fontFamily:    "Inter_600SemiBold",
-    fontSize:      16,
+    fontSize:      14,
     color:         "#000000",
     letterSpacing: 0.1,
   },

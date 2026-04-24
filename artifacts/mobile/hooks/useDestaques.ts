@@ -55,7 +55,13 @@ export function useDestaques() {
 
         if (err) throw err;
 
-        const rows: Destaque[] = (data ?? []).map((row: any) => ({
+        // Filter out v2 items (premium-only Lucky List content)
+        const filtered = (data ?? []).filter((row: any) => {
+          const titulo = row.titulo?.toLowerCase() ?? "";
+          return !titulo.includes("v2");
+        });
+
+        const rows: Destaque[] = filtered.map((row: any) => ({
           id: row.id,
           tipo: row.tipo,
           titulo: row.titulo,

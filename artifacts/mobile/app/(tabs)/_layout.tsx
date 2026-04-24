@@ -7,10 +7,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import PaywallModal from "@/components/PaywallModal";
 import AuthPrompt   from "@/components/AuthPrompt";
 
-const GOLD   = "#D4AF37";
-const GRAY   = "#666666";
-const TAB_BG = "#0D0D0D";
-const BORDER = "rgba(255,255,255,0.08)";
+// Tab bar colors
+// Petrol blue for active icons, subtle white for inactive
+const PETROL_BLUE    = "#1B4F72"; // Active icon color
+const WHITE_ACTIVE   = "#FFFFFF"; // Active label color (white)
+const WHITE_INACTIVE = "rgba(255,255,255,0.45)";
+const TAB_BG         = "#0D0D0D";
+const BORDER         = "rgba(255,255,255,0.08)";
 
 export default function TabLayout() {
   const isIOS = Platform.OS === "ios";
@@ -26,8 +29,8 @@ export default function TabLayout() {
         screenOptions={{
           headerShown: false,
           sceneStyle: { backgroundColor: "#1A0E04" },
-          tabBarActiveTintColor: GOLD,
-          tabBarInactiveTintColor: GRAY,
+          tabBarActiveTintColor: PETROL_BLUE,
+          tabBarInactiveTintColor: WHITE_INACTIVE,
           tabBarLabelStyle: {
             fontFamily: "Inter_500Medium",
             fontSize: 11,
@@ -63,18 +66,20 @@ export default function TabLayout() {
           name="index"
           options={{
             title: "Início",
-            tabBarIcon: ({ color }) =>
-              isIOS ? (
-                <SymbolView name="house" tintColor={color} size={22} />
+            tabBarIcon: ({ color, focused }) => {
+              const iconColor = focused ? PETROL_BLUE : WHITE_INACTIVE;
+              return isIOS ? (
+                <SymbolView name="house" tintColor={iconColor} size={22} />
               ) : (
-                <Feather name="home" size={22} color={color} />
-              ),
+                <Feather name="home" size={22} color={iconColor} />
+              );
+            },
           }}
         />
         <Tabs.Screen
           name="destinos"
           options={{
-            title: "Destinos",
+            title: "Pra onde?",
             tabBarIcon: ({ color }) =>
               isIOS ? (
                 <SymbolView name="map" tintColor={color} size={22} />
@@ -127,7 +132,9 @@ export default function TabLayout() {
         <Tabs.Screen name="oQueFazer/categorias/[id]" options={{ href: null }} />
         <Tabs.Screen name="essencial/[id]"   options={{ href: null }} />
         <Tabs.Screen name="agoraNoRio/[id]"  options={{ href: null }} />
+        <Tabs.Screen name="agoraNoRio/all"   options={{ href: null }} />
         <Tabs.Screen name="luckyList/[id]"   options={{ href: null }} />
+        <Tabs.Screen name="luckyList/all"    options={{ href: null }} />
         <Tabs.Screen name="roteiro/index"    options={{ href: null }} />
         <Tabs.Screen name="roteiro/[id]"     options={{ href: null }} />
         <Tabs.Screen name="subscription"     options={{ href: null }} />

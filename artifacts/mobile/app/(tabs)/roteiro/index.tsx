@@ -21,6 +21,7 @@ import {
   Animated,
   Dimensions,
   Image,
+  ImageSourcePropType,
   Linking,
   Platform,
   Pressable,
@@ -86,10 +87,16 @@ const BUDGET_TO_VIBE: Record<BudgetStyle, Vibe> = {
 };
 
 const CATEGORY_LABEL: Record<SavedCategory, string> = {
-  oQueFazer:   "O Que Fazer",
-  restaurante: "Restaurante",
-  hotel:       "Hotel",
-  lucky:       "Lucky",
+  oQueFazer:    "O Que Fazer",
+  restaurante:  "Restaurante",
+  hotel:        "Hotel",
+  lucky:        "Lucky",
+  atividade:    "Atividade",
+  praia:        "Praia",
+  compras:      "Compras",
+  dica_secreta: "Dica Secreta",
+  bar:          "Bar",
+  cafe:         "Café",
 };
 
 // Result phase helpers — time labels, weather, travel connectors
@@ -557,7 +564,7 @@ function FlowPage2({
               style={[fp.insCard, active && fp.insCardActive]}
               onPress={() => onToggleInspiration(ins.id)}
             >
-              <Image source={imgSrc} style={StyleSheet.absoluteFill} resizeMode="cover" />
+              <Image source={imgSrc as ImageSourcePropType} style={StyleSheet.absoluteFill} resizeMode="cover" />
               <LinearGradient
                 colors={["rgba(0,0,0,0.06)", "rgba(0,0,0,0.68)"]}
                 locations={[0, 1]}
@@ -871,7 +878,7 @@ function ContextualFlow({ onGenerate }: { onGenerate: (p: JourneyGenerateProps) 
                   style={[fp.insCard, active && fp.insCardActive]}
                   onPress={() => toggleInspiration(ins.id)}
                 >
-                  <Image source={imgSrc} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                  <Image source={imgSrc as ImageSourcePropType} style={StyleSheet.absoluteFill} resizeMode="cover" />
                   <LinearGradient
                     colors={["transparent", "rgba(0,0,0,0.35)"]}
                     locations={[0.25, 1]}
@@ -2606,12 +2613,12 @@ function ItemThumb({ image, categoria }: { image: unknown; categoria: SavedCateg
   const [errored, setErrored] = React.useState(false);
   const fallback = getItemFallbackImage(categoria);
   const src = (!errored && image != null && image !== undefined && image !== 0)
-    ? (image as ReturnType<typeof require>)
+    ? (image as ImageSourcePropType)
     : fallback;
   return (
     <>
       <Image
-        source={src}
+        source={src as ImageSourcePropType}
         style={StyleSheet.absoluteFill}
         resizeMode="cover"
         onError={() => setErrored(true)}

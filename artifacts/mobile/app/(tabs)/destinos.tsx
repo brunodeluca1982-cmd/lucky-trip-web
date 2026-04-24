@@ -1,4 +1,4 @@
-import React, { memo, useCallback } from "react";
+import React, { memo, useCallback, useState, useEffect } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -19,6 +19,7 @@ import { Feather } from "@expo/vector-icons";
 import { useDestinos } from "@/hooks/useDestinos";
 import { RotatingBackground } from "@/components/RotatingBackground";
 import { useRioHeroMedia } from "@/hooks/useHeroMedia";
+import { useDestinoFoto } from "@/hooks/useDestinoFotos";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -28,30 +29,40 @@ const COLS = 3;
 const CARD_W = (SCREEN_WIDTH - H_PAD * 2 - GAP * (COLS - 1)) / COLS;
 const CARD_H = Math.round(CARD_W * 1.18);
 
-const SELECTED_ID = "rio";
+const SELECTED_ID = "rio-de-janeiro";
 
-// ── Memoized card: does not re-render when parent query state changes ──────────
+// ── Memoized card: uses bucket photos with fallback ──────────────────────────
 interface DestCardProps {
   id: string;
+  slug: string;
   cidade: string;
   pais: string;
-  image: ImageSourcePropType;
+  fallbackImage: ImageSourcePropType;
   selected: boolean;
   lancado: boolean;
 }
 
 const DestCard = memo(function DestCard({
   id,
+  slug,
   cidade,
   pais,
-  image,
+  fallbackImage,
   selected,
   lancado,
 }: DestCardProps) {
+  // Busca foto do bucket media/{slug}/hero/foto/ com fallbacks
+  const { foto, isPlaceholder } = useDestinoFoto(slug);
+
   // Stable handler — created once per card id, never recreated on parent re-render
   const handlePress = useCallback(() => {
     router.push({ pathname: "/cidade/[id]", params: { id } });
   }, [id]);
+
+  // Determina a fonte da imagem
+  const imageSource: ImageSourcePropType = foto
+    ? { uri: foto }
+    : fallbackImage;
 
   return (
     <Pressable
@@ -64,12 +75,18 @@ const DestCard = memo(function DestCard({
         pressed && { opacity: 0.88, transform: [{ scale: 0.97 }] },
       ]}
     >
-      {/* Image fills card — identical pattern to DestinationCard.tsx */}
-      <Image
-        source={image}
-        style={[s.cardImage, !lancado && { opacity: 0.72 }]}
-        resizeMode="cover"
-      />
+      {/* Image from bucket or fallback */}
+      {isPlaceholder && !fallbackImage ? (
+        <View style={[s.cardImage, s.placeholderBg]}>
+          <Text style={s.placeholderText}>{cidade}</Text>
+        </View>
+      ) : (
+        <Image
+          source={imageSource}
+          style={[s.cardImage, !lancado && { opacity: 0.72 }]}
+          resizeMode="cover"
+        />
+      )}
 
       {/* Bottom-anchored gradient — does NOT obscure the image on load */}
       <LinearGradient
@@ -106,13 +123,15 @@ const DestCard = memo(function DestCard({
 });
 
 // ── Screen ─────────────────────────────────────────────────────────────────────
-const DESTINOS_BG_POOL = [
-  require("../../assets/images/hero-santorini.png"),
-  require("../../assets/images/hero-kyoto.png"),
-  require("../../assets/images/rio-aerial-clean.png"),
-  require("../../assets/images/secret2.png"),
-  require("../../assets/images/hotel2.png"),
+// Background com fotos do Rio em loop desfocado (igual home)
+const RIO_BG_PHOTOS = [
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero01.jpg" },
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero02.jpg" },
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero03.jpg" },
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero04.jpg" },
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero05.jpg" },
 ];
+const DESTINOS_BG_POOL = RIO_BG_PHOTOS;
 
 export default function DestinosScreen() {
   const insets = useSafeAreaInsets();
@@ -144,7 +163,8 @@ export default function DestinosScreen() {
           pool={rioHero && rioHero.length > 0
             ? rioHero.map((item) => ({ uri: item.public_url }))
             : DESTINOS_BG_POOL}
-          blurRadius={22}
+          interval={15000}
+          blurRadius={0}
         />
         <LinearGradient
           colors={["rgba(0,0,0,0.74)", "rgba(0,0,0,0.66)", "rgba(0,0,0,0.86)"]}
@@ -169,9 +189,14 @@ export default function DestinosScreen() {
               Descubra lugares autênticos vividos pelo Bruno
             </Text>
           </View>
-          <Pressable style={s.profileBtn} hitSlop={8}>
-            <Feather name="user" size={20} color="rgba(255,255,255,0.80)" />
-          </Pressable>
+          <View style={s.headerRight}>
+            <Pressable style={s.iconBtn} hitSlop={8}>
+              <Feather name="music" size={18} color="#FFF" />
+            </Pressable>
+            <Pressable style={s.iconBtn} hitSlop={8}>
+              <Feather name="play" size={16} color="#FFF" />
+            </Pressable>
+          </View>
         </View>
 
         {/* Search bar */}
@@ -203,9 +228,10 @@ export default function DestinosScreen() {
                   <DestCard
                     key={d.id}
                     id={d.id}
+                    slug={d.id}
                     cidade={d.cidade}
                     pais={d.pais}
-                    image={d.image}
+                    fallbackImage={d.image}
                     selected={d.id === SELECTED_ID}
                     lancado={d.lancado}
                   />
@@ -268,16 +294,17 @@ const s = StyleSheet.create({
     color: "rgba(255,255,255,0.58)",
     lineHeight: 19,
   },
-  profileBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(255,255,255,0.13)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.22)",
+  headerRight: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.35)",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 2,
   },
 
   // Search
@@ -325,6 +352,18 @@ const s = StyleSheet.create({
   cardImage: {
     width: "100%",
     height: "100%",
+  },
+  placeholderBg: {
+    backgroundColor: "#D4C5A9",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  placeholderText: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 11,
+    color: "#4A4844",
+    textAlign: "center",
+    paddingHorizontal: 6,
   },
   // Bottom-anchored: image top half is never covered
   cardGradient: {

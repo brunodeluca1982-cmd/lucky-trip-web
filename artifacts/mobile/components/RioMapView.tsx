@@ -52,52 +52,30 @@ function buildLeafletHTML(
     #map { width: 100%; height: 100%; }
 
     .neigh-marker {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
       cursor: pointer;
       transition: transform 0.2s ease-out;
     }
 
-    .neigh-pin {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background: #F5F0E8;
-      border: 2px solid #1B4F72;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15), 0 1px 3px rgba(0,0,0,0.10);
-      transition: all 0.2s ease-out;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .neigh-pin.selected {
-      width: 44px;
-      height: 44px;
-      background: #1B4F72;
-      border: 2px solid #FFFFFF;
-      box-shadow: 0 4px 12px rgba(27,79,114,0.35), 0 2px 6px rgba(0,0,0,0.15);
-    }
-
-    .neigh-label {
-      margin-top: 6px;
+    .neigh-pill {
+      display: inline-block;
       font-family: -apple-system, 'Inter', sans-serif;
-      font-size: 11px;
+      font-size: 12px;
       font-weight: 500;
-      color: #1B4F72;
-      white-space: nowrap;
-      letter-spacing: 0.2px;
-      text-shadow: 0 1px 2px rgba(255,255,255,0.8);
-      pointer-events: none;
-      background: rgba(255,255,255,0.85);
-      padding: 2px 6px;
-      border-radius: 4px;
-    }
-    .neigh-label.selected {
-      font-weight: 700;
       color: #FFFFFF;
-      background: #1B4F72;
-      text-shadow: none;
+      white-space: nowrap;
+      background: rgba(27, 79, 114, 0.85);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 100px;
+      padding: 6px 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      transition: all 0.2s ease-out;
+    }
+    .neigh-pill.selected {
+      background: #F5F0E8;
+      color: #1B4F72;
+      border: 2px solid #1B4F72;
+      font-weight: 600;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
     }
 
     .leaflet-control-attribution {
@@ -136,11 +114,10 @@ function buildLeafletHTML(
       attributionControl: true,
     });
 
-    // CartoDB Light — clean cartographic style
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+    // Esri World Imagery — satellite style
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: '&copy; Esri',
       maxZoom: 19,
-      subdomains: 'abcd',
     }).addTo(map);
 
     var markers = {};
@@ -148,13 +125,12 @@ function buildLeafletHTML(
     // Add bairro markers
     BAIRROS.forEach(function(b) {
       var isSelected = b.id === SELECTED_ID;
-      var pinClass   = 'neigh-pin'   + (isSelected ? ' selected' : '');
-      var labelClass = 'neigh-label' + (isSelected ? ' selected' : '');
+      var pillClass = 'neigh-pill' + (isSelected ? ' selected' : '');
 
       var icon = L.divIcon({
         className: 'neigh-marker',
-        html: '<div class="' + pinClass + '"></div><div class="' + labelClass + '">' + b.name + '</div>',
-        iconAnchor: [isSelected ? 22 : 18, isSelected ? 22 : 18],
+        html: '<div class="' + pillClass + '">' + b.name + '</div>',
+        iconAnchor: [40, 12],
         iconSize: null,
       });
 

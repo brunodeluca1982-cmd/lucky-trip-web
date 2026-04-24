@@ -1,4 +1,4 @@
-// app/amigo/all.tsx — Lista de todos os Amigos do Lucky
+// app/amigo/all.tsx — Lista de todos os Amigos The Lucky
 import React, { useState, useEffect } from "react";
 import {
   Dimensions,
@@ -82,7 +82,7 @@ export default function AmigosAllScreen() {
         <Pressable style={styles.backBtn} onPress={() => router.back()}>
           <Feather name="arrow-left" size={20} color="#FFF" />
         </Pressable>
-        <Text style={styles.headerTitle}>Amigos do Lucky</Text>
+        <Text style={styles.headerTitle}>Amigos The Lucky</Text>
         <View style={{ width: 44 }} />
       </View>
 

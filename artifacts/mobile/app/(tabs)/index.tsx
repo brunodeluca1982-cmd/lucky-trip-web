@@ -14,6 +14,7 @@ import {
   View,
 } from "react-native";
 import * as Haptics from "expo-haptics";
+import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -74,6 +75,13 @@ function useHeroPhotos() {
   return photos;
 }
 
+// Builds full Supabase storage URL from relative path
+function buildMediaUrl(path: string | null | undefined): string {
+  if (!path) return FALLBACK;
+  if (path.startsWith("http")) return path;
+  return `${SUPABASE}/storage/v1/object/public/media/${path}`;
+}
+
 // Hook para buscar "Agora no Rio" de destino_destaques
 function useAgoraNoRio(destinoId: string) {
   const [items, setItems] = useState<AgoraItem[]>([]);
@@ -81,7 +89,7 @@ function useAgoraNoRio(destinoId: string) {
   useEffect(() => {
     supabase
       .from("destino_destaques")
-      .select("id, lugar_id, titulo_override, ordem, lugares(id, nome, hero_image_url, bairro:bairros!bairro_id(nome))")
+      .select("id, lugar_id, titulo_override, ordem, lugares(id, nome, hero_image_url, bairro_id, bairros(nome))")
       .eq("destino_id", destinoId)
       .eq("ativo", true)
       .order("ordem")
@@ -91,9 +99,9 @@ function useAgoraNoRio(destinoId: string) {
           const mapped: AgoraItem[] = data.map((item: any) => ({
             id: item.lugar_id || item.id,
             titulo: item.titulo_override || item.lugares?.nome || "Lugar",
-            sub: item.lugares?.bairro?.nome || "",
+            sub: item.lugares?.bairros?.nome || "",
             tag: "AGORA",
-            foto: item.lugares?.hero_image_url || FALLBACK,
+            foto: buildMediaUrl(item.lugares?.hero_image_url),
           }));
           setItems(mapped);
         }
@@ -123,7 +131,7 @@ function useLucklists(destinoId: string) {
         // Depois busca os lugares dessa lucklist
         supabase
           .from("lucklist_lugares")
-          .select("lugar_id, lugares(id, nome, hero_image_url, bairro:bairros!bairro_id(nome))")
+          .select("lugar_id, lugares(id, nome, hero_image_url, bairro_id, bairros(nome))")
           .eq("lucklist_id", lucklist.id)
           .limit(6)
           .then(({ data }) => {
@@ -131,8 +139,8 @@ function useLucklists(destinoId: string) {
               const mapped: LucklistItem[] = data.map((item: any) => ({
                 id: item.lugar_id || item.id,
                 titulo: item.lugares?.nome || "Lugar",
-                sub: item.lugares?.bairro?.nome || "",
-                foto: item.lugares?.hero_image_url || FALLBACK,
+                sub: item.lugares?.bairros?.nome || "",
+                foto: buildMediaUrl(item.lugares?.hero_image_url),
               }));
               setItems(mapped);
             }
@@ -203,16 +211,21 @@ function HeroDestaque({
     const handlePress = () => {
       switch (item.tipo) {
         case "destino":
-          router.push(`/destino/${item.destino_slug}`);
+          // Navega para /cidade/[id] - mesma página do menu "Pra onde?"
+          router.push({ pathname: "/cidade/[id]", params: { id: item.destino_slug } });
           break;
         case "amigo":
-          router.push(`/amigo/${item.destino_slug}`);
+          // Navega para /amigo/[slug] usando entity_id para buscar o amigo
+          if (item.entity_id) {
+            router.push(`/amigo/${item.entity_id}`);
+          }
           break;
         case "lugar":
         case "restaurante":
         case "bar":
         case "atividade":
         case "evento":
+        case "luckylist":
           if (item.entity_id) {
             router.push(`/lugar/${item.entity_id}`);
           }
@@ -323,32 +336,36 @@ function ViajeComEles() {
   if (amigos.length === 0) return null;
 
   return (
-    <View style={styles.sectionCompact}>
-      <View style={styles.viajeHeader}>
-        <Text style={styles.sectionLabel}>VIAJE COM ELES</Text>
-        <Pressable style={styles.seeAll} onPress={() => router.push("/amigo/all")}>
-          <Text style={styles.seeAllText}>Ver todos</Text>
-          <Ionicons name="chevron-forward" size={14} color={PETROL} />
-        </Pressable>
-      </View>
-      <View style={styles.viajeRow}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.amigosRow}>
-          {amigos.map(a => {
-            const { nome, sobrenome } = formatNome(a.nome);
-            return (
-              <Pressable key={a.id} style={styles.amigoItem} onPress={() => router.push(`/amigo/${a.slug}`)}>
-                <Image source={{ uri: a.foto_url || FALLBACK }} style={styles.amigoFoto} />
-                <Text style={styles.amigoNome}>{nome}</Text>
-                <Text style={styles.amigoSobrenome}>{sobrenome}</Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-        {/* Seta à direita */}
-        <Pressable style={styles.viajeArrow} onPress={() => router.push("/amigo/all")}>
-          <Ionicons name="chevron-forward" size={20} color={PETROL} />
-        </Pressable>
-      </View>
+    <View style={styles.sectionFrameOuter}>
+      <BlurView intensity={40} tint="dark" style={styles.sectionBlur}>
+        <View style={styles.sectionFrameInner}>
+          <View style={styles.viajeHeader}>
+            <Text style={styles.sectionLabel}>VIAJE COM ELES</Text>
+            <Pressable style={styles.seeAll} onPress={() => router.push("/amigo/all")}>
+              <Text style={styles.seeAllText}>Ver todos</Text>
+              <Ionicons name="chevron-forward" size={14} color={PETROL} />
+            </Pressable>
+          </View>
+          <View style={styles.viajeRow}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.amigosRow}>
+              {amigos.map(a => {
+                const { nome, sobrenome } = formatNome(a.nome);
+                return (
+                  <Pressable key={a.id} style={styles.amigoItem} onPress={() => router.push(`/amigo/${a.slug}`)}>
+                    <Image source={{ uri: a.foto_url || FALLBACK }} style={styles.amigoFoto} />
+                    <Text style={styles.amigoNome}>{nome}</Text>
+                    <Text style={styles.amigoSobrenome}>{sobrenome}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+            {/* Seta à direita */}
+            <Pressable style={styles.viajeArrow} onPress={() => router.push("/amigo/all")}>
+              <Ionicons name="chevron-forward" size={20} color={PETROL} />
+            </Pressable>
+          </View>
+        </View>
+      </BlurView>
     </View>
   );
 }
@@ -360,35 +377,39 @@ function AgoraNoDestino({ destinoNome, destinoId }: { destinoNome: string; desti
   if (items.length === 0) return null;
 
   return (
-    <View style={styles.sectionCompact}>
-      <View style={styles.agoraHeader}>
-        <View>
-          <Text style={styles.sectionLabel}>AGORA NO {nomeFormatado}</Text>
-          <Text style={styles.agoraUpdated}>Atualizado agora</Text>
+    <View style={styles.sectionFrameOuter}>
+      <BlurView intensity={40} tint="dark" style={styles.sectionBlur}>
+        <View style={styles.sectionFrameInner}>
+          <View style={styles.agoraHeader}>
+            <View>
+              <Text style={styles.sectionLabel}>AGORA NO {nomeFormatado}</Text>
+              <Text style={styles.agoraUpdated}>Atualizado agora</Text>
+            </View>
+            <Pressable style={styles.seeAll} onPress={() => router.push("/(tabs)/agoraNoRio/all")}>
+              <Text style={styles.seeAllText}>Ver todos</Text>
+              <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.6)" />
+            </Pressable>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cardsRowFrame}>
+            {items.map(item => (
+              <Pressable key={item.id} style={styles.card} onPress={() => router.push(`/lugar/${item.id}`)}>
+                <Image source={{ uri: item.foto }} style={styles.cardImg} />
+                <LinearGradient colors={["transparent", "rgba(0,0,0,0.7)"]} style={StyleSheet.absoluteFill} />
+                <View style={styles.cardTag}>
+                  <Text style={styles.cardTagText}>{item.tag}</Text>
+                </View>
+                <View style={styles.cardContent}>
+                  <Text style={styles.cardTitle} numberOfLines={2}>{item.titulo}</Text>
+                  <View style={styles.cardLoc}>
+                    <Ionicons name="location-outline" size={10} color="rgba(255,255,255,0.7)" />
+                    <Text style={styles.cardLocText}>{item.sub}</Text>
+                  </View>
+                </View>
+              </Pressable>
+            ))}
+          </ScrollView>
         </View>
-        <Pressable style={styles.seeAll} onPress={() => router.push("/(tabs)/agoraNoRio/all")}>
-          <Text style={styles.seeAllText}>Ver todos</Text>
-          <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.6)" />
-        </Pressable>
-      </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cardsRow}>
-        {items.map(item => (
-          <Pressable key={item.id} style={styles.card} onPress={() => router.push(`/(tabs)/agoraNoRio/${item.id}`)}>
-            <Image source={{ uri: item.foto }} style={styles.cardImg} />
-            <LinearGradient colors={["transparent", "rgba(0,0,0,0.7)"]} style={StyleSheet.absoluteFill} />
-            <View style={styles.cardTag}>
-              <Text style={styles.cardTagText}>{item.tag}</Text>
-            </View>
-            <View style={styles.cardContent}>
-              <Text style={styles.cardTitle} numberOfLines={2}>{item.titulo}</Text>
-              <View style={styles.cardLoc}>
-                <Ionicons name="location-outline" size={10} color="rgba(255,255,255,0.7)" />
-                <Text style={styles.cardLocText}>{item.sub}</Text>
-              </View>
-            </View>
-          </Pressable>
-        ))}
-      </ScrollView>
+      </BlurView>
     </View>
   );
 }
@@ -399,20 +420,24 @@ function LucklistsSection({ destinoNome, items }: { destinoNome: string; items: 
   if (items.length === 0) return null;
 
   return (
-    <View style={styles.sectionCompact}>
-      <SectionHeader label={`LUCKLISTS ${nomeFormatado}`} right="Ver todos >" onPress={() => router.push("/(tabs)/luckyList/all")} />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cardsRow}>
-        {items.map(item => (
-          <Pressable key={item.id} style={styles.card} onPress={() => router.push(`/(tabs)/luckyList/${item.id}`)}>
-            <Image source={{ uri: item.foto }} style={styles.cardImg} />
-            <LinearGradient colors={["transparent", "rgba(0,0,0,0.7)"]} style={StyleSheet.absoluteFill} />
-            <View style={styles.cardContent}>
-              <Text style={styles.cardTitle} numberOfLines={2}>{item.titulo}</Text>
-              <Text style={styles.cardSub}>{item.sub}</Text>
-            </View>
-          </Pressable>
-        ))}
-      </ScrollView>
+    <View style={styles.sectionFrameOuter}>
+      <BlurView intensity={40} tint="dark" style={styles.sectionBlur}>
+        <View style={styles.sectionFrameInner}>
+          <SectionHeader label={`LUCKLISTS ${nomeFormatado}`} right="Ver todos >" onPress={() => router.push("/(tabs)/luckyList/all")} />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cardsRowFrame}>
+            {items.map(item => (
+              <Pressable key={item.id} style={styles.card} onPress={() => router.push(`/lugar/${item.id}`)}>
+                <Image source={{ uri: item.foto }} style={styles.cardImg} />
+                <LinearGradient colors={["transparent", "rgba(0,0,0,0.7)"]} style={StyleSheet.absoluteFill} />
+                <View style={styles.cardContent}>
+                  <Text style={styles.cardTitle} numberOfLines={2}>{item.titulo}</Text>
+                  <Text style={styles.cardSub}>{item.sub}</Text>
+                </View>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      </BlurView>
     </View>
   );
 }
@@ -668,23 +693,47 @@ const styles = StyleSheet.create({
 
   // Sections - compact
   sectionCompact: { marginBottom: 8 },
-  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, marginBottom: 8 },
+  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 14, marginBottom: 8 },
   sectionLabel: { fontFamily: "Inter_600SemiBold", fontSize: 11, letterSpacing: 1.5, color: "rgba(255,255,255,0.7)", textTransform: "uppercase" },
   seeAll: { flexDirection: "row", alignItems: "center", gap: 2 },
   seeAllText: { fontFamily: "Inter_500Medium", fontSize: 12, color: "rgba(255,255,255,0.6)" },
 
+  // Glassmorphism frame (estilo iOS widget / Instagram)
+  sectionFrameOuter: {
+    marginHorizontal: 12,
+    marginBottom: 16,
+    borderRadius: 20,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  sectionBlur: {
+    borderRadius: 20,
+    overflow: "hidden",
+  },
+  sectionFrameInner: {
+    paddingVertical: 14,
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  cardsRowFrame: { paddingHorizontal: 12, gap: 10 },
+
   // Viaje com eles
-  viajeHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, marginBottom: 8 },
+  viajeHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 14, marginBottom: 8 },
   viajeRow: { flexDirection: "row", alignItems: "center" },
-  viajeArrow: { width: 32, height: 56, alignItems: "center", justifyContent: "center", marginRight: 8 },
-  amigosRow: { paddingLeft: 16, gap: 12, alignItems: "center" },
+  viajeArrow: { width: 32, height: 56, alignItems: "center", justifyContent: "center", marginRight: 6 },
+  amigosRow: { paddingLeft: 14, gap: 12, alignItems: "center" },
   amigoItem: { alignItems: "center", width: 60 },
   amigoFoto: { width: 56, height: 56, borderRadius: 28, marginBottom: 6 },
   amigoNome: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: "#FFF", textAlign: "center" },
   amigoSobrenome: { fontFamily: "Inter_400Regular", fontSize: 10, color: "rgba(255,255,255,0.7)", textAlign: "center" },
 
   // Agora no Rio
-  agoraHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", paddingHorizontal: 16, marginBottom: 8 },
+  agoraHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", paddingHorizontal: 14, marginBottom: 8 },
   agoraUpdated: { fontFamily: "Inter_400Regular", fontSize: 10, color: "rgba(255,255,255,0.5)", marginTop: 2 },
 
   // Cards 120x120

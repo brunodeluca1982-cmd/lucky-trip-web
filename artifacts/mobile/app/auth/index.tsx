@@ -696,8 +696,8 @@ const s = StyleSheet.create({
     ...WNS,
   },
   logo: {
-    width: 68,
-    height: 68,
+    width: 100,
+    height: 28,
     marginBottom: 4,
   },
   brand: {
@@ -798,13 +798,13 @@ const s = StyleSheet.create({
     width: "100%",
     backgroundColor: GOLD,
     borderRadius: 12,
-    paddingVertical: 16,
+    paddingVertical: 10,
     alignItems: "center",
     marginBottom: 18,
   },
   ctaText: {
     fontFamily: "Inter_700Bold",
-    fontSize: 16,
+    fontSize: 14,
     color: "#000000",
     ...WNS,
   },

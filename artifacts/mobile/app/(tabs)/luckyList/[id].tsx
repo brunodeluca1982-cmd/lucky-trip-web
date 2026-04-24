@@ -8,6 +8,7 @@
 
 import React, { useRef } from "react";
 import {
+  ActivityIndicator,
   Dimensions,
   Image,
   Platform,
@@ -25,7 +26,8 @@ import Colors from "@/constants/colors";
 import { destinos } from "@/data/mockData";
 import RioMapView from "@/components/RioMapView";
 import { useGuia } from "@/context/GuiaContext";
-import { useLuckyList } from "@/hooks/useLuckyList";
+import { useLuckyList, type LuckyListItem } from "@/hooks/useLuckyList";
+import { useBairros } from "@/hooks/useBairros";
 
 const FREE_ITEMS = 3;
 
@@ -57,6 +59,8 @@ const DEFAULT_EDITORIAL = {
   ],
 };
 
+const RIO_DESTINO_ID = "7f047742-427f-4b11-8286-781af899c57d";
+
 export default function LuckyListScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets    = useSafeAreaInsets();
@@ -64,18 +68,21 @@ export default function LuckyListScreen() {
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
   const destino    = destinos.find((d) => d.id === id) ?? destinos[0];
-  const { lugares: allLugares, loading: lugaresLoading } = useLuckyList();
+  const { luckyList, loading: lugaresLoading, error } = useLuckyList("lucky-list-rio-de-janeiro");
+  const { bairros, loading: bairrosLoading } = useBairros(RIO_DESTINO_ID);
   const editorial  = EDITORIAIS[destino.id] ?? DEFAULT_EDITORIAL;
+
+  const allItens = luckyList?.itens ?? [];
 
   const { save, unsave, isSaved, isPremium, showPaywall } = useGuia();
 
   const listRef = useRef<ScrollView>(null);
 
-  function handleNeighborhoodPress(name: string | null) {
-    if (!name) return;
+  function handleBairroPress(bairro: any) {
+    if (!bairro) return;
     router.push({
       pathname: "/luckyList/bairro/[bairroNome]",
-      params: { bairroNome: name, cityId: destino.id },
+      params: { bairroNome: bairro.nome, cityId: destino.id },
     });
   }
 
@@ -86,8 +93,10 @@ export default function LuckyListScreen() {
       {/* ── Fixed map section ── */}
       <View style={s.mapSection}>
         <RioMapView
-          selectedNeighborhood={null}
-          onNeighborhoodPress={handleNeighborhoodPress}
+          bairros={bairros}
+          selectedBairroId={null}
+          onBairroPress={handleBairroPress}
+          loading={bairrosLoading}
           style={StyleSheet.absoluteFillObject}
         />
 
@@ -97,7 +106,7 @@ export default function LuckyListScreen() {
           </Pressable>
           <View style={[s.pill, s.pillGold]}>
             <Text style={s.pillGoldText}>
-              {lugaresLoading ? "✦ carregando…" : `✦ ${allLugares.length} picks`}
+              {lugaresLoading ? "✦ carregando…" : `✦ ${allItens.length} picks`}
             </Text>
           </View>
         </View>
@@ -127,7 +136,7 @@ export default function LuckyListScreen() {
           <View style={s.curatorBadge}>
             <View style={s.curatorDot} />
             <Text style={s.curatorText}>
-              Curadoria Lucky Trip · {destino.cidade} · {allLugares.length} picks selecionados
+              Curadoria Lucky Trip · {destino.cidade} · {allItens.length} picks selecionados
             </Text>
           </View>
         </View>
@@ -139,11 +148,26 @@ export default function LuckyListScreen() {
             <View style={s.sectionLabelLine} />
           </View>
 
-          {allLugares.map((place, index) => {
-            const isLocked = !isPremium && index >= FREE_ITEMS;
+          {lugaresLoading && (
+            <View style={s.loadingWrap}>
+              <ActivityIndicator size="small" color={GOLD} />
+              <Text style={s.loadingText}>Carregando picks...</Text>
+            </View>
+          )}
+
+          {error && !lugaresLoading && (
+            <View style={s.loadingWrap}>
+              <Feather name="alert-circle" size={18} color="rgba(201,168,76,0.4)" />
+              <Text style={s.loadingText}>{error}</Text>
+            </View>
+          )}
+
+          {!lugaresLoading && !error && allItens.map((item: LuckyListItem, index: number) => {
+            const isLocked = item.bloqueado && !isPremium;
+            const lugar = item.lugar;
             return (
               <Pressable
-                key={place.id}
+                key={item.id}
                 style={s.card}
                 onPress={() => {
                   if (isLocked) {
@@ -152,16 +176,17 @@ export default function LuckyListScreen() {
                   }
                   router.push({
                     pathname: "/lugar/[cityId]/[placeId]",
-                    params: { cityId: destino.id, placeId: place.id, source_table: "lucky_list_rio" },
+                    params: { cityId: destino.id, placeId: lugar.id, source_table: "lugares" },
                   });
                 }}
               >
                 <View style={s.cardImageWrap}>
-                  <Image
-                    source={place.image}
-                    style={[s.cardImage, isLocked && s.cardImageLocked]}
-                    resizeMode="cover"
-                  />
+                  <LinearGradient
+                    colors={["#1A1208", "#0F0A06"]}
+                    style={[s.cardImage, { justifyContent: "center", alignItems: "center" }]}
+                  >
+                    <Text style={{ fontSize: 40, color: GOLD, opacity: 0.3 }}>✦</Text>
+                  </LinearGradient>
                   <LinearGradient
                     colors={["rgba(0,0,0,0.22)", "rgba(0,0,0,0.05)", "rgba(0,0,0,0.55)"]}
                     locations={[0, 0.45, 1]}
@@ -189,22 +214,22 @@ export default function LuckyListScreen() {
                     <Text style={s.luckyIndexText}>{String(index + 1).padStart(2, "0")}</Text>
                   </View>
                   <View style={s.categoriaBadge}>
-                    <Text style={s.categoriaText}>{place.categoria}</Text>
+                    <Text style={s.categoriaText}>LUCKY LIST</Text>
                   </View>
                 </View>
 
                 <View style={s.cardBody}>
                   <View style={s.cardLocRow}>
                     <Feather name="map-pin" size={10} color={GOLD} />
-                    <Text style={s.cardLocText}>{place.localizacao}</Text>
+                    <Text style={s.cardLocText}>{lugar.bairro_nome ?? "Rio de Janeiro"}</Text>
                   </View>
                   <Text style={[s.cardTitulo, isLocked && s.cardTituloLocked]}>
-                    {isLocked ? "Lucky Pick exclusivo" : place.titulo}
+                    {isLocked ? "Lucky Pick exclusivo" : lugar.nome}
                   </Text>
                   <Text style={s.cardDesc}>
                     {isLocked
                       ? "Este endereço faz parte da curadoria Lucky Premium. Desbloqueie para ver."
-                      : place.descricao}
+                      : (lugar.meu_olhar ?? "Um dos achados especiais da Lucky List.")}
                   </Text>
 
                   {isLocked ? (
@@ -223,7 +248,7 @@ export default function LuckyListScreen() {
                           e.stopPropagation?.();
                           router.push({
                             pathname: "/lugar/[cityId]/[placeId]",
-                            params: { cityId: destino.id, placeId: place.id, source_table: "lucky_list_rio", showMap: "true" },
+                            params: { cityId: destino.id, placeId: lugar.id, source_table: "lugares", showMap: "true" },
                           });
                         }}
                       >
@@ -231,19 +256,19 @@ export default function LuckyListScreen() {
                         <Text style={s.verNoMapaText}>Ver no mapa</Text>
                       </Pressable>
                       <Pressable
-                        style={[s.saveBtn, isSaved(place.id) && s.saveBtnSaved]}
+                        style={[s.saveBtn, isSaved(lugar.id) && s.saveBtnSaved]}
                         onPress={(e) => {
                           e.stopPropagation?.();
-                          if (isSaved(place.id)) {
-                            unsave(place.id);
+                          if (isSaved(lugar.id)) {
+                            unsave(lugar.id);
                           } else {
                             save({
-                              id:           place.id,
+                              id:           lugar.id,
                               categoria:    "lucky",
-                              source_table: "lucky_list_rio",
-                              titulo:       place.titulo,
-                              localizacao:  place.localizacao,
-                              image:        place.image,
+                              source_table: "lugares",
+                              titulo:       lugar.nome,
+                              localizacao:  lugar.bairro_nome ?? "Rio de Janeiro",
+                              image:        require("../../../assets/images/ipanema.png"),
                             });
                           }
                         }}
@@ -251,10 +276,10 @@ export default function LuckyListScreen() {
                         <Feather
                           name="bookmark"
                           size={13}
-                          color={isSaved(place.id) ? C.white : GOLD}
+                          color={isSaved(lugar.id) ? C.white : GOLD}
                         />
-                        <Text style={[s.saveBtnText, isSaved(place.id) && s.saveBtnTextSaved]}>
-                          {isSaved(place.id) ? "Salvo" : "Salvar"}
+                        <Text style={[s.saveBtnText, isSaved(lugar.id) && s.saveBtnTextSaved]}>
+                          {isSaved(lugar.id) ? "Salvo" : "Salvar"}
                         </Text>
                       </Pressable>
                     </View>
@@ -407,6 +432,17 @@ const s = StyleSheet.create({
     paddingTop: 28,
     paddingHorizontal: 20,
     paddingBottom: 8,
+  },
+  loadingWrap: {
+    alignItems: "center",
+    paddingVertical: 40,
+    gap: 10,
+  },
+  loadingText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: "rgba(201,168,76,0.50)",
+    textAlign: "center",
   },
   sectionHeader: {
     flexDirection: "row",

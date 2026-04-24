@@ -42,6 +42,7 @@ import { AppState, type AppStateStatus, type ImageSourcePropType } from "react-n
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import { buildMediaUrl } from "@/lib/mediaUrl";
 
 // ── Storage keys ───────────────────────────────────────────────────────────────
 
@@ -54,13 +55,14 @@ export type PaywallType = "discovery" | "lucky" | "depth";
 
 // ── SavedItem ─────────────────────────────────────────────────────────────────
 
-export type SavedCategory = "oQueFazer" | "restaurante" | "hotel" | "lucky";
+export type SavedCategory = "oQueFazer" | "restaurante" | "hotel" | "lucky" | "atividade" | "praia" | "compras" | "dica_secreta" | "bar" | "cafe";
 
 /**
  * Valid Supabase table names for internal entities.
  * Used as the authoritative routing key — must match the actual DB table.
  */
 export type SourceTable =
+  | "lugares"
   | "restaurantes"
   | "stay_hotels"
   | "o_que_fazer_rio"
@@ -69,16 +71,27 @@ export type SourceTable =
 /** Maps UI category to the Supabase source table. */
 export function sourceTableFromCategoria(categoria: SavedCategory): SourceTable {
   switch (categoria) {
-    case "restaurante": return "restaurantes";
-    case "hotel":       return "stay_hotels";
-    case "oQueFazer":   return "o_que_fazer_rio";
-    case "lucky":       return "lucky_list_rio";
+    case "restaurante":
+    case "bar":
+    case "cafe":
+      return "lugares";
+    case "hotel":
+      return "lugares";
+    case "oQueFazer":
+    case "atividade":
+    case "praia":
+    case "compras":
+    case "dica_secreta":
+      return "lugares";
+    case "lucky":
+      return "lugares";
   }
 }
 
 /** Maps Supabase source table back to UI category. */
 export function categoriaFromSourceTable(table: SourceTable): SavedCategory {
   switch (table) {
+    case "lugares":         return "oQueFazer"; // Default for universal lugares table
     case "restaurantes":    return "restaurante";
     case "stay_hotels":     return "hotel";
     case "o_que_fazer_rio": return "oQueFazer";
@@ -419,7 +432,7 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
             titulo:       (row.titulo as string | null) ?? "",
             localizacao:  (row.localizacao as string | null) ?? "",
             image:        (row.image_url as string | null)
-                            ? { uri: row.image_url as string }
+                            ? { uri: buildMediaUrl(row.image_url as string) }
                             : { uri: "" },
           }));
 

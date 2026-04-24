@@ -12,6 +12,7 @@ import {
   Image,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -23,49 +24,61 @@ import { Feather } from "@expo/vector-icons";
 import { useBairros, type Bairro } from "@/hooks/useBairros";
 import RioMapView from "@/components/RioMapView";
 
-const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const MAP_H = Math.round(SCREEN_HEIGHT * 0.50);
+const CARD_SIZE = SCREEN_WIDTH - 48; // Square card with padding
 
 // Colors
 const PETROL = "#1B4F72";
-const SAND = "#F5F0E8";
 const TEAL = "#4ECDC4";
 const BG_DARK = "#0A0A0A";
-const CARD_BG = "#141414";
 
 // Rio de Janeiro destino_id
 const RIO_DESTINO_ID = "7f047742-427f-4b11-8286-781af899c57d";
 const FALLBACK_IMAGE = "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero01.jpg";
 
-// ── Pill label mappers ────────────────────────────────────────────────────────
+// ── Pill builders with emojis ─────────────────────────────────────────────────
 
-function getCaminhavelLabel(value?: string): string | null {
-  if (!value) return null;
-  switch (value.toLowerCase()) {
-    case "muito": return "Muito caminhavel";
-    case "razoavel": return "Caminhavel";
-    case "pouco": return "Pouco caminhavel";
-    default: return null;
-  }
-}
+function buildPills(bairro: Bairro): string[] {
+  const pills: string[] = [];
 
-function getVidaNoturnaLabel(value?: string): string | null {
-  if (!value) return null;
-  switch (value.toLowerCase()) {
-    case "intensa": return "Noite intensa";
-    case "moderada": return "Noite moderada";
-    case "tranquila": return "Tranquilo";
-    default: return null;
+  // Caminhavel
+  if (bairro.caminhavel) {
+    switch (bairro.caminhavel.toLowerCase()) {
+      case "muito":
+        pills.push("🚶 Muito caminhavel");
+        break;
+      case "razoavel":
+        pills.push("🚶 Caminhavel");
+        break;
+    }
   }
-}
 
-function getGastronomiaLabel(value?: string): string | null {
-  if (!value) return null;
-  switch (value.toLowerCase()) {
-    case "excelente": return "Gastronomia top";
-    case "boa": return "Boa gastronomia";
-    default: return null;
+  // Vida noturna
+  if (bairro.vida_noturna) {
+    switch (bairro.vida_noturna.toLowerCase()) {
+      case "intensa":
+        pills.push("🌙 Noite intensa");
+        break;
+      case "moderada":
+        pills.push("🌙 Noite moderada");
+        break;
+    }
   }
+
+  // Gastronomia
+  if (bairro.gastronomia) {
+    switch (bairro.gastronomia.toLowerCase()) {
+      case "excelente":
+        pills.push("🍽 Gastronomia top");
+        break;
+      case "boa":
+        pills.push("🍽 Boa gastronomia");
+        break;
+    }
+  }
+
+  return pills;
 }
 
 // ── Screen ────────────────────────────────────────────────────────────────────
@@ -82,24 +95,45 @@ export default function OndeFicarScreen() {
   // Selected bairro state
   const [selectedBairro, setSelectedBairro] = useState<Bairro | null>(null);
 
-  // Animation for card slide-up
-  const cardAnim = useRef(new Animated.Value(0)).current;
+  // Animation for card slide-up and cross-fade
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(1)).current;
 
   // Animate card when selection changes
   useEffect(() => {
-    Animated.timing(cardAnim, {
-      toValue: selectedBairro ? 1 : 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  }, [selectedBairro]);
+    if (selectedBairro) {
+      // Slide up + fade in
+      slideAnim.setValue(0);
+      fadeAnim.setValue(0);
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [selectedBairro?.id]);
 
   // Handle bairro selection from map
   function handleBairroPress(bairro: Bairro | null) {
     if (bairro) {
+      // Cross-fade when changing bairro
+      if (selectedBairro && selectedBairro.id !== bairro.id) {
+        fadeAnim.setValue(0);
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }).start();
+      }
       setSelectedBairro(bairro);
     }
-    // Don't deselect on map background tap
   }
 
   // "Escolher por mim" — pick random bairro (not the current one)
@@ -113,6 +147,17 @@ export default function OndeFicarScreen() {
     if (available.length === 0) return;
 
     const random = available[Math.floor(Math.random() * available.length)];
+
+    // Cross-fade animation
+    if (selectedBairro) {
+      fadeAnim.setValue(0);
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    }
+
     setSelectedBairro(random);
   }
 
@@ -122,21 +167,13 @@ export default function OndeFicarScreen() {
     router.push(`/ondeFicar/bairro/${selectedBairro.slug}`);
   }
 
-  // Build pills array
-  const pills: { icon: string; label: string }[] = [];
-  if (selectedBairro) {
-    const caminhavel = getCaminhavelLabel(selectedBairro.caminhavel);
-    const vidaNoturna = getVidaNoturnaLabel(selectedBairro.vida_noturna);
-    const gastronomia = getGastronomiaLabel(selectedBairro.gastronomia);
-    if (caminhavel) pills.push({ icon: "user", label: caminhavel });
-    if (vidaNoturna) pills.push({ icon: "moon", label: vidaNoturna });
-    if (gastronomia) pills.push({ icon: "coffee", label: gastronomia });
-  }
+  // Build pills for selected bairro
+  const pills = selectedBairro ? buildPills(selectedBairro) : [];
 
   // Card translate animation
-  const cardTranslate = cardAnim.interpolate({
+  const cardTranslate = slideAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [100, 0],
+    outputRange: [80, 0],
   });
 
   return (
@@ -168,7 +205,7 @@ export default function OndeFicarScreen() {
           /* ── Empty state: no bairro selected ── */
           <View style={s.emptyState}>
             <Text style={s.emptyTitle}>
-              Escolha no mapa o bairro que e a sua cara.
+              Escolha no mapa o bairro{"\n"}que e a sua cara.
             </Text>
             <Pressable style={s.chooseBtn} onPress={handleChooseForMe}>
               <Text style={s.chooseBtnIcon}>✦</Text>
@@ -176,55 +213,42 @@ export default function OndeFicarScreen() {
             </Pressable>
           </View>
         ) : (
-          /* ── Bairro preview card ── */
+          /* ── Bairro preview card (square style matching mockup) ── */
           <Animated.View
             style={[
               s.previewCard,
-              { transform: [{ translateY: cardTranslate }], opacity: cardAnim },
+              {
+                transform: [{ translateY: cardTranslate }],
+                opacity: fadeAnim,
+              },
             ]}
           >
-            {/* Hero image */}
-            <View style={s.heroImageWrap}>
+            {/* Square card with image */}
+            <View style={s.squareCard}>
               <Image
                 source={{ uri: selectedBairro.hero_image_url || FALLBACK_IMAGE }}
-                style={s.heroImage}
+                style={s.squareCardImage}
                 resizeMode="cover"
               />
               <LinearGradient
-                colors={["transparent", "rgba(0,0,0,0.7)"]}
+                colors={["transparent", "rgba(0,0,0,0.3)", "rgba(0,0,0,0.85)"]}
+                locations={[0.3, 0.6, 1]}
                 style={StyleSheet.absoluteFill}
               />
-              <Text style={s.heroName}>{selectedBairro.nome}</Text>
-            </View>
 
-            {/* Identidade */}
-            {selectedBairro.identidade && (
-              <Text style={s.identidade}>{selectedBairro.identidade}</Text>
-            )}
+              {/* Content at bottom of card */}
+              <View style={s.squareCardContent}>
+                {/* CTA Button */}
+                <Pressable style={s.ctaBtn} onPress={handleViewHotels}>
+                  <Text style={s.ctaBtnText}>Ver hoteis no →</Text>
+                </Pressable>
 
-            {/* Pills */}
-            {pills.length > 0 && (
-              <View style={s.pillsRow}>
-                {pills.map((pill, i) => (
-                  <View key={i} style={s.pill}>
-                    <Feather name={pill.icon as any} size={12} color="rgba(255,255,255,0.7)" />
-                    <Text style={s.pillText}>{pill.label}</Text>
-                  </View>
-                ))}
+                {/* Choose another link */}
+                <Pressable style={s.chooseAnotherBtn} onPress={handleChooseForMe}>
+                  <Text style={s.chooseAnotherText}>Escolher outro bairro</Text>
+                </Pressable>
               </View>
-            )}
-
-            {/* CTA Button */}
-            <Pressable style={s.ctaBtn} onPress={handleViewHotels}>
-              <Text style={s.ctaBtnText}>
-                Ver hoteis no {selectedBairro.nome} →
-              </Text>
-            </Pressable>
-
-            {/* Choose another link */}
-            <Pressable style={s.chooseAnotherBtn} onPress={handleChooseForMe}>
-              <Text style={s.chooseAnotherText}>Escolher outro bairro</Text>
-            </Pressable>
+            </View>
           </Animated.View>
         )}
       </View>
@@ -277,7 +301,7 @@ const s = StyleSheet.create({
     flex: 1,
     backgroundColor: BG_DARK,
     paddingHorizontal: 24,
-    paddingTop: 24,
+    paddingTop: 20,
   },
 
   // Empty state
@@ -294,7 +318,6 @@ const s = StyleSheet.create({
     textAlign: "center",
     lineHeight: 30,
     marginBottom: 24,
-    maxWidth: 280,
   },
   chooseBtn: {
     flexDirection: "row",
@@ -320,56 +343,29 @@ const s = StyleSheet.create({
   // Preview card
   previewCard: {
     flex: 1,
-  },
-  heroImageWrap: {
-    height: 160,
-    borderRadius: 12,
-    overflow: "hidden",
-    marginBottom: 16,
-  },
-  heroImage: {
-    width: "100%",
-    height: "100%",
-  },
-  heroName: {
-    position: "absolute",
-    bottom: 16,
-    left: 16,
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 28,
-    color: "#FFFFFF",
-    textShadowColor: "rgba(0,0,0,0.5)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-  },
-  identidade: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    fontStyle: "italic",
-    color: "rgba(255,255,255,0.6)",
-    marginBottom: 16,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
-  // Pills
-  pillsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginBottom: 24,
+  // Square card (matching mockup)
+  squareCard: {
+    width: CARD_SIZE,
+    height: CARD_SIZE * 0.65,
+    borderRadius: 20,
+    overflow: "hidden",
+    backgroundColor: "#1a1a1a",
   },
-  pill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderRadius: 100,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+  squareCardImage: {
+    width: "100%",
+    height: "100%",
+    position: "absolute",
   },
-  pillText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 12,
-    color: "rgba(255,255,255,0.85)",
+  squareCardContent: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 20,
   },
 
   // CTA
@@ -378,11 +374,11 @@ const s = StyleSheet.create({
     borderRadius: 100,
     paddingVertical: 16,
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 12,
   },
   ctaBtnText: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 16,
+    fontSize: 15,
     color: "#FFFFFF",
   },
 

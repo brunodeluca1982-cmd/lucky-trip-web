@@ -232,7 +232,7 @@ export default function LuckyScreen() {
         pool={rioHero && rioHero.length > 0
           ? rioHero.map((item) => ({ uri: item.public_url }))
           : LUCKY_BG_POOL}
-        blurRadius={14}
+        blurRadius={22}
       />
       <View style={styles.overlay}>
         <KeyboardAvoidingView
@@ -428,7 +428,7 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.44)",
+    backgroundColor: "rgba(0,0,0,0.45)",
   },
   content: {
     paddingHorizontal: 20,

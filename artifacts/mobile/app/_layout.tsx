@@ -20,7 +20,6 @@ import { Platform, StyleSheet, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { notifyFontsReady } from "@/lib/splashGate";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -142,9 +141,7 @@ export default function RootLayout() {
         <GuiaProvider>
           <QueryClientProvider client={queryClient}>
             <GestureHandlerRootView style={{ flex: 1, backgroundColor: ROOT_BG }}>
-              <KeyboardProvider>
-                <RootLayoutNav />
-              </KeyboardProvider>
+              <RootLayoutNav />
               {/* Branded session splash — covers everything on first launch only */}
               <SplashOverlay />
             </GestureHandlerRootView>

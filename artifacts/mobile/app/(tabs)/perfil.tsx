@@ -71,10 +71,11 @@ export default function PerfilScreen() {
 // ── Profile Hero Background ────────────────────────────────────────────────────
 
 const PROFILE_HERO_IMAGES = [
-  require("@/assets/images/ipanema.png"),
-  require("@/assets/images/hero-rio.png"),
-  require("@/assets/images/pao-acucar.png"),
-  require("@/assets/images/lapa.png"),
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero01.jpg" },
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero02.jpg" },
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero03.jpg" },
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero04.jpg" },
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero05.jpg" },
 ];
 const PROFILE_HERO_INTERVAL = 10_000;
 
@@ -117,14 +118,16 @@ function ProfileHeroBg() {
         source={resolvedPool[currentIdx]}
         style={StyleSheet.absoluteFill}
         resizeMode="cover"
-        pointerEvents="none"
+        blurRadius={22}
       />
-      <Animated.Image
-        source={resolvedPool[nextIdx]}
-        style={[StyleSheet.absoluteFill, { opacity: nextOpacity }]}
-        resizeMode="cover"
-        pointerEvents="none"
-      />
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: nextOpacity }]}>
+        <Image
+          source={resolvedPool[nextIdx]}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+          blurRadius={22}
+        />
+      </Animated.View>
       <View style={s.profileHeroOverlay} pointerEvents="none" />
       <LinearGradient
         colors={["transparent", "rgba(13,13,13,0.70)", "#0D0D0D"]}
@@ -403,7 +406,7 @@ const s = StyleSheet.create({
   },
   profileHeroOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.48)",
+    backgroundColor: "rgba(0,0,0,0.45)",
   },
   profileHeroGradient: {
     position: "absolute",

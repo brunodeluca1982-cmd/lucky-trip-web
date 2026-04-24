@@ -44,17 +44,31 @@ const C    = Colors.light;
 const GOLD = "#D4AF37";
 const { width: SCREEN_W } = Dimensions.get("window");
 
-const FALLBACK_BG = require("@/assets/images/ipanema.png");
+// Rio photos for rotating background
+const RIO_BG_PHOTOS = [
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero01.jpg" },
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero02.jpg" },
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero03.jpg" },
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero04.jpg" },
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero05.jpg" },
+];
+const FALLBACK_BG = RIO_BG_PHOTOS[0];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Category label map
 // ─────────────────────────────────────────────────────────────────────────────
 
 const CATEGORY_LABEL: Record<SavedCategory, string> = {
-  oQueFazer:   "Experiência",
-  restaurante: "Restaurante",
-  hotel:       "Hotel",
-  lucky:       "Lucky List",
+  oQueFazer:    "Experiência",
+  restaurante:  "Restaurante",
+  hotel:        "Hotel",
+  lucky:        "Lucky List",
+  atividade:    "Atividade",
+  praia:        "Praia",
+  compras:      "Compras",
+  dica_secreta: "Dica Secreta",
+  bar:          "Bar",
+  cafe:         "Café",
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -62,23 +76,21 @@ const CATEGORY_LABEL: Record<SavedCategory, string> = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function SceneBackground({ images }: { images: ImageSourcePropType[] }) {
-  const hasSaved      = images.length > 0;
+  // Always use Rio photos as background with loop
+  const bgImages = RIO_BG_PHOTOS;
   const [idx, setIdx] = useState(0);
-  // Overlay starts invisible — fades in once the first image is actually displayed.
-  // This guarantees content never lands on a darkened black canvas.
-  const overlayAnim   = useRef(new Animated.Value(0)).current;
+  const overlayAnim = useRef(new Animated.Value(0)).current;
 
-  // Cycle through saved place images every 5 s.
-  // expo-image crossfades automatically when `source` changes (transition prop below).
+  // Cycle through Rio photos every 8s (igual home)
   useEffect(() => {
-    if (images.length <= 1) return;
+    if (bgImages.length <= 1) return;
     const timer = setInterval(() => {
-      setIdx((prev) => (prev + 1) % images.length);
-    }, 5000);
+      setIdx((prev) => (prev + 1) % bgImages.length);
+    }, 8000);
     return () => clearInterval(timer);
-  }, [images.length]);
+  }, [bgImages.length]);
 
-  const src = hasSaved ? (images[idx] ?? images[0]) : FALLBACK_BG;
+  const src = bgImages[idx] ?? bgImages[0];
 
   function handleDisplay() {
     Animated.timing(overlayAnim, {
@@ -90,36 +102,27 @@ function SceneBackground({ images }: { images: ImageSourcePropType[] }) {
 
   return (
     <>
-      {/* Warm amber base — renders instantly in the same frame as mount */}
+      {/* Warm amber base — renders instantly */}
       <LinearGradient
         colors={["#2D1A08", "#1A0E04"]}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
-      {/* expo-image: backgroundColor shows immediately; crossfades to real image */}
+      {/* Rio photos with blur 22 */}
       <ExpoImage
         source={src}
         style={[StyleSheet.absoluteFillObject, { backgroundColor: "#1A0E04" }]}
         contentFit="cover"
-        blurRadius={Platform.OS === "ios" ? 30 : 18}
-        transition={{ duration: 600, effect: "cross-dissolve" }}
+        blurRadius={22}
+        transition={{ duration: 800, effect: "cross-dissolve" }}
         onDisplay={handleDisplay}
       />
-      {/* Dark cinematic overlay fades in with the image — never above an empty canvas */}
+      {/* Dark overlay 0.45 */}
       <Animated.View
         style={[StyleSheet.absoluteFill, { opacity: overlayAnim }]}
         pointerEvents="none"
       >
-        <LinearGradient
-          colors={[
-            "rgba(0,0,0,0.05)",
-            "rgba(0,0,0,0.25)",
-            "rgba(0,0,0,0.52)",
-            "rgba(0,0,0,0.72)",
-          ]}
-          locations={[0, 0.30, 0.62, 1]}
-          style={StyleSheet.absoluteFill}
-        />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.45)" }]} />
       </Animated.View>
     </>
   );

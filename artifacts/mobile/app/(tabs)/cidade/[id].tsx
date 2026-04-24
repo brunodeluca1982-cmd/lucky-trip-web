@@ -1,1085 +1,360 @@
-import React from "react";
+// cidade/[id].tsx — EXACT copy of reference image
+import React, { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
+  Animated,
   Dimensions,
   Image,
-  Linking,
+  ImageSourcePropType,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
-import Colors from "@/constants/colors";
-import { HorizontalScroll } from "@/components/HorizontalScroll";
-import { PlaceCard } from "@/components/PlaceCard";
-import { SectionHeader } from "@/components/SectionHeader";
-import {
-  destinos,
-  detectPeriodo,
-  type Periodo,
-} from "@/data/mockData";
-import { AGORA_CONTENT, FALLBACK_CONTENT } from "@/data/agoraContent";
-import { RestauranteCard } from "@/components/RestauranteCard";
-import { HotelCard } from "@/components/HotelCard";
-import { useOQueFazer } from "@/hooks/useOQueFazer";
-import { useRestaurants } from "@/hooks/useRestaurants";
-import { useNeighborhoods } from "@/hooks/useNeighborhoods";
-import { getNeighborhoodImage } from "@/data/neighborhoodImages";
-import { supabase } from "@/lib/supabase";
+import { Feather, Ionicons } from "@expo/vector-icons";
+import { destinos } from "@/data/mockData";
+import { useDestinoFotos } from "@/hooks/useDestinoFotos";
+import { useDestaquesDestino, type DestaqueDestino } from "@/hooks/useDestaquesDestino";
 
-const C = Colors.light;
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const PETROL_BLUE = "#1B4F72";
+const GLASS_BG = "rgba(20,20,20,0.35)";
+const SAND_BORDER = "rgba(232,220,200,0.35)"; // Tom areia para bordas
 
-// "Agora no/em/na" — preposition + city label for the real-time card eyebrow
-const AGORA_LABEL: Record<string, string> = {
-  rio: "Agora no Rio",
-  santorini: "Agora em Santorini",
-  kyoto: "Agora em Kyoto",
-  paris: "Agora em Paris",
-  "nova-york": "Agora em Nova York",
-  toquio: "Agora em Tóquio",
-  lisboa: "Agora em Lisboa",
-  miami: "Agora em Miami",
-  bali: "Agora em Bali",
-  amsterdam: "Agora em Amsterdam",
-  marrakech: "Agora em Marrakech",
-  ilhabela: "Agora em Ilhabela",
-};
+// Hero carousel - 13s interval, 400ms fade
+const CROSSFADE_DURATION = 400;
+const ROTATION_INTERVAL = 13000;
 
-const ESSENTIALS: Record<string, string> = {
-  rio: "do Rio",
-  santorini: "de Santorini",
-  kyoto: "de Kyoto",
-  paris: "de Paris",
-  "nova-york": "de Nova York",
-  toquio: "de Tóquio",
-  lisboa: "de Lisboa",
-  miami: "de Miami",
-  bali: "de Bali",
-  amsterdam: "de Amsterdam",
-  marrakech: "de Marrakech",
-  ilhabela: "de Ilhabela",
-};
+// ── Constants ─────────────────────────────────────────────────────────────────
+const RIO_DESTINO_ID = "7f047742-427f-4b11-8286-781af899c57d";
 
-const AGORA: Record<string, Record<Periodo, string>> = {
-  rio: {
-    manha: "Café da manhã em Ipanema",
-    tarde: "Praia no Leblon",
-    noite: "Drinks em Botafogo",
-  },
-  santorini: {
-    manha: "Nascer do sol no Aegeu",
-    tarde: "Vinho na caldera ao entardecer",
-    noite: "Jantar com vista para o vulcão",
-  },
-  kyoto: {
-    manha: "Cerimônia do chá em Gion",
-    tarde: "Passeio pelos templos dourados",
-    noite: "Izakaya no Pontocho",
-  },
-  paris: {
-    manha: "Café da manhã em Montmartre",
-    tarde: "Musée d'Orsay sem fila",
-    noite: "Jantar perto do Sena",
-  },
-  "nova-york": {
-    manha: "Café no West Village",
-    tarde: "Hora dourada no High Line",
-    noite: "Bar no terraço em Manhattan",
-  },
-  toquio: {
-    manha: "Sakura no Shinjuku Gyoen",
-    tarde: "Tsukiji e sushi fresco",
-    noite: "Izakaya no Shinjuku",
-  },
-  lisboa: {
-    manha: "Pastel de nata em Belém",
-    tarde: "Elétrico 28 pelo Alfama",
-    noite: "Fado ao cair da noite",
-  },
-  miami: {
-    manha: "Corrida na praia de South Beach",
-    tarde: "Passeio pela Art Deco District",
-    noite: "Wynwood Walls à noite",
-  },
-  bali: {
-    manha: "Yoga ao amanhecer em Ubud",
-    tarde: "Arrozais de Tegallalang",
-    noite: "Ritual ao pôr do sol em Uluwatu",
-  },
-  amsterdam: {
-    manha: "Mercado de flores Bloemenmarkt",
-    tarde: "Canal ao entardecer de bicicleta",
-    noite: "Jenever nos bares do Jordaan",
-  },
-  marrakech: {
-    manha: "Mercado de especiarias na medina",
-    tarde: "Riads escondidos no souk",
-    noite: "Pôr do sol no deserto de Agafay",
-  },
-  ilhabela: {
-    manha: "Trilha para a cachoeira do Gato",
-    tarde: "Snorkel nas praias do sul",
-    noite: "Frutos do mar na Vila",
-  },
-};
+// Navigation helper - routes to proper entity page based on categoria
+function getEntityRoute(destaque: DestaqueDestino): { pathname: string; params: Record<string, string> } | null {
+  if (!destaque.entity_id || !destaque.lugar) return null;
 
-// Editorial microcopy for non-launched destinations — shown in place of content modules
-const COMING_SOON_COPY: Record<string, string> = {
-  santorini:   "Santorini está sendo mapeada com o mesmo cuidado que merece o seu pôr-do-sol. Em breve, cada calçada branca e cada vinho local estará aqui.",
-  kyoto:       "Kyoto exige paciência — a mesma que os monges que varreram seus templos por séculos. Estamos preparando algo à altura da cidade.",
-  lisboa:      "Lisboa está quase pronta: os becos do Alfama, os pastéis de Belém e o fado que só se entende de perto.",
-  buenosaires: "Buenos Aires é urgente — tango, bifes e uma arquitectura que te faz parar a cada esquina. A nossa curadoria chega em breve.",
-  floripa:     "Florianópolis tem 42 praias. Estamos visitando cada uma delas antes de te recomendar qualquer coisa.",
-  paraty:      "Paraty é pequena e profunda. Estamos conversando com moradores, cozinheiras e barqueiros para te dar o que os guias convencionais nunca vão ter.",
-  gramado:     "Gramado tem o charme de um segredo de família. A nossa curadoria chega com chocolate, fondue e tudo o que a Serra Gaúcha guarda de melhor.",
-  miami:       "Miami vive fast — mas a nossa curadoria vai devagar, encontrando o que existe entre South Beach e Little Havana.",
-  paris:       "Paris não precisa de apresentação. Mas precisa de um guia que te tire dos caminhos óbvios. Em breve.",
-  bali:       "Bali é um estado de espírito antes de ser um destino. Estamos encontrando os templos, os rituais e os warungs que valem o voo longo.",
-  ilhabela:    "Ilhabela é cachoeira, vento e mar aberto. Estamos mapeando trilhas e ancoradouros que poucos conhecem.",
-};
+  const { id, slug, categoria } = destaque.lugar;
 
-function GlassButton({
-  onPress,
-  children,
-  style,
-  bright,
-}: {
-  onPress?: () => void;
-  children: React.ReactNode;
-  style?: object;
-  bright?: boolean;
-}) {
+  // Map categoria to route
+  switch (categoria) {
+    case "restaurante":
+    case "bar":
+      return { pathname: "/lugar/[cityId]/[placeId]", params: { cityId: "rio", placeId: id, source_table: "lugares" } };
+    case "atividade":
+    case "praia":
+    case "dica_secreta":
+    case "compras":
+      return { pathname: "/lugar/[cityId]/[placeId]", params: { cityId: "rio", placeId: id, source_table: "lugares" } };
+    case "hotel":
+      return { pathname: "/hotel/[id]", params: { id } };
+    default:
+      return { pathname: "/lugar/[cityId]/[placeId]", params: { cityId: "rio", placeId: id, source_table: "lugares" } };
+  }
+}
+
+// ── Hero Background ───────────────────────────────────────────────────────────
+function HeroBackground({ fotos, fallback }: { fotos: string[]; fallback: ImageSourcePropType }) {
+  const [idx, setIdx] = useState(0);
+  const fade = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (fotos.length <= 1) return;
+    const timer = setInterval(() => {
+      Animated.timing(fade, { toValue: 0, duration: CROSSFADE_DURATION, useNativeDriver: true }).start(() => {
+        setIdx((i) => (i + 1) % fotos.length);
+        fade.setValue(1);
+      });
+    }, ROTATION_INTERVAL);
+    return () => clearInterval(timer);
+  }, [fotos.length, idx]);
+
+  if (fotos.length === 0) return <Image source={fallback} style={s.bgImg} resizeMode="cover" />;
+  if (fotos.length === 1) return <Image source={{ uri: fotos[0] }} style={s.bgImg} resizeMode="cover" />;
+
+  const next = (idx + 1) % fotos.length;
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        s.glassBtn,
-        bright && s.glassBtnBright,
-        style,
-        pressed && { opacity: 0.82 },
-      ]}
-    >
-      {children}
-    </Pressable>
+    <>
+      <Image source={{ uri: fotos[next] }} style={s.bgImg} resizeMode="cover" />
+      <Animated.Image source={{ uri: fotos[idx] }} style={[s.bgImg, { opacity: fade }]} resizeMode="cover" />
+    </>
   );
 }
 
-type EventoAtivo = {
-  id: string;
-  nome: string;
-  tipo: string | null;
-  cor_destaque: string | null;
-  icone: string | null;
-};
-
-type EventoItem = {
-  id: string;
-  titulo: string;
-  tipo: string;
-  descricao: string | null;
-  local_nome: string | null;
-  bairro: string | null;
-  google_maps_url: string | null;
-  instagram: string | null;
-  ordem: number;
-};
-
-// Map evento tipo → Feather icon
-function tipoIcon(tipo: string): keyof typeof Feather.glyphMap {
-  const map: Record<string, keyof typeof Feather.glyphMap> = {
-    show:        "music",
-    ingresso:    "tag",
-    hospedagem:  "home",
-    hotel:       "home",
-    restaurante: "coffee",
-    gastronomia: "coffee",
-    transporte:  "navigation",
-    dica:        "star",
-    copa:        "award",
-    esporte:     "award",
-    festival:    "headphones",
-    compra:      "shopping-bag",
-  };
-  return map[tipo.toLowerCase()] ?? "star";
-}
-
-// ── Evento items horizontal card ──────────────────────────────────────────────
-
-function EventoItemCard({
-  item,
-  color,
-}: {
-  item: EventoItem;
-  color: string;
-}) {
-  const primaryLink = item.google_maps_url ?? item.instagram ?? null;
-  const linkIcon: keyof typeof Feather.glyphMap =
-    item.google_maps_url ? "map-pin" : "instagram";
-
-  return (
-    <Pressable
-      style={({ pressed }) => [evs.card, pressed && { opacity: 0.80 }]}
-      onPress={() => {
-        if (primaryLink) Linking.openURL(primaryLink);
-      }}
-    >
-      <View style={[evs.iconCircle, { backgroundColor: color + "22", borderColor: color + "44" }]}>
-        <Feather name={tipoIcon(item.tipo)} size={15} color={color} />
-      </View>
-      <Text style={[evs.categoria, { color: color + "CC" }]}>
-        {item.tipo.toUpperCase()}
-      </Text>
-      <Text style={evs.titulo} numberOfLines={2}>{item.titulo}</Text>
-      {item.local_nome ? (
-        <Text style={evs.subtitulo} numberOfLines={1}>{item.local_nome}</Text>
-      ) : item.descricao ? (
-        <Text style={evs.subtitulo} numberOfLines={2}>{item.descricao}</Text>
-      ) : null}
-      {item.bairro ? (
-        <Text style={[evs.bairro, { color: color + "88" }]}>{item.bairro}</Text>
-      ) : null}
-      {primaryLink ? (
-        <View style={[evs.linkChip, { borderColor: color + "55" }]}>
-          <Feather name={linkIcon} size={10} color={color} />
-          <Text style={[evs.linkText, { color }]}>
-            {item.google_maps_url ? "Ver no mapa" : "Instagram"}
-          </Text>
-        </View>
-      ) : null}
-    </Pressable>
-  );
-}
-
+// ── Main Screen ───────────────────────────────────────────────────────────────
 export default function CidadeScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
-
   const destino = destinos.find((d) => d.id === id) ?? destinos[0];
-  const isRio = destino.id === "rio";
+  const top = Platform.OS === "web" ? 20 : insets.top;
+  const bottom = Platform.OS === "web" ? 34 : insets.bottom;
 
-  const topInset = Platform.OS === "web" ? 67 : insets.top;
-  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
-  const periodo = detectPeriodo();
+  const { fotos, loading } = useDestinoFotos(destino.id);
+  const { essencial, agora, loading: loadingDestaques } = useDestaquesDestino(RIO_DESTINO_ID);
+  const [dotIdx, setDotIdx] = useState(0);
 
-  // Modo Evento — destination-specific, activated via Supabase `eventos` table
-  const [evento,      setEvento]      = React.useState<EventoAtivo | null>(null);
-  const [eventoOn,    setEventoOn]    = React.useState(false);
-  const [eventoItens, setEventoItens] = React.useState<EventoItem[]>([]);
-
-  React.useEffect(() => {
-    let cancelled = false;
-    async function fetchEvento() {
-      const { data } = await supabase
-        .from("eventos")
-        .select("id, nome, tipo, cor_destaque, icone")
-        .eq("cidade_id", destino.id)
-        .eq("is_active", true)
-        .maybeSingle();
-      if (!cancelled) setEvento(data ?? null);
-
-      // Eagerly load items so they appear instantly when toggle is flipped
-      if (data?.id && !cancelled) {
-        const { data: itens } = await supabase
-          .from("evento_itens")
-          .select("id, titulo, tipo, descricao, local_nome, bairro, google_maps_url, instagram, ordem")
-          .eq("evento_id", data.id)
-          .eq("ativo", true)
-          .order("ordem");
-        if (!cancelled) setEventoItens(itens ?? []);
-      }
-    }
-    fetchEvento();
-    return () => { cancelled = true; };
-  }, [destino.id]);
-
-  const eventoColor = evento?.cor_destaque ?? "#D4AF37";
-
-  // Supabase data
-  const { lugares: atividades, loading: loadingAtiv } = useOQueFazer();
-  const { restaurantes: restos, loading: loadingRestos } = useRestaurants();
-  const { neighborhoods, loading: loadingHoteis } = useNeighborhoods();
-  const allHotels = neighborhoods.flatMap((n) =>
-    (n.hotels ?? []).map((h) => ({ ...h, localizacao: n.neighborhood_name }))
-  );
-  // Derive "Agora" label + pinned item from the same source as the next page
-  const cityAgoraContent = AGORA_CONTENT[destino.id] ?? FALLBACK_CONTENT;
-  const firstAgoraItem = cityAgoraContent[periodo]?.[0];
-  const experience = firstAgoraItem?.titulo ?? "Descoberta local";
-  const agoraLabel = AGORA_LABEL[destino.id] ?? `Agora em ${destino.cidade}`;
-  const essentialRef = ESSENTIALS[destino.id] ?? `de ${destino.cidade}`;
+  useEffect(() => {
+    if (fotos.length <= 1) return;
+    const t = setInterval(() => setDotIdx((i) => (i + 1) % fotos.length), ROTATION_INTERVAL);
+    return () => clearInterval(t);
+  }, [fotos.length]);
 
   return (
     <View style={s.root}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* ── Fullscreen background image — fixed behind everything ── */}
-      <Image source={destino.image} style={s.bgImage} resizeMode="cover" />
-
-      {/* ── Cinematic gradient overlay — full screen, fixed ──
-          Designed in three zones:
-            Top 20%  → dark burn (back button readable)
-            20–48%   → clears out (city name reads on image)
-            48–100%  → deepens to near-black (buttons float on dark canvas) */}
-      <LinearGradient
-        colors={[
-          "rgba(0,0,0,0.62)",
-          "rgba(0,0,0,0.14)",
-          "rgba(0,0,0,0.08)",
-          "rgba(0,0,0,0.72)",
-          "rgba(0,0,0,0.96)",
-        ]}
-        locations={[0, 0.20, 0.42, 0.62, 1]}
-        style={StyleSheet.absoluteFill}
-      />
-
-      {/* ── Back button — fixed, does not scroll ── */}
-      <Pressable
-        onPress={() => router.back()}
-        style={[s.backBtn, { top: topInset + 12 }]}
-        hitSlop={8}
-      >
-        <Feather name="arrow-left" size={20} color={C.white} />
-      </Pressable>
-
-      {/* ── Media buttons — fixed top-right (Play + Music) ── */}
-      <View style={[s.mediaButtons, { top: topInset + 12 }]}>
-        <Pressable
-          hitSlop={8}
-          style={({ pressed }) => [s.mediaBtn, pressed && { opacity: 0.70 }]}
-          onPress={() => {
-            const videoUrl = (destino as any).video_url;
-            if (videoUrl) {
-              Linking.openURL(videoUrl);
-            } else {
-              Alert.alert("Vídeos em breve", "Os vídeos de " + destino.cidade + " chegam em breve.");
-            }
-          }}
-        >
-          <Feather name="play" size={15} color={C.white} />
-        </Pressable>
-        <Pressable
-          hitSlop={8}
-          style={({ pressed }) => [s.mediaBtn, pressed && { opacity: 0.70 }]}
-          onPress={() => {
-            const spotifyUrl = (destino as any).spotify_url;
-            if (spotifyUrl) {
-              Linking.openURL(spotifyUrl);
-            } else {
-              Alert.alert("Trilha sonora em breve", "A playlist de " + destino.cidade + " no Spotify chega em breve.");
-            }
-          }}
-        >
-          <Feather name="music" size={15} color={C.white} />
-        </Pressable>
+      {/* ══ FULLSCREEN HERO BACKGROUND ══ */}
+      <View style={StyleSheet.absoluteFill}>
+        <HeroBackground fotos={fotos} fallback={destino.image} />
+        <LinearGradient
+          colors={["rgba(0,0,0,0.3)", "rgba(0,0,0,0.05)", "rgba(0,0,0,0.1)", "rgba(0,0,0,0.6)"]}
+          locations={[0, 0.25, 0.5, 1]}
+          style={StyleSheet.absoluteFill}
+        />
       </View>
 
-      {/* ── Scrollable content — transparent, floats over the fixed image ──
-          Everything here is in normal vertical flow: title → spacing → buttons.
-          No absolute positioning between siblings → no overlap possible. */}
-      <ScrollView
-        style={s.scroll}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          s.scrollContent,
-          { paddingTop: topInset + 44, paddingBottom: bottomPad + 96 },
-        ]}
-      >
-        {/* City identity — in flow, sits in the clear zone of the gradient */}
-        <View style={s.identity}>
-          <Text style={s.pais}>{destino.pais}</Text>
-          <Text style={s.cidade}>{destino.cidade}</Text>
+      {/* ══ TOP BAR ══ */}
+      <View style={[s.topBar, { paddingTop: top + 8 }]}>
+        <Pressable style={s.topBtn} onPress={() => router.back()}>
+          <Feather name="arrow-left" size={18} color="#fff" />
+        </Pressable>
+        <View style={s.topCenter}>
+          <Image source={require("@/assets/images/logo_symbol_white.png")} style={s.logo} resizeMode="contain" />
+          <View style={s.separator} />
+        </View>
+        <View style={s.topRight}>
+          <Pressable style={s.topBtn}><Feather name="music" size={14} color="#fff" /></Pressable>
+          <Pressable style={s.topBtn}><Feather name="play" size={14} color="#fff" /></Pressable>
+        </View>
+      </View>
+
+      {/* ══ SCROLLABLE CONTENT ══ */}
+      <ScrollView style={s.scroll} contentContainerStyle={{ paddingBottom: bottom + 90 }} showsVerticalScrollIndicator={false}>
+
+        {/* ── Hero Text ── */}
+        <View style={[s.heroText, { paddingTop: top + 60 }]}>
+          <Text style={s.label}>DESTINO</Text>
+          <Text style={s.title}>Rio de Janeiro</Text>
+          <Text style={s.subtitle}>Três dias entre o mar e a montanha.</Text>
+          <Text style={s.country}>BRASIL</Text>
+          <View style={s.dots}>
+            {[0, 1, 2, 3].map((i) => (
+              <View key={i} style={[s.dot, dotIdx % 4 === i && s.dotActive]} />
+            ))}
+          </View>
         </View>
 
-        {/* Modo Evento toggle — visible only when an active event exists for this city */}
-        {evento && (
-          <View style={[s.eventoRow, eventoOn && { borderColor: eventoColor + "60" }]}>
-            <View style={s.eventoLeft}>
-              {evento.icone ? (
-                <Feather name={evento.icone as any} size={15} color={eventoColor} />
-              ) : (
-                <Text style={[s.eventoStar, { color: eventoColor }]}>✦</Text>
-              )}
-              <Text style={[s.eventoLabel, { color: eventoOn ? eventoColor : "rgba(255,255,255,0.80)" }]}>
-                {evento.nome}
-              </Text>
-            </View>
-            <Switch
-              value={eventoOn}
-              onValueChange={setEventoOn}
-              trackColor={{ false: "rgba(255,255,255,0.18)", true: eventoColor + "A0" }}
-              thumbColor={eventoOn ? eventoColor : "rgba(255,255,255,0.70)"}
-              ios_backgroundColor="rgba(255,255,255,0.18)"
-            />
-          </View>
-        )}
-
-        {/* Spacer — pushes buttons into the dark lower zone, prevents collision */}
-        <View style={{ height: SCREEN_HEIGHT * 0.10 }} />
-
-        {/* ── Action buttons — normal flow inside scroll ── */}
-        <View style={s.menu}>
-          {/* 1. PRIMARY */}
-          <GlassButton
-            bright
-            style={s.btnPrimary}
-            onPress={() =>
-              router.push({ pathname: "/essencial/[id]", params: { id: destino.id } })
-            }
-          >
-            <View style={s.btnPrimaryInner}>
-              <View style={s.btnPrimaryLeft}>
-                <Text style={s.eyebrow}>Comece por aqui</Text>
-                <Text style={s.btnPrimaryLabel}>
-                  O essencial {essentialRef}
-                </Text>
+        {/* ── COMECE POR AQUI ── */}
+        <View style={s.section}>
+          <View style={s.glass}>
+            <View style={s.header}>
+              <View>
+                <Text style={s.eyebrow}>COMECE POR AQUI</Text>
+                <Text style={s.headerTitle}>O essencial do Rio</Text>
               </View>
-              <View style={s.btnPrimaryArrow}>
-                <Feather name="arrow-right" size={18} color={C.white} />
-              </View>
-            </View>
-          </GlassButton>
-
-          {/* 2. EXPERIENCE */}
-          <GlassButton
-            style={s.btnExperience}
-            onPress={() => {
-              const params: Record<string, string> = { id: destino.id };
-              if (firstAgoraItem?.id) params.pinnedId = firstAgoraItem.id;
-              router.push({ pathname: "/agoraNoRio/[id]", params });
-            }}
-          >
-            <View style={s.btnExperienceInner}>
-              <View style={s.expIconWrap}>
-                <Text style={s.expIcon}>✦</Text>
-              </View>
-              <View style={s.expTexts}>
-                <Text style={s.eyebrowGold}>{agoraLabel}</Text>
-                <Text style={s.btnExperienceLabel}>{experience}</Text>
-              </View>
-            </View>
-          </GlassButton>
-
-          {/* 3. Onde ficar */}
-          <GlassButton
-            style={s.btnStandard}
-            onPress={() =>
-              router.push({ pathname: "/ondeFicar/[id]", params: { id: destino.id } })
-            }
-          >
-            <View style={s.btnStandardInner}>
-              <Feather name="moon" size={16} color="rgba(255,255,255,0.70)" />
-              <Text style={s.btnStandardLabel}>Onde ficar</Text>
-            </View>
-          </GlassButton>
-
-          {/* 4. Onde comer */}
-          <GlassButton
-            style={s.btnStandard}
-            onPress={() =>
-              router.push({ pathname: "/comerBem/[id]", params: { id: destino.id } })
-            }
-          >
-            <View style={s.btnStandardInner}>
-              <Feather name="coffee" size={16} color="rgba(255,255,255,0.70)" />
-              <Text style={s.btnStandardLabel}>Onde comer</Text>
-            </View>
-          </GlassButton>
-
-          {/* 5. O que fazer */}
-          <GlassButton
-            style={s.btnStandard}
-            onPress={() =>
-              router.push({ pathname: "/oQueFazer/categorias/[id]", params: { id: destino.id } })
-            }
-          >
-            <View style={s.btnStandardInner}>
-              <Feather name="compass" size={16} color="rgba(255,255,255,0.70)" />
-              <Text style={s.btnStandardLabel}>O que fazer</Text>
-            </View>
-          </GlassButton>
-
-          {/* 6. Lucky List */}
-          <GlassButton
-            style={[s.btnStandard, s.btnLucky]}
-            onPress={() =>
-              router.push({ pathname: "/luckyList/[id]", params: { id: destino.id } })
-            }
-          >
-            <View style={s.btnStandardInner}>
-              <Text style={s.luckyIcon}>✦</Text>
-              <Text style={s.btnLuckyLabel}>Lucky List</Text>
-            </View>
-          </GlassButton>
-
-          {/* 7. Como chegar */}
-          <GlassButton
-            style={s.btnStandard}
-            onPress={() => router.push({ pathname: "/comoChegar/[cityId]", params: { cityId: destino?.id ?? "rio" } })}
-          >
-            <View style={s.btnStandardInner}>
-              <Feather name="map-pin" size={16} color="rgba(255,255,255,0.70)" />
-              <Text style={s.btnStandardLabel}>Como chegar</Text>
-            </View>
-          </GlassButton>
-        </View>
-
-        {/* ── Evento section — appears when toggle is ON and items exist ── */}
-        {eventoOn && evento && eventoItens.length > 0 && (
-          <View style={evs.section}>
-            <View style={evs.header}>
-              {evento.icone ? (
-                <Feather name={evento.icone as any} size={13} color={eventoColor} />
-              ) : (
-                <Text style={[evs.headerStar, { color: eventoColor }]}>✦</Text>
-              )}
-              <Text style={[evs.headerTitle, { color: eventoColor }]}>
-                {evento.nome} · O que não perder
-              </Text>
-            </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={evs.scrollContent}
-            >
-              {eventoItens.map((item) => (
-                <EventoItemCard key={item.id} item={item} color={eventoColor} />
-              ))}
-            </ScrollView>
-          </View>
-        )}
-
-        {/* ── Editorial content — cream section, scrolls naturally below ── */}
-        <View style={s.editorial}>
-          {isRio ? (
-            <>
-              {/* ── O que fazer — Supabase: o_que_fazer_rio ── */}
-              <View style={s.section}>
-                <SectionHeader
-                  title="O que fazer"
-                  subtitle={`Experiências imperdíveis em ${destino.cidade}.`}
-                />
-                {loadingAtiv ? (
-                  <ActivityIndicator color="#C9A84C" style={{ marginVertical: 16 }} />
-                ) : (
-                  <HorizontalScroll>
-                    {atividades.slice(0, 8).map((item) => (
-                      <PlaceCard
-                        key={item.id}
-                        id={item.id}
-                        saveCategoria="oQueFazer"
-                        titulo={item.titulo}
-                        localizacao={item.localizacao}
-                        image={item.image}
-                        size="medium"
-                        onPress={() => router.push({
-                          pathname: "/lugar/[cityId]/[placeId]",
-                          params: { cityId: "rio", placeId: item.id, source_table: "o_que_fazer_rio" },
-                        })}
-                      />
-                    ))}
-                  </HorizontalScroll>
-                )}
-              </View>
-
-              <View style={s.divider} />
-
-              {/* ── Onde comer — Supabase: restaurantes ── */}
-              <View style={s.section}>
-                <SectionHeader
-                  title="Onde comer"
-                  subtitle={`Restaurantes com alma em ${destino.cidade}.`}
-                />
-                {loadingRestos ? (
-                  <ActivityIndicator color="#C9A84C" style={{ marginVertical: 16 }} />
-                ) : (
-                  <HorizontalScroll>
-                    {restos.slice(0, 8).map((r) => (
-                      <RestauranteCard
-                        key={String(r.id)}
-                        id={String(r.id)}
-                        nome={r.nome}
-                        bairro={r.bairro}
-                        categoria={r.categoria}
-                        image={r.resolvedPhotoUri ? { uri: r.resolvedPhotoUri } : require("../../../assets/images/hero-rio.png")}
-                        onPress={() => router.push({
-                          pathname: "/lugar/[cityId]/[placeId]",
-                          params: { cityId: "rio", placeId: String(r.id), source_table: "restaurantes" },
-                        })}
-                      />
-                    ))}
-                  </HorizontalScroll>
-                )}
-              </View>
-
-              <View style={s.divider} />
-
-              {/* ── Onde ficar — Supabase: stay_hotels via stay_neighborhoods ── */}
-              {!loadingHoteis && allHotels.length > 0 && (
-                <>
-                  <View style={s.section}>
-                    <SectionHeader
-                      title="Onde ficar"
-                      subtitle={`Hospedagem com personalidade em ${destino.cidade}.`}
-                    />
-                    <HorizontalScroll>
-                      {allHotels.slice(0, 6).map((h) => (
-                        <HotelCard
-                          key={h.id}
-                          id={h.id}
-                          nome={h.hotel_name}
-                          localizacao={h.localizacao}
-                          tipo={h.hotel_category}
-                          image={
-                            h.photo_url
-                              ? { uri: h.photo_url }
-                              : getNeighborhoodImage(h.neighborhood_slug ?? h.localizacao)
-                          }
-                          onPress={() => router.push({
-                            pathname: "/lugar/[cityId]/[placeId]",
-                            params: { cityId: "rio", placeId: h.id, source_table: "stay_hotels" },
-                          })}
-                        />
-                      ))}
-                    </HorizontalScroll>
-                  </View>
-                  <View style={s.divider} />
-                </>
-              )}
-            </>
-          ) : (
-            /* ── Em breve — destinos ainda não lançados ── */
-            <View style={s.comingSoonBlock}>
-              <Text style={s.comingSoonEyebrow}>Em breve</Text>
-              <Text style={s.comingSoonCopy}>
-                {COMING_SOON_COPY[destino.id] ?? `${destino.cidade} está sendo preparada com o cuidado que ela merece.`}
-              </Text>
-              <Pressable
-                style={s.comingSoonCta}
-                onPress={() => router.replace({ pathname: "/cidade/[id]", params: { id: "rio" } })}
-              >
-                <Text style={s.comingSoonCtaText}>Explorar o Rio agora</Text>
-                <Feather name="arrow-right" size={14} color="#C9A84C" />
+              <Pressable style={s.linkRow} onPress={() => router.push({ pathname: "/oQueFazer/categorias/[id]", params: { id: destino.id } })}>
+                <Text style={s.link}>Ver todos</Text>
+                <Feather name="chevron-right" size={12} color="rgba(255,255,255,0.5)" />
               </Pressable>
             </View>
-          )}
-
-          <View style={s.footer}>
-            <Text style={s.footerL}>L.</Text>
+            <View style={s.cardsRow}>
+              {essencial.map((item) => {
+                const route = getEntityRoute(item);
+                return (
+                  <Pressable
+                    key={item.id}
+                    style={s.card}
+                    onPress={() => route && router.push(route as any)}
+                  >
+                    <Image source={{ uri: item.photo_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                    <LinearGradient colors={["transparent", "rgba(0,0,0,0.7)"]} style={s.cardGrad} />
+                    <Text style={s.cardText}>{item.titulo}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
         </View>
+
+        {/* ── AGORA NO RIO ── */}
+        <View style={s.section}>
+          <View style={s.glass}>
+            <View style={s.header}>
+              <View>
+                <Text style={s.eyebrow}>AGORA NO RIO</Text>
+                <Text style={s.headerSub}>Atualizado agora</Text>
+              </View>
+              <Pressable style={s.linkRow} onPress={() => router.push({ pathname: "/oQueFazer/categorias/[id]", params: { id: destino.id } })}>
+                <Text style={s.link}>Ver todos</Text>
+                <Feather name="chevron-right" size={12} color="rgba(255,255,255,0.5)" />
+              </Pressable>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.cards}>
+              {/* Weather - not clickable */}
+              <View style={s.weather}>
+                <View style={s.weatherRow}>
+                  <Feather name="sun" size={22} color="#FFB800" />
+                  <Text style={s.temp}>28°</Text>
+                </View>
+                <Text style={s.weatherLabel}>Ensolarado</Text>
+                <Text style={s.weatherSub}>Sensação 30°</Text>
+              </View>
+              {/* Events - clickable, navigate to entity */}
+              {agora.map((ev) => {
+                const route = getEntityRoute(ev);
+                const cor = ev.cor || "#4CAF50";
+                return (
+                  <Pressable
+                    key={ev.id}
+                    style={s.eventCard}
+                    onPress={() => route && router.push(route as any)}
+                  >
+                    <Image source={{ uri: ev.photo_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                    <LinearGradient colors={["transparent", "rgba(0,0,0,0.75)"]} style={s.cardGrad} />
+                    <View style={s.eventContent}>
+                      <Text style={s.eventTitle}>{ev.titulo}</Text>
+                      <View style={[s.chip, { backgroundColor: cor + "30" }]}>
+                        <View style={[s.chipDot, { backgroundColor: cor }]} />
+                        <Text style={[s.chipText, { color: cor }]}>{ev.horario}</Text>
+                      </View>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+
+        {/* ── PLANEJE SUA VIAGEM ── */}
+        <View style={s.section}>
+          <View style={s.glass}>
+            <Text style={s.eyebrow}>PLANEJE SUA VIAGEM</Text>
+            <View style={s.planRow}>
+              <Pressable style={s.planBtn} onPress={() => router.push({ pathname: "/ondeFicar/[id]", params: { id: destino.id } })}>
+                <View style={s.planIcon}><Feather name="moon" size={24} color="#fff" /></View>
+                <Text style={s.planTitle} numberOfLines={2}>ONDE FICAR</Text>
+                <Feather name="arrow-right" size={14} color="rgba(255,255,255,0.5)" style={{ marginTop: 8 }} />
+              </Pressable>
+              <Pressable style={s.planBtn} onPress={() => router.push({ pathname: "/comerBem/[id]", params: { id: destino.id } })}>
+                <View style={s.planIcon}><Feather name="coffee" size={24} color="#fff" /></View>
+                <Text style={s.planTitle} numberOfLines={2}>ONDE COMER</Text>
+                <Feather name="arrow-right" size={14} color="rgba(255,255,255,0.5)" style={{ marginTop: 8 }} />
+              </Pressable>
+              <Pressable style={s.planBtn} onPress={() => router.push({ pathname: "/oQueFazer/categorias/[id]", params: { id: destino.id } })}>
+                <View style={s.planIcon}><Feather name="compass" size={24} color="#fff" /></View>
+                <Text style={s.planTitle} numberOfLines={2}>O QUE FAZER</Text>
+                <Feather name="arrow-right" size={14} color="rgba(255,255,255,0.5)" style={{ marginTop: 8 }} />
+              </Pressable>
+            </View>
+          </View>
+        </View>
+
+        {/* ── LUCKY LIST ── */}
+        <View style={s.section}>
+          <Pressable style={s.lucky} onPress={() => router.push({ pathname: "/luckyList/[id]", params: { id: destino.id } })}>
+            <Text style={s.luckyStar}>✦</Text>
+            <Text style={s.luckyTitle}>LUCKY LIST</Text>
+            <Text style={s.luckyDesc} numberOfLines={1}>O que só os locais sabem</Text>
+            <View style={s.luckyBtn}><Text style={s.luckyBtnText}>Ver seleção</Text></View>
+          </Pressable>
+        </View>
+
+        {/* ── COMO CHEGAR ── */}
+        <View style={s.section}>
+          <Pressable style={s.comoChegar} onPress={() => router.push({ pathname: "/comoChegar/[cityId]", params: { cityId: destino.id } })}>
+            <View style={s.ccLeft}>
+              <View style={s.ccIcon}><Ionicons name="airplane" size={16} color="rgba(255,255,255,0.8)" /></View>
+              <View>
+                <Text style={s.ccTitle}>COMO CHEGAR</Text>
+                <Text style={s.ccSub}>Voos, aeroportos e acesso à cidade</Text>
+              </View>
+            </View>
+            <Feather name="chevron-right" size={18} color="rgba(255,255,255,0.4)" />
+          </Pressable>
+        </View>
+
       </ScrollView>
     </View>
   );
 }
 
+// ── Styles ────────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: "#000000",
-  },
+  root: { flex: 1, backgroundColor: "#000" },
+  bgImg: { ...StyleSheet.absoluteFillObject, width: "100%", height: "100%" },
+  scroll: { flex: 1 },
 
-  // Fullscreen background — sits behind everything
-  bgImage: {
-    ...StyleSheet.absoluteFillObject,
-    width: "100%",
-    height: "100%",
-    resizeMode: "cover",
-  },
+  // Top bar
+  topBar: { position: "absolute", top: 0, left: 0, right: 0, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, zIndex: 10 },
+  topBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(0,0,0,0.4)", alignItems: "center", justifyContent: "center" },
+  logo: { width: 28, height: 28 },
+  topCenter: { flexDirection: "row", alignItems: "center" },
+  separator: { width: 1, height: 18, backgroundColor: "rgba(255,255,255,0.4)", marginLeft: 6 },
+  topRight: { flexDirection: "row", gap: 10 },
 
-  // Back button — fixed position, does not participate in scroll flow
-  backBtn: {
-    position: "absolute",
-    left: 20,
-    zIndex: 20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(0,0,0,0.38)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  // Hero text
+  heroText: { paddingHorizontal: 16, paddingBottom: 10 },
+  label: { fontFamily: "Inter_500Medium", fontSize: 10, color: "rgba(255,255,255,0.6)", letterSpacing: 2.5, marginBottom: 2, textAlign: "left" },
+  title: { fontFamily: "PlayfairDisplay_700Bold", fontSize: 36, color: "#fff", textAlign: "left", marginBottom: 4 },
+  subtitle: { fontFamily: "Inter_400Regular", fontSize: 14, color: "rgba(255,255,255,0.7)", textAlign: "left", marginBottom: 4 },
+  country: { fontFamily: "Inter_500Medium", fontSize: 10, color: "rgba(255,255,255,0.5)", letterSpacing: 2, textAlign: "left", marginBottom: 8 },
+  dots: { flexDirection: "row", gap: 5, alignSelf: "flex-start" },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.3)" },
+  dotActive: { width: 16, backgroundColor: "#fff" },
 
-  // Media buttons row — fixed top-right
-  mediaButtons: {
-    position: "absolute",
-    right: 20,
-    zIndex: 20,
-    flexDirection: "row",
-    gap: 10,
-  },
-  mediaBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(0,0,0,0.38)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  // Sections
+  section: { marginBottom: 8, paddingHorizontal: 14 },
+  glass: { backgroundColor: GLASS_BG, borderRadius: 16, paddingVertical: 10, paddingHorizontal: 12, borderWidth: 1, borderColor: SAND_BORDER },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 },
+  eyebrow: { fontFamily: "Inter_600SemiBold", fontSize: 9, color: "rgba(255,255,255,0.5)", letterSpacing: 1.8, marginBottom: 2 },
+  headerTitle: { fontFamily: "PlayfairDisplay_600SemiBold", fontSize: 17, color: "#fff" },
+  headerSub: { fontFamily: "Inter_400Regular", fontSize: 10, color: "rgba(255,255,255,0.4)", marginTop: 2 },
+  link: { fontFamily: "Inter_500Medium", fontSize: 11, color: "rgba(255,255,255,0.5)" },
+  linkRow: { flexDirection: "row", alignItems: "center", gap: 2 },
+  cardsRow: { flexDirection: "row", justifyContent: "space-between" },
+  cards: { gap: 10 },
 
-  // Transparent scroll layer — floats above the fixed image
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    // paddingTop set dynamically to topInset + 56
-  },
+  // Cards
+  card: { width: 110, height: 110, borderRadius: 12, overflow: "hidden", backgroundColor: "#3a3632" },
+  cardGrad: { position: "absolute", bottom: 0, left: 0, right: 0, height: 70 },
+  cardText: { position: "absolute", bottom: 10, left: 10, right: 10, fontFamily: "Inter_600SemiBold", fontSize: 12, color: "#fff", lineHeight: 16 },
 
-  // City identity — in normal flow, sits in the clear zone
-  identity: {
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 24,
-  },
-  pais: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 12,
-    color: "rgba(255,255,255,0.55)",
-    letterSpacing: 3,
-    textTransform: "uppercase",
-  },
-  cidade: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 46,
-    color: "#FFFFFF",
-    lineHeight: 52,
-    letterSpacing: -0.6,
-    textAlign: "center",
-  },
+  // Weather
+  weather: { width: 80, height: 100, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 14, padding: 10, justifyContent: "center", borderWidth: 1, borderColor: SAND_BORDER },
+  weatherRow: { flexDirection: "row", alignItems: "flex-start", gap: 2 },
+  temp: { fontFamily: "Inter_600SemiBold", fontSize: 22, color: "#fff" },
+  weatherLabel: { fontFamily: "Inter_500Medium", fontSize: 10, color: "rgba(255,255,255,0.7)", marginTop: 2 },
+  weatherSub: { fontFamily: "Inter_400Regular", fontSize: 9, color: "rgba(255,255,255,0.4)" },
 
-  // Buttons — in normal flow, below the spacer
-  menu: {
-    paddingHorizontal: 20,
-    gap: 8,
-  },
+  // Event cards
+  eventCard: { width: 110, height: 100, borderRadius: 14, overflow: "hidden", backgroundColor: "#3a3632" },
+  eventContent: { position: "absolute", bottom: 8, left: 8, right: 8 },
+  eventTitle: { fontFamily: "Inter_600SemiBold", fontSize: 10, color: "#fff", lineHeight: 14, marginBottom: 4 },
+  chip: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 8, alignSelf: "flex-start" },
+  chipDot: { width: 4, height: 4, borderRadius: 2 },
+  chipText: { fontFamily: "Inter_500Medium", fontSize: 8 },
 
-  // ── Glass button base — ALL buttons share these metrics ──
-  // borderRadius: 16  •  same for every tier
-  glassBtn: {
-    backgroundColor: "rgba(255,255,255,0.13)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.22)",
-    borderRadius: 16,
-  },
-  glassBtnBright: {
-    backgroundColor: "rgba(255,255,255,0.20)",
-    borderColor: "rgba(255,255,255,0.38)",
-  },
+  // Planeje
+  planRow: { flexDirection: "row", gap: 8, marginTop: 10 },
+  planBtn: { flex: 1, height: 110, maxHeight: 110, backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 14, paddingVertical: 14, paddingHorizontal: 12, alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)" },
+  planIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center", marginBottom: 8 },
+  planTitle: { fontFamily: "Inter_700Bold", fontSize: 13, color: "#fff", letterSpacing: 1.2, textAlign: "center", marginBottom: 4 },
+  planSub: { fontFamily: "Inter_400Regular", fontSize: 11, color: "rgba(255,255,255,0.7)", textAlign: "center", lineHeight: 15 },
 
-  // PRIMARY — "O essencial": tallest, brightest, arrow CTA
-  // paddingVertical 16 keeps it visually heavier than tier-2/3
-  btnPrimary: {
-    borderRadius: 16,
-  },
-  btnPrimaryInner: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    gap: 12,
-  },
-  btnPrimaryLeft: {
-    flex: 1,
-    gap: 3,
-  },
-  eyebrow: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 11,
-    color: "rgba(255,255,255,0.52)",
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-  },
-  btnPrimaryLabel: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 20,
-    color: "#FFFFFF",
-    lineHeight: 26,
-    letterSpacing: -0.2,
-  },
-  btnPrimaryArrow: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "rgba(255,255,255,0.18)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  // Lucky — fundo petrol blue sólido
+  lucky: { backgroundColor: PETROL_BLUE, borderRadius: 16, paddingVertical: 12, paddingHorizontal: 14 },
+  luckyStar: { fontSize: 16, color: "#fff", marginBottom: 6 },
+  luckyTitle: { fontFamily: "Inter_700Bold", fontSize: 12, color: "#fff", letterSpacing: 1.5, marginBottom: 4 },
+  luckyDesc: { fontFamily: "Inter_400Regular", fontSize: 12, color: "rgba(255,255,255,0.85)", lineHeight: 17, marginBottom: 12 },
+  luckyBtn: { backgroundColor: "#fff", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 14, alignSelf: "flex-start" },
+  luckyBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: PETROL_BLUE },
 
-  // EXPERIENCE — "Agora no Rio": gold accent, two-line label
-  // Same borderRadius + paddingHorizontal as all others
-  btnExperience: {
-    borderRadius: 16,
-    borderColor: "rgba(201,168,76,0.38)",
-  },
-  btnExperienceInner: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    gap: 14,
-  },
-  expIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(201,168,76,0.22)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  expIcon: {
-    fontSize: 14,
-    color: "#D4AF37",
-  },
-  expTexts: {
-    gap: 2,
-  },
-  eyebrowGold: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 10,
-    color: "rgba(201,168,76,0.80)",
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-  },
-  btnExperienceLabel: {
-    fontFamily: "PlayfairDisplay_600SemiBold",
-    fontSize: 16,
-    color: "#FFFFFF",
-    lineHeight: 22,
-    letterSpacing: -0.1,
-  },
-
-  // STANDARD — category buttons: icon + label, single row
-  // Same borderRadius + paddingHorizontal; paddingVertical 13 (compact but breathable)
-  btnStandard: {
-    borderRadius: 16,
-  },
-  btnStandardInner: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 13,
-    gap: 12,
-  },
-  btnStandardLabel: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 15,
-    color: "rgba(255,255,255,0.88)",
-  },
-
-  // LUCKY accent — same metrics as standard, gold border only
-  btnLucky: {
-    borderColor: "rgba(196,112,74,0.40)",
-  },
-  luckyIcon: {
-    fontSize: 15,
-    color: "#C4704A",
-  },
-  btnLuckyLabel: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 15,
-    color: "rgba(255,255,255,0.88)",
-  },
-
-  // Editorial content — cream block, scrolls in naturally
-  editorial: {
-    marginTop: 32,
-    backgroundColor: "rgba(255,255,255,0.12)",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-  },
-  section: {
-    paddingTop: 28,
-    paddingBottom: 4,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: C.border,
-    marginHorizontal: 24,
-    marginTop: 16,
-  },
-  footer: {
-    marginTop: 40,
-    marginHorizontal: 24,
-    paddingTop: 24,
-    borderTopWidth: 1,
-    borderTopColor: C.border,
-    alignItems: "center",
-    gap: 8,
-  },
-  footerL: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 36,
-    color: C.terracotta,
-  },
-  footerText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: C.warmGray,
-    textAlign: "center",
-    lineHeight: 20,
-    maxWidth: 240,
-  },
-
-  // ── Em breve — non-launched destination placeholder block ──
-  comingSoonBlock: {
-    paddingHorizontal: 28,
-    paddingTop: 40,
-    paddingBottom: 16,
-    gap: 20,
-  },
-  comingSoonEyebrow: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 10,
-    letterSpacing: 2,
-    textTransform: "uppercase",
-    color: "rgba(201,168,76,0.72)",
-  },
-  comingSoonCopy: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 15,
-    color: "rgba(255,255,255,0.62)",
-    lineHeight: 24,
-    maxWidth: 340,
-  },
-  comingSoonCta: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingTop: 8,
-  },
-  comingSoonCtaText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 14,
-    color: "#C9A84C",
-    letterSpacing: 0.2,
-  },
-
-  // ── Modo Evento toggle ──────────────────────────────────────────────────
-  eventoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
-    backgroundColor: "rgba(0,0,0,0.30)",
-  },
-  eventoLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-  },
-  eventoStar: {
-    fontSize: 16,
-    lineHeight: 18,
-  },
-  eventoLabel: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
-    letterSpacing: 0.2,
-  },
-});
-
-// ── Evento items section styles ───────────────────────────────────────────────
-
-const evs = StyleSheet.create({
-  section: {
-    marginTop: 16,
-    marginBottom: 4,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    paddingHorizontal: 20,
-    marginBottom: 12,
-  },
-  headerStar: {
-    fontSize: 13,
-    lineHeight: 15,
-  },
-  headerTitle: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 11,
-    letterSpacing: 1.4,
-    textTransform: "uppercase",
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    gap: 10,
-  },
-  card: {
-    width: 150,
-    backgroundColor: "rgba(0,0,0,0.38)",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.13)",
-    padding: 14,
-    gap: 6,
-  },
-  iconCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 4,
-  },
-  categoria: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 9,
-    letterSpacing: 1.6,
-  },
-  titulo: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-    color: "rgba(255,255,255,0.92)",
-    lineHeight: 18,
-  },
-  subtitulo: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    color: "rgba(255,255,255,0.52)",
-    lineHeight: 16,
-  },
-  bairro: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 9,
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
-  },
-  linkChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginTop: 4,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    alignSelf: "flex-start",
-  },
-  linkText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 10,
-    letterSpacing: 0.3,
-  },
+  // Como chegar
+  comoChegar: { backgroundColor: GLASS_BG, borderRadius: 14, paddingVertical: 10, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderColor: SAND_BORDER },
+  ccLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  ccIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.1)", alignItems: "center", justifyContent: "center" },
+  ccTitle: { fontFamily: "Inter_600SemiBold", fontSize: 10, color: "rgba(255,255,255,0.85)", letterSpacing: 1.2 },
+  ccSub: { fontFamily: "Inter_400Regular", fontSize: 10, color: "rgba(255,255,255,0.5)", marginTop: 1 },
 });

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { Platform } from "react-native";
 import * as WebBrowser from "expo-web-browser";
-import * as Linking from "expo-linking";
+import { makeRedirectUri } from "expo-auth-session";
 import { supabase } from "@/lib/supabase";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -140,52 +140,69 @@ export function useAuth(): AuthState {
   // ── Google OAuth ───────────────────────────────────────────────────────────
 
   async function signInWithGoogle(): Promise<{ error: string | null }> {
+    console.log("[signInWithGoogle] Iniciando login com Google");
+    console.log("[signInWithGoogle] Platform:", Platform.OS);
+
     if (Platform.OS === "web") {
+      console.log("[signInWithGoogle] Web flow - redirectTo:", callbackUrl());
       try {
-        const { error } = await supabase.auth.signInWithOAuth({
+        const { data, error } = await supabase.auth.signInWithOAuth({
           provider: "google",
           options: { redirectTo: callbackUrl() },
         });
+        console.log("[signInWithGoogle] Web OAuth data:", data);
+        if (error) {
+          console.error("[signInWithGoogle] Web OAuth error:", error);
+        }
         webCleanup();
         if (error) return { error: error.message };
         return { error: null };
       } catch (e: any) {
+        console.error("[signInWithGoogle] Web OAuth exception:", e);
         webCleanup();
         return { error: e?.message ?? "Erro inesperado." };
       }
     }
 
+    // Native OAuth flow using expo-auth-session
     try {
-      const redirectTo = Linking.createURL("/");
+      const redirectTo = makeRedirectUri({ scheme: "theluckytrip" });
+      console.log("[signInWithGoogle] Native flow - Redirect URL:", redirectTo);
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo, skipBrowserRedirect: true },
+        options: {
+          redirectTo,
+          skipBrowserRedirect: true,
+        },
       });
 
       if (error || !data.url) {
-        return { error: error?.message ?? "OAuth error" };
+        console.error("[signInWithGoogle] OAuth error:", error);
+        return { error: error?.message ?? "Não foi possível iniciar login com Google." };
       }
 
+      console.log("[signInWithGoogle] Opening OAuth URL:", data.url);
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+      console.log("[signInWithGoogle] Auth result:", result.type);
 
-      if (result.type === "success") {
-        const parsed       = Linking.parse(result.url);
-        const accessToken  = parsed.queryParams?.access_token  as string | undefined;
-        const refreshToken = parsed.queryParams?.refresh_token as string | undefined;
+      if (result.type === "cancel" || result.type === "dismiss") {
+        return { error: null }; // User cancelled, not an error
+      }
 
-        if (accessToken && refreshToken) {
-          const { error: sessionErr } = await supabase.auth.setSession({
-            access_token:  accessToken,
-            refresh_token: refreshToken,
-          });
-          if (sessionErr) return { error: sessionErr.message };
+      if (result.type === "success" && result.url) {
+        const { error: sessionErr } = await supabase.auth.exchangeCodeForSession(result.url);
+        if (sessionErr) {
+          console.error("[signInWithGoogle] exchangeCodeForSession error:", sessionErr);
+          return { error: sessionErr.message };
         }
+        return { error: null };
       }
 
       return { error: null };
     } catch (e: any) {
-      return { error: e?.message ?? "Erro inesperado." };
+      console.error("[signInWithGoogle] Exception:", e);
+      return { error: e?.message ?? "Erro inesperado ao fazer login com Google." };
     }
   }
 
