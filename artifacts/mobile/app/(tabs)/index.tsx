@@ -1,10 +1,11 @@
-import React, { useEffect, useRef } from "react";
+// app/(tabs)/index.tsx — HomeScreen v3 (features completas)
+import React, { useState, useRef, useEffect } from "react";
 import {
   Animated,
-  ActivityIndicator,
   Dimensions,
+  FlatList,
   Image,
-  ImageBackground,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -13,938 +14,688 @@ import {
   View,
 } from "react-native";
 import * as Haptics from "expo-haptics";
-import { notifyHeroReady } from "@/lib/splashGate";
-import { RotatingBackground } from "@/components/RotatingBackground";
-import { VideoBackground } from "@/components/VideoBackground";
-import { useHomeHeroMedia } from "@/hooks/useHeroMedia";
-
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather, Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
+import { supabase } from "@/lib/supabase";
+import { useDestaques, Destaque } from "@/hooks/useDestaques";
+import { useAmigos } from "@/hooks/useFriends";
 
-import { AppHeader } from "@/components/AppHeader";
-import { HeroCarousel, type HeroItem } from "@/components/HeroCarousel";
-import { HorizontalScroll } from "@/components/HorizontalScroll";
-import { PlaceCard } from "@/components/PlaceCard";
-import { RestauranteCard } from "@/components/RestauranteCard";
-import { SectionHeader } from "@/components/SectionHeader";
-import Colors from "@/constants/colors";
-import { heroDestinos } from "@/data/mockData";
-import { useGuia } from "@/context/GuiaContext";
-import { useDestinos } from "@/hooks/useDestinos";
-import { useLuckyList } from "@/hooks/useLuckyList";
-import { useOQueFazer } from "@/hooks/useOQueFazer";
-import { useRestaurants } from "@/hooks/useRestaurants";
-import { useFriends, type FriendCard } from "@/hooks/useFriends";
+// ═══════════════════════════════════════════════════════════════════════════
+// LOGO ASSET
+// ═══════════════════════════════════════════════════════════════════════════
+const LOGO_WHITE = require("@/assets/images/logo_symbol_white.png");
 
-// ── Creative "Em Breve" copy for carousel cards ───────────────────────────────
-// Each entry: [badge label, short tagline for Alert popup]
-const EM_BREVE_COPY: Record<string, { badge: string; copy: string }> = {
-  santorini:     { badge: "EM BREVE",   copy: "Santorini chega quando o vinho estiver na temperatura certa. Muy pronto." },
-  kyoto:         { badge: "EM BREVE",   copy: "Kyoto exige paciência. A mesma dos monges. Logo, logo." },
-  paris:         { badge: "EM BREVE",   copy: "Paris não precisa de apresentação. Mas precisa do guia certo. Bientôt." },
-  miami:         { badge: "EM BREVE",   copy: "Miami vive fast — mas a nossa curadoria vai devagar. Soon." },
-  "nova-york":   { badge: "EM BREVE",   copy: "Nova York: 8 milhões de pessoas, mil segredos. Coming soon." },
-  bali:          { badge: "EM BREVE",   copy: "Bali é um estado de espírito. O nosso chega logo." },
-  lisboa:        { badge: "EM BREVE",   copy: "Os becos do Alfama e o pastel de Belém merecem capítulo próprio. Em breve." },
-  "sao-paulo":   { badge: "EM BREVE",   copy: "SP nunca para. A gente está correndo pra acompanhar. Em breve." },
-  jericoacoara:  { badge: "EM BREVE",   copy: "Jeri só tem sentido sem pressa. Estamos preparando com calma." },
-  ibiza:         { badge: "EM BREVE",   copy: "Ibiza não é só balada — mas também é. Muy pronto, amigos." },
-  amsterdam:     { badge: "EM BREVE",   copy: "Canais, bicicletas e um segredo por esquina. Quase lá." },
-  marrakech:     { badge: "EM BREVE",   copy: "O souk, os riads, o chá de hortelã. Bientôt, habibi." },
-};
+// ═══════════════════════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════════════════════
+const PETROL = "#1B4F72";
+const { width: W, height: H } = Dimensions.get("window");
+const SUPABASE = "https://bkwlximkadmlnbgjcrdp.supabase.co";
+const FALLBACK = `${SUPABASE}/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero01.jpg`;
+const RIO_DESTINO_ID = "7f047742-427f-4b11-8286-781af899c57d";
 
-// ── Context-aware "O que fazer agora" title ───────────────────────────────────
-// Prepositions for known destinations (Portuguese grammar)
-const DESTINO_PREP: Record<string, string> = {
-  "Rio de Janeiro":   "no Rio de Janeiro",
-  "São Paulo":        "em São Paulo",
-  "Belo Horizonte":   "em Belo Horizonte",
-  "Florianópolis":    "em Florianópolis",
-  "Santorini":        "em Santorini",
-  "Kyoto":            "em Kyoto",
-  "Paris":            "em Paris",
-  "Lisboa":           "em Lisboa",
-};
+// ═══════════════════════════════════════════════════════════════════════════
+// TYPES
+// ═══════════════════════════════════════════════════════════════════════════
+type AgoraItem = { id: string; titulo: string; sub: string; tag: string; foto: string };
+type LucklistItem = { id: string; titulo: string; sub: string; foto: string };
 
-// Priority: user location (future) → active trip → fallback
-function getAgoraTitle(tripDestino?: string): string {
-  // 1. User location: not available in this build (expo-location not installed)
-  // 2. Active trip
-  if (tripDestino) {
-    const prep = DESTINO_PREP[tripDestino] ?? `em ${tripDestino}`;
-    return `O que fazer agora ${prep}`;
+// ═══════════════════════════════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════════════════════════════
+function shuffleArray<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
   }
-  // 3. Fallback
-  return "O que fazer agora";
+  return a;
 }
 
-const C = Colors.light;
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const CARD_W = (SCREEN_WIDTH - 48 - 12) / 2;
+// ═══════════════════════════════════════════════════════════════════════════
+// HOOKS
+// ═══════════════════════════════════════════════════════════════════════════
+function useHeroPhotos() {
+  const [photos, setPhotos] = useState<string[]>([FALLBACK]);
 
-const HOME_BG_POOL = [
-  require("../../assets/images/ipanema.png"),
-  require("../../assets/images/hotel1.png"),
-  require("../../assets/images/secret1.png"),
-];
+  useEffect(() => {
+    supabase.storage.from("media").list("rio-de-janeiro/hero/foto").then(({ data }) => {
+      if (data && data.length > 0) {
+        const urls = data
+          .filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f.name))
+          .map(f => `${SUPABASE}/storage/v1/object/public/media/rio-de-janeiro/hero/foto/${f.name}`);
+        if (urls.length > 0) setPhotos(shuffleArray(urls));
+      }
+    });
+  }, []);
 
-// ── Thin hairline between sections ───────────────────────────────────────────
-function Divider() {
-  return <View style={s.divider} />;
+  return photos;
 }
 
-// ── Lucky List dark editorial block — powered by Supabase ────────────────────
-function LuckyHighlight() {
-  const { lugares, loading } = useLuckyList();
-  const picks = lugares.slice(0, 3);
+// Hook para buscar "Agora no Rio" de destino_destaques
+function useAgoraNoRio(destinoId: string) {
+  const [items, setItems] = useState<AgoraItem[]>([]);
+
+  useEffect(() => {
+    supabase
+      .from("destino_destaques")
+      .select("id, lugar_id, titulo_override, ordem, lugares(id, nome, hero_image_url, bairro:bairros!bairro_id(nome))")
+      .eq("destino_id", destinoId)
+      .eq("ativo", true)
+      .order("ordem")
+      .limit(6)
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          const mapped: AgoraItem[] = data.map((item: any) => ({
+            id: item.lugar_id || item.id,
+            titulo: item.titulo_override || item.lugares?.nome || "Lugar",
+            sub: item.lugares?.bairro?.nome || "",
+            tag: "AGORA",
+            foto: item.lugares?.hero_image_url || FALLBACK,
+          }));
+          setItems(mapped);
+        }
+      });
+  }, [destinoId]);
+
+  return items;
+}
+
+// Hook para buscar lucklists do destino
+function useLucklists(destinoId: string) {
+  const [items, setItems] = useState<LucklistItem[]>([]);
+
+  useEffect(() => {
+    // Primeiro busca a lucklist do destino
+    supabase
+      .from("lucklists")
+      .select("id, titulo, subtitulo, capa_url")
+      .eq("destino_id", destinoId)
+      .eq("ativo", true)
+      .order("ordem")
+      .limit(1)
+      .single()
+      .then(({ data: lucklist }) => {
+        if (!lucklist) return;
+
+        // Depois busca os lugares dessa lucklist
+        supabase
+          .from("lucklist_lugares")
+          .select("lugar_id, lugares(id, nome, hero_image_url, bairro:bairros!bairro_id(nome))")
+          .eq("lucklist_id", lucklist.id)
+          .limit(6)
+          .then(({ data }) => {
+            if (data && data.length > 0) {
+              const mapped: LucklistItem[] = data.map((item: any) => ({
+                id: item.lugar_id || item.id,
+                titulo: item.lugares?.nome || "Lugar",
+                sub: item.lugares?.bairro?.nome || "",
+                foto: item.lugares?.hero_image_url || FALLBACK,
+              }));
+              setItems(mapped);
+            }
+          });
+      });
+  }, [destinoId]);
+
+  return items;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COMPONENTS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function TopBar({ top, onMusicPress, onGalleryPress }: { top: number; onMusicPress: () => void; onGalleryPress: () => void }) {
   return (
-    <View style={s.luckyBlock}>
-      <View style={s.luckyHeader}>
-        <Text style={s.luckyAccentText}>✦ LUCKY LIST</Text>
-        <View style={s.luckyAccentLine} />
+    <View style={[styles.topBar, { paddingTop: top + 8 }]}>
+      {/* Espaço vazio no lugar do botão voltar (home não tem tela anterior) */}
+      <View style={styles.topLeftSpacer} />
+      {/* Logo cursiva oficial */}
+      <Image source={LOGO_WHITE} style={styles.logo} resizeMode="contain" />
+      <View style={styles.topRight}>
+        <Pressable style={styles.iconBtn} onPress={onMusicPress}>
+          <Ionicons name="musical-notes" size={18} color="#FFF" />
+        </Pressable>
+        <Pressable style={styles.iconBtn} onPress={onGalleryPress}>
+          <Ionicons name="play" size={16} color="#FFF" />
+        </Pressable>
       </View>
-      <Text style={s.luckyHeadline}>Seu Rio mais Lucky</Text>
-      <Text style={s.luckySubtitle}>
-        Os segredos que poucos conhecem. Curadoria feita à mão, atualizada quando vale a pena.
-      </Text>
-      {loading ? (
-        <ActivityIndicator color="rgba(201,168,76,0.7)" style={{ marginVertical: 16 }} />
-      ) : (
-        <View style={s.luckyPicks}>
-          {picks.map((place) => (
-            <Pressable
-              key={place.id}
-              style={s.luckyPickRow}
-              onPress={() => router.push({
-                pathname: "/lugar/[cityId]/[placeId]",
-                params: { cityId: "rio", placeId: place.id, source_table: "lucky_list_rio" },
-              })}
-            >
-              <Text style={s.luckyPickStar}>✦</Text>
-              <View style={s.luckyPickText}>
-                <Text style={s.luckyPickTitle}>{place.titulo}</Text>
-                <Text style={s.luckyPickLoc}>{place.localizacao}</Text>
-              </View>
-              <Feather name="arrow-right" size={13} color="rgba(201,168,76,0.50)" />
-            </Pressable>
-          ))}
-        </View>
-      )}
-      <Pressable
-        style={s.luckyBtn}
-        onPress={() => router.push({ pathname: "/luckyList/[id]", params: { id: "rio" } })}
-      >
-        <Text style={s.luckyBtnText}>✦  Ver Lucky List completa</Text>
-      </Pressable>
     </View>
   );
 }
 
-// ── Friend card (2-col grid) — dados reais do Supabase ───────────────────────
-const FRIEND_FALLBACK = require("../../assets/images/carol-dieckmann.jpg");
+// ═══════════════════════════════════════════════════════════════════════════
+// HeroDestaque: primeiro terço com crossFade limpo (zero pisca)
+// ═══════════════════════════════════════════════════════════════════════════
+function HeroDestaque({
+  top,
+  destaques,
+  carouselIdx,
+  rioPhotos,
+  rioBgIdx
+}: {
+  top: number;
+  destaques: Destaque[];
+  carouselIdx: number;
+  rioPhotos: string[];
+  rioBgIdx: number;
+}) {
+  const item = destaques[carouselIdx] || { titulo: "Rio de Janeiro", subtitulo: "Três dias entre o mar e a montanha", tipo: "destino", photo_url: FALLBACK };
+  const isAmigo = item.tipo === "amigo";
+  const isRio = item.tipo === "destino" && item.titulo === "Rio de Janeiro";
 
-function InfluencerCard({ influencer }: { influencer: FriendCard }) {
-  const imgSource = influencer.profile_photo_url
-    ? { uri: influencer.profile_photo_url }
-    : influencer.cover_photo_url
-    ? { uri: influencer.cover_photo_url }
-    : FRIEND_FALLBACK;
+  // Foto a exibir: se for Rio, usa slideshow; senão, usa foto do destaque
+  const currentPhoto = isRio ? (rioPhotos[rioBgIdx] || FALLBACK) : (item.photo_url || FALLBACK);
+
+  // CrossFade: duas imagens sobrepostas para transição limpa
+  const [displayedPhoto, setDisplayedPhoto] = useState(currentPhoto);
+  const [prevPhoto, setPrevPhoto] = useState(currentPhoto);
+  const crossFade = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (currentPhoto !== displayedPhoto) {
+      setPrevPhoto(displayedPhoto);
+      setDisplayedPhoto(currentPhoto);
+      crossFade.setValue(0);
+      Animated.timing(crossFade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+    }
+  }, [currentPhoto]);
+
+  // Navegação baseada no tipo de destaque
+  const handlePress = () => {
+    switch (item.tipo) {
+      case "destino":
+        router.push(`/destino/${item.destino_slug}`);
+        break;
+      case "amigo":
+        router.push(`/amigo/${item.destino_slug}`);
+        break;
+      case "lugar":
+      case "restaurante":
+      case "bar":
+      case "atividade":
+      case "evento":
+        // Todos os tipos de entidade navegam para /lugar/[id]
+        if (item.entity_id) {
+          router.push(`/lugar/${item.entity_id}`);
+        }
+        break;
+    }
+  };
 
   return (
-    <Pressable
-      style={({ pressed }) => [pressed && { opacity: 0.90, transform: [{ scale: 0.97 }] }]}
-      onPress={() => router.push({ pathname: "/friend/[slug]", params: { slug: influencer.slug } })}
-    >
-      <ImageBackground
-        source={imgSource}
-        style={s.influencerCard}
-        resizeMode="cover"
-        imageStyle={s.influencerImageStyle}
-      >
-        <LinearGradient
-          colors={["rgba(0,0,0,0.00)", "rgba(0,0,0,0.45)", "rgba(0,0,0,0.72)"]}
-          locations={[0.30, 0.65, 1]}
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={s.influencerBadge}>
-          <Feather name="map" size={10} color={C.white} />
-          <Text style={s.influencerBadgeText}>
-            Roteiros: {String(influencer.guide_count).padStart(2, "0")}
-          </Text>
+    <Pressable style={styles.heroDestaque} onPress={handlePress}>
+      {/* Imagem anterior (fica embaixo) */}
+      <Image source={{ uri: prevPhoto }} style={styles.heroDestaqueImage} />
+      {/* Imagem atual (faz fade in por cima) */}
+      <Animated.Image source={{ uri: displayedPhoto }} style={[styles.heroDestaqueImage, { opacity: crossFade }]} />
+      {/* Gradiente */}
+      <LinearGradient colors={["rgba(0,0,0,0.2)", "rgba(0,0,0,0.5)", "rgba(10,10,10,1)"]} locations={[0, 0.6, 1]} style={StyleSheet.absoluteFill} />
+
+      {/* Conteúdo do card */}
+      <View style={[styles.heroTitleContainer, { paddingTop: top + 70 }]}>
+        <Text style={styles.heroKicker}>{isAmigo ? "VIAJE COM" : "DESTINO"}</Text>
+        <Text style={styles.heroTitleText}>{item.titulo}</Text>
+        <Text style={styles.heroSub}>{item.subtitulo}</Text>
+        {!isAmigo && <Text style={styles.heroPais}>BRASIL</Text>}
+        <View style={styles.dots}>
+          {destaques.slice(0, 5).map((_, i) => (
+            <View key={i} style={[styles.dot, i === carouselIdx % 5 && styles.dotActive]} />
+          ))}
         </View>
-        <Text style={s.influencerName}>{influencer.display_name}</Text>
-      </ImageBackground>
+      </View>
     </Pressable>
   );
 }
 
-// ── Criar roteiro CTA ─────────────────────────────────────────────────────────
-function RoteiroCTA() {
+function InputBar() {
   return (
-    <View style={s.ctaBlock}>
-      <LinearGradient
-        colors={["rgba(255,255,255,0.06)", "rgba(255,255,255,0.02)"]}
-        style={StyleSheet.absoluteFill}
-      />
-      <Text style={s.ctaEyebrow}>ORGANIZE SUA PRÓXIMA VIAGEM</Text>
-      <Text style={s.ctaHeadline}>Monte seu roteiro personalizado</Text>
-      <Text style={s.ctaSub}>
-        Use nosso planejador intuitivo para criar experiências únicas no seu destino.
-      </Text>
-      <Pressable
-        style={s.ctaBtn}
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          router.push("/roteiro");
-        }}
-      >
-        <Feather name="plus" size={15} color={C.white} />
-        <Text style={s.ctaBtnText}>Criar roteiro</Text>
-      </Pressable>
+    <View style={styles.inputWrap}>
+      <View style={styles.inputBar}>
+        <View style={styles.socialIcons}>
+          <View style={[styles.socialIcon, { backgroundColor: "#E1306C" }]}>
+            <Ionicons name="logo-instagram" size={14} color="#FFF" />
+          </View>
+          <View style={[styles.socialIcon, { backgroundColor: "#000" }]}>
+            <Ionicons name="logo-tiktok" size={14} color="#FFF" />
+          </View>
+          <View style={[styles.socialIcon, { backgroundColor: "#FF0000" }]}>
+            <Ionicons name="logo-youtube" size={14} color="#FFF" />
+          </View>
+        </View>
+        <Text style={styles.inputPlaceholder}>Cole um link do Instagram, TikTok...</Text>
+      </View>
     </View>
   );
 }
 
-
-// ── Main screen ───────────────────────────────────────────────────────────────
-
-type MomentoTab = "manha" | "tarde" | "noite";
-
-type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
-const MOMENTO_TABS: { key: MomentoTab; label: string; icon: IoniconName }[] = [
-  { key: "manha", label: "Manhã", icon: "partly-sunny-outline" },
-  { key: "tarde", label: "Tarde", icon: "sunny-outline"         },
-  { key: "noite", label: "Noite", icon: "moon-outline"          },
-];
-
-// Determine the current time period automatically.
-// Rules: 05:00–11:59 → manhã | 12:00–17:59 → tarde | 18:00–04:59 → noite
-function getCurrentMomento(): MomentoTab {
-  const hour = new Date().getHours();
-  if (hour >= 5 && hour < 12) return "manha";
-  if (hour >= 12 && hour < 18) return "tarde";
-  return "noite";
+function SectionHeader({ label, right, onPress }: { label: string; right?: string; onPress?: () => void }) {
+  return (
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionLabel}>{label}</Text>
+      {right && (
+        <Pressable style={styles.seeAll} onPress={onPress}>
+          <Text style={styles.seeAllText}>{right}</Text>
+          <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.6)" />
+        </Pressable>
+      )}
+    </View>
+  );
 }
 
-export default function HomeScreen() {
-  const insets = useSafeAreaInsets();
-  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
-  const heroItems = useHomeHeroMedia();
-  const { destinos } = useDestinos();
-  const { viagem } = useGuia();
-  const agoraTitle = getAgoraTitle(viagem.destino || undefined);
-  const { lugares: atividades, loading: loadingAtividades } = useOQueFazer();
-  const { restaurantes: restos, loading: loadingRestos } = useRestaurants();
-  const { friends, loading: loadingFriends } = useFriends();
-  const [momentoTab, setMomentoTab] = React.useState<MomentoTab>(getCurrentMomento);
+function ViajeComEles() {
+  const { amigos } = useAmigos();
 
-  const carouselItems = React.useMemo((): HeroItem[] => {
-    const launched  = destinos.filter((d) => d.lancado);
-    const teasers   = destinos.filter((d) => !d.lancado);
+  // Divide nome em nome + sobrenome para exibição
+  const formatNome = (nome: string) => {
+    const partes = nome.split(" ");
+    return { nome: partes[0], sobrenome: partes.slice(1).join(" ") };
+  };
 
-    if (launched.length === 0 && friends.length === 0) {
-      // Pure fallback: static Rio card
-      return heroDestinos.map((h) => ({ ...h, type: "destino" as const, badge: "DESTINO" }));
-    }
-
-    const items: HeroItem[] = [];
-
-    // 1. Launched destinations first
-    launched.forEach((d) => {
-      items.push({
-        id:     d.id,
-        cidade: d.cidade,
-        pais:   d.pais,
-        badge:  "DESTINO",
-        image:  d.image,
-        type:   "destino",
-        cityId: d.id,
-      });
-    });
-
-    // 2. First friend (Guia Exclusivo) after the first destination
-    if (friends.length > 0) {
-      const f = friends[0];
-      const img = f.profile_photo_url
-        ? { uri: f.profile_photo_url }
-        : f.cover_photo_url
-        ? { uri: f.cover_photo_url }
-        : require("../../assets/images/carol-dieckmann.jpg");
-      items.splice(1, 0, {
-        id:          `guia-${f.id}`,
-        cidade:      f.display_name,
-        pais:        "RIO DE JANEIRO",
-        badge:       "GUIA EXCLUSIVO",
-        image:       img,
-        type:        "guia",
-        friendSlug:  f.slug,
-      });
-    }
-
-    // 3. Teaser destinations (Em Breve) — up to 4
-    teasers.slice(0, 4).forEach((d) => {
-      const meta = EM_BREVE_COPY[d.id];
-      items.push({
-        id:               `teaser-${d.id}`,
-        cidade:           d.cidade,
-        pais:             d.pais.toUpperCase(),
-        badge:            meta?.badge ?? "EM BREVE",
-        image:            d.image,
-        type:             "em_breve",
-        cityId:           d.id,
-        comingSoonCopy:   meta?.copy,
-      });
-    });
-
-    // 4. Second friend if available
-    if (friends.length > 1) {
-      const f = friends[1];
-      const img = f.profile_photo_url
-        ? { uri: f.profile_photo_url }
-        : f.cover_photo_url
-        ? { uri: f.cover_photo_url }
-        : require("../../assets/images/carol-dieckmann.jpg");
-      items.push({
-        id:          `guia-${f.id}`,
-        cidade:      f.display_name,
-        pais:        "RIO DE JANEIRO",
-        badge:       "GUIA EXCLUSIVO",
-        image:       img,
-        type:        "guia",
-        friendSlug:  f.slug,
-      });
-    }
-
-    return items;
-  }, [destinos, friends]);
-
-  const filteredAtividades = React.useMemo(() => {
-    if (!atividades.length) return [];
-    const filtered = atividades.filter((a) => {
-      const m = a.momento_ideal;
-      if (!m) return false;
-      if (typeof m === "string") return m.toLowerCase() === momentoTab;
-      if (Array.isArray(m)) return (m as string[]).some((v) => v.toLowerCase() === momentoTab);
-      return false;
-    });
-    return filtered.length > 0 ? filtered : atividades.slice(0, 10);
-  }, [atividades, momentoTab]);
-
-  // ── Hero background animation ─────────────────────────────────────────────
-  // overlayAnim starts at 0 so the dark editorial overlay is invisible until
-  // the hero image is actually displayed — content always lands on a warm bg.
-  const scrollRef = useRef<ScrollView>(null);
-  const overlayAnim = useRef(new Animated.Value(0)).current;
-  const heroReadyFired = useRef(false);
-
-  // Ensure the page always starts at the top (prevents web scroll restoration)
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ y: 0, animated: false });
-  }, []);
-
-  function handleHeroDisplay() {
-    if (heroReadyFired.current) return;
-    heroReadyFired.current = true;
-    notifyHeroReady();                         // release the splash gate
-    Animated.timing(overlayAnim, {
-      toValue: 1,
-      duration: 500,
-      useNativeDriver: true,
-    }).start();
-  }
-
-  // When video data arrives from Supabase, release the splash gate immediately.
-  React.useEffect(() => {
-    if (heroItems && heroItems.length > 0) handleHeroDisplay();
-  }, [heroItems]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (amigos.length === 0) return null;
 
   return (
-    <View style={s.root}>
-      {/* ── Background — video from Supabase, falls back to local pool ── */}
-      <View style={[s.bgImage, { backgroundColor: "#1A0E04" }]} pointerEvents="none">
-        {heroItems && heroItems.length > 0 ? (
-          <VideoBackground
-            videoUrl={heroItems[0].video_url}
-            fallbackPool={HOME_BG_POOL}
-          />
-        ) : (
-          <RotatingBackground
-            pool={HOME_BG_POOL}
-            onFirstImageDisplay={handleHeroDisplay}
-          />
-        )}
+    <View style={styles.sectionCompact}>
+      <View style={styles.viajeHeader}>
+        <Text style={styles.sectionLabel}>VIAJE COM ELES</Text>
+        <Pressable style={styles.seeAll} onPress={() => router.push("/amigo/all")}>
+          <Text style={styles.seeAllText}>Ver todos</Text>
+          <Ionicons name="chevron-forward" size={14} color={PETROL} />
+        </Pressable>
       </View>
-      {/* Editorial overlay fades in WITH the image — never darkens a black canvas */}
-      <Animated.View
-        style={[StyleSheet.absoluteFill, { opacity: overlayAnim }]}
-        pointerEvents="none"
-      >
-        <LinearGradient
-          colors={["rgba(0,0,0,0.44)", "rgba(0,0,0,0.56)", "rgba(0,0,0,0.70)"]}
-          locations={[0, 0.38, 1]}
-          style={StyleSheet.absoluteFill}
-        />
-      </Animated.View>
-
-      <AppHeader transparent />
-
-      <ScrollView
-        ref={scrollRef}
-        style={s.scroll}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: bottomPad + 80 }}
-      >
-
-        {/* ── 1. HERO CAROUSEL ── */}
-        <HeroCarousel items={carouselItems} />
-
-        {/* ── 2. O QUE FAZER NO RIO ── Supabase: o_que_fazer_rio */}
-        <View style={s.section}>
-          <SectionHeader
-            title={agoraTitle}
-            uppercase
-            subtitle="Experiências selecionadas para o Rio de Janeiro."
-            dark
-          />
-
-          {/* ── Manhã / Tarde / Noite tabs ── */}
-          <View style={s.momentoTabs}>
-            {MOMENTO_TABS.map((tab) => {
-              const active = momentoTab === tab.key;
-              return (
-                <Pressable
-                  key={tab.key}
-                  onPress={() => setMomentoTab(tab.key)}
-                  style={({ pressed }) => [
-                    s.momentoTab,
-                    active && s.momentoTabActive,
-                    pressed && { opacity: 0.75 },
-                  ]}
-                >
-                  <Ionicons
-                    name={tab.icon}
-                    size={14}
-                    color={active ? "#1a1a1a" : "rgba(255,255,255,0.60)"}
-                    style={{ marginRight: 5 }}
-                  />
-                  <Text style={[s.momentoTabText, active && s.momentoTabTextActive]}>
-                    {tab.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          {loadingAtividades ? (
-            <ActivityIndicator color="rgba(255,255,255,0.4)" style={{ marginTop: 20, marginBottom: 8 }} />
-          ) : (
-            <HorizontalScroll>
-              {filteredAtividades.slice(0, 10).map((item) => (
-                <PlaceCard
-                  key={item.id}
-                  id={item.id}
-                  saveCategoria="oQueFazer"
-                  titulo={item.titulo}
-                  localizacao={item.localizacao}
-                  image={item.image}
-                  size="medium"
-                  onPress={() => router.push({
-                    pathname: "/lugar/[cityId]/[placeId]",
-                    params: { cityId: "rio", placeId: item.id, source_table: "o_que_fazer_rio" },
-                  })}
-                />
-              ))}
-            </HorizontalScroll>
-          )}
-        </View>
-
-        <Divider />
-
-        {/* ── 3. ONDE COMER ── Supabase: restaurantes */}
-        <View style={s.section}>
-          <SectionHeader
-            title="Onde comer"
-            uppercase
-            subtitle="Os melhores restaurantes do Rio."
-            dark
-          />
-          {loadingRestos ? (
-            <ActivityIndicator color="rgba(255,255,255,0.4)" style={{ marginTop: 20, marginBottom: 8 }} />
-          ) : (
-            <HorizontalScroll>
-              {restos.slice(0, 10).map((r) => (
-                <RestauranteCard
-                  key={String(r.id)}
-                  id={String(r.id)}
-                  nome={r.nome}
-                  bairro={r.bairro ?? "Rio de Janeiro"}
-                  categoria={r.categoria ?? "Restaurante"}
-                  image={r.resolvedPhotoUri ? { uri: r.resolvedPhotoUri } : null}
-                  onPress={() => router.push({
-                    pathname: "/lugar/[cityId]/[placeId]",
-                    params: { cityId: "rio", placeId: String(r.id), source_table: "restaurantes" },
-                  })}
-                />
-              ))}
-            </HorizontalScroll>
-          )}
-        </View>
-
-        <Divider />
-
-        {/* ── 4. LUCKY LIST HIGHLIGHT ── Supabase: lucky_list_rio */}
-        <LuckyHighlight />
-
-        <Divider />
-
-        {/* ── 5. CIDADES MAIS BUSCADAS — Supabase: destinos ── */}
-        <View style={s.section}>
-          <SectionHeader
-            title="Vai pra onde?"
-            uppercase
-            subtitle="Destinos com curadoria do Bruno de Luca."
-            dark
-          />
-          <View style={s.cityGrid}>
-            {destinos.slice(0, 6).map((d) => (
-              <Pressable
-                key={d.id}
-                style={({ pressed }) => [s.cityCard, pressed && { opacity: 0.82, transform: [{ scale: 0.97 }] }]}
-                onPress={() =>
-                  router.push({ pathname: "/(tabs)/cidade/[id]", params: { id: d.id } })
-                }
-              >
-                <Image source={d.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                <LinearGradient
-                  colors={["transparent", "rgba(0,0,0,0.74)"]}
-                  locations={[0.3, 1]}
-                  style={StyleSheet.absoluteFill}
-                />
-                {!d.lancado && (
-                  <View style={s.cityCardBadge}>
-                    <Text style={s.cityCardBadgeText}>EM BREVE</Text>
-                  </View>
-                )}
-                <View style={s.cityCardInfo}>
-                  <Text style={s.cityCardName} numberOfLines={1}>{d.cidade}</Text>
-                  <Text style={s.cityCardPais} numberOfLines={1}>{d.pais}</Text>
-                </View>
+      <View style={styles.viajeRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.amigosRow}>
+          {amigos.map(a => {
+            const { nome, sobrenome } = formatNome(a.nome);
+            return (
+              <Pressable key={a.id} style={styles.amigoItem} onPress={() => router.push(`/amigo/${a.slug}`)}>
+                <Image source={{ uri: a.foto_url || FALLBACK }} style={styles.amigoFoto} />
+                <Text style={styles.amigoNome}>{nome}</Text>
+                <Text style={styles.amigoSobrenome}>{sobrenome}</Text>
               </Pressable>
-            ))}
-          </View>
-          <Pressable
-            style={({ pressed }) => [s.verTodosBtnRow, pressed && { opacity: 0.70 }]}
-            onPress={() => router.push("/(tabs)/destinos")}
-          >
-            <Text style={s.verTodosText}>Ver todos os destinos</Text>
-            <Feather name="arrow-right" size={13} color="rgba(255,255,255,0.40)" />
-          </Pressable>
+            );
+          })}
+        </ScrollView>
+        {/* Seta à direita */}
+        <Pressable style={styles.viajeArrow} onPress={() => router.push("/amigo/all")}>
+          <Ionicons name="chevron-forward" size={20} color={PETROL} />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function AgoraNoDestino({ destinoNome, destinoId }: { destinoNome: string; destinoId: string }) {
+  const items = useAgoraNoRio(destinoId);
+  const nomeFormatado = destinoNome === "Rio de Janeiro" ? "RIO" : destinoNome.toUpperCase();
+
+  if (items.length === 0) return null;
+
+  return (
+    <View style={styles.sectionCompact}>
+      <View style={styles.agoraHeader}>
+        <View>
+          <Text style={styles.sectionLabel}>AGORA NO {nomeFormatado}</Text>
+          <Text style={styles.agoraUpdated}>Atualizado agora</Text>
         </View>
-
-        <Divider />
-
-        {/* ── 8. VIAJE COMO ELES — Supabase: friends ── */}
-        <View style={s.section}>
-          <SectionHeader
-            title="Viaje como eles"
-            uppercase
-            subtitle="Siga os passos de quem você admira. Acesse roteiros detalhados, segredos e dicas pessoais das nossas estrelas convidadas."
-            dark
-          />
-          {loadingFriends ? (
-            <ActivityIndicator color="rgba(201,168,76,0.7)" style={{ marginVertical: 16 }} />
-          ) : (
-            <View style={s.grid2}>
-              {friends.map((f) => (
-                <InfluencerCard key={f.id} influencer={f} />
-              ))}
+        <Pressable style={styles.seeAll} onPress={() => router.push("/(tabs)/agoraNoRio/all")}>
+          <Text style={styles.seeAllText}>Ver todos</Text>
+          <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.6)" />
+        </Pressable>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cardsRow}>
+        {items.map(item => (
+          <Pressable key={item.id} style={styles.card} onPress={() => router.push(`/(tabs)/agoraNoRio/${item.id}`)}>
+            <Image source={{ uri: item.foto }} style={styles.cardImg} />
+            <LinearGradient colors={["transparent", "rgba(0,0,0,0.7)"]} style={StyleSheet.absoluteFill} />
+            <View style={styles.cardTag}>
+              <Text style={styles.cardTagText}>{item.tag}</Text>
             </View>
-          )}
-        </View>
-
-        <Divider />
-
-        {/* ── 10. CTA: CRIAR ROTEIRO ── */}
-        <RoteiroCTA />
-
-        {/* ── EDITORIAL FOOTER ── */}
-        <View style={s.footer}>
-          <Image
-            source={require("../../assets/images/logo-symbol.png")}
-            style={s.footerLogo}
-            resizeMode="contain"
-          />
-          <Text style={s.footerTagline}>inteligência humana em viagens</Text>
-        </View>
-
+            <View style={styles.cardContent}>
+              <Text style={styles.cardTitle} numberOfLines={2}>{item.titulo}</Text>
+              <View style={styles.cardLoc}>
+                <Ionicons name="location-outline" size={10} color="rgba(255,255,255,0.7)" />
+                <Text style={styles.cardLocText}>{item.sub}</Text>
+              </View>
+            </View>
+          </Pressable>
+        ))}
       </ScrollView>
     </View>
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
+function LucklistsSection({ destinoNome, items }: { destinoNome: string; items: LucklistItem[] }) {
+  const nomeFormatado = destinoNome === "Rio de Janeiro" ? "DO RIO" : `DE ${destinoNome.toUpperCase()}`;
 
-const s = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: "#1A0E04",
-  },
+  if (items.length === 0) return null;
 
-  // ── Background ──
-  bgImage: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    width: "100%",
-    height: "100%",
-    opacity: 0.50,
-  },
+  return (
+    <View style={styles.sectionCompact}>
+      <SectionHeader label={`LUCKLISTS ${nomeFormatado}`} right="Ver todos >" onPress={() => router.push("/(tabs)/luckyList/all")} />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cardsRow}>
+        {items.map(item => (
+          <Pressable key={item.id} style={styles.card} onPress={() => router.push(`/(tabs)/luckyList/${item.id}`)}>
+            <Image source={{ uri: item.foto }} style={styles.cardImg} />
+            <LinearGradient colors={["transparent", "rgba(0,0,0,0.7)"]} style={StyleSheet.absoluteFill} />
+            <View style={styles.cardContent}>
+              <Text style={styles.cardTitle} numberOfLines={2}>{item.titulo}</Text>
+              <Text style={styles.cardSub}>{item.sub}</Text>
+            </View>
+          </Pressable>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
 
-  scroll: {
-    flex: 1,
-  },
+function TrilhaDaViagem() {
+  const bars = useRef(Array.from({ length: 12 }, () => new Animated.Value(Math.random()))).current;
 
-  section: {
-    paddingTop: 24,
-    paddingBottom: 8,
-  },
+  useEffect(() => {
+    bars.forEach((bar, i) => {
+      const animate = () => {
+        Animated.sequence([
+          Animated.timing(bar, { toValue: Math.random(), duration: 200 + i * 30, useNativeDriver: false }),
+          Animated.timing(bar, { toValue: Math.random() * 0.5 + 0.2, duration: 200 + i * 30, useNativeDriver: false }),
+        ]).start(animate);
+      };
+      animate();
+    });
+  }, []);
 
-  // Subtle hairline — barely visible on dark bg
-  divider: {
-    height: 1,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    marginHorizontal: 24,
-    marginTop: 18,
-  },
+  return (
+    <View style={styles.trilhaSection}>
+      <Text style={styles.sectionLabel}>TRILHA DA VIAGEM</Text>
+      <Pressable style={styles.trilhaCard} onPress={() => router.push("/trilha")}>
+        <Image source={{ uri: FALLBACK }} style={styles.trilhaThumb} />
+        <View style={styles.trilhaText}>
+          <Text style={styles.trilhaTitle}>Rio de Janeiro</Text>
+          <Text style={styles.trilhaSub}>A trilha sonora perfeita para a cidade.</Text>
+          <Text style={styles.trilhaPlaylist}>Playlist by The Lucky Trip</Text>
+        </View>
+        <View style={styles.playBtn}>
+          <Ionicons name="play" size={18} color="#FFF" />
+        </View>
+        <View style={styles.waveform}>
+          {bars.map((bar, i) => (
+            <Animated.View
+              key={i}
+              style={[styles.waveBar, { height: bar.interpolate({ inputRange: [0, 1], outputRange: [4, 20] }) }]}
+            />
+          ))}
+        </View>
+      </Pressable>
+    </View>
+  );
+}
 
-  // ── Momento tabs (manhã / tarde / noite) ──
-  momentoTabs: {
-    flexDirection: "row",
-    gap: 8,
-    paddingHorizontal: 24,
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  momentoTab: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.22)",
-    backgroundColor: "rgba(255,255,255,0.06)",
-  },
-  momentoTabActive: {
-    backgroundColor: "#C9A84C",
-    borderColor: "#C9A84C",
-  },
-  momentoTabText: {
-    fontFamily: "Inter",
-    fontSize: 12,
-    fontWeight: "600",
-    color: "rgba(255,255,255,0.65)",
-    letterSpacing: 0.4,
-  },
-  momentoTabTextActive: {
-    color: "#1a1a1a",
-  },
+// ── Music Modal ──────────────────────────────────────────────────────────────
+function MusicModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  return (
+    <Modal visible={visible} animationType="slide" transparent>
+      <View style={styles.modalOverlay}>
+        <View style={styles.musicModal}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Trilhas Sonoras</Text>
+            <Pressable onPress={onClose} style={styles.modalClose}>
+              <Ionicons name="close" size={24} color="#FFF" />
+            </Pressable>
+          </View>
+          <Pressable style={styles.playlistItem}>
+            <Image source={{ uri: FALLBACK }} style={styles.playlistThumb} />
+            <View style={styles.playlistInfo}>
+              <Text style={styles.playlistName}>Rio de Janeiro</Text>
+              <Text style={styles.playlistSub}>Trilha Sonora • 42 músicas</Text>
+            </View>
+            <View style={styles.playlistPlay}>
+              <Ionicons name="play" size={20} color="#FFF" />
+            </View>
+          </Pressable>
+          <Text style={styles.comingSoonText}>Mais playlists em breve...</Text>
+        </View>
+      </View>
+    </Modal>
+  );
+}
 
-  // ── 2-column grid ──
-  grid2: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    paddingHorizontal: 24,
-    gap: 12,
-  },
+// ── Gallery Modal ────────────────────────────────────────────────────────────
+function GalleryModal({ visible, onClose, photos }: { visible: boolean; onClose: () => void; photos: string[] }) {
+  const [currentIdx, setCurrentIdx] = useState(0);
 
-  // ── City grid (Cidades mais buscadas) ──
-  cityGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    paddingHorizontal: 24,
-    gap: 10,
-  },
-  cityCard: {
-    width: CARD_W,
-    height: CARD_W * 0.72,
-    borderRadius: 16,
-    overflow: "hidden",
-    backgroundColor: "#1A1208",
-    justifyContent: "flex-end",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.07)",
-  },
-  cityCardBadge: {
-    position: "absolute",
-    top: 8,
-    left: 8,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-  },
-  cityCardBadgeText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 8,
-    color: "rgba(255,255,255,0.60)",
-    letterSpacing: 1.4,
-    textTransform: "uppercase",
-  },
-  cityCardInfo: {
-    paddingHorizontal: 10,
-    paddingBottom: 10,
-    gap: 1,
-  },
-  cityCardName: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 15,
-    color: "#FFFFFF",
-    lineHeight: 20,
-  },
-  cityCardPais: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 10.5,
-    color: "rgba(255,255,255,0.45)",
-    letterSpacing: 0.4,
-  },
-  verTodosBtnRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 12,
-    marginHorizontal: 24,
-    marginTop: 6,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-  },
-  verTodosText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: "rgba(255,255,255,0.40)",
-  },
+  return (
+    <Modal visible={visible} animationType="fade" statusBarTranslucent>
+      <View style={styles.galleryContainer}>
+        <Pressable style={styles.galleryClose} onPress={onClose}>
+          <Ionicons name="close" size={28} color="#FFF" />
+        </Pressable>
+        <FlatList
+          data={photos}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={(e) => {
+            const idx = Math.round(e.nativeEvent.contentOffset.x / W);
+            setCurrentIdx(idx);
+          }}
+          renderItem={({ item }) => (
+            <Image source={{ uri: item }} style={styles.galleryImage} resizeMode="contain" />
+          )}
+          keyExtractor={(item, i) => i.toString()}
+        />
+        <View style={styles.galleryDots}>
+          <Text style={styles.galleryCounter}>{currentIdx + 1} / {photos.length}</Text>
+        </View>
+      </View>
+    </Modal>
+  );
+}
 
-  // ── Lucky List highlight ──
-  luckyBlock: {
-    marginTop: 24,
-    marginHorizontal: 24,
-    borderRadius: 22,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(201,168,76,0.24)",
-    backgroundColor: "rgba(0,0,0,0.65)",
-    padding: 24,
-    boxShadow: "0px 6px 28px rgba(201,168,76,0.08)",
-  },
-  luckyHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 16,
-  },
-  luckyAccentText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 10,
-    color: C.gold,
-    letterSpacing: 2.5,
-  },
-  luckyAccentLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "rgba(201,168,76,0.20)",
-  },
-  luckyHeadline: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 22,
-    color: C.white,
-    lineHeight: 30,
-    letterSpacing: -0.2,
-    marginBottom: 8,
-  },
-  luckySubtitle: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: "rgba(255,255,255,0.55)",
-    lineHeight: 20,
-    marginBottom: 20,
-  },
-  luckyPicks: {
-    marginBottom: 20,
-  },
-  luckyPickRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(201,168,76,0.08)",
-  },
-  luckyPickStar: {
-    fontSize: 10,
-    color: C.gold,
-    width: 18,
-    textAlign: "center",
-  },
-  luckyPickText: {
-    flex: 1,
-  },
-  luckyPickTitle: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 14,
-    color: C.white,
-    lineHeight: 20,
-  },
-  luckyPickLoc: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    color: "rgba(201,168,76,0.55)",
-    marginTop: 1,
-  },
-  luckyBtn: {
-    borderWidth: 1,
-    borderColor: "rgba(201,168,76,0.40)",
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: "center",
-    backgroundColor: "rgba(201,168,76,0.09)",
-  },
-  luckyBtnText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-    color: C.gold,
-    letterSpacing: 0.3,
-  },
+// ═══════════════════════════════════════════════════════════════════════════
+// MAIN SCREEN
+// ═══════════════════════════════════════════════════════════════════════════
 
-  // ── Influencer card ──
-  influencerCard: {
-    width: CARD_W,
-    height: CARD_W * 1.22,
-    borderRadius: 18,
-    overflow: "hidden",
-    backgroundColor: "#1A1208",
-    position: "relative",
-    justifyContent: "flex-end",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-  influencerImageStyle: {
-    borderRadius: 18,
-  },
-  influencerBadge: {
-    position: "absolute",
-    top: 10,
-    left: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: "rgba(0,0,0,0.50)",
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-  },
-  influencerBadgeText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 10,
-    color: C.white,
-    letterSpacing: 0.2,
-  },
-  influencerName: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-    color: C.white,
-    lineHeight: 18,
-    padding: 12,
-    paddingTop: 6,
-  },
+export default function HomeScreen() {
+  const insets = useSafeAreaInsets();
+  const top = Platform.OS === "web" ? 0 : insets.top;
+  const bottom = Platform.OS === "web" ? 34 : insets.bottom;
 
-  // ── CTA block — glass card ──
-  ctaBlock: {
-    marginTop: 24,
-    marginHorizontal: 24,
-    borderRadius: 22,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    padding: 28,
-  },
-  ctaEyebrow: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 10,
-    color: C.terracotta,
-    letterSpacing: 2,
-    marginBottom: 10,
-  },
-  ctaHeadline: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 22,
-    color: C.white,
-    lineHeight: 30,
-    letterSpacing: -0.2,
-    marginBottom: 10,
-  },
-  ctaSub: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    color: "rgba(255,255,255,0.52)",
-    lineHeight: 22,
-    marginBottom: 22,
-  },
-  ctaBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: C.terracotta,
-    borderRadius: 12,
-    paddingVertical: 15,
-  },
-  ctaBtnText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
-    color: C.white,
-    letterSpacing: 0.3,
-  },
+  const photos = useHeroPhotos();
+  const { destaques } = useDestaques();
+  const lucklistItems = useLucklists(RIO_DESTINO_ID);
+  const [musicModalVisible, setMusicModalVisible] = useState(false);
+  const [galleryModalVisible, setGalleryModalVisible] = useState(false);
 
-  // ── Footer ──
-  footer: {
-    marginTop: 48,
-    marginHorizontal: 24,
-    paddingTop: 28,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.08)",
-    alignItems: "center",
-    gap: 10,
-    paddingBottom: 8,
-  },
-  footerLogo: {
-    width: 110,
-    height: 32,
-    opacity: 0.65,
-  },
-  footerTagline: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 10,
-    color: "rgba(255,255,255,0.38)",
-    letterSpacing: 2.0,
-    textTransform: "uppercase",
-    textAlign: "center",
-  },
-  footerText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: "rgba(255,255,255,0.28)",
-    textAlign: "center",
-    lineHeight: 20,
-    maxWidth: 240,
-  },
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SISTEMA 1 — BACKGROUND (13 segundos, todas as fotos do bucket hero/foto)
+  // ═══════════════════════════════════════════════════════════════════════════
+  const [bgIdx, setBgIdx] = useState(0);
+  const bgIdxRef = useRef(0);
+  const bgFade = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => { bgIdxRef.current = bgIdx; }, [bgIdx]);
+
+  useEffect(() => {
+    if (photos.length <= 1) return;
+    const interval = setInterval(() => {
+      const nextIdx = (bgIdxRef.current + 1) % photos.length;
+      bgFade.setValue(0);
+      setBgIdx(nextIdx);
+      Animated.timing(bgFade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+    }, 13000);
+    return () => clearInterval(interval);
+  }, [photos.length]);
+
+  const currentBgPhoto = photos[bgIdx] || FALLBACK;
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SISTEMA 2 — CARROSSEL DE DESTAQUES (5 segundos, cards de amigos/destinos)
+  // O crossFade é tratado dentro do HeroDestaque
+  // ═══════════════════════════════════════════════════════════════════════════
+  const [carouselIdx, setCarouselIdx] = useState(0);
+  const carouselIdxRef = useRef(0);
+
+  useEffect(() => { carouselIdxRef.current = carouselIdx; }, [carouselIdx]);
+
+  useEffect(() => {
+    if (destaques.length <= 1) return;
+    const interval = setInterval(() => {
+      const nextIdx = (carouselIdxRef.current + 1) % destaques.length;
+      setCarouselIdx(nextIdx);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [destaques.length]);
+
+  // Nome do destino atual (para seções dinâmicas)
+  const currentDestino = destaques[carouselIdx];
+  const destinoNome = currentDestino?.tipo === "destino" ? currentDestino.titulo : "Rio de Janeiro";
+
+  return (
+    <View style={styles.root}>
+      {/* ═══ BACKGROUND: só visível abaixo do primeiro terço ═══ */}
+      <View style={styles.bgContainer}>
+        <Animated.Image source={{ uri: currentBgPhoto }} style={[styles.bgImage, { opacity: bgFade }]} resizeMode="cover" />
+        <View style={styles.overlay} />
+        <LinearGradient colors={["transparent", "rgba(0,0,0,0.55)"]} locations={[0.3, 1]} style={StyleSheet.absoluteFill} />
+      </View>
+
+      {/* ═══ HERO DESTAQUE: primeiro terço com crossFade próprio ═══ */}
+      <HeroDestaque
+        top={top}
+        destaques={destaques}
+        carouselIdx={carouselIdx}
+        rioPhotos={photos}
+        rioBgIdx={bgIdx}
+      />
+
+      {/* TopBar */}
+      <TopBar top={top} onMusicPress={() => setMusicModalVisible(true)} onGalleryPress={() => setGalleryModalVisible(true)} />
+
+      {/* Modals */}
+      <MusicModal visible={musicModalVisible} onClose={() => setMusicModalVisible(false)} />
+      <GalleryModal visible={galleryModalVisible} onClose={() => setGalleryModalVisible(false)} photos={photos} />
+
+      {/* Content */}
+      <ScrollView style={styles.scroll} contentContainerStyle={{ paddingBottom: bottom + 90, paddingTop: H * 0.38 }} showsVerticalScrollIndicator={false}>
+        {/* Input */}
+        <InputBar />
+
+        {/* Sections */}
+        <ViajeComEles />
+        <AgoraNoDestino destinoNome={destinoNome} destinoId={RIO_DESTINO_ID} />
+        <LucklistsSection destinoNome={destinoNome} items={lucklistItems} />
+        <TrilhaDaViagem />
+      </ScrollView>
+    </View>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STYLES
+// ═══════════════════════════════════════════════════════════════════════════
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: "#0A0A0A" },
+  scroll: { flex: 1 },
+
+  // Background (só visível abaixo do primeiro terço)
+  bgContainer: { position: "absolute", top: H * 0.38, left: 0, right: 0, bottom: 0, overflow: "hidden" },
+  bgImage: { position: "absolute", width: W, height: H, top: -H * 0.38 },
+  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.25)" },
+
+  // HeroDestaque (primeiro terço - fundo sólido, crossFade próprio)
+  heroDestaque: { position: "absolute", top: 0, left: 0, right: 0, height: H * 0.38, backgroundColor: "#000", zIndex: 5 },
+  heroDestaqueImage: { position: "absolute", width: "100%", height: "100%" },
+
+  // TopBar
+  topBar: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 10, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16 },
+  topLeftSpacer: { width: 40 },
+  logo: { width: 36, height: 36 },
+  topRight: { flexDirection: "row", gap: 8 },
+  iconBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(0,0,0,0.35)", alignItems: "center", justifyContent: "center" },
+
+  // Hero Title (at top)
+  heroTitleContainer: { paddingHorizontal: 20 },
+  heroKicker: { fontFamily: "Inter_500Medium", fontSize: 11, letterSpacing: 2, color: "rgba(255,255,255,0.8)", marginBottom: 6 },
+  heroTitleText: { fontFamily: "PlayfairDisplay_700Bold", fontSize: 38, color: "#FFF", marginBottom: 6 },
+  heroSub: { fontFamily: "Inter_400Regular", fontSize: 15, color: "rgba(255,255,255,0.9)", marginBottom: 6 },
+  heroPais: { fontFamily: "Inter_500Medium", fontSize: 11, letterSpacing: 3, color: "rgba(255,255,255,0.7)" },
+  dots: { flexDirection: "row", gap: 4, marginTop: 10 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.4)" },
+  dotActive: { width: 18, backgroundColor: "#FFF" },
+
+  // Input - glass style
+  inputWrap: { paddingHorizontal: 16, marginBottom: 12 },
+  inputBar: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 12, height: 44, paddingHorizontal: 10, borderWidth: 1, borderColor: "rgba(255,255,255,0.3)" },
+  socialIcons: { flexDirection: "row", gap: 4 },
+  socialIcon: { width: 28, height: 28, borderRadius: 6, alignItems: "center", justifyContent: "center" },
+  inputPlaceholder: { flex: 1, marginLeft: 10, fontFamily: "Inter_400Regular", fontSize: 13, color: "rgba(255,255,255,0.6)" },
+
+  // Sections - compact
+  sectionCompact: { marginBottom: 8 },
+  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, marginBottom: 8 },
+  sectionLabel: { fontFamily: "Inter_600SemiBold", fontSize: 11, letterSpacing: 1.5, color: "rgba(255,255,255,0.7)", textTransform: "uppercase" },
+  seeAll: { flexDirection: "row", alignItems: "center", gap: 2 },
+  seeAllText: { fontFamily: "Inter_500Medium", fontSize: 12, color: "rgba(255,255,255,0.6)" },
+
+  // Viaje com eles
+  viajeHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, marginBottom: 8 },
+  viajeRow: { flexDirection: "row", alignItems: "center" },
+  viajeArrow: { width: 32, height: 56, alignItems: "center", justifyContent: "center", marginRight: 8 },
+  amigosRow: { paddingLeft: 16, gap: 12, alignItems: "center" },
+  amigoItem: { alignItems: "center", width: 60 },
+  amigoFoto: { width: 56, height: 56, borderRadius: 28, marginBottom: 6 },
+  amigoNome: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: "#FFF", textAlign: "center" },
+  amigoSobrenome: { fontFamily: "Inter_400Regular", fontSize: 10, color: "rgba(255,255,255,0.7)", textAlign: "center" },
+
+  // Agora no Rio
+  agoraHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", paddingHorizontal: 16, marginBottom: 8 },
+  agoraUpdated: { fontFamily: "Inter_400Regular", fontSize: 10, color: "rgba(255,255,255,0.5)", marginTop: 2 },
+
+  // Cards 120x120
+  cardsRow: { paddingHorizontal: 16, gap: 10 },
+  card: { width: 120, height: 120, borderRadius: 10, overflow: "hidden", backgroundColor: "#1A1A1A" },
+  cardImg: { width: "100%", height: "100%" },
+  cardTag: { position: "absolute", top: 8, left: 8, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 4, backgroundColor: PETROL },
+  cardTagText: { fontFamily: "Inter_600SemiBold", fontSize: 10, color: "#FFF", letterSpacing: 0.5 },
+  cardContent: { position: "absolute", bottom: 0, left: 0, right: 0, padding: 8 },
+  cardTitle: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: "#FFF", lineHeight: 16 },
+  cardSub: { fontFamily: "Inter_400Regular", fontSize: 9, color: "rgba(255,255,255,0.6)", marginTop: 2 },
+  cardLoc: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 3 },
+  cardLocText: { fontFamily: "Inter_400Regular", fontSize: 9, color: "rgba(255,255,255,0.7)" },
+
+  // Trilha
+  trilhaSection: { paddingHorizontal: 16, marginBottom: 8 },
+  trilhaCard: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 12, padding: 10, gap: 10 },
+  trilhaThumb: { width: 48, height: 48, borderRadius: 8 },
+  trilhaText: { flex: 1 },
+  trilhaTitle: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: "#FFF" },
+  trilhaSub: { fontFamily: "Inter_400Regular", fontSize: 10, color: "rgba(255,255,255,0.6)" },
+  trilhaPlaylist: { fontFamily: "Inter_400Regular", fontSize: 9, color: "rgba(255,255,255,0.4)", marginTop: 2 },
+  playBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: PETROL, alignItems: "center", justifyContent: "center" },
+  waveform: { flexDirection: "row", alignItems: "flex-end", gap: 2, height: 20 },
+  waveBar: { width: 3, borderRadius: 1.5, backgroundColor: PETROL },
+
+  // Music Modal
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.85)", justifyContent: "flex-end" },
+  musicModal: { backgroundColor: "#1A1A1A", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 40 },
+  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
+  modalTitle: { fontFamily: "Inter_600SemiBold", fontSize: 18, color: "#FFF" },
+  modalClose: { padding: 4 },
+  playlistItem: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 12, padding: 12, gap: 12 },
+  playlistThumb: { width: 56, height: 56, borderRadius: 8 },
+  playlistInfo: { flex: 1 },
+  playlistName: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: "#FFF" },
+  playlistSub: { fontFamily: "Inter_400Regular", fontSize: 12, color: "rgba(255,255,255,0.6)", marginTop: 2 },
+  playlistPlay: { width: 40, height: 40, borderRadius: 20, backgroundColor: PETROL, alignItems: "center", justifyContent: "center" },
+  comingSoonText: { fontFamily: "Inter_400Regular", fontSize: 13, color: "rgba(255,255,255,0.4)", textAlign: "center", marginTop: 20 },
+
+  // Gallery Modal
+  galleryContainer: { flex: 1, backgroundColor: "#000" },
+  galleryClose: { position: "absolute", top: 50, right: 20, zIndex: 10, width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center" },
+  galleryImage: { width: W, height: H },
+  galleryDots: { position: "absolute", bottom: 50, left: 0, right: 0, alignItems: "center" },
+  galleryCounter: { fontFamily: "Inter_500Medium", fontSize: 14, color: "#FFF" },
 });
