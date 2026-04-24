@@ -167,86 +167,112 @@ function TopBar({ top, onMusicPress, onGalleryPress }: { top: number; onMusicPre
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// HeroDestaque: primeiro terço com crossFade limpo (zero pisca)
+// HeroDestaque: carrossel com swipe horizontal + auto-play
 // ═══════════════════════════════════════════════════════════════════════════
 function HeroDestaque({
   top,
   destaques,
   carouselIdx,
+  setCarouselIdx,
+  flatListRef,
   rioPhotos,
-  rioBgIdx
+  rioBgIdx,
 }: {
   top: number;
   destaques: Destaque[];
   carouselIdx: number;
+  setCarouselIdx: (idx: number) => void;
+  flatListRef: React.RefObject<FlatList | null>;
   rioPhotos: string[];
   rioBgIdx: number;
 }) {
-  const item = destaques[carouselIdx] || { titulo: "Rio de Janeiro", subtitulo: "Três dias entre o mar e a montanha", tipo: "destino", photo_url: FALLBACK };
-  const isAmigo = item.tipo === "amigo";
-  const isRio = item.tipo === "destino" && item.titulo === "Rio de Janeiro";
-
-  // Foto a exibir: se for Rio, usa slideshow; senão, usa foto do destaque
-  const currentPhoto = isRio ? (rioPhotos[rioBgIdx] || FALLBACK) : (item.photo_url || FALLBACK);
-
-  // CrossFade: duas imagens sobrepostas para transição limpa
-  const [displayedPhoto, setDisplayedPhoto] = useState(currentPhoto);
-  const [prevPhoto, setPrevPhoto] = useState(currentPhoto);
-  const crossFade = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    if (currentPhoto !== displayedPhoto) {
-      setPrevPhoto(displayedPhoto);
-      setDisplayedPhoto(currentPhoto);
-      crossFade.setValue(0);
-      Animated.timing(crossFade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
-    }
-  }, [currentPhoto]);
-
-  // Navegação baseada no tipo de destaque
-  const handlePress = () => {
-    switch (item.tipo) {
-      case "destino":
-        router.push(`/destino/${item.destino_slug}`);
-        break;
-      case "amigo":
-        router.push(`/amigo/${item.destino_slug}`);
-        break;
-      case "lugar":
-      case "restaurante":
-      case "bar":
-      case "atividade":
-      case "evento":
-        // Todos os tipos de entidade navegam para /lugar/[id]
-        if (item.entity_id) {
-          router.push(`/lugar/${item.entity_id}`);
-        }
-        break;
+  // Handle swipe end — update carouselIdx
+  const onMomentumScrollEnd = (e: any) => {
+    const idx = Math.round(e.nativeEvent.contentOffset.x / W);
+    if (idx !== carouselIdx && idx >= 0 && idx < destaques.length) {
+      setCarouselIdx(idx);
     }
   };
 
-  return (
-    <Pressable style={styles.heroDestaque} onPress={handlePress}>
-      {/* Imagem anterior (fica embaixo) */}
-      <Image source={{ uri: prevPhoto }} style={styles.heroDestaqueImage} />
-      {/* Imagem atual (faz fade in por cima) */}
-      <Animated.Image source={{ uri: displayedPhoto }} style={[styles.heroDestaqueImage, { opacity: crossFade }]} />
-      {/* Gradiente */}
-      <LinearGradient colors={["rgba(0,0,0,0.2)", "rgba(0,0,0,0.5)", "rgba(10,10,10,1)"]} locations={[0, 0.6, 1]} style={StyleSheet.absoluteFill} />
+  // Render each destaque slide
+  const renderItem = ({ item, index }: { item: Destaque; index: number }) => {
+    const isAmigo = item.tipo === "amigo";
+    const isRio = item.tipo === "destino" && item.titulo === "Rio de Janeiro";
+    const photoUrl = isRio ? (rioPhotos[rioBgIdx] || FALLBACK) : (item.photo_url || FALLBACK);
 
-      {/* Conteúdo do card */}
-      <View style={[styles.heroTitleContainer, { paddingTop: top + 70 }]}>
-        <Text style={styles.heroKicker}>{isAmigo ? "VIAJE COM" : "DESTINO"}</Text>
-        <Text style={styles.heroTitleText}>{item.titulo}</Text>
-        <Text style={styles.heroSub}>{item.subtitulo}</Text>
-        {!isAmigo && <Text style={styles.heroPais}>BRASIL</Text>}
-        <View style={styles.dots}>
-          {destaques.slice(0, 5).map((_, i) => (
-            <View key={i} style={[styles.dot, i === carouselIdx % 5 && styles.dotActive]} />
-          ))}
+    const handlePress = () => {
+      switch (item.tipo) {
+        case "destino":
+          router.push(`/destino/${item.destino_slug}`);
+          break;
+        case "amigo":
+          router.push(`/amigo/${item.destino_slug}`);
+          break;
+        case "lugar":
+        case "restaurante":
+        case "bar":
+        case "atividade":
+        case "evento":
+          if (item.entity_id) {
+            router.push(`/lugar/${item.entity_id}`);
+          }
+          break;
+      }
+    };
+
+    return (
+      <Pressable style={styles.heroSlide} onPress={handlePress}>
+        <Image source={{ uri: photoUrl }} style={styles.heroDestaqueImage} />
+        <LinearGradient
+          colors={["rgba(0,0,0,0.2)", "rgba(0,0,0,0.5)", "rgba(10,10,10,1)"]}
+          locations={[0, 0.6, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={[styles.heroTitleContainer, { paddingTop: top + 70 }]}>
+          <Text style={styles.heroKicker}>{isAmigo ? "VIAJE COM" : "DESTINO"}</Text>
+          <Text style={styles.heroTitleText}>{item.titulo}</Text>
+          <Text style={styles.heroSub}>{item.subtitulo}</Text>
+          {!isAmigo && <Text style={styles.heroPais}>BRASIL</Text>}
+        </View>
+      </Pressable>
+    );
+  };
+
+  if (destaques.length === 0) {
+    return (
+      <View style={styles.heroDestaque}>
+        <Image source={{ uri: FALLBACK }} style={styles.heroDestaqueImage} />
+        <LinearGradient colors={["rgba(0,0,0,0.2)", "rgba(0,0,0,0.5)", "rgba(10,10,10,1)"]} locations={[0, 0.6, 1]} style={StyleSheet.absoluteFill} />
+        <View style={[styles.heroTitleContainer, { paddingTop: top + 70 }]}>
+          <Text style={styles.heroKicker}>DESTINO</Text>
+          <Text style={styles.heroTitleText}>Rio de Janeiro</Text>
+          <Text style={styles.heroSub}>Carregando...</Text>
         </View>
       </View>
-    </Pressable>
+    );
+  }
+
+  return (
+    <View style={styles.heroDestaque}>
+      <FlatList
+        ref={flatListRef}
+        data={destaques}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.id}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={onMomentumScrollEnd}
+        getItemLayout={(_, index) => ({ length: W, offset: W * index, index })}
+        initialScrollIndex={0}
+      />
+      {/* Dots indicator */}
+      <View style={styles.dotsContainer}>
+        {destaques.slice(0, 8).map((_, i) => (
+          <View key={i} style={[styles.dot, i === carouselIdx && styles.dotActive]} />
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -531,19 +557,22 @@ export default function HomeScreen() {
   const currentBgPhoto = photos[bgIdx] || FALLBACK;
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // SISTEMA 2 — CARROSSEL DE DESTAQUES (5 segundos, cards de amigos/destinos)
-  // O crossFade é tratado dentro do HeroDestaque
+  // SISTEMA 2 — CARROSSEL DE DESTAQUES (5 segundos, swipeable)
   // ═══════════════════════════════════════════════════════════════════════════
   const [carouselIdx, setCarouselIdx] = useState(0);
   const carouselIdxRef = useRef(0);
+  const heroFlatListRef = useRef<FlatList>(null);
 
   useEffect(() => { carouselIdxRef.current = carouselIdx; }, [carouselIdx]);
 
+  // Auto-advance every 5 seconds
   useEffect(() => {
     if (destaques.length <= 1) return;
     const interval = setInterval(() => {
       const nextIdx = (carouselIdxRef.current + 1) % destaques.length;
       setCarouselIdx(nextIdx);
+      // Scroll FlatList to the new index
+      heroFlatListRef.current?.scrollToIndex({ index: nextIdx, animated: true });
     }, 5000);
     return () => clearInterval(interval);
   }, [destaques.length]);
@@ -566,6 +595,8 @@ export default function HomeScreen() {
         top={top}
         destaques={destaques}
         carouselIdx={carouselIdx}
+        setCarouselIdx={setCarouselIdx}
+        flatListRef={heroFlatListRef}
         rioPhotos={photos}
         rioBgIdx={bgIdx}
       />
@@ -607,6 +638,7 @@ const styles = StyleSheet.create({
 
   // HeroDestaque (primeiro terço - fundo sólido, crossFade próprio)
   heroDestaque: { position: "absolute", top: 0, left: 0, right: 0, height: H * 0.38, backgroundColor: "#000", zIndex: 5 },
+  heroSlide: { width: W, height: H * 0.38 },
   heroDestaqueImage: { position: "absolute", width: "100%", height: "100%" },
 
   // TopBar
@@ -622,6 +654,7 @@ const styles = StyleSheet.create({
   heroTitleText: { fontFamily: "PlayfairDisplay_700Bold", fontSize: 38, color: "#FFF", marginBottom: 6 },
   heroSub: { fontFamily: "Inter_400Regular", fontSize: 15, color: "rgba(255,255,255,0.9)", marginBottom: 6 },
   heroPais: { fontFamily: "Inter_500Medium", fontSize: 11, letterSpacing: 3, color: "rgba(255,255,255,0.7)" },
+  dotsContainer: { position: "absolute", bottom: 16, left: 0, right: 0, flexDirection: "row", justifyContent: "center", gap: 6 },
   dots: { flexDirection: "row", gap: 4, marginTop: 10 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.4)" },
   dotActive: { width: 18, backgroundColor: "#FFF" },
