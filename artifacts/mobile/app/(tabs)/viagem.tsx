@@ -14,6 +14,8 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Animated,
   Dimensions,
   ImageSourcePropType,
@@ -22,6 +24,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
@@ -34,22 +37,38 @@ import { useGuia, sourceTableFromCategoria } from "@/context/GuiaContext";
 import type { SavedCategory, SavedItem } from "@/context/GuiaContext";
 import { buildRoteiro, PERIODO_LABEL, PERIODO_ICON } from "@/utils/buildRoteiro";
 import type { DiaRoteiro, DiaPeriodo } from "@/utils/buildRoteiro";
+import { supabase } from "@/lib/supabase";
+import { getNeighborhoodImage } from "@/data/neighborhoodImages";
 
 const C    = Colors.light;
 const GOLD = "#D4AF37";
 const { width: SCREEN_W } = Dimensions.get("window");
 
-const FALLBACK_BG = require("@/assets/images/ipanema.png");
+// Rio photos for rotating background
+const RIO_BG_PHOTOS = [
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero01.jpg" },
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero02.jpg" },
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero03.jpg" },
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero04.jpg" },
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero05.jpg" },
+];
+const FALLBACK_BG = RIO_BG_PHOTOS[0];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Category label map
 // ─────────────────────────────────────────────────────────────────────────────
 
 const CATEGORY_LABEL: Record<SavedCategory, string> = {
-  oQueFazer:   "Experiência",
-  restaurante: "Restaurante",
-  hotel:       "Hotel",
-  lucky:       "Lucky List",
+  oQueFazer:    "Experiência",
+  restaurante:  "Restaurante",
+  hotel:        "Hotel",
+  lucky:        "Lucky List",
+  atividade:    "Atividade",
+  praia:        "Praia",
+  compras:      "Compras",
+  dica_secreta: "Dica Secreta",
+  bar:          "Bar",
+  cafe:         "Café",
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -57,23 +76,21 @@ const CATEGORY_LABEL: Record<SavedCategory, string> = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function SceneBackground({ images }: { images: ImageSourcePropType[] }) {
-  const hasSaved      = images.length > 0;
+  // Always use Rio photos as background with loop
+  const bgImages = RIO_BG_PHOTOS;
   const [idx, setIdx] = useState(0);
-  // Overlay starts invisible — fades in once the first image is actually displayed.
-  // This guarantees content never lands on a darkened black canvas.
-  const overlayAnim   = useRef(new Animated.Value(0)).current;
+  const overlayAnim = useRef(new Animated.Value(0)).current;
 
-  // Cycle through saved place images every 5 s.
-  // expo-image crossfades automatically when `source` changes (transition prop below).
+  // Cycle through Rio photos every 8s (igual home)
   useEffect(() => {
-    if (images.length <= 1) return;
+    if (bgImages.length <= 1) return;
     const timer = setInterval(() => {
-      setIdx((prev) => (prev + 1) % images.length);
-    }, 5000);
+      setIdx((prev) => (prev + 1) % bgImages.length);
+    }, 8000);
     return () => clearInterval(timer);
-  }, [images.length]);
+  }, [bgImages.length]);
 
-  const src = hasSaved ? (images[idx] ?? images[0]) : FALLBACK_BG;
+  const src = bgImages[idx] ?? bgImages[0];
 
   function handleDisplay() {
     Animated.timing(overlayAnim, {
@@ -85,36 +102,27 @@ function SceneBackground({ images }: { images: ImageSourcePropType[] }) {
 
   return (
     <>
-      {/* Warm amber base — renders instantly in the same frame as mount */}
+      {/* Warm amber base — renders instantly */}
       <LinearGradient
         colors={["#2D1A08", "#1A0E04"]}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
-      {/* expo-image: backgroundColor shows immediately; crossfades to real image */}
+      {/* Rio photos with blur 22 */}
       <ExpoImage
         source={src}
         style={[StyleSheet.absoluteFillObject, { backgroundColor: "#1A0E04" }]}
         contentFit="cover"
-        blurRadius={Platform.OS === "ios" ? 30 : 18}
-        transition={{ duration: 600, effect: "cross-dissolve" }}
+        blurRadius={22}
+        transition={{ duration: 800, effect: "cross-dissolve" }}
         onDisplay={handleDisplay}
       />
-      {/* Dark cinematic overlay fades in with the image — never above an empty canvas */}
+      {/* Dark overlay 0.45 */}
       <Animated.View
         style={[StyleSheet.absoluteFill, { opacity: overlayAnim }]}
         pointerEvents="none"
       >
-        <LinearGradient
-          colors={[
-            "rgba(0,0,0,0.05)",
-            "rgba(0,0,0,0.25)",
-            "rgba(0,0,0,0.52)",
-            "rgba(0,0,0,0.72)",
-          ]}
-          locations={[0, 0.30, 0.62, 1]}
-          style={StyleSheet.absoluteFill}
-        />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.45)" }]} />
       </Animated.View>
     </>
   );
@@ -147,14 +155,212 @@ function SocialChip({
   );
 }
 
-function ActionArea({ hasSaved }: { hasSaved: boolean }) {
+// ─────────────────────────────────────────────────────────────────────────────
+// URL paste sheet — user pastes an Instagram/TikTok URL → edge function extracts location
+// ─────────────────────────────────────────────────────────────────────────────
+
+function UrlPasteSheet({
+  source,
+  onClose,
+  onAdd,
+}: {
+  source:  "instagram" | "tiktok";
+  onClose: () => void;
+  onAdd:   (item: SavedItem) => void;
+}) {
+  const [url,     setUrl]     = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const placeholder = source === "instagram"
+    ? "https://www.instagram.com/p/..."
+    : "https://vm.tiktok.com/...";
+
+  const isValidUrl = url.trim().startsWith("http");
+
+  async function handleSubmit() {
+    const trimmed = url.trim();
+    if (!trimmed.startsWith("http")) {
+      Alert.alert("URL inválida", "Cole o link completo do post (começa com https://).");
+      return;
+    }
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("lucky-trip-ai", {
+        body: { url: trimmed, source },
+      });
+      if (error || !data?.titulo) throw new Error(error?.message ?? "sem resposta");
+      const item: SavedItem = {
+        id:          data.id ?? `ext-${Date.now()}`,
+        categoria:   (data.categoria as SavedCategory) ?? "oQueFazer",
+        titulo:      data.titulo,
+        localizacao: data.bairro ?? data.localizacao ?? "Rio de Janeiro",
+        image:       data.photo_url
+          ? { uri: data.photo_url }
+          : getNeighborhoodImage(data.bairro ?? ""),
+      };
+      onAdd(item);
+      onClose();
+    } catch {
+      Alert.alert(
+        "Não consegui identificar o local",
+        "Verifique se o link é público e tente novamente. Se o problema persistir, adicione o lugar manualmente.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <View style={up.overlay} pointerEvents="box-none">
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      <View style={up.sheet}>
+        <View style={up.handle} />
+        <View style={up.header}>
+          <Feather
+            name={source === "instagram" ? "instagram" : "video"}
+            size={16}
+            color={GOLD}
+          />
+          <Text style={up.title}>
+            {source === "instagram" ? "Colar link do Instagram" : "Colar link do TikTok"}
+          </Text>
+        </View>
+        <Text style={up.hint}>
+          Abra o post no {source === "instagram" ? "Instagram" : "TikTok"}, copie o link e cole abaixo. A Lucky extrai automaticamente o lugar.
+        </Text>
+        <TextInput
+          style={up.input}
+          value={url}
+          onChangeText={setUrl}
+          placeholder={placeholder}
+          placeholderTextColor="rgba(255,255,255,0.30)"
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+          autoFocus
+        />
+        <Pressable
+          style={({ pressed }) => [
+            up.submitBtn,
+            (!isValidUrl || loading) && up.submitBtnDisabled,
+            pressed && isValidUrl && { opacity: 0.85 },
+          ]}
+          onPress={handleSubmit}
+          disabled={!isValidUrl || loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#1A1109" size="small" />
+          ) : (
+            <>
+              <Feather name="search" size={14} color="#1A1109" />
+              <Text style={up.submitText}>Identificar lugar</Text>
+            </>
+          )}
+        </Pressable>
+        <Pressable onPress={onClose} style={up.cancelBtn}>
+          <Text style={up.cancelText}>Cancelar</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+const up = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.60)",
+    justifyContent: "flex-end",
+    zIndex: 90,
+  },
+  sheet: {
+    backgroundColor: "#15120E",
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    borderTopWidth: 1,
+    borderColor: "rgba(212,175,55,0.22)",
+    paddingTop: 10,
+    paddingHorizontal: 20,
+    paddingBottom: 32,
+    gap: 12,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.20)",
+    alignSelf: "center",
+    marginBottom: 4,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  title: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: "#F5EFE0",
+  },
+  hint: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.55)",
+    lineHeight: 19,
+  },
+  input: {
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: "#F5EFE0",
+  },
+  submitBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: GOLD,
+    paddingVertical: 14,
+    borderRadius: 14,
+  },
+  submitBtnDisabled: {
+    opacity: 0.45,
+  },
+  submitText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+    color: "#1A1109",
+  },
+  cancelBtn: {
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  cancelText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: "rgba(255,255,255,0.40)",
+  },
+});
+
+function ActionArea({
+  hasSaved,
+  onInstagram,
+  onTikTok,
+}: {
+  hasSaved: boolean;
+  onInstagram: () => void;
+  onTikTok:    () => void;
+}) {
   return (
     <View style={act.wrap}>
       {/* Row 1 — social import chips */}
       <View style={act.socialRow}>
-        <SocialChip icon="instagram" label="Instagram" onPress={() => {}} />
-        <SocialChip icon="video"     label="TikTok"    onPress={() => {}} />
-        <SocialChip icon="link-2"    label="Link"      onPress={() => {}} />
+        <SocialChip icon="instagram" label="Instagram" onPress={onInstagram} />
+        <SocialChip icon="video"     label="TikTok"    onPress={onTikTok} />
       </View>
 
       {/* Row 2 — primary AI CTA (dark glass panel, gold accent) */}
@@ -362,8 +568,21 @@ function SavedSection({
   saved: SavedItem[];
   onRemove: (id: string) => void;
 }) {
+  // Group saved items by city (cityId field, default "rio")
+  const groups = React.useMemo(() => {
+    const map = new Map<string, { label: string; items: SavedItem[] }>();
+    for (const item of saved) {
+      const city = (item as any).cityId ?? "rio";
+      const label = (item as any).cityLabel ?? "Rio de Janeiro";
+      if (!map.has(city)) map.set(city, { label, items: [] });
+      map.get(city)!.items.push(item);
+    }
+    return Array.from(map.values());
+  }, [saved]);
+
   return (
     <View style={ss.wrap}>
+<<<<<<< HEAD
       <View style={ss.labelRow}>
         <Text style={ss.label}>
           {saved.length === 1 ? "1 lugar salvo" : `${saved.length} lugares salvos`}
@@ -381,26 +600,53 @@ function SavedSection({
           <SavedCard key={`${item.source_table ?? item.categoria}_${item.id}`} item={item} onRemove={onRemove} />
         ))}
       </ScrollView>
+=======
+      {groups.map((group, gi) => (
+        <View key={gi} style={ss.group}>
+          {/* Destination header */}
+          <View style={ss.destRow}>
+            <Feather name="map-pin" size={11} color={GOLD} />
+            <Text style={ss.destLabel}>{group.label}</Text>
+            <View style={ss.dot} />
+            <Text style={ss.sublabel}>
+              {group.items.length === 1 ? "1 lugar" : `${group.items.length} lugares`}
+            </Text>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={ss.scroll}
+            decelerationRate="fast"
+          >
+            {group.items.map((item) => (
+              <SavedCard key={item.id} item={item} onRemove={onRemove} />
+            ))}
+          </ScrollView>
+        </View>
+      ))}
+>>>>>>> claude/plan-app-architecture-73RnI
     </View>
   );
 }
 
 const ss = StyleSheet.create({
   wrap: {
-    gap: 12,
+    gap: 20,
     marginBottom: 4,
   },
-  labelRow: {
+  group: {
+    gap: 10,
+  },
+  destRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
   },
-  label: {
+  destLabel: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 11,
-    color: "rgba(255,255,255,0.55)",
-    letterSpacing: 1.4,
-    textTransform: "uppercase",
+    fontSize: 12,
+    color: "rgba(255,255,255,0.72)",
+    letterSpacing: 0.3,
   },
   dot: {
     width: 3,
@@ -647,10 +893,13 @@ export default function MinhaViagemScreen() {
   const topPad    = Platform.OS === "web" ? 67 : insets.top + 12;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
-  const { saved, unsave } = useGuia();
-  const totalSaved        = saved.length;
-  const bgImages          = saved.map((s) => s.image);
-  const dias              = buildRoteiro(saved);
+  const { saved, unsave, save } = useGuia();
+  const totalSaved              = saved.length;
+  const bgImages                = saved.map((s) => s.image);
+  const dias                    = buildRoteiro(saved);
+
+  // URL paste sheet — "instagram" | "tiktok" | null
+  const [pasteSource, setPasteSource] = useState<"instagram" | "tiktok" | null>(null);
 
   return (
     <View style={s.root}>
@@ -690,7 +939,11 @@ export default function MinhaViagemScreen() {
         <View style={s.rule} />
 
         {/* ── Actions (social chips → AI CTA) ── */}
-        <ActionArea hasSaved={totalSaved > 0} />
+        <ActionArea
+          hasSaved={totalSaved > 0}
+          onInstagram={() => setPasteSource("instagram")}
+          onTikTok={() => setPasteSource("tiktok")}
+        />
 
         {/* ── Saved places or empty hint ── */}
         {totalSaved > 0 ? (
@@ -703,6 +956,15 @@ export default function MinhaViagemScreen() {
         <RoteiroSection dias={dias} />
 
       </ScrollView>
+
+      {/* ── URL paste sheet (Instagram / TikTok) ── */}
+      {pasteSource && (
+        <UrlPasteSheet
+          source={pasteSource}
+          onClose={() => setPasteSource(null)}
+          onAdd={(item) => { save(item); }}
+        />
+      )}
     </View>
   );
 }

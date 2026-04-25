@@ -28,9 +28,10 @@ import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { sanitizePhotoUrl } from "@/utils/getImageForEntity";
 import { destinos } from "@/data/mockData";
-import type { LugarPlace } from "@/data/lugares";
-import { useOQueFazer } from "@/hooks/useOQueFazer";
-import { useLuckyList } from "@/hooks/useLuckyList";
+import { useOQueFazer, type Atividade } from "@/hooks/useOQueFazer";
+import { useLuckyList, type LuckyListItem } from "@/hooks/useLuckyList";
+
+const FALLBACK_IMG = require("../../../assets/images/ipanema.png");
 
 const C = Colors.light;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -38,7 +39,8 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 // ── 2-column card (reference style) ──────────────────────────────────────────
 const CARD_W = (SCREEN_WIDTH - 48 - 12) / 2;
 
-function ClassicoCard({ item }: { item: LugarPlace }) {
+function ClassicoCard({ item }: { item: Atividade }) {
+  const imgSrc = item.hero_image_url ? { uri: item.hero_image_url } : FALLBACK_IMG;
   return (
     <Pressable
       style={({ pressed }) => [
@@ -47,6 +49,7 @@ function ClassicoCard({ item }: { item: LugarPlace }) {
       ]}
       onPress={() => router.push({
         pathname: "/lugar/[cityId]/[placeId]",
+<<<<<<< HEAD
         params: { cityId: "rio", placeId: item.id, source_table: "o_que_fazer_rio_v2" },
       })}
     >
@@ -55,17 +58,23 @@ function ClassicoCard({ item }: { item: LugarPlace }) {
       ) : (
         <View style={[s.classicoImage, { backgroundColor: "#1A0E04" }]} />
       )}
+=======
+        params: { cityId: "rio", placeId: item.id, source_table: "lugares" },
+      })}
+    >
+      <Image source={imgSrc} style={s.classicoImage} resizeMode="cover" />
+>>>>>>> claude/plan-app-architecture-73RnI
       <LinearGradient
         colors={["rgba(0,0,0,0.02)", "rgba(0,0,0,0.82)"]}
         locations={[0.25, 1]}
         style={StyleSheet.absoluteFill}
       />
       <View style={s.classicoOverlay}>
-        <Text style={s.classicoCategoria}>{item.categoria}</Text>
+        <Text style={s.classicoCategoria}>{item.categoria?.toUpperCase()}</Text>
         <Text style={s.classicoTitulo} numberOfLines={2}>
-          {item.titulo}
+          {item.nome}
         </Text>
-        <Text style={s.classicoBairro}>{item.localizacao}</Text>
+        <Text style={s.classicoBairro}>{item.bairro_nome ?? ""}</Text>
       </View>
     </Pressable>
   );
@@ -77,7 +86,7 @@ function LuckyCard({
   index,
   cityId,
 }: {
-  item: LugarPlace;
+  item: LuckyListItem;
   index: number;
   cityId: string;
 }) {
@@ -89,16 +98,24 @@ function LuckyCard({
       ]}
       onPress={() => router.push({
         pathname: "/lugar/[cityId]/[placeId]",
+<<<<<<< HEAD
         params: { cityId, placeId: item.id, source_table: "lucky_list_rio_v2" },
+=======
+        params: { cityId, placeId: item.lugar.id, source_table: "lugares" },
+>>>>>>> claude/plan-app-architecture-73RnI
       })}
     >
       {/* Image */}
       <View style={s.luckyImageWrap}>
+<<<<<<< HEAD
         {sanitizePhotoUrl(item.photo_url) ? (
           <Image source={{ uri: sanitizePhotoUrl(item.photo_url)! }} style={s.luckyImage} resizeMode="cover" />
         ) : (
           <View style={[s.luckyImage, { backgroundColor: "#1A0E04" }]} />
         )}
+=======
+        <Image source={FALLBACK_IMG} style={s.luckyImage} resizeMode="cover" />
+>>>>>>> claude/plan-app-architecture-73RnI
         <LinearGradient
           colors={["rgba(0,0,0,0.06)", "rgba(0,0,0,0.55)"]}
           locations={[0.2, 1]}
@@ -110,7 +127,7 @@ function LuckyCard({
         </View>
         {/* Category pill */}
         <View style={s.luckyCatPill}>
-          <Text style={s.luckyCatText}>{item.categoria}</Text>
+          <Text style={s.luckyCatText}>LUCKY</Text>
         </View>
       </View>
 
@@ -118,11 +135,11 @@ function LuckyCard({
       <View style={s.luckyBody}>
         <View style={s.luckyMeta}>
           <Text style={s.luckyStar}>✦</Text>
-          <Text style={s.luckyLoc}>{item.localizacao}</Text>
+          <Text style={s.luckyLoc}>{item.lugar.bairro_nome ?? ""}</Text>
         </View>
-        <Text style={s.luckyTitulo}>{item.titulo}</Text>
+        <Text style={s.luckyTitulo}>{item.lugar.nome}</Text>
         <Text style={s.luckyDesc} numberOfLines={3}>
-          {item.descricao}
+          {item.lugar.meu_olhar ?? ""}
         </Text>
         <View style={s.luckyAction}>
           <Text style={s.luckyActionText}>Ver detalhes</Text>
@@ -144,13 +161,13 @@ export default function EssencialScreen() {
   const destino = destinos.find((d) => d.id === id) ?? destinos[0];
 
   // Supabase data only
-  const { lugares: todasAtividades, loading: loadingAtiv } = useOQueFazer();
-  const { lugares: todasLucky, loading: loadingLucky } = useLuckyList();
+  const { atividades, loading: loadingAtiv } = useOQueFazer();
+  const { luckyList, loading: loadingLucky } = useLuckyList();
 
   // First 6 activities as "Clássicos do Rio"
-  const classicos = todasAtividades.slice(0, 6);
+  const classicos = (atividades ?? []).slice(0, 6);
   // First 3 lucky picks
-  const luckyPicks = todasLucky.slice(0, 3);
+  const luckyPicks = (luckyList?.itens ?? []).slice(0, 3);
 
   const HERO_HEIGHT = topInset + 300;
 

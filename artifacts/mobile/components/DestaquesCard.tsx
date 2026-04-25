@@ -10,6 +10,11 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
+<<<<<<< HEAD
+=======
+import { router } from "expo-router";
+import type { DestaqueType } from "@/data/mockData";
+>>>>>>> claude/plan-app-architecture-73RnI
 import Colors from "@/constants/colors";
 import { BookmarkButton } from "@/components/BookmarkButton";
 import type { SavedCategory } from "@/context/GuiaContext";
@@ -31,9 +36,10 @@ interface CardProps {
 }
 
 // ─── Layout A: O que fazer ─────────────────────────────────────────────────
-function OQueFazerCard({ id, titulo, localizacao, descricao, image, categoria }: CardProps) {
+function OQueFazerCard({ id, titulo, localizacao, descricao, image, categoria, onPress }: CardProps) {
   return (
     <Pressable
+      onPress={onPress}
       style={({ pressed }) => [
         la.card,
         pressed && { opacity: 0.93, transform: [{ scale: 0.988 }] },
@@ -141,9 +147,10 @@ const la = StyleSheet.create({
 });
 
 // ─── Layout B: Restaurante ────────────────────────────────────────────────
-function RestauranteCard({ id, titulo, localizacao, descricao, image, categoria }: CardProps) {
+function RestauranteCard({ id, titulo, localizacao, descricao, image, categoria, onPress }: CardProps) {
   return (
     <Pressable
+      onPress={onPress}
       style={({ pressed }) => [
         lb.card,
         pressed && { opacity: 0.93, transform: [{ scale: 0.988 }] },
@@ -247,9 +254,10 @@ const lb = StyleSheet.create({
 });
 
 // ─── Layout C: Hotel ──────────────────────────────────────────────────────
-function HotelCard({ id, titulo, localizacao, descricao, image, categoria }: CardProps) {
+function HotelCard({ id, titulo, localizacao, descricao, image, categoria, onPress }: CardProps) {
   return (
     <Pressable
+      onPress={onPress}
       style={({ pressed }) => [
         lc.card,
         pressed && { opacity: 0.93, transform: [{ scale: 0.988 }] },
@@ -357,9 +365,10 @@ const lc = StyleSheet.create({
 });
 
 // ─── Layout D: Lucky Pick ─────────────────────────────────────────────────
-function LuckyCard({ id, titulo, localizacao, descricao, image, categoria }: CardProps) {
+function LuckyCard({ id, titulo, localizacao, descricao, image, categoria, onPress }: CardProps) {
   return (
     <Pressable
+      onPress={onPress}
       style={({ pressed }) => [
         ld.card,
         pressed && { opacity: 0.93, transform: [{ scale: 0.988 }] },
@@ -509,14 +518,20 @@ interface DestaquesCardProps {
 export function DestaquesCard(props: DestaquesCardProps) {
   const { tipo, id, ...rest } = props;
   const categoria = tipo as SavedCategory;
+
+  // Navegação para página de entidade
+  const handlePress = () => {
+    router.push(`/lugar/${id}`);
+  };
+
   switch (tipo) {
     case "oQueFazer":
-      return <OQueFazerCard id={id} categoria={categoria} {...rest} />;
+      return <OQueFazerCard id={id} categoria={categoria} onPress={handlePress} {...rest} />;
     case "restaurante":
-      return <RestauranteCard id={id} categoria={categoria} {...rest} />;
+      return <RestauranteCard id={id} categoria={categoria} onPress={handlePress} {...rest} />;
     case "hotel":
-      return <HotelCard id={id} categoria={categoria} {...rest} />;
+      return <HotelCard id={id} categoria={categoria} onPress={handlePress} {...rest} />;
     case "lucky":
-      return <LuckyCard id={id} categoria={categoria} {...rest} />;
+      return <LuckyCard id={id} categoria={categoria} onPress={handlePress} {...rest} />;
   }
 }

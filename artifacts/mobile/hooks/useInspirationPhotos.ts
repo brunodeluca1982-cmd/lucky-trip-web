@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { buildMediaUrl } from "@/lib/mediaUrl";
 import type { Inspiration } from "@/utils/buildItinerary";
 
 export type InspirationPhotoMap = Partial<Record<Inspiration, string>>;
@@ -23,7 +24,7 @@ async function fetchPhoto(
     const { data, error } = await (q as any).limit(1).maybeSingle();
 
     if (error || !data) return null;
-    return (data as { photo_url: string }).photo_url ?? null;
+    return buildMediaUrl((data as { photo_url: string }).photo_url) || null;
   } catch {
     return null;
   }

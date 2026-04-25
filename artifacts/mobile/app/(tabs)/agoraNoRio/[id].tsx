@@ -69,7 +69,7 @@ function HeroCard({ item, cityId }: { item: AgoraItem; cityId: string }) {
           <Text style={s.heroCardSub} numberOfLines={2}>{item.descricao}</Text>
         ) : null}
         <View style={s.heroCardAction}>
-          <Text style={s.heroCardActionText}>Explorar</Text>
+          <Text style={s.heroCardActionText}>Abrir</Text>
           <Feather name="arrow-right" size={13} color="rgba(255,255,255,0.70)" />
         </View>
       </View>

@@ -21,11 +21,26 @@ import { useBackground } from "@/context/BackgroundContext";
 
 type Props = {
   onFirstImageDisplay?: () => void;
+  blurRadius?: number;
 };
 
+<<<<<<< HEAD
 export function RotatingBackground({ onFirstImageDisplay }: Props) {
   const { pool, currentIdx, nextIdx, nextOpacity, onImageLoaded } =
     useBackground();
+=======
+export function RotatingBackground({
+  pool,
+  interval = 10_000,
+  fadeDuration = 1500,
+  firstSource = null,
+  onFirstImageDisplay,
+  blurRadius = 0,
+}: Props) {
+  const resolvedPool = firstSource
+    ? [firstSource as ImageSourcePropType, ...pool]
+    : pool;
+>>>>>>> claude/plan-app-architecture-73RnI
 
   const firstFiredRef = useRef(false);
 
@@ -45,6 +60,7 @@ export function RotatingBackground({ onFirstImageDisplay }: Props) {
         source={pool[currentIdx]}
         style={styles.fill}
         resizeMode="cover"
+        blurRadius={blurRadius}
         pointerEvents="none"
         onLoad={handleFirstLoad}
       />
@@ -52,6 +68,7 @@ export function RotatingBackground({ onFirstImageDisplay }: Props) {
         source={pool[nextIdx]}
         style={[styles.fill, { opacity: nextOpacity }]}
         resizeMode="cover"
+        blurRadius={blurRadius}
         pointerEvents="none"
       />
     </>

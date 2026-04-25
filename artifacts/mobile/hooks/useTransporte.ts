@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { buildMediaUrl } from "@/lib/mediaUrl";
 
 export interface TransporteItem {
   id: string;
@@ -52,7 +53,11 @@ export function useTransporte(cityId = "rio"): State {
         return;
       }
 
-      setItems((data ?? []) as TransporteItem[]);
+      const mapped = (data ?? []).map((item: any) => ({
+        ...item,
+        photo_url: buildMediaUrl(item.photo_url),
+      })) as TransporteItem[];
+      setItems(mapped);
       setLoading(false);
     }
 

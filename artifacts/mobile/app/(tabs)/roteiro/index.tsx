@@ -16,11 +16,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { RotatingBackground } from "@/components/RotatingBackground";
+import { useRioHeroMedia } from "@/hooks/useHeroMedia";
 import {
   Alert,
   Animated,
   Dimensions,
   Image,
+  ImageSourcePropType,
   Linking,
   Platform,
   Pressable,
@@ -50,11 +52,18 @@ import {
   type Vibe,
 } from "@/utils/buildItinerary";
 import { PERIODO_LABEL, PERIODO_ICON } from "@/utils/buildRoteiro";
+<<<<<<< HEAD
 import type { DiaRoteiro } from "@/utils/buildRoteiro";
 import {
   useInspirationPhotos,
   type InspirationPhotoMap,
 } from "@/hooks/useInspirationPhotos";
+=======
+import type { DiaRoteiro, PeriodoDia } from "@/utils/buildRoteiro";
+import { useInspirationPhotos, type InspirationPhotoMap } from "@/hooks/useInspirationPhotos";
+import { haversineKm, bairroCoord, formatTravel, walkMinutes } from "@/utils/haversine";
+import { PlaceSearchModal, type SelectedPlace } from "@/components/PlaceSearchModal";
+>>>>>>> claude/plan-app-architecture-73RnI
 
 const C = Colors.light;
 const GOLD = "#D4AF37";
@@ -93,11 +102,30 @@ const BUDGETS: { id: BudgetStyle; label: string; desc: string }[] = [
   },
 ];
 
+const BUDGET_TO_VIBE: Record<BudgetStyle, Vibe> = {
+  essencial:   "tranquilo",
+  conforto:    "moderado",
+  sofisticado: "intenso",
+};
+
 const CATEGORY_LABEL: Record<SavedCategory, string> = {
+<<<<<<< HEAD
   oQueFazer: "O Que Fazer",
   restaurante: "Restaurante",
   hotel: "Hotel",
   lucky: "Lucky",
+=======
+  oQueFazer:    "O Que Fazer",
+  restaurante:  "Restaurante",
+  hotel:        "Hotel",
+  lucky:        "Lucky",
+  atividade:    "Atividade",
+  praia:        "Praia",
+  compras:      "Compras",
+  dica_secreta: "Dica Secreta",
+  bar:          "Bar",
+  cafe:         "Café",
+>>>>>>> claude/plan-app-architecture-73RnI
 };
 
 // Result phase helpers — time labels, weather, travel connectors
@@ -226,7 +254,15 @@ function parseDuracao(dur: string | undefined | null): number {
 //   This gives correct sequencing for arcs like:
 //     Teatro 19:30 (anchor) → Samba 21:00 (19:30 + 90 min)
 //   instead of a collision at 19:30 for both.
-function getItemTime(periodo: string, items: SavedItem[], idx: number): string {
+function getItemTime(
+  periodo: string,
+  items: SavedItem[],
+  idx: number,
+  overrides?: Record<string, number>,
+): string {
+  const dur = (item: SavedItem) =>
+    overrides?.[item.id] ?? parseDuracao(item.duracao);
+
   let refMinutes = PERIODO_TIME[periodo] ?? 9 * 60;
   let refIdx = -1;
 
@@ -239,12 +275,10 @@ function getItemTime(periodo: string, items: SavedItem[], idx: number): string {
     }
   }
 
-  // Elapsed = anchor item's own duration (if any) + durations of items between
-  // the anchor and the current item.
   let elapsed = 0;
-  if (refIdx >= 0) elapsed += parseDuracao(items[refIdx].duracao);
+  if (refIdx >= 0) elapsed += dur(items[refIdx]);
   for (let i = Math.max(refIdx + 1, 0); i < idx; i++) {
-    elapsed += parseDuracao(items[i].duracao);
+    elapsed += dur(items[i]);
   }
 
   return _fmt(refMinutes + elapsed);
@@ -490,9 +524,10 @@ function FlowPage1({
 
   function handleArrival(d: Date) {
     onArrivalChange(d);
-    // Next Best Step: auto-advance departure calendar to the following month
-    setDeptInitMonth(new Date(d.getFullYear(), d.getMonth() + 1, 1));
+    // Open departure calendar on the same month as arrival
+    setDeptInitMonth(new Date(d.getFullYear(), d.getMonth(), 1));
     setOpenCal("departure");
+    // Clear departure if it's now before the new arrival
     if (departureDate && !isBeforeDay(d, departureDate)) {
       onDepartureChange(
         new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1),
@@ -664,11 +699,15 @@ function FlowPage2({
               style={[fp.insCard, active && fp.insCardActive]}
               onPress={() => onToggleInspiration(ins.id)}
             >
+<<<<<<< HEAD
               <Image
                 source={imgSrc}
                 style={StyleSheet.absoluteFill}
                 resizeMode="cover"
               />
+=======
+              <Image source={imgSrc as ImageSourcePropType} style={StyleSheet.absoluteFill} resizeMode="cover" />
+>>>>>>> claude/plan-app-architecture-73RnI
               <LinearGradient
                 colors={["rgba(0,0,0,0.06)", "rgba(0,0,0,0.68)"]}
                 locations={[0, 1]}
@@ -785,6 +824,7 @@ function StandardFlow({
             ),
           )
         : 3;
+<<<<<<< HEAD
     const toYMD = (d: Date) => d.toISOString().split("T")[0];
     setTimeout(
       () =>
@@ -799,6 +839,9 @@ function StandardFlow({
         }),
       300,
     );
+=======
+    setTimeout(() => onGenerate({ nights: n, travelVibe, inspirations, budget: b, vibe: BUDGET_TO_VIBE[b] }), 300);
+>>>>>>> claude/plan-app-architecture-73RnI
   }
 
   function toggleInspiration(id: Inspiration) {
@@ -897,6 +940,7 @@ function ContextualFlow({
             ),
           )
         : 3;
+<<<<<<< HEAD
     const toYMD = (d: Date) => d.toISOString().split("T")[0];
     setTimeout(
       () =>
@@ -911,6 +955,15 @@ function ContextualFlow({
         }),
       300,
     );
+=======
+    setTimeout(() => onGenerate({
+      nights,
+      travelVibe: travelVibe ?? "amigos",
+      inspirations,
+      budget: b,
+      vibe: BUDGET_TO_VIBE[b],
+    }), 300);
+>>>>>>> claude/plan-app-architecture-73RnI
   }
 
   const STEP_LABELS = ["Datas", "Companhia", "Interesses", "Estilo"];
@@ -995,6 +1048,11 @@ function ContextualFlow({
                   : new Date()
               }
               onSelect={openCal === "arrival" ? handleArrival : handleDeparture}
+              initialMonth={
+                openCal === "departure" && arrivalDate
+                  ? new Date(arrivalDate.getFullYear(), arrivalDate.getMonth(), 1)
+                  : undefined
+              }
             />
           )}
 
@@ -1060,11 +1118,15 @@ function ContextualFlow({
                   style={[fp.insCard, active && fp.insCardActive]}
                   onPress={() => toggleInspiration(ins.id)}
                 >
+<<<<<<< HEAD
                   <Image
                     source={imgSrc}
                     style={StyleSheet.absoluteFill}
                     resizeMode="cover"
                   />
+=======
+                  <Image source={imgSrc as ImageSourcePropType} style={StyleSheet.absoluteFill} resizeMode="cover" />
+>>>>>>> claude/plan-app-architecture-73RnI
                   <LinearGradient
                     colors={["transparent", "rgba(0,0,0,0.35)"]}
                     locations={[0.25, 1]}
@@ -2179,10 +2241,380 @@ function LoadingPhase() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Add-item menu — "+" button per day → 7 options sheet
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface AddItemMenuProps {
+  diaNum:        number;
+  onClose:       () => void;
+  onPickCategory:(categoria: SavedCategory) => void;
+  onTempoLivre:  () => void;
+  onVoltarHotel: () => void;
+  onSugerir:     () => void;
+  onManual:      () => void;
+}
+
+const ADD_MENU_OPTIONS: {
+  id: string;
+  label: string;
+  icon: string;
+  danger?: boolean;
+}[] = [
+  { id: "atrativo",   label: "Atrativo",              icon: "star"     },
+  { id: "gastronomia",label: "Gastronomia",            icon: "coffee"   },
+  { id: "tour",       label: "Tour com agência",       icon: "compass"  },
+  { id: "manual",     label: "Adicionar manualmente",  icon: "edit-3"   },
+  { id: "livre",      label: "Tempo livre",            icon: "sunset"   },
+  { id: "hotel",      label: "Voltar ao hotel",        icon: "home"     },
+  { id: "sugerir",    label: "Sugerir automaticamente",icon: "zap"      },
+];
+
+function AddItemMenu({
+  diaNum, onClose, onPickCategory, onTempoLivre, onVoltarHotel, onSugerir, onManual,
+}: AddItemMenuProps) {
+  function handleOption(id: string) {
+    if (id === "atrativo")    { onPickCategory("oQueFazer"); onClose(); return; }
+    if (id === "gastronomia") { onPickCategory("restaurante"); onClose(); return; }
+    if (id === "tour")        { onPickCategory("lucky"); onClose(); return; }
+    if (id === "manual")      { onManual(); onClose(); return; }
+    if (id === "livre")       { onTempoLivre(); onClose(); return; }
+    if (id === "hotel")       { onVoltarHotel(); onClose(); return; }
+    if (id === "sugerir")     { onSugerir(); onClose(); return; }
+  }
+
+  return (
+    <View style={am.overlay} pointerEvents="box-none">
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      <View style={am.sheet}>
+        <View style={am.handle} />
+        <Text style={am.title}>Adicionar ao Dia {diaNum}</Text>
+
+        {ADD_MENU_OPTIONS.map((opt) => (
+          <Pressable
+            key={opt.id}
+            style={({ pressed }) => [am.option, pressed && { opacity: 0.75 }]}
+            onPress={() => handleOption(opt.id)}
+          >
+            <View style={am.optIcon}>
+              <Feather name={opt.icon as any} size={16} color={GOLD} />
+            </View>
+            <Text style={am.optLabel}>{opt.label}</Text>
+            <Feather name="chevron-right" size={14} color={`${GOLD}50`} />
+          </Pressable>
+        ))}
+
+        <Pressable onPress={onClose} style={am.closeBtn}>
+          <Feather name="x" size={18} color="rgba(255,255,255,0.50)" />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+const am = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "flex-end",
+    zIndex: 92,
+  },
+  sheet: {
+    backgroundColor: "#15120E",
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    borderTopWidth: 1,
+    borderColor: "rgba(212,175,55,0.22)",
+    paddingTop: 10,
+    paddingHorizontal: 18,
+    paddingBottom: 32,
+    gap: 2,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.20)",
+    alignSelf: "center",
+    marginBottom: 10,
+  },
+  title: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    color: `${GOLD}B0`,
+    letterSpacing: 1.1,
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  option: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    paddingVertical: 15,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+  optIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: "rgba(212,175,55,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  optLabel: {
+    flex: 1,
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    color: "#F5EFE0",
+  },
+  closeBtn: {
+    alignItems: "center",
+    paddingVertical: 14,
+    marginTop: 4,
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Item menu sheet — tap on itinerary item → info + 4 actions
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface ItemMenuSheetProps {
+  item:         SavedItem;
+  diaNum:       number;
+  onClose:      () => void;
+  onReplace:    () => void;
+  onDelete:     () => void;
+  onShare:      () => void;
+  onSeeDetails: () => void;
+}
+
+function ItemMenuSheet({
+  item, diaNum, onClose, onReplace, onDelete, onShare, onSeeDetails,
+}: ItemMenuSheetProps) {
+  return (
+    <View style={ms.overlay} pointerEvents="box-none">
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      <View style={ms.sheet}>
+        <View style={ms.handle} />
+
+        {/* Info row */}
+        <View style={ms.info}>
+          <View style={ms.infoThumb}>
+            <ItemThumb image={item.image} categoria={item.categoria} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={ms.infoEyebrow}>DIA {diaNum}</Text>
+            <Text style={ms.infoTitle} numberOfLines={2}>{item.titulo}</Text>
+            {item.localizacao ? (
+              <View style={ms.infoLocRow}>
+                <Feather name="map-pin" size={10} color={`${GOLD}90`} />
+                <Text style={ms.infoLoc} numberOfLines={1}>{item.localizacao}</Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+
+        <Pressable
+          style={({ pressed }) => [ms.seeDetails, pressed && { opacity: 0.80 }]}
+          onPress={onSeeDetails}
+        >
+          <Feather name="external-link" size={13} color={GOLD} />
+          <Text style={ms.seeDetailsText}>Ver detalhes</Text>
+        </Pressable>
+
+        {/* Primary CTA */}
+        <Pressable
+          style={({ pressed }) => [ms.primaryCta, pressed && { opacity: 0.85 }]}
+          onPress={() => {
+            Alert.alert(
+              "Em breve",
+              "A compra de ingresso estará disponível em breve.",
+            );
+          }}
+        >
+          <Feather name="tag" size={14} color="#1A1109" />
+          <Text style={ms.primaryCtaText}>Comprar ingresso</Text>
+        </Pressable>
+
+        {/* Secondary actions */}
+        <View style={ms.actionsCol}>
+          <Pressable
+            style={({ pressed }) => [ms.action, pressed && { opacity: 0.75 }]}
+            onPress={onShare}
+          >
+            <Feather name="share-2" size={15} color={GOLD} />
+            <Text style={ms.actionText}>Compartilhar atração</Text>
+            <Feather name="chevron-right" size={14} color={`${GOLD}50`} />
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [ms.action, pressed && { opacity: 0.75 }]}
+            onPress={onReplace}
+          >
+            <Feather name="refresh-cw" size={15} color={GOLD} />
+            <Text style={ms.actionText}>Substituir atração</Text>
+            <Feather name="chevron-right" size={14} color={`${GOLD}50`} />
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [ms.action, pressed && { opacity: 0.75 }]}
+            onPress={() => {
+              Alert.alert(
+                "Remover atração",
+                `Remover "${item.titulo}" do Dia ${diaNum}?`,
+                [
+                  { text: "Cancelar", style: "cancel" },
+                  { text: "Remover", style: "destructive", onPress: onDelete },
+                ],
+              );
+            }}
+          >
+            <Feather name="trash-2" size={15} color="#E85C5C" />
+            <Text style={[ms.actionText, { color: "#E85C5C" }]}>Excluir</Text>
+            <Feather name="chevron-right" size={14} color="#E85C5C60" />
+          </Pressable>
+        </View>
+
+        <Pressable onPress={onClose} style={ms.closeBtn}>
+          <Text style={ms.closeText}>Fechar</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+const ms = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "flex-end",
+    zIndex: 90,
+  },
+  sheet: {
+    backgroundColor: "#15120E",
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    borderTopWidth: 1,
+    borderColor: "rgba(212,175,55,0.22)",
+    paddingTop: 10,
+    paddingHorizontal: 18,
+    paddingBottom: 28,
+    gap: 12,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.20)",
+    alignSelf: "center",
+    marginBottom: 6,
+  },
+  info: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 6,
+  },
+  infoThumb: {
+    width: 70,
+    height: 70,
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: "rgba(0,0,0,0.35)",
+  },
+  infoEyebrow: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 9,
+    color: `${GOLD}B0`,
+    letterSpacing: 1.1,
+  },
+  infoTitle: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 16,
+    color: "#F5EFE0",
+    lineHeight: 20,
+    marginTop: 2,
+  },
+  infoLocRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 3,
+  },
+  infoLoc: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: "rgba(255,255,255,0.55)",
+    flex: 1,
+  },
+  seeDetails: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(212,175,55,0.22)",
+    backgroundColor: "rgba(212,175,55,0.06)",
+  },
+  seeDetailsText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: GOLD,
+  },
+  primaryCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: GOLD,
+  },
+  primaryCtaText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+    color: "#1A1109",
+    letterSpacing: 0.3,
+  },
+  actionsCol: {
+    gap: 2,
+    marginTop: 4,
+  },
+  action: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+  actionText: {
+    flex: 1,
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: "#F5EFE0",
+  },
+  closeBtn: {
+    alignItems: "center",
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  closeText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: "rgba(255,255,255,0.45)",
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Result phase — day-by-day itinerary
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface ResultPhaseProps {
+<<<<<<< HEAD
   result: ItineraryResult;
   hotelItem: SavedItem | null;
   totalPlaces: number;
@@ -2193,20 +2625,97 @@ interface ResultPhaseProps {
   onExport: () => void;
   isExporting: boolean;
   scrollRef: React.RefObject<ScrollView>;
+=======
+  result:          ItineraryResult;
+  hotelItem:       SavedItem | null;
+  /** Supabase-fetched fallback shown when no hotel is in saved places. */
+  suggestedHotel?: SavedItem | null;
+  totalPlaces:     number;
+  editMode:        boolean;
+  onToggleEdit:    () => void;
+  onReplaceItem:   (diaNum: number, itemId: string, newItem: SavedItem) => void;
+  onOpenItemMenu:  (diaNum: number, item: SavedItem) => void;
+  onAddItem:       (diaNum: number) => void;
+  onShareResult:   () => void;
+  onExport:        () => void;
+  isExporting:     boolean;
+  scrollRef:       React.RefObject<ScrollView>;
+}
+
+// Rough per-person cost estimate derived from vibe + item counts.
+// Numbers are per-night hotel, per-meal, per-activity in BRL.
+function estimateCost(result: ItineraryResult): {
+  low: number; high: number; perDayLow: number; perDayHigh: number;
+} {
+  const vibe: Vibe = result.preferences?.vibe ?? "moderado";
+  const days   = Math.max(1, result.summary.totalDays);
+  const nights = Math.max(0, days - 1);
+
+  const HOTEL: Record<Vibe, [number, number]> = {
+    tranquilo: [180, 320],
+    moderado:  [400, 750],
+    intenso:   [900, 2200],
+  };
+  const MEAL: Record<Vibe, [number, number]> = {
+    tranquilo: [40, 80],
+    moderado:  [100, 180],
+    intenso:   [250, 550],
+  };
+  const ACTIVITY: Record<Vibe, [number, number]> = {
+    tranquilo: [0, 40],
+    moderado:  [30, 120],
+    intenso:   [100, 300],
+  };
+
+  let restaurants = 0;
+  let activities  = 0;
+  for (const dia of result.days) {
+    for (const periodo of dia.periodos) {
+      for (const item of periodo.items) {
+        if (item.categoria === "restaurante")       restaurants++;
+        else if (item.categoria === "oQueFazer" ||
+                 item.categoria === "lucky")         activities++;
+      }
+    }
+  }
+  const meals = Math.max(restaurants, days * 2);
+
+  const [hLo, hHi] = HOTEL[vibe];
+  const [mLo, mHi] = MEAL[vibe];
+  const [aLo, aHi] = ACTIVITY[vibe];
+
+  const low  = nights * hLo + meals * mLo + activities * aLo;
+  const high = nights * hHi + meals * mHi + activities * aHi;
+
+  return {
+    low, high,
+    perDayLow:  Math.round(low  / days),
+    perDayHigh: Math.round(high / days),
+  };
+}
+
+function formatBRL(n: number): string {
+  return n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+>>>>>>> claude/plan-app-architecture-73RnI
 }
 
 function ResultPhase({
   result,
   hotelItem,
+  suggestedHotel,
   totalPlaces,
   editMode,
   onToggleEdit,
   onReplaceItem,
+  onOpenItemMenu,
+  onAddItem,
   onShareResult,
   onExport,
   isExporting,
   scrollRef,
 }: ResultPhaseProps) {
+  // Use user's saved hotel first; fall back to Supabase-suggested hotel
+  const displayHotel = hotelItem ?? suggestedHotel ?? null;
   const { totalDays, totalItems } = result.summary;
   const [dayOffsets, setDayOffsets] = React.useState<Record<number, number>>(
     {},
@@ -2321,9 +2830,10 @@ function ResultPhase({
       )}
 
       {/* ── Hotel card ── */}
-      {hotelItem && (
+      {displayHotel && (
         <Pressable
           style={re.hotelCard}
+<<<<<<< HEAD
           onPress={() =>
             router.push({
               pathname: "/ondeFicar/hotel/[hotelId]",
@@ -2338,6 +2848,13 @@ function ResultPhase({
               style={StyleSheet.absoluteFill}
               resizeMode="cover"
             />
+=======
+          onPress={() => router.push({ pathname: "/ondeFicar/hotel/[hotelId]", params: { hotelId: displayHotel.id } })}
+        >
+          {/* Thumbnail */}
+          <View style={re.hotelThumb}>
+            <Image source={displayHotel.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
+>>>>>>> claude/plan-app-architecture-73RnI
             <LinearGradient
               colors={["transparent", "rgba(0,0,0,0.38)"]}
               style={StyleSheet.absoluteFill}
@@ -2345,6 +2862,7 @@ function ResultPhase({
           </View>
           {/* Content */}
           <View style={re.hotelContent}>
+<<<<<<< HEAD
             <Text style={re.hotelLabel}>✦ Hotel recomendado</Text>
             <Text style={re.hotelName} numberOfLines={1}>
               {hotelItem.titulo}
@@ -2355,6 +2873,14 @@ function ResultPhase({
                 <Text style={re.hotelLoc} numberOfLines={1}>
                   {hotelItem.localizacao}
                 </Text>
+=======
+            <Text style={re.hotelLabel}>{hotelItem ? "✦ Hotel selecionado" : "✦ Sugestão de hospedagem"}</Text>
+            <Text style={re.hotelName} numberOfLines={1}>{displayHotel.titulo}</Text>
+            {displayHotel.localizacao ? (
+              <View style={re.hotelLocRow}>
+                <Feather name="map-pin" size={9} color={`${GOLD}90`} />
+                <Text style={re.hotelLoc} numberOfLines={1}>{displayHotel.localizacao}</Text>
+>>>>>>> claude/plan-app-architecture-73RnI
               </View>
             ) : null}
           </View>
@@ -2431,12 +2957,43 @@ function ResultPhase({
           dia={dia}
           editMode={editMode}
           onReplaceItem={onReplaceItem}
+<<<<<<< HEAD
           onLayout={(y) =>
             setDayOffsets((prev) => ({ ...prev, [dia.numero]: y }))
           }
+=======
+          onOpenItemMenu={onOpenItemMenu}
+          onAddItem={onAddItem}
+          onLayout={(y) => setDayOffsets((prev) => ({ ...prev, [dia.numero]: y }))}
+>>>>>>> claude/plan-app-architecture-73RnI
         />
       ))}
+
+      {/* ── Custo estimado ── */}
+      <CustoFooter result={result} />
     </>
+  );
+}
+
+function CustoFooter({ result }: { result: ItineraryResult }) {
+  const est = estimateCost(result);
+  return (
+    <View style={re.custoCard}>
+      <View style={re.custoHeader}>
+        <Feather name="dollar-sign" size={13} color={GOLD} />
+        <Text style={re.custoLabel}>CUSTO ESTIMADO</Text>
+      </View>
+      <Text style={re.custoValue}>
+        ~R$ {formatBRL(est.low)}–{formatBRL(est.high)}
+      </Text>
+      <Text style={re.custoSub}>
+        por pessoa · ~R$ {formatBRL(est.perDayLow)}–{formatBRL(est.perDayHigh)}/dia
+      </Text>
+      <Text style={re.custoNote}>
+        Estimativa do estilo escolhido — hospedagem, refeições e atrações.
+        Lucky pode refinar com base no seu perfil.
+      </Text>
+    </View>
   );
 }
 
@@ -2538,6 +3095,7 @@ function PlaceholderImage() {
 // Never accepts undefined — callers must normalise with ?? null.
 function ItemThumb({ photoUrl }: { photoUrl: string | null }) {
   const [errored, setErrored] = React.useState(false);
+<<<<<<< HEAD
   const imageSource: { uri: string } | null =
     !errored && typeof photoUrl === "string" && photoUrl.length > 0
       ? { uri: photoUrl }
@@ -2554,6 +3112,20 @@ function ItemThumb({ photoUrl }: { photoUrl: string | null }) {
       ) : (
         <PlaceholderImage />
       )}
+=======
+  const fallback = getItemFallbackImage(categoria);
+  const src = (!errored && image != null && image !== undefined && image !== 0)
+    ? (image as ImageSourcePropType)
+    : fallback;
+  return (
+    <>
+      <Image
+        source={src as ImageSourcePropType}
+        style={StyleSheet.absoluteFill}
+        resizeMode="cover"
+        onError={() => setErrored(true)}
+      />
+>>>>>>> claude/plan-app-architecture-73RnI
       <LinearGradient
         colors={["transparent", "rgba(0,0,0,0.32)"]}
         style={StyleSheet.absoluteFill}
@@ -2566,13 +3138,34 @@ function ResultDayCard({
   dia,
   editMode,
   onReplaceItem,
+  onOpenItemMenu,
+  onAddItem,
   onLayout,
 }: {
+<<<<<<< HEAD
   dia: DiaRoteiro;
   editMode: boolean;
   onReplaceItem: (diaNum: number, itemId: string, newItem: SavedItem) => void;
   onLayout?: (y: number) => void;
+=======
+  dia:            DiaRoteiro;
+  editMode:       boolean;
+  onReplaceItem:  (diaNum: number, itemId: string, newItem: SavedItem) => void;
+  onOpenItemMenu: (diaNum: number, item: SavedItem) => void;
+  onAddItem:      (diaNum: number) => void;
+  onLayout?:      (y: number) => void;
+>>>>>>> claude/plan-app-architecture-73RnI
 }) {
+  // per-item duration overrides (minutes) — keys are item.id
+  const [durationOverrides, setDurationOverrides] = React.useState<Record<string, number>>({});
+
+  function adjustDuration(itemId: string, baseDur: string | undefined, delta: number) {
+    setDurationOverrides((prev) => {
+      const current = prev[itemId] ?? parseDuracao(baseDur);
+      const next = Math.max(15, current + delta);
+      return { ...prev, [itemId]: next };
+    });
+  }
   const weather = getDayWeather(dia.numero);
   const allItems = dia.periodos.flatMap((p) => p.items);
   const travelMinTotal =
@@ -2651,6 +3244,7 @@ function ResultDayCard({
 
               {/* Items */}
               {periodo.items.map((item, idx) => {
+<<<<<<< HEAD
                 const timeStr = getItemTime(
                   periodo.periodo,
                   periodo.items,
@@ -2658,6 +3252,23 @@ function ResultDayCard({
                 );
                 const travelMin = 10 + ((dia.numero * 7 + idx * 5) % 22);
                 const travelKm = (1.8 + (dia.numero + idx) * 1.3).toFixed(1);
+=======
+                const timeStr   = getItemTime(periodo.periodo, periodo.items, idx, durationOverrides);
+                const curDurMin = durationOverrides[item.id] ?? parseDuracao(item.duracao);
+                const nextItem  = periodo.items[idx + 1];
+                let travelLabel = "";
+                if (nextItem) {
+                  const aCoord = item.lat && item.lng
+                    ? { lat: item.lat, lng: item.lng }
+                    : bairroCoord(item.localizacao ?? dia.bairro);
+                  const bCoord = nextItem.lat && nextItem.lng
+                    ? { lat: nextItem.lat, lng: nextItem.lng }
+                    : bairroCoord(nextItem.localizacao ?? dia.bairro);
+                  const km  = haversineKm(aCoord, bCoord);
+                  const min = walkMinutes(km);
+                  travelLabel = formatTravel(km, min);
+                }
+>>>>>>> claude/plan-app-architecture-73RnI
 
                 return (
                   <React.Fragment
@@ -2672,9 +3283,10 @@ function ResultDayCard({
                         if (editMode) {
                           onReplaceItem(dia.numero, item.id, item);
                         } else {
-                          navigateToItem(item);
+                          onOpenItemMenu(dia.numero, item);
                         }
                       }}
+                      onLongPress={() => navigateToItem(item)}
                     >
                       {/* Left: time */}
                       <View style={re.timeCol}>
@@ -2724,6 +3336,7 @@ function ResultDayCard({
                           <Feather name="refresh-cw" size={13} color={GOLD} />
                         </View>
                       ) : (
+<<<<<<< HEAD
                         <Feather
                           name="chevron-right"
                           size={14}
@@ -2767,6 +3380,80 @@ function ResultDayCard({
             <Feather name="arrow-right" size={12} color={`${GOLD}55`} />
           </Pressable>
         </View>
+=======
+                        <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.22)" />
+                      )}
+                    </Pressable>
+
+                    {/* Duration controls */}
+                    {!editMode && (
+                      <View style={re.durationRow}>
+                        <View style={re.timeColSpacer} />
+                        <View style={re.durationPill}>
+                          <Pressable
+                            style={re.durBtn}
+                            onPress={() => adjustDuration(item.id, item.duracao, -15)}
+                            hitSlop={6}
+                          >
+                            <Text style={re.durBtnText}>−</Text>
+                          </Pressable>
+                          <Feather name="clock" size={9} color="rgba(255,255,255,0.45)" />
+                          <Text style={re.durLabel}>
+                            {curDurMin >= 60
+                              ? `${Math.floor(curDurMin / 60)}h${curDurMin % 60 > 0 ? String(curDurMin % 60).padStart(2, "0") : ""}`
+                              : `${curDurMin}min`}
+                          </Text>
+                          <Pressable
+                            style={re.durBtn}
+                            onPress={() => adjustDuration(item.id, item.duracao, +15)}
+                            hitSlop={6}
+                          >
+                            <Text style={re.durBtnText}>+</Text>
+                          </Pressable>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Travel connector between items */}
+                    {idx < periodo.items.length - 1 && (
+                      <View style={re.travelConnector}>
+                        <View style={re.timeColSpacer} />
+                        <View style={re.connectorPill}>
+                          <Feather name="navigation" size={9} color="rgba(255,255,255,0.40)" />
+                          <Text style={re.connectorText}>
+                            Deslocamento · {travelLabel}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+          </View>
+        ))}
+
+        {/* ── Add item button ── */}
+        <Pressable
+          style={({ pressed }) => [re.addItemBtn, pressed && { opacity: 0.75 }]}
+          onPress={() => onAddItem(dia.numero)}
+        >
+          <View style={re.addItemBtnIcon}>
+            <Feather name="plus" size={14} color={GOLD} />
+          </View>
+          <Text style={re.addItemBtnText}>Adicionar ao Dia {dia.numero}</Text>
+        </Pressable>
+
+        {/* ── Per-day map button ── */}
+        <Pressable
+          style={({ pressed }) => [re.dayMapBtn, pressed && { opacity: 0.75 }]}
+          onPress={handleDayMap}
+        >
+          <Feather name="map-pin" size={11} color={GOLD} />
+          <Text style={re.dayMapBtnText}>Ver Dia {dia.numero} no mapa</Text>
+          <Feather name="arrow-right" size={12} color={`${GOLD}55`} />
+        </Pressable>
+      </View>
+>>>>>>> claude/plan-app-architecture-73RnI
       )}
     </View>
   );
@@ -3267,6 +3954,117 @@ const re = StyleSheet.create({
     fontSize: 12,
     color: `${GOLD}CC`,
   },
+
+  // ── Duration controls ────────────────────────────────────────────────────
+  durationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 2,
+  },
+  durationPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    backgroundColor: "rgba(212,175,55,0.08)",
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: "rgba(212,175,55,0.14)",
+  },
+  durBtn: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(212,175,55,0.14)",
+  },
+  durBtnText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+    color: GOLD,
+    lineHeight: 18,
+  },
+  durLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    color: "rgba(255,255,255,0.65)",
+    minWidth: 38,
+    textAlign: "center",
+  },
+
+  // ── Add item button (per day) ────────────────────────────────────────────
+  addItemBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 4,
+    marginBottom: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: "rgba(212,175,55,0.30)",
+    backgroundColor: "rgba(212,175,55,0.04)",
+  },
+  addItemBtnIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(212,175,55,0.14)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addItemBtnText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: `${GOLD}CC`,
+    flex: 1,
+  },
+
+  // ── Custo estimado footer ────────────────────────────────────────────────
+  custoCard: {
+    backgroundColor: GLASS_BG,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(212,175,55,0.22)",
+    padding: 18,
+    marginTop: 6,
+    marginBottom: 20,
+    gap: 4,
+  },
+  custoHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 4,
+  },
+  custoLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+    color: `${GOLD}CC`,
+    letterSpacing: 1.2,
+  },
+  custoValue: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 24,
+    color: CREAM,
+    lineHeight: 30,
+  },
+  custoSub: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: "rgba(255,255,255,0.70)",
+  },
+  custoNote: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: "rgba(255,255,255,0.40)",
+    lineHeight: 16,
+    marginTop: 8,
+  },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3277,12 +4075,14 @@ export default function RoteiroScreen() {
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const rioHero   = useRioHeroMedia("image");
 
   const params = useLocalSearchParams<{ contextual?: string }>();
   const isContextual = params.contextual === "1";
 
   const { saved, user, setCurrentItinerary } = useGuia();
 
+<<<<<<< HEAD
   const [result, setResult] = useState<ItineraryResult | null>(null);
   const [generating, setGenerating] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -3294,7 +4094,99 @@ export default function RoteiroScreen() {
   /** ID of the auto-saved user_itineraries row — set after generation, used by Share/Export to update rather than re-insert. */
   const [savedItineraryId, setSavedItineraryId] = useState<string | null>(null);
   const [genError, setGenError] = useState<string | null>(null);
+=======
+  const [result,            setResult]            = useState<ItineraryResult | null>(null);
+  const [generating,        setGenerating]        = useState(false);
+  const [editMode,          setEditMode]          = useState(false);
+  const [isExporting,       setIsExporting]       = useState(false);
+  const [replacingItem,     setReplacingItem]     = useState<{ item: SavedItem; diaNum: number } | null>(null);
+  /** Open item menu sheet — set when user taps an itinerary row outside of editMode. */
+  const [menuItem,          setMenuItem]          = useState<{ item: SavedItem; diaNum: number } | null>(null);
+  /** Day number for the "+" add-item menu — null when closed. */
+  const [addMenuDay,        setAddMenuDay]        = useState<number | null>(null);
+  /** Google Places search modal — open via "Busca manual" in AddItemMenu. */
+  const [placeSearchVisible, setPlaceSearchVisible] = useState(false);
+  /** Day number targeted by the place search modal. */
+  const [placeSearchDay,     setPlaceSearchDay]     = useState<number | null>(null);
+  /** ID of the auto-saved user_itineraries row — set after generation, used by Share/Export to update rather than re-insert. */
+  const [savedItineraryId,  setSavedItineraryId]  = useState<string | null>(null);
+  /** Hotel suggestion fetched from Supabase when user has no hotel in their saved list. */
+  const [suggestedHotel,    setSuggestedHotel]    = useState<SavedItem | null>(null);
+>>>>>>> claude/plan-app-architecture-73RnI
   const scrollRef = useRef<ScrollView>(null);
+
+  function removeItem(diaNum: number, itemId: string) {
+    setResult((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        summary: { ...prev.summary, totalItems: Math.max(0, prev.summary.totalItems - 1) },
+        days: prev.days.map((dia) => {
+          if (dia.numero !== diaNum) return dia;
+          return {
+            ...dia,
+            periodos: dia.periodos.map((periodo) => ({
+              ...periodo,
+              items: periodo.items.filter((it) => it.id !== itemId),
+            })),
+          };
+        }),
+      };
+    });
+  }
+
+  function shareSingleItem(item: SavedItem) {
+    const msg = `Olha essa dica do The Lucky Trip:\n✦ ${item.titulo}${item.localizacao ? ` — ${item.localizacao}` : ""}`;
+    Share.share({ message: msg }).catch(() => {});
+  }
+
+  function addItemToDay(diaNum: number, item: SavedItem, periodo: PeriodoDia = "tarde") {
+    setResult((prev): ItineraryResult | null => {
+      if (!prev) return prev;
+      const updatedDays = prev.days.map((dia) => {
+        if (dia.numero !== diaNum) return dia;
+        const existsPeriodo = dia.periodos.find((p) => p.periodo === periodo);
+        return {
+          ...dia,
+          periodos: existsPeriodo
+            ? dia.periodos.map((p) =>
+                p.periodo === periodo ? { ...p, items: [...p.items, item] } : p
+              )
+            : [...dia.periodos, { periodo, items: [item] }],
+        };
+      });
+      return {
+        ...prev,
+        summary: { ...prev.summary, totalItems: prev.summary.totalItems + 1 },
+        days: updatedDays,
+      };
+    });
+  }
+
+  function handleTempoLivre(diaNum: number) {
+    const item: SavedItem = {
+      id:          `livre-${diaNum}-${Date.now()}`,
+      categoria:   "oQueFazer",
+      titulo:      "Tempo livre",
+      localizacao: "Rio de Janeiro",
+      image:       require("@/assets/images/hero-rio.png"),
+      duracao:     "60min",
+    };
+    addItemToDay(diaNum, item);
+  }
+
+  function handleVoltarHotel(diaNum: number) {
+    const hotel = hotelItem ?? suggestedHotel;
+    const item: SavedItem = {
+      id:          `hotel-${diaNum}-${Date.now()}`,
+      categoria:   "hotel",
+      titulo:      hotel ? `Voltar — ${hotel.titulo}` : "Voltar ao hotel",
+      localizacao: hotel?.localizacao ?? "Rio de Janeiro",
+      image:       hotel?.image ?? require("@/assets/images/hotel1.png"),
+      duracao:     "30min",
+    };
+    addItemToDay(diaNum, item, "noite" as PeriodoDia);
+  }
 
   function replaceItem(diaNum: number, itemId: string, newItem: SavedItem) {
     setResult((prev) => {
@@ -3478,6 +4370,20 @@ export default function RoteiroScreen() {
    */
   async function handleExport() {
     if (!result || isExporting) return;
+
+    // Require authentication to export
+    if (!user) {
+      Alert.alert(
+        "Faça login para exportar",
+        "Crie uma conta gratuita para salvar e compartilhar seus roteiros.",
+        [
+          { text: "Entrar", onPress: () => router.push("/(tabs)/perfil") },
+          { text: "Agora não", style: "cancel" },
+        ]
+      );
+      return;
+    }
+
     setIsExporting(true);
     let exportUrl: string | undefined;
 
@@ -3495,8 +4401,9 @@ export default function RoteiroScreen() {
           .update({ is_public: true, share_slug: slug })
           .eq("id", savedItineraryId);
         if (!error) exportUrl = `https://theluckytrip.app/r/${slug}`;
+        else console.error("[Export] update error:", error.message);
       } else {
-        // Unauthenticated fallback — full insert (preserves existing behavior)
+        // Insert for users where auto-save didn't run
         const { data: itinerary, error: itinErr } = await supabase
           .from("user_itineraries")
           .insert({
@@ -3539,17 +4446,33 @@ export default function RoteiroScreen() {
           );
           await supabase.from("roteiro_itens").insert(roteiroItens);
           exportUrl = `https://theluckytrip.app/r/${slug}`;
+        } else if (itinErr) {
+          console.error("[Export] insert error:", itinErr.message);
         }
       }
+<<<<<<< HEAD
     } catch {
       /* Supabase unavailable — proceed without URL */
+=======
+    } catch (e) {
+      console.error("[Export] unexpected error:", e);
+>>>>>>> claude/plan-app-architecture-73RnI
     }
 
-    const urlToShow = exportUrl ?? "Roteiro ainda não salvo. Tente novamente.";
+    // 2. Surface the URL
+    if (!exportUrl) {
+      Alert.alert(
+        "Erro ao exportar",
+        "Não foi possível gerar o link. Tente novamente.",
+        [{ text: "OK" }]
+      );
+      setIsExporting(false);
+      return;
+    }
 
-    // 2. Surface the URL — copy on web, share prompt on native
     if (Platform.OS === "web") {
       try {
+<<<<<<< HEAD
         if (exportUrl) await navigator.clipboard.writeText(exportUrl);
       } catch {
         /* clipboard not available */
@@ -3577,13 +4500,83 @@ export default function RoteiroScreen() {
               { text: "Fechar", style: "cancel" },
             ]
           : [{ text: "OK" }],
+=======
+        await navigator.clipboard.writeText(exportUrl);
+      } catch { /* clipboard not available */ }
+      Alert.alert(
+        "Link copiado!",
+        `${exportUrl}\n\nCompartilhe este link para acessar o roteiro em qualquer dispositivo.`,
+        [{ text: "OK" }]
+      );
+    } else {
+      Alert.alert(
+        "Roteiro exportado",
+        "Link pronto para compartilhar:",
+        [
+          {
+            text: "Compartilhar",
+            onPress: () => Share.share({ message: exportUrl!, url: exportUrl, title: "Roteiro Rio de Janeiro — The Lucky Trip" }),
+          },
+          { text: "Fechar", style: "cancel" },
+        ]
+>>>>>>> claude/plan-app-architecture-73RnI
       );
     }
     setIsExporting(false);
   }
 
+<<<<<<< HEAD
   const hotelItem = saved.find((s) => s.categoria === "hotel") ?? null;
   const totalPlaces = saved.filter((s) => s.categoria !== "hotel").length;
+=======
+  const hotelItem   = saved.find((s) => s.categoria === "hotel") ?? null;
+  const totalPlaces = result
+    ? result.days.reduce((n, d) => n + d.periodos.reduce((m, p) => m + p.items.length, 0), 0)
+    : saved.filter((s) => s.categoria !== "hotel").length;
+
+  /** Fetches a hotel recommendation from Supabase when the user has none saved. */
+  async function fetchSuggestedHotel(budget: BudgetStyle) {
+    try {
+      const { data } = await supabase
+        .from("v_stay_neighborhoods_with_hotels")
+        .select("neighborhood_name, neighborhood_slug, hotels")
+        .eq("active", true)
+        .order("display_order", { ascending: true })
+        .limit(8);
+
+      if (!data || data.length === 0) return;
+
+      type HotelRow = { id: string; hotel_name: string; hotel_category: string; photo_url: string | null; neighborhood_slug: string | null; display_order: number };
+      const allHotels: (HotelRow & { neighborhood_name: string })[] = (data as any[]).flatMap((n) =>
+        ((n.hotels ?? []) as HotelRow[]).map((h) => ({ ...h, neighborhood_name: n.neighborhood_name as string }))
+      );
+
+      if (allHotels.length === 0) return;
+
+      // Budget-matching heuristic using hotel_category keywords
+      const luxuryKeywords  = ["luxo", "luxury", "resort", "grand", "palace"];
+      const budgetKeywords  = ["hostel", "pousada", "budget", "econom"];
+
+      let selected: typeof allHotels[0] | undefined;
+      if (budget === "sofisticado") {
+        selected = allHotels.find((h) => luxuryKeywords.some((k) => h.hotel_category?.toLowerCase().includes(k)));
+      } else if (budget === "essencial") {
+        selected = allHotels.find((h) => budgetKeywords.some((k) => h.hotel_category?.toLowerCase().includes(k)));
+      }
+      // conforto (or no match): use first curated hotel by display_order
+      if (!selected) selected = allHotels[0];
+
+      setSuggestedHotel({
+        id:           selected.id,
+        titulo:       selected.hotel_name,
+        localizacao:  selected.neighborhood_name,
+        image:        selected.photo_url ? { uri: selected.photo_url } : require("@/assets/images/rio-aerial-clean.png"),
+        categoria:    "hotel",
+        source_table: "stay_hotels",
+      });
+    } catch { /* silent — hotel suggestion is optional */ }
+  }
+>>>>>>> claude/plan-app-architecture-73RnI
 
   async function handleGenerate({
     nights,
@@ -3598,6 +4591,9 @@ export default function RoteiroScreen() {
     setGenError(null);
     setGenerating(true);
     console.log("STEP 1 - iniciou geração");
+
+    // Fetch a hotel suggestion in the background when user has none saved
+    if (!hotelItem) fetchSuggestedHotel(budget);
 
     try {
       const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
@@ -3822,9 +4818,23 @@ export default function RoteiroScreen() {
     <View style={sc.root}>
       {/* ── Cinematic background — global rotating pool (shared with all screens) ── */}
       <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}>
+<<<<<<< HEAD
         <RotatingBackground />
+=======
+        <RotatingBackground
+          pool={rioHero && rioHero.length > 0
+            ? rioHero.map((item) => ({ uri: item.public_url }))
+            : ROTEIRO_BG_POOL}
+          firstSource={(hotelItem ?? suggestedHotel)?.image ?? null}
+          blurRadius={phase === "result" ? 14 : 0}
+        />
+>>>>>>> claude/plan-app-architecture-73RnI
         <LinearGradient
-          colors={["rgba(0,0,0,0.05)", "rgba(0,0,0,0.28)", "rgba(0,0,0,0.60)"]}
+          colors={
+            phase === "result"
+              ? ["rgba(10,8,5,0.50)", "rgba(10,8,5,0.72)", "rgba(10,8,5,0.92)"]
+              : ["rgba(0,0,0,0.05)", "rgba(0,0,0,0.28)", "rgba(0,0,0,0.60)"]
+          }
           locations={[0, 0.35, 1]}
           style={StyleSheet.absoluteFill}
         />
@@ -3882,16 +4892,36 @@ export default function RoteiroScreen() {
           <ResultPhase
             result={result!}
             hotelItem={hotelItem}
+            suggestedHotel={suggestedHotel}
             totalPlaces={totalPlaces}
             editMode={editMode}
             onToggleEdit={() => setEditMode((v) => !v)}
             onReplaceItem={openReplaceSheet}
+            onOpenItemMenu={(diaNum, item) => setMenuItem({ item, diaNum })}
+            onAddItem={(diaNum) => setAddMenuDay(diaNum)}
             onShareResult={handleShare}
             onExport={handleExport}
             isExporting={isExporting}
             scrollRef={scrollRef}
           />
         </ScrollView>
+      )}
+
+      {/* ── Assistente Lucky (FAB) — only in result phase ── */}
+      {phase === "result" && !replacingItem && !menuItem && !addMenuDay && (
+        <Pressable
+          style={({ pressed }) => [
+            sc.luckyFab,
+            { bottom: bottomPad + 24 },
+            pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] },
+          ]}
+          onPress={() => {
+            router.push("/lucky");
+          }}
+        >
+          <Text style={sc.luckyFabIcon}>✦</Text>
+          <Text style={sc.luckyFabLabel}>Lucky</Text>
+        </Pressable>
       )}
 
       {/* ── Replace sheet overlay ── */}
@@ -3906,6 +4936,93 @@ export default function RoteiroScreen() {
           }}
         />
       )}
+
+      {/* ── Item menu sheet ── */}
+      {menuItem && (
+        <ItemMenuSheet
+          item={menuItem.item}
+          diaNum={menuItem.diaNum}
+          onClose={() => setMenuItem(null)}
+          onSeeDetails={() => {
+            const it = menuItem.item;
+            setMenuItem(null);
+            navigateToItem(it);
+          }}
+          onShare={() => {
+            shareSingleItem(menuItem.item);
+            setMenuItem(null);
+          }}
+          onReplace={() => {
+            const { item, diaNum } = menuItem;
+            setMenuItem(null);
+            openReplaceSheet(diaNum, item.id, item);
+          }}
+          onDelete={() => {
+            const { item, diaNum } = menuItem;
+            removeItem(diaNum, item.id);
+            setMenuItem(null);
+          }}
+        />
+      )}
+
+      {/* ── Add item menu ── */}
+      {addMenuDay !== null && (
+        <AddItemMenu
+          diaNum={addMenuDay}
+          onClose={() => setAddMenuDay(null)}
+          onPickCategory={(categoria) => {
+            const diaNum = addMenuDay;
+            setAddMenuDay(null);
+            setReplacingItem({ item: {
+              id: `new-${diaNum}-${Date.now()}`,
+              categoria,
+              titulo: "",
+              localizacao: "",
+              image: require("@/assets/images/hero-rio.png"),
+            }, diaNum });
+          }}
+          onTempoLivre={() => handleTempoLivre(addMenuDay)}
+          onVoltarHotel={() => handleVoltarHotel(addMenuDay)}
+          onSugerir={() => {
+            setAddMenuDay(null);
+            router.push("/lucky");
+          }}
+          onManual={() => {
+            const day = addMenuDay;
+            setAddMenuDay(null);
+            setPlaceSearchDay(day);
+            setPlaceSearchVisible(true);
+          }}
+        />
+      )}
+
+      {/* ── Google Places search modal ("Busca manual") ── */}
+      <PlaceSearchModal
+        visible={placeSearchVisible}
+        onClose={() => {
+          setPlaceSearchVisible(false);
+          setPlaceSearchDay(null);
+        }}
+        onSelectPlace={(place: SelectedPlace) => {
+          setPlaceSearchVisible(false);
+          if (!placeSearchDay || !result) return;
+          const newItem: SavedItem = {
+            id:          place.place_id,
+            titulo:      place.titulo,
+            localizacao: place.localizacao,
+            categoria:   "oQueFazer",
+            source_table:"o_que_fazer_rio",
+            image:       getItemFallbackImage("oQueFazer"),
+            isExternal:  true,
+            placeId:     place.place_id,
+            address:     place.localizacao,
+            lat:         place.lat,
+            lng:         place.lng,
+          };
+          addItemToDay(newItem, placeSearchDay);
+          setPlaceSearchDay(null);
+        }}
+      />
     </View>
   );
 }
@@ -3985,6 +5102,38 @@ const sc = StyleSheet.create({
     height: 7,
     borderRadius: 3.5,
     backgroundColor: GOLD,
+  },
+
+  // ── Lucky FAB (result phase) ─────────────────────────────────────────────
+  luckyFab: {
+    position: "absolute",
+    right: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: GOLD,
+    paddingVertical: 12,
+    paddingLeft: 14,
+    paddingRight: 16,
+    borderRadius: 28,
+    shadowColor: "#000",
+    shadowOpacity: 0.35,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 14,
+    elevation: 10,
+    zIndex: 80,
+  },
+  luckyFabIcon: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 18,
+    color: "#1A1109",
+    lineHeight: 20,
+  },
+  luckyFabLabel: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+    color: "#1A1109",
+    letterSpacing: 0.3,
   },
 });
 

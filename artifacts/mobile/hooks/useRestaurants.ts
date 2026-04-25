@@ -7,7 +7,11 @@
 
 import { useEffect, useState } from "react";
 import { supabase, type Restaurante } from "@/lib/supabase";
+<<<<<<< HEAD
 import { sanitizePhotoUrl } from "@/utils/getImageForEntity";
+=======
+import { buildMediaUrl } from "@/lib/mediaUrl";
+>>>>>>> claude/plan-app-architecture-73RnI
 
 type State = {
   restaurantes: Restaurante[];
@@ -49,6 +53,7 @@ export function useRestaurants(cidadeId?: string): State {
 
       if (cancelled) return;
 
+<<<<<<< HEAD
       // ── 2. Map + sanitize photo_url (block Google CDN and invalid sources) ──
       const merged: Restaurante[] = rawRows.map((r) => {
         const safe = sanitizePhotoUrl(r.photo_url ?? null);
@@ -59,6 +64,13 @@ export function useRestaurants(cidadeId?: string): State {
         }
         return { ...r, resolvedPhotoUri: safe };
       });
+=======
+      // ── 3. Render immediately with Supabase / place_photos ────────────────
+      const merged: Restaurante[] = rawRows.map((r) => ({
+        ...r,
+        resolvedPhotoUri: buildMediaUrl(r.photo_url ?? photoMap[String(r.id)]) || null,
+      }));
+>>>>>>> claude/plan-app-architecture-73RnI
 
       setRestaurantes(merged);
       setLoading(false);

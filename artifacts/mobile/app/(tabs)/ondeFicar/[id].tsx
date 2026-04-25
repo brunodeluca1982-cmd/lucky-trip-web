@@ -1,14 +1,13 @@
 /**
- * ondeFicar/[id].tsx — "Onde ficar" map + hotel list screen
+ * ondeFicar/[id].tsx — "Onde ficar" redesigned
  *
- * Map: RioMapView (Leaflet satellite).
- * Tap a neighborhood → navigate directly to ondeFicar/bairro/[slug] (no floating card).
- * The scrollable section below the map always shows ALL hotels.
+ * Top half: Map with bairro pins (light cartographic style)
+ * Bottom half: Either "Escolha no mapa..." prompt or bairro preview card
  */
 
-import React, { useRef } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import {
-  ActivityIndicator,
+  Animated,
   Dimensions,
   Image,
   Platform,
@@ -22,20 +21,24 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import Colors from "@/constants/colors";
-import { destinos } from "@/data/mockData";
-import { useNeighborhoods } from "@/hooks/useNeighborhoods";
-import type { Hotel, Neighborhood } from "@/lib/supabase";
+import { useBairros, type Bairro } from "@/hooks/useBairros";
 import RioMapView from "@/components/RioMapView";
 import { HotelCard } from "@/components/HotelCard";
 
-const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const MAP_H = Math.round(SCREEN_HEIGHT * 0.50);
+const CARD_SIZE = SCREEN_WIDTH - 48; // Square card with padding
 
-const C = Colors.light;
+// Colors
+const PETROL = "#1B4F72";
+const TEAL = "#4ECDC4";
+const BG_DARK = "#0A0A0A";
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// Rio de Janeiro destino_id
+const RIO_DESTINO_ID = "7f047742-427f-4b11-8286-781af899c57d";
+const FALLBACK_IMAGE = "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero01.jpg";
 
+<<<<<<< HEAD
 type FlatHotel = Hotel & { localizacao: string; neighborhood: Neighborhood };
 
 function flattenHotels(neighborhoods: Neighborhood[]): FlatHotel[] {
@@ -43,103 +46,184 @@ function flattenHotels(neighborhoods: Neighborhood[]): FlatHotel[] {
   for (const n of neighborhoods) {
     for (const h of n.hotels ?? []) {
       result.push({ ...h, localizacao: n.neighborhood_name, neighborhood: n });
+=======
+// ── Pill builders with emojis ─────────────────────────────────────────────────
+
+function buildPills(bairro: Bairro): string[] {
+  const pills: string[] = [];
+
+  // Caminhavel
+  if (bairro.caminhavel) {
+    switch (bairro.caminhavel.toLowerCase()) {
+      case "muito":
+        pills.push("🚶 Muito caminhavel");
+        break;
+      case "razoavel":
+        pills.push("🚶 Caminhavel");
+        break;
+>>>>>>> claude/plan-app-architecture-73RnI
     }
   }
-  result.sort((a, b) => {
-    const nd = a.neighborhood.display_order - b.neighborhood.display_order;
-    return nd !== 0 ? nd : a.display_order - b.display_order;
-  });
-  return result;
+
+  // Vida noturna
+  if (bairro.vida_noturna) {
+    switch (bairro.vida_noturna.toLowerCase()) {
+      case "intensa":
+        pills.push("🌙 Noite intensa");
+        break;
+      case "moderada":
+        pills.push("🌙 Noite moderada");
+        break;
+    }
+  }
+
+  // Gastronomia
+  if (bairro.gastronomia) {
+    switch (bairro.gastronomia.toLowerCase()) {
+      case "excelente":
+        pills.push("🍽 Gastronomia top");
+        break;
+      case "boa":
+        pills.push("🍽 Boa gastronomia");
+        break;
+    }
+  }
+
+  return pills;
 }
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 export default function OndeFicarScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const insets    = useSafeAreaInsets();
-  const topInset  = Platform.OS === "web" ? 67 : insets.top;
-  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const insets = useSafeAreaInsets();
+  const topInset = Platform.OS === "web" ? 0 : insets.top;
+  const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
 
-  const destino = destinos.find((d) => d.id === id) ?? destinos[0];
-  const { neighborhoods, loading, error } = useNeighborhoods();
-  const allHotels = flattenHotels(neighborhoods);
+  // Fetch bairros from Supabase
+  const { bairros, loading: loadingBairros } = useBairros(RIO_DESTINO_ID);
 
-  const listRef = useRef<ScrollView>(null);
+  // Selected bairro state
+  const [selectedBairro, setSelectedBairro] = useState<Bairro | null>(null);
 
-  // Tap a neighborhood → navigate directly to its detail page
-  function handleNeighborhoodPress(name: string | null) {
-    if (!name) return;
-    const neighborhood = neighborhoods.find((n) => n.neighborhood_name === name);
-    if (!neighborhood) return;
-    router.push({
-      pathname: "/ondeFicar/bairro/[slug]",
-      params: { slug: neighborhood.neighborhood_slug, cityId: destino.id },
-    });
+  // Animation for card slide-up and cross-fade
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+
+  // Animate card when selection changes
+  useEffect(() => {
+    if (selectedBairro) {
+      // Slide up + fade in
+      slideAnim.setValue(0);
+      fadeAnim.setValue(0);
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [selectedBairro?.id]);
+
+  // Handle bairro selection from map
+  function handleBairroPress(bairro: Bairro | null) {
+    if (bairro) {
+      // Cross-fade when changing bairro
+      if (selectedBairro && selectedBairro.id !== bairro.id) {
+        fadeAnim.setValue(0);
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }).start();
+      }
+      setSelectedBairro(bairro);
+    }
   }
+
+  // "Escolher por mim" — pick random bairro (not the current one)
+  function handleChooseForMe() {
+    if (bairros.length === 0) return;
+
+    const available = selectedBairro
+      ? bairros.filter((b) => b.id !== selectedBairro.id)
+      : bairros;
+
+    if (available.length === 0) return;
+
+    const random = available[Math.floor(Math.random() * available.length)];
+
+    // Cross-fade animation
+    if (selectedBairro) {
+      fadeAnim.setValue(0);
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    }
+
+    setSelectedBairro(random);
+  }
+
+  // Navigate to bairro detail
+  function handleViewHotels() {
+    if (!selectedBairro) return;
+    router.push(`/ondeFicar/bairro/${selectedBairro.slug}`);
+  }
+
+  // Build pills for selected bairro
+  const pills = selectedBairro ? buildPills(selectedBairro) : [];
+
+  // Card translate animation
+  const cardTranslate = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [80, 0],
+  });
 
   return (
     <View style={s.root}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* ── Fixed map section ── */}
+      {/* ── Map section (top 50%) ── */}
       <View style={s.mapSection}>
         <RioMapView
-          selectedNeighborhood={null}
-          onNeighborhoodPress={handleNeighborhoodPress}
+          bairros={bairros}
+          selectedBairroId={selectedBairro?.id ?? null}
+          onBairroPress={handleBairroPress}
+          loading={loadingBairros}
           style={StyleSheet.absoluteFillObject}
         />
 
-        <View style={[s.mapControls, { top: topInset + 10 }]} pointerEvents="box-none">
-          <Pressable style={s.pill} onPress={() => router.back()} hitSlop={8}>
-            <Text style={s.pillText}>← Voltar</Text>
+        {/* Back button */}
+        <View style={[s.mapControls, { top: topInset + 12 }]} pointerEvents="box-none">
+          <Pressable style={s.backBtn} onPress={() => router.back()} hitSlop={8}>
+            <Feather name="chevron-left" size={22} color={PETROL} />
+            <Text style={s.backText}>Voltar</Text>
           </Pressable>
-          <View style={s.pill}>
-            <View style={s.badgeDot} />
-            <Text style={s.pillText}>
-              {loading ? "carregando…" : `${allHotels.length} hospedagens`}
-            </Text>
-          </View>
-        </View>
-
-        <View style={[s.mapHint, { pointerEvents: "none" }]}>
-          <Text style={s.mapHintText}>Toque num bairro para explorar</Text>
         </View>
       </View>
 
-      {/* ── Scrollable hotel list ── */}
-      <ScrollView
-        ref={listRef}
-        style={s.listScroll}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: bottomPad + 96 }}
-      >
-        {/* Photo hero intro */}
-        <View style={s.introHeroWrap}>
-          <Image
-            source={destino.image}
-            style={StyleSheet.absoluteFillObject}
-            resizeMode="cover"
-          />
-          <LinearGradient
-            colors={["rgba(0,0,0,0.28)", "rgba(0,0,0,0.92)"]}
-            locations={[0.05, 1]}
-            style={StyleSheet.absoluteFill}
-            pointerEvents="none"
-          />
-          <View style={[s.intro, s.introAbsolute]}>
-            <Text style={s.introTitle}>Onde ficar em {destino.cidade}</Text>
-            <Text style={s.introPara}>
-              Onde você dorme define como você acorda. No Rio, cada bairro tem
-              um ritmo próprio — escolher bem o hotel muda toda a experiência.
+      {/* ── Content section (bottom 50%) ── */}
+      <View style={[s.contentSection, { paddingBottom: bottomInset + 20 }]}>
+        {!selectedBairro ? (
+          /* ── Empty state: no bairro selected ── */
+          <View style={s.emptyState}>
+            <Text style={s.emptyTitle}>
+              Escolha no mapa o bairro{"\n"}que e a sua cara.
             </Text>
-            <View style={s.introMeta}>
-              <View style={s.introDot} />
-              <Text style={s.introMetaText}>
-                Seleção curada ·{" "}
-                {loading ? "…" : `${allHotels.length} hospedagem${allHotels.length !== 1 ? "s" : ""}`}
-              </Text>
-            </View>
+            <Pressable style={s.chooseBtn} onPress={handleChooseForMe}>
+              <Text style={s.chooseBtnIcon}>✦</Text>
+              <Text style={s.chooseBtnText}>Escolher por mim</Text>
+            </Pressable>
           </View>
+<<<<<<< HEAD
         </View>
 
         {/* List section */}
@@ -190,6 +274,48 @@ export default function OndeFicarScreen() {
           </Text>
         </View>
       </ScrollView>
+=======
+        ) : (
+          /* ── Bairro preview card (square style matching mockup) ── */
+          <Animated.View
+            style={[
+              s.previewCard,
+              {
+                transform: [{ translateY: cardTranslate }],
+                opacity: fadeAnim,
+              },
+            ]}
+          >
+            {/* Square card with image */}
+            <View style={s.squareCard}>
+              <Image
+                source={{ uri: selectedBairro.hero_image_url || FALLBACK_IMAGE }}
+                style={s.squareCardImage}
+                resizeMode="cover"
+              />
+              <LinearGradient
+                colors={["transparent", "rgba(0,0,0,0.3)", "rgba(0,0,0,0.85)"]}
+                locations={[0.3, 0.6, 1]}
+                style={StyleSheet.absoluteFill}
+              />
+
+              {/* Content at bottom of card */}
+              <View style={s.squareCardContent}>
+                {/* CTA Button */}
+                <Pressable style={s.ctaBtn} onPress={handleViewHotels}>
+                  <Text style={s.ctaBtnText}>Ver hoteis no →</Text>
+                </Pressable>
+
+                {/* Choose another link */}
+                <Pressable style={s.chooseAnotherBtn} onPress={handleChooseForMe}>
+                  <Text style={s.chooseAnotherText}>Escolher outro bairro</Text>
+                </Pressable>
+              </View>
+            </View>
+          </Animated.View>
+        )}
+      </View>
+>>>>>>> claude/plan-app-architecture-73RnI
     </View>
   );
 }
@@ -197,8 +323,12 @@ export default function OndeFicarScreen() {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#000000" },
+  root: {
+    flex: 1,
+    backgroundColor: BG_DARK,
+  },
 
+  // Map
   mapSection: {
     width: "100%",
     height: MAP_H,
@@ -206,112 +336,124 @@ const s = StyleSheet.create({
   },
   mapControls: {
     position: "absolute",
-    left: 0,
-    right: 0,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
+    left: 16,
     zIndex: 30,
-    pointerEvents: "box-none",
   },
-  pill: {
+  backBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    backgroundColor: "rgba(0,0,0,0.46)",
-    borderRadius: 22,
-    paddingHorizontal: 15,
-    paddingVertical: 9,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-    boxShadow: "0px 2px 16px rgba(0,0,0,0.38), 0px 0px 0px 1px rgba(255,255,255,0.06)",
-  } as any,
-  pillText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: "rgba(255,255,255,0.88)",
-    letterSpacing: 0.1,
+    backgroundColor: "rgba(255,255,255,0.95)",
+    borderRadius: 24,
+    paddingVertical: 10,
+    paddingLeft: 8,
+    paddingRight: 16,
+    gap: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  badgeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: C.terracotta,
+  backText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    color: PETROL,
   },
-  mapHint: {
-    position: "absolute",
-    bottom: 14,
-    left: 0,
-    right: 0,
+
+  // Content
+  contentSection: {
+    flex: 1,
+    backgroundColor: BG_DARK,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+  },
+
+  // Empty state
+  emptyState: {
+    flex: 1,
+    justifyContent: "center",
     alignItems: "center",
-    zIndex: 10,
+    paddingBottom: 60,
   },
-  mapHintText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    color: "rgba(255,255,255,0.52)",
-    letterSpacing: 0.4,
+  emptyTitle: {
+    fontFamily: "PlayfairDisplay_400Regular",
+    fontSize: 22,
+    color: "#FFFFFF",
+    textAlign: "center",
+    lineHeight: 30,
+    marginBottom: 24,
   },
-
-  listScroll: { flex: 1, backgroundColor: "#000000" },
-
-  introHeroWrap: {
+  chooseBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: PETROL,
+    borderRadius: 100,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
     width: "100%",
-    height: 260,
-    position: "relative",
-    overflow: "hidden",
+    gap: 10,
   },
-  introAbsolute: {
+  chooseBtnIcon: {
+    fontSize: 16,
+    color: "#FFFFFF",
+  },
+  chooseBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 16,
+    color: "#FFFFFF",
+  },
+
+  // Preview card
+  previewCard: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  // Square card (matching mockup)
+  squareCard: {
+    width: CARD_SIZE,
+    height: CARD_SIZE * 0.65,
+    borderRadius: 20,
+    overflow: "hidden",
+    backgroundColor: "#1a1a1a",
+  },
+  squareCardImage: {
+    width: "100%",
+    height: "100%",
+    position: "absolute",
+  },
+  squareCardContent: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-  },
-  intro: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 26,
-  },
-  introTitle: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 28,
-    color: C.white,
-    lineHeight: 36,
-    letterSpacing: -0.4,
-    marginBottom: 8,
-  },
-  introPara: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 15,
-    color: "rgba(255,255,255,0.62)",
-    lineHeight: 26,
-    marginBottom: 14,
-  },
-  introMeta: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 },
-  introDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: "rgba(201,168,76,0.55)",
-  },
-  introMetaText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 12,
-    color: "rgba(255,255,255,0.35)",
-    letterSpacing: 0.5,
+    padding: 20,
   },
 
-  listSection: {
-    backgroundColor: "#000000",
-    paddingTop: 20,
-    paddingHorizontal: 20,
-    paddingBottom: 8,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.05)",
+  // CTA
+  ctaBtn: {
+    backgroundColor: PETROL,
+    borderRadius: 100,
+    paddingVertical: 16,
+    alignItems: "center",
+    marginBottom: 12,
   },
-  listLabel: {
+  ctaBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: "#FFFFFF",
+  },
+
+  // Choose another
+  chooseAnotherBtn: {
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  chooseAnotherText: {
     fontFamily: "Inter_500Medium",
+<<<<<<< HEAD
     fontSize: 10,
     color: C.warmGray,
     letterSpacing: 2,
@@ -352,5 +494,9 @@ const s = StyleSheet.create({
     textAlign: "center",
     lineHeight: 20,
     maxWidth: 240,
+=======
+    fontSize: 14,
+    color: TEAL,
+>>>>>>> claude/plan-app-architecture-73RnI
   },
 });

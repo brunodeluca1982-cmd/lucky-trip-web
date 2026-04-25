@@ -42,6 +42,7 @@ import { AppState, type AppStateStatus, type ImageSourcePropType } from "react-n
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+<<<<<<< HEAD
 import type { ItineraryResult } from "@/utils/buildItinerary";
 
 // ── Date helpers ───────────────────────────────────────────────────────────────
@@ -51,6 +52,9 @@ function safeDate(value: unknown): Date | null {
   const date = new Date(value as any);
   return isNaN(date.getTime()) ? null : date;
 }
+=======
+import { buildMediaUrl } from "@/lib/mediaUrl";
+>>>>>>> claude/plan-app-architecture-73RnI
 
 // ── Storage keys ───────────────────────────────────────────────────────────────
 
@@ -63,13 +67,14 @@ export type PaywallType = "discovery" | "lucky" | "depth";
 
 // ── SavedItem ─────────────────────────────────────────────────────────────────
 
-export type SavedCategory = "oQueFazer" | "restaurante" | "hotel" | "lucky";
+export type SavedCategory = "oQueFazer" | "restaurante" | "hotel" | "lucky" | "atividade" | "praia" | "compras" | "dica_secreta" | "bar" | "cafe";
 
 /**
  * Valid Supabase table names for internal entities.
  * Used as the authoritative routing key — must match the actual DB table.
  */
 export type SourceTable =
+  | "lugares"
   | "restaurantes"
   | "stay_hotels"
   | "o_que_fazer_rio_v2"
@@ -78,20 +83,45 @@ export type SourceTable =
 /** Maps UI category to the Supabase source table. */
 export function sourceTableFromCategoria(categoria: SavedCategory): SourceTable {
   switch (categoria) {
+<<<<<<< HEAD
     case "restaurante": return "restaurantes";
     case "hotel":       return "stay_hotels";
     case "oQueFazer":   return "o_que_fazer_rio_v2";
     case "lucky":       return "lucky_list_rio_v2";
+=======
+    case "restaurante":
+    case "bar":
+    case "cafe":
+      return "lugares";
+    case "hotel":
+      return "lugares";
+    case "oQueFazer":
+    case "atividade":
+    case "praia":
+    case "compras":
+    case "dica_secreta":
+      return "lugares";
+    case "lucky":
+      return "lugares";
+>>>>>>> claude/plan-app-architecture-73RnI
   }
 }
 
 /** Maps Supabase source table back to UI category. */
 export function categoriaFromSourceTable(table: SourceTable): SavedCategory {
   switch (table) {
+<<<<<<< HEAD
     case "restaurantes":       return "restaurante";
     case "stay_hotels":        return "hotel";
     case "o_que_fazer_rio_v2": return "oQueFazer";
     case "lucky_list_rio_v2":  return "lucky";
+=======
+    case "lugares":         return "oQueFazer"; // Default for universal lugares table
+    case "restaurantes":    return "restaurante";
+    case "stay_hotels":     return "hotel";
+    case "o_que_fazer_rio": return "oQueFazer";
+    case "lucky_list_rio":  return "lucky";
+>>>>>>> claude/plan-app-architecture-73RnI
   }
 }
 
@@ -432,7 +462,7 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
             titulo:       (row.titulo as string | null) ?? "",
             localizacao:  (row.localizacao as string | null) ?? "",
             image:        (row.image_url as string | null)
-                            ? { uri: row.image_url as string }
+                            ? { uri: buildMediaUrl(row.image_url as string) }
                             : { uri: "" },
           }));
 

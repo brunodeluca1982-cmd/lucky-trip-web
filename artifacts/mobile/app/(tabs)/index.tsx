@@ -1,10 +1,11 @@
-import React, { useRef } from "react";
+// app/(tabs)/index.tsx — HomeScreen v3 (features completas)
+import React, { useState, useRef, useEffect } from "react";
 import {
   Animated,
-  ActivityIndicator,
   Dimensions,
+  FlatList,
   Image,
-  ImageBackground,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -12,13 +13,22 @@ import {
   Text,
   View,
 } from "react-native";
+<<<<<<< HEAD
 import { RotatingBackground } from "@/components/RotatingBackground";
 
+=======
+import * as Haptics from "expo-haptics";
+import { BlurView } from "expo-blur";
+>>>>>>> claude/plan-app-architecture-73RnI
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather, Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
+import { supabase } from "@/lib/supabase";
+import { useDestaques, Destaque } from "@/hooks/useDestaques";
+import { useAmigos } from "@/hooks/useFriends";
 
+<<<<<<< HEAD
 import { AppHeader } from "@/components/AppHeader";
 import { HeroCarousel } from "@/components/HeroCarousel";
 import { HorizontalScroll } from "@/components/HorizontalScroll";
@@ -32,51 +42,162 @@ import { useOQueFazer } from "@/hooks/useOQueFazer";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import { useFriends, type FriendCard } from "@/hooks/useFriends";
 import { useHeroComposed } from "@/hooks/useHeroComposed";
+=======
+// ═══════════════════════════════════════════════════════════════════════════
+// LOGO ASSET
+// ═══════════════════════════════════════════════════════════════════════════
+const LOGO_WHITE = require("@/assets/images/logo_symbol_white.png");
+>>>>>>> claude/plan-app-architecture-73RnI
 
-// ── Context-aware "O que fazer agora" title ───────────────────────────────────
-// Prepositions for known destinations (Portuguese grammar)
-const DESTINO_PREP: Record<string, string> = {
-  "Rio de Janeiro":   "no Rio de Janeiro",
-  "São Paulo":        "em São Paulo",
-  "Belo Horizonte":   "em Belo Horizonte",
-  "Florianópolis":    "em Florianópolis",
-  "Santorini":        "em Santorini",
-  "Kyoto":            "em Kyoto",
-  "Paris":            "em Paris",
-  "Lisboa":           "em Lisboa",
-};
+// ═══════════════════════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════════════════════
+const PETROL = "#1B4F72";
+const { width: W, height: H } = Dimensions.get("window");
+const SUPABASE = "https://bkwlximkadmlnbgjcrdp.supabase.co";
+const FALLBACK = `${SUPABASE}/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero01.jpg`;
+const RIO_DESTINO_ID = "7f047742-427f-4b11-8286-781af899c57d";
 
-// Priority: user location (future) → active trip → fallback
-function getAgoraTitle(tripDestino?: string): string {
-  // 1. User location: not available in this build (expo-location not installed)
-  // 2. Active trip
-  if (tripDestino) {
-    const prep = DESTINO_PREP[tripDestino] ?? `em ${tripDestino}`;
-    return `O que fazer agora ${prep}`;
+// ═══════════════════════════════════════════════════════════════════════════
+// TYPES
+// ═══════════════════════════════════════════════════════════════════════════
+type AgoraItem = { id: string; titulo: string; sub: string; tag: string; foto: string };
+type LucklistItem = { id: string; titulo: string; sub: string; foto: string };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════════════════════════════
+function shuffleArray<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
   }
-  // 3. Fallback
-  return "O que fazer agora";
+  return a;
 }
 
-const C = Colors.light;
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const CARD_W = (SCREEN_WIDTH - 48 - 12) / 2;
+// ═══════════════════════════════════════════════════════════════════════════
+// HOOKS
+// ═══════════════════════════════════════════════════════════════════════════
+function useHeroPhotos() {
+  const [photos, setPhotos] = useState<string[]>([FALLBACK]);
 
+<<<<<<< HEAD
 // ── Thin hairline between sections ───────────────────────────────────────────
 function Divider() {
   return <View style={s.divider} />;
+=======
+  useEffect(() => {
+    supabase.storage.from("media").list("rio-de-janeiro/hero/foto").then(({ data }) => {
+      if (data && data.length > 0) {
+        const urls = data
+          .filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f.name))
+          .map(f => `${SUPABASE}/storage/v1/object/public/media/rio-de-janeiro/hero/foto/${f.name}`);
+        if (urls.length > 0) setPhotos(shuffleArray(urls));
+      }
+    });
+  }, []);
+
+  return photos;
+>>>>>>> claude/plan-app-architecture-73RnI
 }
 
-// ── Lucky List dark editorial block — powered by Supabase ────────────────────
-function LuckyHighlight() {
-  const { lugares, loading } = useLuckyList();
-  const picks = lugares.slice(0, 3);
+// Builds full Supabase storage URL from relative path
+function buildMediaUrl(path: string | null | undefined): string {
+  if (!path) return FALLBACK;
+  if (path.startsWith("http")) return path;
+  return `${SUPABASE}/storage/v1/object/public/media/${path}`;
+}
+
+// Hook para buscar "Agora no Rio" de destino_destaques
+function useAgoraNoRio(destinoId: string) {
+  const [items, setItems] = useState<AgoraItem[]>([]);
+
+  useEffect(() => {
+    supabase
+      .from("destino_destaques")
+      .select("id, lugar_id, titulo_override, ordem, lugares(id, nome, hero_image_url, bairro_id, bairros(nome))")
+      .eq("destino_id", destinoId)
+      .eq("ativo", true)
+      .order("ordem")
+      .limit(6)
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          const mapped: AgoraItem[] = data.map((item: any) => ({
+            id: item.lugar_id || item.id,
+            titulo: item.titulo_override || item.lugares?.nome || "Lugar",
+            sub: item.lugares?.bairros?.nome || "",
+            tag: "AGORA",
+            foto: buildMediaUrl(item.lugares?.hero_image_url),
+          }));
+          setItems(mapped);
+        }
+      });
+  }, [destinoId]);
+
+  return items;
+}
+
+// Hook para buscar lucklists do destino
+function useLucklists(destinoId: string) {
+  const [items, setItems] = useState<LucklistItem[]>([]);
+
+  useEffect(() => {
+    // Primeiro busca a lucklist do destino
+    supabase
+      .from("lucklists")
+      .select("id, titulo, subtitulo, capa_url")
+      .eq("destino_id", destinoId)
+      .eq("ativo", true)
+      .order("ordem")
+      .limit(1)
+      .single()
+      .then(({ data: lucklist }) => {
+        if (!lucklist) return;
+
+        // Depois busca os lugares dessa lucklist
+        supabase
+          .from("lucklist_lugares")
+          .select("lugar_id, lugares(id, nome, hero_image_url, bairro_id, bairros(nome))")
+          .eq("lucklist_id", lucklist.id)
+          .limit(6)
+          .then(({ data }) => {
+            if (data && data.length > 0) {
+              const mapped: LucklistItem[] = data.map((item: any) => ({
+                id: item.lugar_id || item.id,
+                titulo: item.lugares?.nome || "Lugar",
+                sub: item.lugares?.bairros?.nome || "",
+                foto: buildMediaUrl(item.lugares?.hero_image_url),
+              }));
+              setItems(mapped);
+            }
+          });
+      });
+  }, [destinoId]);
+
+  return items;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COMPONENTS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function TopBar({ top, onMusicPress, onGalleryPress }: { top: number; onMusicPress: () => void; onGalleryPress: () => void }) {
   return (
-    <View style={s.luckyBlock}>
-      <View style={s.luckyHeader}>
-        <Text style={s.luckyAccentText}>✦ LUCKY LIST</Text>
-        <View style={s.luckyAccentLine} />
+    <View style={[styles.topBar, { paddingTop: top + 8 }]}>
+      {/* Espaço vazio no lugar do botão voltar (home não tem tela anterior) */}
+      <View style={styles.topLeftSpacer} />
+      {/* Logo cursiva oficial */}
+      <Image source={LOGO_WHITE} style={styles.logo} resizeMode="contain" />
+      <View style={styles.topRight}>
+        <Pressable style={styles.iconBtn} onPress={onMusicPress}>
+          <Ionicons name="musical-notes" size={18} color="#FFF" />
+        </Pressable>
+        <Pressable style={styles.iconBtn} onPress={onGalleryPress}>
+          <Ionicons name="play" size={16} color="#FFF" />
+        </Pressable>
       </View>
+<<<<<<< HEAD
       <Text style={s.luckyHeadline}>Seu Rio mais Lucky</Text>
       <Text style={s.luckySubtitle}>
         Os segredos que poucos conhecem. Curadoria feita à mão, atualizada quando vale a pena.
@@ -110,100 +231,392 @@ function LuckyHighlight() {
       >
         <Text style={s.luckyBtnText}>✦  Ver Lucky List completa</Text>
       </Pressable>
+=======
+>>>>>>> claude/plan-app-architecture-73RnI
     </View>
   );
 }
 
-// ── Friend card (2-col grid) — dados reais do Supabase ───────────────────────
-const FRIEND_FALLBACK = require("../../assets/images/carol-dieckmann.jpg");
+// ═══════════════════════════════════════════════════════════════════════════
+// HeroDestaque: carrossel com swipe horizontal + auto-play
+// ═══════════════════════════════════════════════════════════════════════════
+function HeroDestaque({
+  top,
+  destaques,
+  carouselIdx,
+  setCarouselIdx,
+  flatListRef,
+  rioPhotos,
+  rioBgIdx,
+}: {
+  top: number;
+  destaques: Destaque[];
+  carouselIdx: number;
+  setCarouselIdx: (idx: number) => void;
+  flatListRef: React.RefObject<FlatList | null>;
+  rioPhotos: string[];
+  rioBgIdx: number;
+}) {
+  // Handle swipe end — update carouselIdx
+  const onMomentumScrollEnd = (e: any) => {
+    const idx = Math.round(e.nativeEvent.contentOffset.x / W);
+    if (idx !== carouselIdx && idx >= 0 && idx < destaques.length) {
+      setCarouselIdx(idx);
+    }
+  };
 
-function InfluencerCard({ influencer }: { influencer: FriendCard }) {
-  const imgSource = influencer.profile_photo_url
-    ? { uri: influencer.profile_photo_url }
-    : influencer.cover_photo_url
-    ? { uri: influencer.cover_photo_url }
-    : FRIEND_FALLBACK;
+  // Render each destaque slide
+  const renderItem = ({ item, index }: { item: Destaque; index: number }) => {
+    const isAmigo = item.tipo === "amigo";
+    const isRio = item.tipo === "destino" && item.titulo === "Rio de Janeiro";
+    const photoUrl = isRio ? (rioPhotos[rioBgIdx] || FALLBACK) : (item.photo_url || FALLBACK);
 
-  return (
-    <Pressable
-      style={({ pressed }) => [pressed && { opacity: 0.90, transform: [{ scale: 0.97 }] }]}
-      onPress={() => router.push({ pathname: "/friend/[slug]", params: { slug: influencer.slug } })}
-    >
-      <ImageBackground
-        source={imgSource}
-        style={s.influencerCard}
-        resizeMode="cover"
-        imageStyle={s.influencerImageStyle}
-      >
+    const handlePress = () => {
+      switch (item.tipo) {
+        case "destino":
+          // Navega para /cidade/[id] - mesma página do menu "Pra onde?"
+          router.push({ pathname: "/cidade/[id]", params: { id: item.destino_slug } });
+          break;
+        case "amigo":
+          // Navega para /amigo/[slug] usando entity_id para buscar o amigo
+          if (item.entity_id) {
+            router.push(`/amigo/${item.entity_id}`);
+          }
+          break;
+        case "lugar":
+        case "restaurante":
+        case "bar":
+        case "atividade":
+        case "evento":
+        case "luckylist":
+          if (item.entity_id) {
+            router.push(`/lugar/${item.entity_id}`);
+          }
+          break;
+      }
+    };
+
+    return (
+      <Pressable style={styles.heroSlide} onPress={handlePress}>
+        <Image source={{ uri: photoUrl }} style={styles.heroDestaqueImage} />
         <LinearGradient
-          colors={["rgba(0,0,0,0.00)", "rgba(0,0,0,0.45)", "rgba(0,0,0,0.72)"]}
-          locations={[0.30, 0.65, 1]}
+          colors={["rgba(0,0,0,0.2)", "rgba(0,0,0,0.5)", "rgba(10,10,10,1)"]}
+          locations={[0, 0.6, 1]}
           style={StyleSheet.absoluteFill}
         />
-        <View style={s.influencerBadge}>
-          <Feather name="map" size={10} color={C.white} />
-          <Text style={s.influencerBadgeText}>
-            Roteiros: {String(influencer.guide_count).padStart(2, "0")}
-          </Text>
+        <View style={[styles.heroTitleContainer, { paddingTop: top + 70 }]}>
+          <Text style={styles.heroKicker}>{isAmigo ? "VIAJE COM" : "DESTINO"}</Text>
+          <Text style={styles.heroTitleText}>{item.titulo}</Text>
+          <Text style={styles.heroSub}>{item.subtitulo}</Text>
+          {!isAmigo && <Text style={styles.heroPais}>BRASIL</Text>}
         </View>
-        <Text style={s.influencerName}>{influencer.display_name}</Text>
-      </ImageBackground>
-    </Pressable>
+      </Pressable>
+    );
+  };
+
+  if (destaques.length === 0) {
+    return (
+      <View style={styles.heroDestaque}>
+        <Image source={{ uri: FALLBACK }} style={styles.heroDestaqueImage} />
+        <LinearGradient colors={["rgba(0,0,0,0.2)", "rgba(0,0,0,0.5)", "rgba(10,10,10,1)"]} locations={[0, 0.6, 1]} style={StyleSheet.absoluteFill} />
+        <View style={[styles.heroTitleContainer, { paddingTop: top + 70 }]}>
+          <Text style={styles.heroKicker}>DESTINO</Text>
+          <Text style={styles.heroTitleText}>Rio de Janeiro</Text>
+          <Text style={styles.heroSub}>Carregando...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.heroDestaque}>
+      <FlatList
+        ref={flatListRef}
+        data={destaques}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.id}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={onMomentumScrollEnd}
+        getItemLayout={(_, index) => ({ length: W, offset: W * index, index })}
+        initialScrollIndex={0}
+      />
+      {/* Dots indicator */}
+      <View style={styles.dotsContainer}>
+        {destaques.slice(0, 8).map((_, i) => (
+          <View key={i} style={[styles.dot, i === carouselIdx && styles.dotActive]} />
+        ))}
+      </View>
+    </View>
   );
 }
 
-// ── Criar roteiro CTA ─────────────────────────────────────────────────────────
-function RoteiroCTA() {
+function InputBar() {
   return (
-    <View style={s.ctaBlock}>
-      <LinearGradient
-        colors={["rgba(255,255,255,0.06)", "rgba(255,255,255,0.02)"]}
-        style={StyleSheet.absoluteFill}
-      />
-      <Text style={s.ctaEyebrow}>ORGANIZE SUA PRÓXIMA VIAGEM</Text>
-      <Text style={s.ctaHeadline}>Monte seu roteiro personalizado</Text>
-      <Text style={s.ctaSub}>
-        Use nosso planejador intuitivo para criar experiências únicas no seu destino.
-      </Text>
-      <Pressable style={s.ctaBtn} onPress={() => router.push("/roteiro")}>
-        <Feather name="plus" size={15} color={C.white} />
-        <Text style={s.ctaBtnText}>Criar roteiro</Text>
+    <View style={styles.inputWrap}>
+      <View style={styles.inputBar}>
+        <View style={styles.socialIcons}>
+          <View style={[styles.socialIcon, { backgroundColor: "#E1306C" }]}>
+            <Ionicons name="logo-instagram" size={14} color="#FFF" />
+          </View>
+          <View style={[styles.socialIcon, { backgroundColor: "#000" }]}>
+            <Ionicons name="logo-tiktok" size={14} color="#FFF" />
+          </View>
+          <View style={[styles.socialIcon, { backgroundColor: "#FF0000" }]}>
+            <Ionicons name="logo-youtube" size={14} color="#FFF" />
+          </View>
+        </View>
+        <Text style={styles.inputPlaceholder}>Cole um link do Instagram, TikTok...</Text>
+      </View>
+    </View>
+  );
+}
+
+function SectionHeader({ label, right, onPress }: { label: string; right?: string; onPress?: () => void }) {
+  return (
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionLabel}>{label}</Text>
+      {right && (
+        <Pressable style={styles.seeAll} onPress={onPress}>
+          <Text style={styles.seeAllText}>{right}</Text>
+          <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.6)" />
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+function ViajeComEles() {
+  const { amigos } = useAmigos();
+
+  // Divide nome em nome + sobrenome para exibição
+  const formatNome = (nome: string) => {
+    const partes = nome.split(" ");
+    return { nome: partes[0], sobrenome: partes.slice(1).join(" ") };
+  };
+
+  if (amigos.length === 0) return null;
+
+  return (
+    <View style={styles.sectionFrameOuter}>
+      <BlurView intensity={40} tint="dark" style={styles.sectionBlur}>
+        <View style={styles.sectionFrameInner}>
+          <View style={styles.viajeHeader}>
+            <Text style={styles.sectionLabel}>VIAJE COM ELES</Text>
+            <Pressable style={styles.seeAll} onPress={() => router.push("/amigo/all")}>
+              <Text style={styles.seeAllText}>Ver todos</Text>
+              <Ionicons name="chevron-forward" size={14} color={PETROL} />
+            </Pressable>
+          </View>
+          <View style={styles.viajeRow}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.amigosRow}>
+              {amigos.map(a => {
+                const { nome, sobrenome } = formatNome(a.nome);
+                return (
+                  <Pressable key={a.id} style={styles.amigoItem} onPress={() => router.push(`/amigo/${a.slug}`)}>
+                    <Image source={{ uri: a.foto_url || FALLBACK }} style={styles.amigoFoto} />
+                    <Text style={styles.amigoNome}>{nome}</Text>
+                    <Text style={styles.amigoSobrenome}>{sobrenome}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+            {/* Seta à direita */}
+            <Pressable style={styles.viajeArrow} onPress={() => router.push("/amigo/all")}>
+              <Ionicons name="chevron-forward" size={20} color={PETROL} />
+            </Pressable>
+          </View>
+        </View>
+      </BlurView>
+    </View>
+  );
+}
+
+function AgoraNoDestino({ destinoNome, destinoId }: { destinoNome: string; destinoId: string }) {
+  const items = useAgoraNoRio(destinoId);
+  const nomeFormatado = destinoNome === "Rio de Janeiro" ? "RIO" : destinoNome.toUpperCase();
+
+  if (items.length === 0) return null;
+
+  return (
+    <View style={styles.sectionFrameOuter}>
+      <BlurView intensity={40} tint="dark" style={styles.sectionBlur}>
+        <View style={styles.sectionFrameInner}>
+          <View style={styles.agoraHeader}>
+            <View>
+              <Text style={styles.sectionLabel}>AGORA NO {nomeFormatado}</Text>
+              <Text style={styles.agoraUpdated}>Atualizado agora</Text>
+            </View>
+            <Pressable style={styles.seeAll} onPress={() => router.push("/(tabs)/agoraNoRio/all")}>
+              <Text style={styles.seeAllText}>Ver todos</Text>
+              <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.6)" />
+            </Pressable>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cardsRowFrame}>
+            {items.map(item => (
+              <Pressable key={item.id} style={styles.card} onPress={() => router.push(`/lugar/${item.id}`)}>
+                <Image source={{ uri: item.foto }} style={styles.cardImg} />
+                <LinearGradient colors={["transparent", "rgba(0,0,0,0.7)"]} style={StyleSheet.absoluteFill} />
+                <View style={styles.cardTag}>
+                  <Text style={styles.cardTagText}>{item.tag}</Text>
+                </View>
+                <View style={styles.cardContent}>
+                  <Text style={styles.cardTitle} numberOfLines={2}>{item.titulo}</Text>
+                  <View style={styles.cardLoc}>
+                    <Ionicons name="location-outline" size={10} color="rgba(255,255,255,0.7)" />
+                    <Text style={styles.cardLocText}>{item.sub}</Text>
+                  </View>
+                </View>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      </BlurView>
+    </View>
+  );
+}
+
+function LucklistsSection({ destinoNome, items }: { destinoNome: string; items: LucklistItem[] }) {
+  const nomeFormatado = destinoNome === "Rio de Janeiro" ? "DO RIO" : `DE ${destinoNome.toUpperCase()}`;
+
+  if (items.length === 0) return null;
+
+  return (
+    <View style={styles.sectionFrameOuter}>
+      <BlurView intensity={40} tint="dark" style={styles.sectionBlur}>
+        <View style={styles.sectionFrameInner}>
+          <SectionHeader label={`LUCKLISTS ${nomeFormatado}`} right="Ver todos >" onPress={() => router.push("/(tabs)/luckyList/all")} />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cardsRowFrame}>
+            {items.map(item => (
+              <Pressable key={item.id} style={styles.card} onPress={() => router.push(`/lugar/${item.id}`)}>
+                <Image source={{ uri: item.foto }} style={styles.cardImg} />
+                <LinearGradient colors={["transparent", "rgba(0,0,0,0.7)"]} style={StyleSheet.absoluteFill} />
+                <View style={styles.cardContent}>
+                  <Text style={styles.cardTitle} numberOfLines={2}>{item.titulo}</Text>
+                  <Text style={styles.cardSub}>{item.sub}</Text>
+                </View>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      </BlurView>
+    </View>
+  );
+}
+
+function TrilhaDaViagem() {
+  const bars = useRef(Array.from({ length: 12 }, () => new Animated.Value(Math.random()))).current;
+
+  useEffect(() => {
+    bars.forEach((bar, i) => {
+      const animate = () => {
+        Animated.sequence([
+          Animated.timing(bar, { toValue: Math.random(), duration: 200 + i * 30, useNativeDriver: false }),
+          Animated.timing(bar, { toValue: Math.random() * 0.5 + 0.2, duration: 200 + i * 30, useNativeDriver: false }),
+        ]).start(animate);
+      };
+      animate();
+    });
+  }, []);
+
+  return (
+    <View style={styles.trilhaSection}>
+      <Text style={styles.sectionLabel}>TRILHA DA VIAGEM</Text>
+      <Pressable style={styles.trilhaCard} onPress={() => router.push("/trilha")}>
+        <Image source={{ uri: FALLBACK }} style={styles.trilhaThumb} />
+        <View style={styles.trilhaText}>
+          <Text style={styles.trilhaTitle}>Rio de Janeiro</Text>
+          <Text style={styles.trilhaSub}>A trilha sonora perfeita para a cidade.</Text>
+          <Text style={styles.trilhaPlaylist}>Playlist by The Lucky Trip</Text>
+        </View>
+        <View style={styles.playBtn}>
+          <Ionicons name="play" size={18} color="#FFF" />
+        </View>
+        <View style={styles.waveform}>
+          {bars.map((bar, i) => (
+            <Animated.View
+              key={i}
+              style={[styles.waveBar, { height: bar.interpolate({ inputRange: [0, 1], outputRange: [4, 20] }) }]}
+            />
+          ))}
+        </View>
       </Pressable>
     </View>
   );
 }
 
-
-// ── Main screen ───────────────────────────────────────────────────────────────
-
-type MomentoTab = "manha" | "tarde" | "noite";
-
-type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
-const MOMENTO_TABS: { key: MomentoTab; label: string; icon: IoniconName }[] = [
-  { key: "manha", label: "Manhã", icon: "partly-sunny-outline" },
-  { key: "tarde", label: "Tarde", icon: "sunny-outline"         },
-  { key: "noite", label: "Noite", icon: "moon-outline"          },
-];
-
-// Determine the current time period automatically.
-// Rules: 05:00–11:59 → manhã | 12:00–17:59 → tarde | 18:00–04:59 → noite
-function getCurrentMomento(): MomentoTab {
-  const hour = new Date().getHours();
-  if (hour >= 5 && hour < 12) return "manha";
-  if (hour >= 12 && hour < 18) return "tarde";
-  return "noite";
+// ── Music Modal ──────────────────────────────────────────────────────────────
+function MusicModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  return (
+    <Modal visible={visible} animationType="slide" transparent>
+      <View style={styles.modalOverlay}>
+        <View style={styles.musicModal}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Trilhas Sonoras</Text>
+            <Pressable onPress={onClose} style={styles.modalClose}>
+              <Ionicons name="close" size={24} color="#FFF" />
+            </Pressable>
+          </View>
+          <Pressable style={styles.playlistItem}>
+            <Image source={{ uri: FALLBACK }} style={styles.playlistThumb} />
+            <View style={styles.playlistInfo}>
+              <Text style={styles.playlistName}>Rio de Janeiro</Text>
+              <Text style={styles.playlistSub}>Trilha Sonora • 42 músicas</Text>
+            </View>
+            <View style={styles.playlistPlay}>
+              <Ionicons name="play" size={20} color="#FFF" />
+            </View>
+          </Pressable>
+          <Text style={styles.comingSoonText}>Mais playlists em breve...</Text>
+        </View>
+      </View>
+    </Modal>
+  );
 }
+
+// ── Gallery Modal ────────────────────────────────────────────────────────────
+function GalleryModal({ visible, onClose, photos }: { visible: boolean; onClose: () => void; photos: string[] }) {
+  const [currentIdx, setCurrentIdx] = useState(0);
+
+  return (
+    <Modal visible={visible} animationType="fade" statusBarTranslucent>
+      <View style={styles.galleryContainer}>
+        <Pressable style={styles.galleryClose} onPress={onClose}>
+          <Ionicons name="close" size={28} color="#FFF" />
+        </Pressable>
+        <FlatList
+          data={photos}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={(e) => {
+            const idx = Math.round(e.nativeEvent.contentOffset.x / W);
+            setCurrentIdx(idx);
+          }}
+          renderItem={({ item }) => (
+            <Image source={{ uri: item }} style={styles.galleryImage} resizeMode="contain" />
+          )}
+          keyExtractor={(item, i) => i.toString()}
+        />
+        <View style={styles.galleryDots}>
+          <Text style={styles.galleryCounter}>{currentIdx + 1} / {photos.length}</Text>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MAIN SCREEN
+// ═══════════════════════════════════════════════════════════════════════════
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
-  const { viagem } = useGuia();
-  const agoraTitle = getAgoraTitle(viagem.destino || undefined);
-  const { lugares: atividades, loading: loadingAtividades } = useOQueFazer();
-  const { restaurantes: restos, loading: loadingRestos } = useRestaurants();
-  const { friends, loading: loadingFriends } = useFriends();
-  const momentoTab = getCurrentMomento();
+  const top = Platform.OS === "web" ? 0 : insets.top;
+  const bottom = Platform.OS === "web" ? 34 : insets.bottom;
 
+<<<<<<< HEAD
   // ── Hero items — useHeroComposed (REAL Supabase data) ───────────────────────
   // 5 slots: restaurante + o_que_fazer + lucky + friend + rio
   // photo_url comes directly from each entity. Navigation per source_table.
@@ -217,12 +630,22 @@ export default function HomeScreen() {
     });
     return filtered.length > 0 ? filtered : atividades.slice(0, 10);
   }, [atividades, momentoTab]);
+=======
+  const photos = useHeroPhotos();
+  const { destaques } = useDestaques();
+  const lucklistItems = useLucklists(RIO_DESTINO_ID);
+  const [musicModalVisible, setMusicModalVisible] = useState(false);
+  const [galleryModalVisible, setGalleryModalVisible] = useState(false);
+>>>>>>> claude/plan-app-architecture-73RnI
 
-  // ── Hero background animation ─────────────────────────────────────────────
-  // overlayAnim starts at 0 so the dark editorial overlay is invisible until
-  // the hero image is actually displayed — content always lands on a warm bg.
-  const overlayAnim = useRef(new Animated.Value(0)).current;
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SISTEMA 1 — BACKGROUND (13 segundos, todas as fotos do bucket hero/foto)
+  // ═══════════════════════════════════════════════════════════════════════════
+  const [bgIdx, setBgIdx] = useState(0);
+  const bgIdxRef = useRef(0);
+  const bgFade = useRef(new Animated.Value(1)).current;
 
+<<<<<<< HEAD
   function handleHeroDisplay() {
     Animated.timing(overlayAnim, {
       toValue: 1,
@@ -238,27 +661,72 @@ export default function HomeScreen() {
         <RotatingBackground
           onFirstImageDisplay={handleHeroDisplay}
         />
+=======
+  useEffect(() => { bgIdxRef.current = bgIdx; }, [bgIdx]);
+
+  useEffect(() => {
+    if (photos.length <= 1) return;
+    const interval = setInterval(() => {
+      const nextIdx = (bgIdxRef.current + 1) % photos.length;
+      bgFade.setValue(0);
+      setBgIdx(nextIdx);
+      Animated.timing(bgFade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+    }, 13000);
+    return () => clearInterval(interval);
+  }, [photos.length]);
+
+  const currentBgPhoto = photos[bgIdx] || FALLBACK;
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SISTEMA 2 — CARROSSEL DE DESTAQUES (5 segundos, swipeable)
+  // ═══════════════════════════════════════════════════════════════════════════
+  const [carouselIdx, setCarouselIdx] = useState(0);
+  const carouselIdxRef = useRef(0);
+  const heroFlatListRef = useRef<FlatList>(null);
+
+  useEffect(() => { carouselIdxRef.current = carouselIdx; }, [carouselIdx]);
+
+  // Auto-advance every 5 seconds
+  useEffect(() => {
+    if (destaques.length <= 1) return;
+    const interval = setInterval(() => {
+      const nextIdx = (carouselIdxRef.current + 1) % destaques.length;
+      setCarouselIdx(nextIdx);
+      // Scroll FlatList to the new index
+      heroFlatListRef.current?.scrollToIndex({ index: nextIdx, animated: true });
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [destaques.length]);
+
+  // Nome do destino atual (para seções dinâmicas)
+  const currentDestino = destaques[carouselIdx];
+  const destinoNome = currentDestino?.tipo === "destino" ? currentDestino.titulo : "Rio de Janeiro";
+
+  return (
+    <View style={styles.root}>
+      {/* ═══ BACKGROUND: só visível abaixo do primeiro terço ═══ */}
+      <View style={styles.bgContainer}>
+        <Animated.Image source={{ uri: currentBgPhoto }} style={[styles.bgImage, { opacity: bgFade }]} resizeMode="cover" />
+        <View style={styles.overlay} />
+        <LinearGradient colors={["transparent", "rgba(0,0,0,0.55)"]} locations={[0.3, 1]} style={StyleSheet.absoluteFill} />
+>>>>>>> claude/plan-app-architecture-73RnI
       </View>
-      {/* Editorial overlay fades in WITH the image — never darkens a black canvas */}
-      <Animated.View
-        style={[StyleSheet.absoluteFill, { opacity: overlayAnim }]}
-        pointerEvents="none"
-      >
-        <LinearGradient
-          colors={["rgba(0,0,0,0.44)", "rgba(0,0,0,0.56)", "rgba(0,0,0,0.70)"]}
-          locations={[0, 0.38, 1]}
-          style={StyleSheet.absoluteFill}
-        />
-      </Animated.View>
 
-      <AppHeader transparent />
+      {/* ═══ HERO DESTAQUE: primeiro terço com crossFade próprio ═══ */}
+      <HeroDestaque
+        top={top}
+        destaques={destaques}
+        carouselIdx={carouselIdx}
+        setCarouselIdx={setCarouselIdx}
+        flatListRef={heroFlatListRef}
+        rioPhotos={photos}
+        rioBgIdx={bgIdx}
+      />
 
-      <ScrollView
-        style={s.scroll}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: bottomPad + 80 }}
-      >
+      {/* TopBar */}
+      <TopBar top={top} onMusicPress={() => setMusicModalVisible(true)} onGalleryPress={() => setGalleryModalVisible(true)} />
 
+<<<<<<< HEAD
         {/* ── 1. HERO CAROUSEL — Always rendered (Supabase + canonical fallback) ── */}
         <HeroCarousel items={heroItems} />
 
@@ -389,302 +857,157 @@ export default function HomeScreen() {
           />
           <Text style={s.footerTagline}>inteligência humana em viagens</Text>
         </View>
+=======
+      {/* Modals */}
+      <MusicModal visible={musicModalVisible} onClose={() => setMusicModalVisible(false)} />
+      <GalleryModal visible={galleryModalVisible} onClose={() => setGalleryModalVisible(false)} photos={photos} />
 
+      {/* Content */}
+      <ScrollView style={styles.scroll} contentContainerStyle={{ paddingBottom: bottom + 90, paddingTop: H * 0.38 }} showsVerticalScrollIndicator={false}>
+        {/* Input */}
+        <InputBar />
+>>>>>>> claude/plan-app-architecture-73RnI
+
+        {/* Sections */}
+        <ViajeComEles />
+        <AgoraNoDestino destinoNome={destinoNome} destinoId={RIO_DESTINO_ID} />
+        <LucklistsSection destinoNome={destinoNome} items={lucklistItems} />
+        <TrilhaDaViagem />
       </ScrollView>
     </View>
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// STYLES
+// ═══════════════════════════════════════════════════════════════════════════
 
-const s = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: "#1A0E04",
-  },
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: "#0A0A0A" },
+  scroll: { flex: 1 },
 
-  // ── Background ──
-  bgImage: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    width: "100%",
-    height: "100%",
-    opacity: 0.50,
-  },
+  // Background (só visível abaixo do primeiro terço)
+  bgContainer: { position: "absolute", top: H * 0.38, left: 0, right: 0, bottom: 0, overflow: "hidden" },
+  bgImage: { position: "absolute", width: W, height: H, top: -H * 0.38 },
+  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.25)" },
 
-  scroll: {
-    flex: 1,
-  },
+  // HeroDestaque (primeiro terço - fundo sólido, crossFade próprio)
+  heroDestaque: { position: "absolute", top: 0, left: 0, right: 0, height: H * 0.38, backgroundColor: "#000", zIndex: 5 },
+  heroSlide: { width: W, height: H * 0.38 },
+  heroDestaqueImage: { position: "absolute", width: "100%", height: "100%" },
 
-  section: {
-    paddingTop: 24,
-    paddingBottom: 8,
-  },
+  // TopBar
+  topBar: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 10, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16 },
+  topLeftSpacer: { width: 40 },
+  logo: { width: 36, height: 36 },
+  topRight: { flexDirection: "row", gap: 8 },
+  iconBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(0,0,0,0.35)", alignItems: "center", justifyContent: "center" },
 
-  // Subtle hairline — barely visible on dark bg
-  divider: {
-    height: 1,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    marginHorizontal: 24,
-    marginTop: 18,
-  },
+  // Hero Title (at top)
+  heroTitleContainer: { paddingHorizontal: 20 },
+  heroKicker: { fontFamily: "Inter_500Medium", fontSize: 11, letterSpacing: 2, color: "rgba(255,255,255,0.8)", marginBottom: 6 },
+  heroTitleText: { fontFamily: "PlayfairDisplay_700Bold", fontSize: 38, color: "#FFF", marginBottom: 6 },
+  heroSub: { fontFamily: "Inter_400Regular", fontSize: 15, color: "rgba(255,255,255,0.9)", marginBottom: 6 },
+  heroPais: { fontFamily: "Inter_500Medium", fontSize: 11, letterSpacing: 3, color: "rgba(255,255,255,0.7)" },
+  dotsContainer: { position: "absolute", bottom: 16, left: 0, right: 0, flexDirection: "row", justifyContent: "center", gap: 6 },
+  dots: { flexDirection: "row", gap: 4, marginTop: 10 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.4)" },
+  dotActive: { width: 18, backgroundColor: "#FFF" },
 
-  // ── Momento tabs (manhã / tarde / noite) ──
-  momentoTabs: {
-    flexDirection: "row",
-    gap: 8,
-    paddingHorizontal: 24,
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  momentoTab: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.22)",
-    backgroundColor: "rgba(255,255,255,0.06)",
-  },
-  momentoTabActive: {
-    backgroundColor: "#C9A84C",
-    borderColor: "#C9A84C",
-  },
-  momentoTabText: {
-    fontFamily: "Inter",
-    fontSize: 12,
-    fontWeight: "600",
-    color: "rgba(255,255,255,0.65)",
-    letterSpacing: 0.4,
-  },
-  momentoTabTextActive: {
-    color: "#1a1a1a",
-  },
+  // Input - glass style
+  inputWrap: { paddingHorizontal: 16, marginBottom: 12 },
+  inputBar: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 12, height: 44, paddingHorizontal: 10, borderWidth: 1, borderColor: "rgba(255,255,255,0.3)" },
+  socialIcons: { flexDirection: "row", gap: 4 },
+  socialIcon: { width: 28, height: 28, borderRadius: 6, alignItems: "center", justifyContent: "center" },
+  inputPlaceholder: { flex: 1, marginLeft: 10, fontFamily: "Inter_400Regular", fontSize: 13, color: "rgba(255,255,255,0.6)" },
 
-  // ── 2-column grid ──
-  grid2: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    paddingHorizontal: 24,
-    gap: 12,
-  },
+  // Sections - compact
+  sectionCompact: { marginBottom: 8 },
+  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 14, marginBottom: 8 },
+  sectionLabel: { fontFamily: "Inter_600SemiBold", fontSize: 11, letterSpacing: 1.5, color: "rgba(255,255,255,0.7)", textTransform: "uppercase" },
+  seeAll: { flexDirection: "row", alignItems: "center", gap: 2 },
+  seeAllText: { fontFamily: "Inter_500Medium", fontSize: 12, color: "rgba(255,255,255,0.6)" },
 
-  // ── Lucky List highlight ──
-  luckyBlock: {
-    marginTop: 24,
-    marginHorizontal: 24,
-    borderRadius: 22,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(201,168,76,0.24)",
-    backgroundColor: "rgba(0,0,0,0.65)",
-    padding: 24,
-    boxShadow: "0px 6px 28px rgba(201,168,76,0.08)",
-  },
-  luckyHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
+  // Glassmorphism frame (estilo iOS widget / Instagram)
+  sectionFrameOuter: {
+    marginHorizontal: 12,
     marginBottom: 16,
-  },
-  luckyAccentText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 10,
-    color: C.gold,
-    letterSpacing: 2.5,
-  },
-  luckyAccentLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "rgba(201,168,76,0.20)",
-  },
-  luckyHeadline: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 22,
-    color: C.white,
-    lineHeight: 30,
-    letterSpacing: -0.2,
-    marginBottom: 8,
-  },
-  luckySubtitle: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: "rgba(255,255,255,0.55)",
-    lineHeight: 20,
-    marginBottom: 20,
-  },
-  luckyPicks: {
-    marginBottom: 20,
-  },
-  luckyPickRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(201,168,76,0.08)",
-  },
-  luckyPickStar: {
-    fontSize: 10,
-    color: C.gold,
-    width: 18,
-    textAlign: "center",
-  },
-  luckyPickText: {
-    flex: 1,
-  },
-  luckyPickTitle: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 14,
-    color: C.white,
-    lineHeight: 20,
-  },
-  luckyPickLoc: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    color: "rgba(201,168,76,0.55)",
-    marginTop: 1,
-  },
-  luckyBtn: {
+    borderRadius: 20,
+    overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(201,168,76,0.40)",
-    borderRadius: 14,
+    borderColor: "rgba(255,255,255,0.18)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  sectionBlur: {
+    borderRadius: 20,
+    overflow: "hidden",
+  },
+  sectionFrameInner: {
     paddingVertical: 14,
-    alignItems: "center",
-    backgroundColor: "rgba(201,168,76,0.09)",
+    backgroundColor: "rgba(255,255,255,0.05)",
   },
-  luckyBtnText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-    color: C.gold,
-    letterSpacing: 0.3,
-  },
+  cardsRowFrame: { paddingHorizontal: 12, gap: 10 },
 
-  // ── Influencer card ──
-  influencerCard: {
-    width: CARD_W,
-    height: CARD_W * 1.22,
-    borderRadius: 18,
-    overflow: "hidden",
-    backgroundColor: "#1A1208",
-    position: "relative",
-    justifyContent: "flex-end",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-  influencerImageStyle: {
-    borderRadius: 18,
-  },
-  influencerBadge: {
-    position: "absolute",
-    top: 10,
-    left: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: "rgba(0,0,0,0.50)",
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-  },
-  influencerBadgeText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 10,
-    color: C.white,
-    letterSpacing: 0.2,
-  },
-  influencerName: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-    color: C.white,
-    lineHeight: 18,
-    padding: 12,
-    paddingTop: 6,
-  },
+  // Viaje com eles
+  viajeHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 14, marginBottom: 8 },
+  viajeRow: { flexDirection: "row", alignItems: "center" },
+  viajeArrow: { width: 32, height: 56, alignItems: "center", justifyContent: "center", marginRight: 6 },
+  amigosRow: { paddingLeft: 14, gap: 12, alignItems: "center" },
+  amigoItem: { alignItems: "center", width: 60 },
+  amigoFoto: { width: 56, height: 56, borderRadius: 28, marginBottom: 6 },
+  amigoNome: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: "#FFF", textAlign: "center" },
+  amigoSobrenome: { fontFamily: "Inter_400Regular", fontSize: 10, color: "rgba(255,255,255,0.7)", textAlign: "center" },
 
-  // ── CTA block — glass card ──
-  ctaBlock: {
-    marginTop: 24,
-    marginHorizontal: 24,
-    borderRadius: 22,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    padding: 28,
-  },
-  ctaEyebrow: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 10,
-    color: C.terracotta,
-    letterSpacing: 2,
-    marginBottom: 10,
-  },
-  ctaHeadline: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 22,
-    color: C.white,
-    lineHeight: 30,
-    letterSpacing: -0.2,
-    marginBottom: 10,
-  },
-  ctaSub: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    color: "rgba(255,255,255,0.52)",
-    lineHeight: 22,
-    marginBottom: 22,
-  },
-  ctaBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: C.terracotta,
-    borderRadius: 12,
-    paddingVertical: 15,
-  },
-  ctaBtnText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
-    color: C.white,
-    letterSpacing: 0.3,
-  },
+  // Agora no Rio
+  agoraHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", paddingHorizontal: 14, marginBottom: 8 },
+  agoraUpdated: { fontFamily: "Inter_400Regular", fontSize: 10, color: "rgba(255,255,255,0.5)", marginTop: 2 },
 
-  // ── Footer ──
-  footer: {
-    marginTop: 48,
-    marginHorizontal: 24,
-    paddingTop: 28,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.08)",
-    alignItems: "center",
-    gap: 10,
-    paddingBottom: 8,
-  },
-  footerLogo: {
-    width: 110,
-    height: 32,
-    opacity: 0.65,
-  },
-  footerTagline: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 10,
-    color: "rgba(255,255,255,0.38)",
-    letterSpacing: 2.0,
-    textTransform: "uppercase",
-    textAlign: "center",
-  },
-  footerText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: "rgba(255,255,255,0.28)",
-    textAlign: "center",
-    lineHeight: 20,
-    maxWidth: 240,
-  },
+  // Cards 120x120
+  cardsRow: { paddingHorizontal: 16, gap: 10 },
+  card: { width: 120, height: 120, borderRadius: 10, overflow: "hidden", backgroundColor: "#1A1A1A" },
+  cardImg: { width: "100%", height: "100%" },
+  cardTag: { position: "absolute", top: 8, left: 8, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 4, backgroundColor: PETROL },
+  cardTagText: { fontFamily: "Inter_600SemiBold", fontSize: 10, color: "#FFF", letterSpacing: 0.5 },
+  cardContent: { position: "absolute", bottom: 0, left: 0, right: 0, padding: 8 },
+  cardTitle: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: "#FFF", lineHeight: 16 },
+  cardSub: { fontFamily: "Inter_400Regular", fontSize: 9, color: "rgba(255,255,255,0.6)", marginTop: 2 },
+  cardLoc: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 3 },
+  cardLocText: { fontFamily: "Inter_400Regular", fontSize: 9, color: "rgba(255,255,255,0.7)" },
+
+  // Trilha
+  trilhaSection: { paddingHorizontal: 16, marginBottom: 8 },
+  trilhaCard: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 12, padding: 10, gap: 10 },
+  trilhaThumb: { width: 48, height: 48, borderRadius: 8 },
+  trilhaText: { flex: 1 },
+  trilhaTitle: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: "#FFF" },
+  trilhaSub: { fontFamily: "Inter_400Regular", fontSize: 10, color: "rgba(255,255,255,0.6)" },
+  trilhaPlaylist: { fontFamily: "Inter_400Regular", fontSize: 9, color: "rgba(255,255,255,0.4)", marginTop: 2 },
+  playBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: PETROL, alignItems: "center", justifyContent: "center" },
+  waveform: { flexDirection: "row", alignItems: "flex-end", gap: 2, height: 20 },
+  waveBar: { width: 3, borderRadius: 1.5, backgroundColor: PETROL },
+
+  // Music Modal
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.85)", justifyContent: "flex-end" },
+  musicModal: { backgroundColor: "#1A1A1A", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 40 },
+  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
+  modalTitle: { fontFamily: "Inter_600SemiBold", fontSize: 18, color: "#FFF" },
+  modalClose: { padding: 4 },
+  playlistItem: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 12, padding: 12, gap: 12 },
+  playlistThumb: { width: 56, height: 56, borderRadius: 8 },
+  playlistInfo: { flex: 1 },
+  playlistName: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: "#FFF" },
+  playlistSub: { fontFamily: "Inter_400Regular", fontSize: 12, color: "rgba(255,255,255,0.6)", marginTop: 2 },
+  playlistPlay: { width: 40, height: 40, borderRadius: 20, backgroundColor: PETROL, alignItems: "center", justifyContent: "center" },
+  comingSoonText: { fontFamily: "Inter_400Regular", fontSize: 13, color: "rgba(255,255,255,0.4)", textAlign: "center", marginTop: 20 },
+
+  // Gallery Modal
+  galleryContainer: { flex: 1, backgroundColor: "#000" },
+  galleryClose: { position: "absolute", top: 50, right: 20, zIndex: 10, width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center" },
+  galleryImage: { width: W, height: H },
+  galleryDots: { position: "absolute", bottom: 50, left: 0, right: 0, alignItems: "center" },
+  galleryCounter: { fontFamily: "Inter_500Medium", fontSize: 14, color: "#FFF" },
 });

@@ -54,8 +54,18 @@ export default function OQueFazerBairroScreen() {
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
   const destino    = destinos.find((d) => d.id === (cityId ?? "rio")) ?? destinos[0];
-  const { lugares: allLugares, loading: lugaresLoading } = useOQueFazer();
-  const filtered   = allLugares.filter((p) => p.localizacao === bairroNome);
+  const { atividades, loading: lugaresLoading } = useOQueFazer();
+  const FALLBACK_IMG = require("../../../assets/images/ipanema.png");
+  const allLugares = (atividades ?? []).map((item: any) => ({
+    id: item.id,
+    titulo: item.nome,
+    localizacao: item.bairro_nome ?? "",
+    descricao: item.meu_olhar ?? "",
+    categoria: item.categoria ?? "atividade",
+    image: item.hero_image_url ? { uri: item.hero_image_url } : FALLBACK_IMG,
+    preco: null,
+  }));
+  const filtered   = allLugares.filter((p: any) => p.localizacao === bairroNome);
 
   const { neighborhoods } = useNeighborhoods();
   const { save, unsave, isSaved } = useGuia();
@@ -228,7 +238,11 @@ export default function OQueFazerBairroScreen() {
               onPress={() =>
                 router.push({
                   pathname: "/lugar/[cityId]/[placeId]",
+<<<<<<< HEAD
                   params: { cityId: destino.id, placeId: place.id, source_table: "o_que_fazer_rio_v2" },
+=======
+                  params: { cityId: destino.id, placeId: place.id, source_table: "lugares" },
+>>>>>>> claude/plan-app-architecture-73RnI
                 })
               }
             >
@@ -254,10 +268,14 @@ export default function OQueFazerBairroScreen() {
                       save({
                         id:           place.id,
                         categoria:    "oQueFazer",
+<<<<<<< HEAD
                         source_table: "o_que_fazer_rio_v2",
+=======
+                        source_table: "lugares",
+>>>>>>> claude/plan-app-architecture-73RnI
                         titulo:       place.titulo,
                         localizacao:  place.localizacao,
-                        image:        place.image,
+                        image:        place.image ?? FALLBACK_IMG,
                       });
                     }
                   }}
@@ -294,7 +312,11 @@ export default function OQueFazerBairroScreen() {
                     e.stopPropagation?.();
                     router.push({
                       pathname: "/lugar/[cityId]/[placeId]",
+<<<<<<< HEAD
                       params: { cityId: destino.id, placeId: place.id, source_table: "o_que_fazer_rio_v2", showMap: "true" },
+=======
+                      params: { cityId: destino.id, placeId: place.id, source_table: "lugares", showMap: "true" },
+>>>>>>> claude/plan-app-architecture-73RnI
                     });
                   }}
                 >

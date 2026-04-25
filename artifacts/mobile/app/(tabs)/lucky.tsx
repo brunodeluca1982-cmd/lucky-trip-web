@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { RotatingBackground } from "@/components/RotatingBackground";
+import { useRioHeroMedia } from "@/hooks/useHeroMedia";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -50,6 +51,11 @@ export default function LuckyScreen() {
   const insets    = useSafeAreaInsets();
   const topPad    = Platform.OS === "web" ? 67 : insets.top + 16;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+<<<<<<< HEAD
+=======
+  const rioHero   = useRioHeroMedia("image");
+
+>>>>>>> claude/plan-app-architecture-73RnI
   const scrollRef = useRef<ScrollView>(null);
 
   const [messages,         setMessages]         = useState<Message[]>([]);
@@ -284,7 +290,16 @@ export default function LuckyScreen() {
 
   return (
     <View style={styles.bg}>
+<<<<<<< HEAD
       <RotatingBackground />
+=======
+      <RotatingBackground
+        pool={rioHero && rioHero.length > 0
+          ? rioHero.map((item) => ({ uri: item.public_url }))
+          : LUCKY_BG_POOL}
+        blurRadius={22}
+      />
+>>>>>>> claude/plan-app-architecture-73RnI
       <View style={styles.overlay}>
         <KeyboardAvoidingView
           style={{ flex: 1 }}
@@ -479,7 +494,7 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.44)",
+    backgroundColor: "rgba(0,0,0,0.45)",
   },
   content: {
     paddingHorizontal: 20,

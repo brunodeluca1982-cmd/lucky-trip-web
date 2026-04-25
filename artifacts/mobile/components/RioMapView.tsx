@@ -1,16 +1,15 @@
 /**
- * RioMapView — platform-aware interactive map for Rio de Janeiro.
+ * RioMapView — platform-aware interactive map.
  *
- * Web:    Leaflet.js in an <iframe> (CartoDB Dark tiles, no API key needed)
- * Native: react-native-maps MapView with custom markers
+ * Web:    Leaflet.js in an <iframe> (Esri satellite tiles)
+ * Native: WebView with Leaflet (Expo Go compatible)
  *
  * Props:
- *   selectedNeighborhood  — name string of currently selected neighborhood (or null)
- *   onNeighborhoodPress   — called with the neighborhood name when a marker is tapped
+ *   bairros               — array of bairros with lat/lng from Supabase
+ *   selectedBairroId      — id of currently selected bairro (or null)
+ *   onBairroPress         — called with bairro when a marker is tapped
+ *   loading               — shows loading state on map
  *   style                 — optional additional style for the container
- *
- * Visual: dark_all tiles with brightness/contrast CSS filter applied so the
- * map reads as dark-charcoal rather than near-black — lighter and more legible.
  */
 
 import React, { useEffect, useRef } from "react";
@@ -18,50 +17,31 @@ import {
   Platform,
   StyleSheet,
   View,
+  ActivityIndicator,
+  Text,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-
-// ── Neighborhood data ─────────────────────────────────────────────────────────
-
-export type RioNeighborhood = {
-  name: string;
-  lat: number;
-  lng: number;
-  clickable: boolean;
-};
-
-export const RIO_NEIGHBORHOODS: RioNeighborhood[] = [
-  // ── Clickable lodging neighborhoods ──
-  { name: "Ipanema",                  lat: -22.9838, lng: -43.2096, clickable: true },
-  { name: "Leblon",                   lat: -22.9860, lng: -43.2237, clickable: true },
-  { name: "Copacabana",               lat: -22.9711, lng: -43.1823, clickable: true },
-  { name: "Arpoador",                 lat: -22.9906, lng: -43.1896, clickable: true },
-  { name: "Leme",                     lat: -22.9588, lng: -43.1713, clickable: true },
-  { name: "Botafogo",                 lat: -22.9417, lng: -43.1834, clickable: true },
-  { name: "Santa Teresa",             lat: -22.9250, lng: -43.1895, clickable: true },
-  { name: "Centro",                   lat: -22.9068, lng: -43.1729, clickable: true },
-  { name: "São Conrado",              lat: -22.9996, lng: -43.2740, clickable: true },
-  { name: "Barra da Tijuca",          lat: -23.0048, lng: -43.3654, clickable: true },
-  { name: "Recreio dos Bandeirantes", lat: -23.0100, lng: -43.4700, clickable: true },
-  // ── Visual context only ──
-  { name: "Cristo Redentor",          lat: -22.9519, lng: -43.2105, clickable: false },
-  { name: "Maracanã",                 lat: -22.9121, lng: -43.2302, clickable: false },
-  { name: "Lagoa",                    lat: -22.9709, lng: -43.2060, clickable: false },
-];
+import type { Bairro } from "@/hooks/useBairros";
 
 // ── Leaflet HTML generator ────────────────────────────────────────────────────
 
+<<<<<<< HEAD
 export function buildLeafletHTML(
   selected: string | null,
   neighborhoods: RioNeighborhood[],
+=======
+function buildLeafletHTML(
+  bairros: Bairro[],
+  selectedId: string | null,
+>>>>>>> claude/plan-app-architecture-73RnI
 ): string {
-  const neighborhoodsJSON = JSON.stringify(
-    neighborhoods.map((n) => ({
-      name: n.name,
-      lat: n.lat,
-      lng: n.lng,
-      clickable: n.clickable,
+  const bairrosJSON = JSON.stringify(
+    bairros.map((b) => ({
+      id: b.id,
+      name: b.nome,
+      lat: b.lat,
+      lng: b.lng,
     })),
   );
 
@@ -74,222 +54,169 @@ export function buildLeafletHTML(
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; background: #0D1117; }
+    html, body { width: 100%; height: 100%; background: #F8F8F8; }
     #map { width: 100%; height: 100%; }
 
-    /*
-     * Tile layer: Esri World Imagery — true satellite imagery.
-     * Real city texture: buildings, beaches, Tijuca forest, ocean depth.
-     * Very gentle filter: slight brightness pull-back + minimal softening blur
-     * so it reads as a cinematic backdrop, not a sharp Google Maps screenshot.
-     * No desaturation — all natural satellite colors are preserved.
-     */
-    .leaflet-tile-pane {
-      filter: brightness(0.96) contrast(0.94) blur(0.45px);
-    }
-
-    /*
-     * GRADIENT OVERLAY — makes the map feel like a rich background image that
-     * fades into the app's dark background. Light dark wash at top (for legibility
-     * of the floating controls), transparent in the middle (full map visibility),
-     * deep warm fade at the bottom (seamless transition to app content below).
-     * z-index 450 sits above tiles but below Leaflet controls (z-index 1000).
-     */
-    #map-gradient {
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      pointer-events: none;
-      z-index: 450;
-      background: linear-gradient(
-        180deg,
-        rgba(10, 5, 2, 0.38) 0%,
-        rgba(10, 5, 2, 0.00) 22%,
-        rgba(10, 5, 2, 0.00) 54%,
-        rgba(10, 5, 2, 0.62) 80%,
-        rgba(10, 5, 2, 0.88) 100%
-      );
-    }
-
     .neigh-marker {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
       cursor: pointer;
+      transition: transform 0.2s ease-out;
     }
 
-    /* Neighbourhood dots — warm terracotta, white ring, subtle drop shadow */
-    .neigh-dot {
-      width: 10px; height: 10px;
-      border-radius: 50%;
-      background: #C4704A;
-      border: 2px solid rgba(255,255,255,0.80);
-      box-shadow: 0 1px 5px rgba(0,0,0,0.40), 0 0 0 1px rgba(196,112,74,0.20);
-      transition: transform 0.15s, box-shadow 0.15s;
-    }
-    .neigh-dot.selected {
-      background: #D4845C;
-      border-color: rgba(255,255,255,0.95);
-      box-shadow: 0 0 0 5px rgba(196,112,74,0.28), 0 2px 8px rgba(0,0,0,0.45);
-      transform: scale(1.45);
-    }
-    .neigh-dot.visual {
-      width: 7px; height: 7px;
-      background: rgba(201,168,76,0.55);
-      border: 1.5px solid rgba(201,168,76,0.60);
-      box-shadow: 0 1px 3px rgba(0,0,0,0.30);
-    }
-
-    /* Labels — white text with warm shadow, readable over both map & gradient */
-    .neigh-label {
-      margin-top: 4px;
+    .neigh-pill {
+      display: inline-block;
       font-family: -apple-system, 'Inter', sans-serif;
-      font-size: 10px;
-      font-weight: 600;
-      color: rgba(255,255,255,0.90);
+      font-size: 12px;
+      font-weight: 500;
+      color: #FFFFFF;
       white-space: nowrap;
-      letter-spacing: 0.25px;
-      text-shadow:
-        0 1px 4px rgba(0,0,0,0.75),
-        0 0 10px rgba(0,0,0,0.55);
-      pointer-events: none;
+      background: rgba(27, 79, 114, 0.85);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 100px;
+      padding: 6px 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      transition: all 0.2s ease-out;
     }
-    .neigh-label.selected {
-      color: #F5C89A;
-      text-shadow: 0 1px 6px rgba(0,0,0,0.80), 0 0 14px rgba(196,112,74,0.40);
-    }
-    .neigh-label.visual {
-      font-size: 9px;
-      font-weight: 400;
-      font-style: italic;
-      color: rgba(201,168,76,0.78);
-      text-shadow: 0 1px 4px rgba(0,0,0,0.70);
+    .neigh-pill.selected {
+      background: #F5F0E8;
+      color: #1B4F72;
+      border: 2px solid #1B4F72;
+      font-weight: 600;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
     }
 
-    /* Leaflet attribution — legally required by Esri; styled to be non-intrusive */
     .leaflet-control-attribution {
-      font-size: 7px;
-      opacity: 0.28;
-      background: transparent !important;
-      box-shadow: none !important;
-      border-radius: 0 !important;
-      color: rgba(255,255,255,0.65) !important;
-      text-shadow: 0 1px 3px rgba(0,0,0,0.90);
-      padding: 2px 5px !important;
+      font-size: 8px;
+      opacity: 0.5;
+      background: rgba(255,255,255,0.8) !important;
     }
-    .leaflet-control-attribution a {
-      color: rgba(255,255,255,0.50) !important;
+    .leaflet-control-zoom {
+      border: none !important;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15) !important;
     }
     .leaflet-bar a {
-      background: rgba(255,255,255,0.14);
-      color: rgba(255,255,255,0.80);
-      border-color: rgba(255,255,255,0.20);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
+      background: #FFFFFF !important;
+      color: #1B4F72 !important;
+      border-color: rgba(0,0,0,0.1) !important;
     }
     .leaflet-bar a:hover {
-      background: rgba(255,255,255,0.22);
-      color: rgba(255,255,255,0.95);
+      background: #F5F0E8 !important;
     }
-    .leaflet-bar { border: 1px solid rgba(255,255,255,0.15) !important; border-radius: 10px !important; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.35); }
   </style>
 </head>
 <body>
   <div id="map"></div>
-  <div id="map-gradient"></div>
   <script>
-    var NEIGHBORHOODS = ${neighborhoodsJSON};
-    var SELECTED = ${JSON.stringify(selected)};
+    var BAIRROS = ${bairrosJSON};
+    var SELECTED_ID = ${JSON.stringify(selectedId)};
+
+    // Fixed center for Rio de Janeiro
+    var centerLat = -22.975;
+    var centerLng = -43.21;
 
     var map = L.map('map', {
-      center: [-22.9768, -43.2100],
-      zoom: 12,
+      center: [centerLat, centerLng],
+      zoom: 11,
       zoomControl: true,
       attributionControl: true,
     });
 
-    /*
-     * Esri World Imagery — true satellite/aerial photography.
-     * Shows the real Rio: Tijuca rainforest (deep green), Atlantic (dark blue),
-     * beaches (sand strip), Lagoa Rodrigo de Freitas (lake), city fabric.
-     * No built-in text labels — all visible labels come only from our custom markers.
-     */
+    // Esri World Imagery — satellite style
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      attribution: 'Tiles &copy; Esri &mdash; Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP',
+      attribution: '&copy; Esri',
       maxZoom: 19,
     }).addTo(map);
 
-    // Add neighborhood markers
-    NEIGHBORHOODS.forEach(function(n) {
-      var isSelected = n.name === SELECTED;
-      var dotClass   = 'neigh-dot'   + (isSelected ? ' selected' : '') + (!n.clickable ? ' visual' : '');
-      var labelClass = 'neigh-label' + (isSelected ? ' selected' : '') + (!n.clickable ? ' visual' : '');
+    var markers = {};
+
+    // Add bairro markers
+    BAIRROS.forEach(function(b) {
+      var isSelected = b.id === SELECTED_ID;
+      var pillClass = 'neigh-pill' + (isSelected ? ' selected' : '');
 
       var icon = L.divIcon({
         className: 'neigh-marker',
-        html: '<div class="' + dotClass + '"></div><div class="' + labelClass + '">' + n.name + '</div>',
-        iconAnchor: [0, 5],
+        html: '<div class="' + pillClass + '">' + b.name + '</div>',
+        iconAnchor: [40, 12],
         iconSize: null,
-        popupAnchor: [0, -15],
       });
 
-      var marker = L.marker([n.lat, n.lng], { icon: icon });
+      var marker = L.marker([b.lat, b.lng], { icon: icon });
+      markers[b.id] = marker;
 
-      if (n.clickable) {
-        marker.on('click', function(e) {
-          L.DomEvent.stopPropagation(e);
-          window.parent.postMessage(
-            { type: 'neighborhoodClick', name: n.name },
-            '*'
-          );
-        });
-      }
+      marker.on('click', function(e) {
+        L.DomEvent.stopPropagation(e);
+        var msg = { type: 'bairroClick', bairro: b };
+        if (typeof window.ReactNativeWebView !== 'undefined') {
+          window.ReactNativeWebView.postMessage(JSON.stringify(msg));
+        } else {
+          window.parent.postMessage(msg, '*');
+        }
+      });
 
       marker.addTo(map);
     });
 
-    // Tap on map background deselects
-    map.on('click', function() {
-      window.parent.postMessage({ type: 'neighborhoodClick', name: null }, '*');
-    });
+    // If a bairro is selected, fly to it
+    if (SELECTED_ID) {
+      var sel = BAIRROS.find(function(b) { return b.id === SELECTED_ID; });
+      if (sel) {
+        map.flyTo([sel.lat, sel.lng], 13, { duration: 0.5 });
+      }
+    }
+
+    // Tap on map background — do nothing (don't deselect)
   </script>
 </body>
 </html>`;
 }
 
-// ── Web component ─────────────────────────────────────────────────────────────
+// ── Props ─────────────────────────────────────────────────────────────────────
 
 type MapProps = {
-  selectedNeighborhood: string | null;
-  onNeighborhoodPress: (name: string | null) => void;
+  bairros: Bairro[];
+  selectedBairroId: string | null;
+  onBairroPress: (bairro: Bairro | null) => void;
+  loading?: boolean;
   style?: StyleProp<ViewStyle>;
 };
 
-function RioMapViewWeb({ selectedNeighborhood, onNeighborhoodPress, style }: MapProps) {
+// ── Web component ─────────────────────────────────────────────────────────────
+
+function RioMapViewWeb({ bairros, selectedBairroId, onBairroPress, loading, style }: MapProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  const html = buildLeafletHTML(selectedNeighborhood, RIO_NEIGHBORHOODS);
+  const html = buildLeafletHTML(bairros, selectedBairroId);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     function handler(e: MessageEvent) {
-      if (e.data && e.data.type === "neighborhoodClick") {
-        onNeighborhoodPress(e.data.name ?? null);
+      if (e.data && e.data.type === "bairroClick") {
+        onBairroPress(e.data.bairro ?? null);
       }
     }
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
-  }, [onNeighborhoodPress]);
+  }, [onBairroPress]);
 
-  // @ts-ignore — <iframe> and srcDoc are web-only; valid in Expo web
+  if (loading) {
+    return (
+      <View style={[s.container, s.loadingContainer, style]}>
+        <ActivityIndicator size="small" color="#C4704A" />
+        <Text style={s.loadingText}>Carregando mapa...</Text>
+      </View>
+    );
+  }
+
+  // @ts-ignore — <iframe> and srcDoc are web-only
   return (
     <View style={[s.container, style]}>
       <iframe
-        key={selectedNeighborhood}
+        key={selectedBairroId}
         ref={iframeRef as any}
         srcDoc={html}
-        style={{ width: "100%", height: "100%", border: "none", background: "#E8E2D8" } as any}
-        title="Mapa do Rio de Janeiro"
+        style={{ width: "100%", height: "100%", border: "none", background: "#12100E" } as any}
+        title="Mapa de Bairros"
       />
     </View>
   );
@@ -297,21 +224,43 @@ function RioMapViewWeb({ selectedNeighborhood, onNeighborhoodPress, style }: Map
 
 // ── Native component ──────────────────────────────────────────────────────────
 
-let NativeMapView: React.ComponentType<MapProps> | null = null;
+function RioMapViewNative({ bairros, selectedBairroId, onBairroPress, loading, style }: MapProps) {
+  // Lazy load to avoid bundling WebView on web
+  const WebViewModule = require("react-native-webview");
+  const WebView = WebViewModule.WebView;
 
-function RioMapViewNative({ selectedNeighborhood, onNeighborhoodPress, style }: MapProps) {
-  if (!NativeMapView) {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { default: Impl } = require("./RioMapViewNative");
-    NativeMapView = Impl;
+  const html = buildLeafletHTML(bairros, selectedBairroId);
+
+  const handleMessage = (event: { nativeEvent: { data: string } }) => {
+    try {
+      const msg = JSON.parse(event.nativeEvent.data);
+      if (msg.type === "bairroClick") {
+        onBairroPress(msg.bairro ?? null);
+      }
+    } catch {}
+  };
+
+  if (loading) {
+    return (
+      <View style={[s.container, s.loadingContainer, style]}>
+        <ActivityIndicator size="small" color="#C4704A" />
+        <Text style={s.loadingText}>Carregando mapa...</Text>
+      </View>
+    );
   }
-  const Comp = NativeMapView!;
+
   return (
-    <Comp
-      selectedNeighborhood={selectedNeighborhood}
-      onNeighborhoodPress={onNeighborhoodPress}
-      style={style}
-    />
+    <View style={[s.container, style]}>
+      <WebView
+        key={selectedBairroId}
+        source={{ html }}
+        style={s.webview}
+        scrollEnabled={false}
+        onMessage={handleMessage}
+        originWhitelist={["*"]}
+        javaScriptEnabled
+      />
+    </View>
   );
 }
 
@@ -326,7 +275,21 @@ export default function RioMapView(props: MapProps) {
 
 const s = StyleSheet.create({
   container: {
+    flex: 1,
     overflow: "hidden",
     backgroundColor: "#12100E",
+  },
+  loadingContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: "rgba(255,255,255,0.5)",
+  },
+  webview: {
+    flex: 1,
+    backgroundColor: "transparent",
   },
 });

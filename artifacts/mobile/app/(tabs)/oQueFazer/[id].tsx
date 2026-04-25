@@ -26,7 +26,12 @@ import { destinos } from "@/data/mockData";
 import RioMapView from "@/components/RioMapView";
 import { useGuia } from "@/context/GuiaContext";
 import { useOQueFazer } from "@/hooks/useOQueFazer";
+<<<<<<< HEAD
 import { sanitizePhotoUrl } from "@/utils/getImageForEntity";
+=======
+import { useBairros } from "@/hooks/useBairros";
+import { getImageForEntity } from "@/utils/getImageForEntity";
+>>>>>>> claude/plan-app-architecture-73RnI
 
 const C = Colors.light;
 const GOLD = "#D4AF37";
@@ -47,24 +52,42 @@ const DEFAULT_DESCRICAO = [
   "A verdadeira experiência começa quando você abandona o roteiro previsível e segue o instinto.",
 ];
 
+// Human-readable labels for each category id
+const CATEGORIA_LABELS: Record<string, string> = {
+  atividade:    "Atividades",
+  praia:        "Praias",
+  compras:      "Compras",
+  dica_secreta: "Dicas Secretas",
+};
+
+const RIO_DESTINO_ID = "7f047742-427f-4b11-8286-781af899c57d";
+
 export default function OQueFazerScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, categoria } = useLocalSearchParams<{ id: string; categoria?: string }>();
   const insets    = useSafeAreaInsets();
   const topInset  = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
   const destino    = destinos.find((d) => d.id === id) ?? destinos[0];
-  const { lugares: allLugares, loading: lugaresLoading } = useOQueFazer();
+  const { atividades, loading, error } = useOQueFazer(RIO_DESTINO_ID);
+  const { bairros, loading: bairrosLoading } = useBairros(RIO_DESTINO_ID);
   const descricao  = DESCRICOES[destino.id] ?? DEFAULT_DESCRICAO;
   const { save, unsave, isSaved } = useGuia();
 
+  // Filter by categoria if provided (case-insensitive)
+  const filtered = categoria
+    ? atividades.filter((l) => l.categoria?.toLowerCase() === categoria.toLowerCase())
+    : atividades;
+
+  const categoriaLabel = categoria ? (CATEGORIA_LABELS[categoria.toLowerCase()] ?? categoria) : null;
+
   const listRef = useRef<ScrollView>(null);
 
-  function handleNeighborhoodPress(name: string | null) {
-    if (!name) return;
+  function handleBairroPress(bairro: any) {
+    if (!bairro) return;
     router.push({
       pathname: "/oQueFazer/bairro/[bairroNome]",
-      params: { bairroNome: name, cityId: destino.id },
+      params: { bairroNome: bairro.nome, cityId: destino.id },
     });
   }
 
@@ -75,8 +98,10 @@ export default function OQueFazerScreen() {
       {/* ── Fixed map section ── */}
       <View style={s.mapSection}>
         <RioMapView
-          selectedNeighborhood={null}
-          onNeighborhoodPress={handleNeighborhoodPress}
+          bairros={bairros}
+          selectedBairroId={null}
+          onBairroPress={handleBairroPress}
+          loading={bairrosLoading}
           style={StyleSheet.absoluteFillObject}
         />
 
@@ -87,7 +112,7 @@ export default function OQueFazerScreen() {
           <View style={s.pill}>
             <View style={s.badgeDot} />
             <Text style={s.pillText}>
-              {lugaresLoading ? "carregando…" : `${allLugares.length} locais`}
+              {loading ? "carregando…" : `${filtered.length} locais`}
             </Text>
           </View>
         </View>
@@ -119,22 +144,46 @@ export default function OQueFazerScreen() {
           <View style={[s.intro, s.introAbsolute]}>
             <Text style={s.introTitle}>O que fazer em {destino.cidade}</Text>
             <Text style={s.introPara}>{descricao[0]}</Text>
+            <Text style={s.byline}>Por Bruno de Luca</Text>
             <View style={s.introMeta}>
               <View style={s.introDot} />
               <Text style={s.introMetaText}>
-                Seleção curada · {allLugares.length} lugar{allLugares.length !== 1 ? "es" : ""}
+                Seleção curada · {filtered.length} lugar{filtered.length !== 1 ? "es" : ""}
               </Text>
             </View>
           </View>
         </View>
 
         <View style={s.listSection}>
-          <Text style={s.listLabel}>Experiências selecionadas</Text>
+          {/* Active filter badge + "Ver todas" */}
+          {categoriaLabel ? (
+            <View style={s.filterRow}>
+              <View style={s.filterBadge}>
+                <Text style={s.filterBadgeText}>{categoriaLabel.toUpperCase()} · {filtered.length} lugar{filtered.length !== 1 ? "es" : ""}</Text>
+              </View>
+              <Pressable
+                hitSlop={8}
+                onPress={() =>
+                  router.replace({
+                    pathname: "/oQueFazer/[id]",
+                    params: { id: destino.id },
+                  })
+                }
+              >
+                <Text style={s.verTodasText}>Ver todas ×</Text>
+              </Pressable>
+            </View>
+          ) : null}
+
+          <Text style={s.listLabel}>
+            {categoriaLabel ? `${categoriaLabel} selecionadas` : "Experiências selecionadas"}
+          </Text>
 
           {descricao.slice(1).map((para, i) => (
             <Text key={`para-${i}`} style={s.descPara}>{para}</Text>
           ))}
 
+<<<<<<< HEAD
           {allLugares.map((place, index) => (
             <Pressable
               key={place.id}
@@ -180,26 +229,88 @@ export default function OQueFazerScreen() {
                     name="bookmark"
                     size={15}
                     color={isSaved(place.id) ? GOLD : C.white}
+=======
+          {filtered.map((place, index) => {
+            const imageSource = getImageForEntity("activity", place.nome, place.bairro_nome ?? "", place.hero_image_url);
+            return (
+              <Pressable
+                key={place.id}
+                style={s.card}
+                onPress={() =>
+                  router.push({
+                    pathname: "/lugar/[cityId]/[placeId]",
+                    params: { cityId: destino.id, placeId: place.id, source_table: "lugares" },
+                  })
+                }
+              >
+                <View style={s.cardImageWrap}>
+                  <Image source={imageSource} style={s.cardImage} resizeMode="cover" />
+                  <LinearGradient
+                    colors={["rgba(0,0,0,0.12)", "transparent"]}
+                    locations={[0, 0.4]}
+                    style={StyleSheet.absoluteFill}
+>>>>>>> claude/plan-app-architecture-73RnI
                   />
-                </Pressable>
-                {place.preco && (
-                  <View style={s.priceBadge}>
-                    <Text style={s.priceText}>{place.preco}</Text>
+                  <Pressable
+                    style={[s.bookmarkBtn, isSaved(place.id) && s.bookmarkBtnSaved]}
+                    hitSlop={6}
+                    onPress={(e) => {
+                      e.stopPropagation?.();
+                      if (isSaved(place.id)) {
+                        unsave(place.id);
+                      } else {
+                        save({
+                          id:           place.id,
+                          categoria:    place.categoria as any,
+                          source_table: "lugares",
+                          titulo:       place.nome,
+                          localizacao:  place.bairro_nome ?? "",
+                          image:        imageSource,
+                        });
+                      }
+                    }}
+                  >
+                    <Feather
+                      name="bookmark"
+                      size={15}
+                      color={isSaved(place.id) ? GOLD : C.white}
+                    />
+                  </Pressable>
+                  {place.energia && (
+                    <View style={s.priceBadge}>
+                      <Text style={s.priceText}>{place.energia}</Text>
+                    </View>
+                  )}
+                  <View style={s.orderBadge}>
+                    <Text style={s.orderText}>{String(index + 1).padStart(2, "0")}</Text>
                   </View>
-                )}
-                <View style={s.orderBadge}>
-                  <Text style={s.orderText}>{String(index + 1).padStart(2, "0")}</Text>
                 </View>
-              </View>
 
-              <View style={s.cardBody}>
-                <View style={s.cardMeta}>
-                  <Text style={s.cardCategoria}>{place.categoria}</Text>
-                  <View style={s.cardLocWrap}>
-                    <Feather name="map-pin" size={10} color={C.warmGray} />
-                    <Text style={s.cardLocText}>{place.localizacao}</Text>
+                <View style={s.cardBody}>
+                  <View style={s.cardMeta}>
+                    <Text style={s.cardCategoria}>{place.categoria.toUpperCase()}</Text>
+                    <View style={s.cardLocWrap}>
+                      <Feather name="map-pin" size={10} color={C.warmGray} />
+                      <Text style={s.cardLocText}>{place.bairro_nome ?? ""}</Text>
+                    </View>
                   </View>
+                  <Text style={s.cardTitulo}>{place.nome}</Text>
+                  <Text style={s.cardDesc}>{place.meu_olhar}</Text>
+                  <Pressable
+                    style={s.verNoMapaBtn}
+                    onPress={(e) => {
+                      e.stopPropagation?.();
+                      router.push({
+                        pathname: "/lugar/[cityId]/[placeId]",
+                        params: { cityId: destino.id, placeId: place.id, source_table: "lugares", showMap: "true" },
+                      });
+                    }}
+                  >
+                    <Feather name="map-pin" size={13} color={C.terracotta} />
+                    <Text style={s.verNoMapaText}>Ver no mapa</Text>
+                  </Pressable>
                 </View>
+<<<<<<< HEAD
                 <Text style={s.cardTitulo}>{place.titulo}</Text>
                 <Text style={s.cardDesc}>{place.descricao}</Text>
                 <Pressable
@@ -218,6 +329,11 @@ export default function OQueFazerScreen() {
               </View>
             </Pressable>
           ))}
+=======
+              </Pressable>
+            );
+          })}
+>>>>>>> claude/plan-app-architecture-73RnI
         </View>
 
         <View style={s.footer}>
@@ -335,6 +451,14 @@ const s = StyleSheet.create({
     fontSize: 12,
     color: "rgba(255,255,255,0.35)",
     letterSpacing: 0.5,
+  },
+  byline: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11.5,
+    color: "#D4AF37",
+    letterSpacing: 0.6,
+    marginBottom: 10,
+    opacity: 0.85,
   },
 
   listSection: {
@@ -473,6 +597,34 @@ const s = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 13,
     color: "rgba(255,255,255,0.65)",
+    letterSpacing: 0.2,
+  },
+
+  filterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 14,
+  },
+  filterBadge: {
+    backgroundColor: "rgba(212,175,55,0.14)",
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: "rgba(212,175,55,0.35)",
+  },
+  filterBadgeText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+    color: GOLD,
+    letterSpacing: 1.4,
+    textTransform: "uppercase",
+  },
+  verTodasText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: "rgba(255,255,255,0.45)",
     letterSpacing: 0.2,
   },
 

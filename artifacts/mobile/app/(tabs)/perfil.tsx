@@ -1,9 +1,9 @@
 /**
  * perfil.tsx — Profile tab
  *
- * STATE A — Visitante (não logado)  : tela de login + hero rotativo Rio
- * STATE B — Usuário Free            : perfil com CTA Lucky Pro
- * STATE C — Usuário Lucky Pro       : perfil premium com status Pro
+ * STATE A — Visitante (não logado)  : delega para AuthScreen (app/auth/index.tsx)
+ * STATE B — Usuário Free            : FreeProfileScreen
+ * STATE C — Usuário Lucky Pro       : ProProfileScreen
  *
  * Regra de sessão: sessão persiste via Supabase onAuthStateChange.
  * Usuário volta a ver login APENAS se clicar em "Sair" ou sessão expirar.
@@ -11,35 +11,36 @@
  * NÃO mexer em Stripe / checkout / webhook / catálogo de planos.
  */
 
-import React, {
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
   Image,
-  KeyboardAvoidingView,
   Linking,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { AntDesign, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useAuth } from "@/hooks/useAuth";
 import { useGuia } from "@/context/GuiaContext";
+<<<<<<< HEAD
 import { useBackground } from "@/context/BackgroundContext";
+=======
+import { useRioHeroMedia } from "@/hooks/useHeroMedia";
+>>>>>>> claude/plan-app-architecture-73RnI
 import type { User } from "@supabase/supabase-js";
+import AuthScreen from "@/app/auth";
+import { supabase } from "@/lib/supabase";
 
-// ── Constants ─────────────────────────────────────────────────────────────────
+// ── Constants ──────────────────────────────────────────────────────────────────
 
 const GOLD      = "#D4AF37";
 const GOLD_DIM  = "rgba(212,175,55,0.15)";
@@ -48,128 +49,17 @@ const DARK      = "#0D0D0D";
 const SURFACE   = "rgba(255,255,255,0.07)";
 const BORDER    = "rgba(255,255,255,0.12)";
 
-const LOGO      = require("@/assets/images/logo-symbol.png");
-
-// Hero images for rotating background (login screen only)
-const HERO_IMAGES = [
-  require("@/assets/images/ipanema.png"),
-  require("@/assets/images/cristo.png"),
-  require("@/assets/images/pao-acucar.png"),
-  require("@/assets/images/lapa.png"),
-];
-
-const HERO_INTERVAL_MS = 10_000;
-
-// ── Web: no-select helper ─────────────────────────────────────────────────────
-
-const WNS: object =
-  Platform.OS === "web"
-    ? ({
-        userSelect: "none",
-        WebkitUserSelect: "none",
-        WebkitTouchCallout: "none",
-      } as any)
-    : {};
-
-function webCleanup() {
-  if (Platform.OS !== "web" || typeof document === "undefined") return;
-  try {
-    (document.activeElement as HTMLElement)?.blur();
-    window.getSelection()?.removeAllRanges();
-  } catch (_) {}
-}
-
-function translateAuthError(raw: string, isLogin: boolean): string {
-  const msg = raw.toLowerCase();
-  if (
-    msg.includes("invalid login credentials") ||
-    msg.includes("invalid credentials")
-  )
-    return isLogin
-      ? "E-mail ou senha incorretos. Verifique e tente novamente."
-      : "Erro ao criar conta. Tente novamente.";
-  if (msg.includes("email not confirmed"))
-    return "Confirme o seu e-mail antes de entrar. Verifique a caixa de entrada.";
-  if (
-    msg.includes("user already registered") ||
-    msg.includes("already registered")
-  )
-    return "Este e-mail já tem cadastro. Clique em \"Entrar\" para acessar.";
-  if (msg.includes("password should be at least"))
-    return "A senha deve ter pelo menos 6 caracteres.";
-  if (msg.includes("unable to validate email address"))
-    return "E-mail inválido. Verifique e tente novamente.";
-  if (msg.includes("signup is disabled"))
-    return "Cadastros temporariamente desabilitados. Tente mais tarde.";
-  if (
-    msg.includes("email rate limit") ||
-    msg.includes("too many requests")
-  )
-    return "Muitas tentativas. Aguarde alguns minutos e tente novamente.";
-  return raw;
-}
-
-// ── Rotating hero background ──────────────────────────────────────────────────
-
-function HeroBackground() {
-  const [currentIdx, setCurrentIdx] = useState(0);
-  const [nextIdx,    setNextIdx]    = useState(1);
-  const nextOpacity = useRef(new Animated.Value(0)).current;
-  const timerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    timerRef.current = setInterval(() => {
-      // Fade in the next image, then promote it to current
-      Animated.timing(nextOpacity, {
-        toValue: 1,
-        duration: 1800,
-        useNativeDriver: true,
-      }).start(({ finished }) => {
-        if (!finished) return;
-        setCurrentIdx((c) => {
-          setNextIdx((c + 2) % HERO_IMAGES.length);
-          return (c + 1) % HERO_IMAGES.length;
-        });
-        nextOpacity.setValue(0);
-      });
-    }, HERO_INTERVAL_MS);
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  return (
-    <>
-      {/* Base (current) image */}
-      <Image
-        source={HERO_IMAGES[currentIdx]}
-        style={StyleSheet.absoluteFill}
-        resizeMode="cover"
-        pointerEvents="none"
-      />
-      {/* Next image fades in on top */}
-      <Animated.Image
-        source={HERO_IMAGES[nextIdx]}
-        style={[StyleSheet.absoluteFill, { opacity: nextOpacity }]}
-        resizeMode="cover"
-        pointerEvents="none"
-      />
-      {/* Gradient overlay for text legibility */}
-      <View style={s.heroOverlay} pointerEvents="none" />
-    </>
-  );
-}
-
-// ── Root screen ───────────────────────────────────────────────────────────────
-
-type AuthScreen = "login" | "signup" | "forgot";
+// ── Root Screen ────────────────────────────────────────────────────────────────
 
 export default function PerfilScreen() {
+<<<<<<< HEAD
   const { user, loading: authLoading, signOut, signInWithPassword, signUp, sendPasswordReset, signInWithGoogle, signInWithOtp } = useAuth();
+=======
+  const { user, loading: authLoading, signOut } = useAuth();
+>>>>>>> claude/plan-app-architecture-73RnI
   const { isPremium } = useGuia();
-  const insets = useSafeAreaInsets();
 
+<<<<<<< HEAD
   // Auth form state
   const [screen,        setScreen]        = useState<AuthScreen>("login");
   const [name,          setName]          = useState("");
@@ -290,22 +180,23 @@ export default function PerfilScreen() {
   }
 
   // ── Auth is still resolving — show spinner (prevents flash of login for logged-in users)
+=======
+>>>>>>> claude/plan-app-architecture-73RnI
   if (authLoading) {
     return (
-      <View style={[s.root, { backgroundColor: DARK, justifyContent: "center", alignItems: "center" }]}>
+      <View style={[s.profileRoot, { justifyContent: "center", alignItems: "center" }]}>
         <ActivityIndicator color={GOLD} />
       </View>
     );
   }
 
-  // ── Logged-in: route to correct profile
   if (user) {
-    if (isPremium) {
-      return <ProProfileScreen user={user} signOut={signOut} />;
-    }
-    return <FreeProfileScreen user={user} signOut={signOut} />;
+    return isPremium
+      ? <ProProfileScreen user={user} signOut={signOut} />
+      : <FreeProfileScreen user={user} signOut={signOut} />;
   }
 
+<<<<<<< HEAD
   // ── Guest: auth screens with hero background
   const topPad = Platform.OS === "web" ? 20 : insets.top + 8;
   const botPad = Platform.OS === "web" ? 32 : insets.bottom + 16;
@@ -844,10 +735,64 @@ function ProfileHeroBg() {
     <>
       <Animated.Image
         source={pool[currentIdx]}
+=======
+  return <AuthScreen />;
+}
+
+// ── Profile Hero Background ────────────────────────────────────────────────────
+
+const PROFILE_HERO_IMAGES = [
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero01.jpg" },
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero02.jpg" },
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero03.jpg" },
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero04.jpg" },
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero05.jpg" },
+];
+const PROFILE_HERO_INTERVAL = 10_000;
+
+function ProfileHeroBg() {
+  const rioHero = useRioHeroMedia("image");
+  const resolvedPool =
+    rioHero && rioHero.length > 0
+      ? rioHero.map((item) => ({ uri: item.public_url }))
+      : PROFILE_HERO_IMAGES;
+
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const [nextIdx,    setNextIdx]    = useState(1);
+  const nextOpacity = useRef(new Animated.Value(0)).current;
+  const timerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    timerRef.current = setInterval(() => {
+      Animated.timing(nextOpacity, {
+        toValue: 1,
+        duration: 1800,
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (!finished) return;
+        setCurrentIdx((c) => {
+          setNextIdx((c + 2) % resolvedPool.length);
+          return (c + 1) % resolvedPool.length;
+        });
+        nextOpacity.setValue(0);
+      });
+    }, PROFILE_HERO_INTERVAL);
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [resolvedPool.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <>
+      <Image
+        source={resolvedPool[currentIdx]}
+>>>>>>> claude/plan-app-architecture-73RnI
         style={StyleSheet.absoluteFill}
         resizeMode="cover"
-        pointerEvents="none"
+        blurRadius={22}
       />
+<<<<<<< HEAD
       <Animated.Image
         source={pool[nextIdx]}
         style={[StyleSheet.absoluteFill, { opacity: nextOpacity }]}
@@ -855,8 +800,17 @@ function ProfileHeroBg() {
         pointerEvents="none"
       />
       {/* Dark overlay — keeps avatar/text readable */}
+=======
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: nextOpacity }]}>
+        <Image
+          source={resolvedPool[nextIdx]}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+          blurRadius={22}
+        />
+      </Animated.View>
+>>>>>>> claude/plan-app-architecture-73RnI
       <View style={s.profileHeroOverlay} pointerEvents="none" />
-      {/* Bottom gradient — fades into the dark card area below */}
       <LinearGradient
         colors={["transparent", "rgba(13,13,13,0.48)", "rgba(13,13,13,0.90)"]}
         locations={[0.50, 0.82, 1]}
@@ -867,7 +821,7 @@ function ProfileHeroBg() {
   );
 }
 
-// ── PROFILE SHARED COMPONENTS ─────────────────────────────────────────────────
+// ── Profile Shared Components ──────────────────────────────────────────────────
 
 type MenuItemProps = {
   icon: React.ReactNode;
@@ -883,25 +837,15 @@ function MenuItem({ icon, label, sublabel, onPress, rightContent, danger }: Menu
     <TouchableOpacity style={s.menuItem} onPress={onPress} activeOpacity={0.65} accessibilityRole="button">
       <View style={s.menuIcon}>{icon}</View>
       <View style={{ flex: 1 }}>
-        <Text style={[s.menuLabel, danger && { color: "#FF6B6B" }]} suppressHighlighting>
-          {label}
-        </Text>
-        {sublabel ? (
-          <Text style={s.menuSublabel} suppressHighlighting>{sublabel}</Text>
-        ) : null}
+        <Text style={[s.menuLabel, danger && { color: "#FF6B6B" }]} suppressHighlighting>{label}</Text>
+        {sublabel ? <Text style={s.menuSublabel} suppressHighlighting>{sublabel}</Text> : null}
       </View>
       {rightContent ?? <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.25)" />}
     </TouchableOpacity>
   );
 }
 
-function ProfileHeader({
-  user,
-  badge,
-}: {
-  user: User;
-  badge: React.ReactNode;
-}) {
+function ProfileHeader({ user, badge }: { user: User; badge: React.ReactNode }) {
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === "web" ? 20 : insets.top + 12;
   const displayName: string =
@@ -912,39 +856,106 @@ function ProfileHeader({
 
   return (
     <View style={[s.profileHeader, { paddingTop: topPad }]}>
-      {/* Rotating hero background — local assets, no network requests */}
       <ProfileHeroBg />
-
-      {/* Content — sits above the hero layers */}
       <View style={s.avatar}>
         <Feather name="user" size={28} color={GOLD} />
       </View>
       <Text style={s.profileName} suppressHighlighting>{displayName}</Text>
-      {user.email ? (
-        <Text style={s.profileEmail} suppressHighlighting>{user.email}</Text>
-      ) : null}
+      {user.email ? <Text style={s.profileEmail} suppressHighlighting>{user.email}</Text> : null}
       <View style={{ marginTop: 10 }}>{badge}</View>
     </View>
   );
 }
 
-// ── FREE PROFILE ──────────────────────────────────────────────────────────────
+// ── Meus Roteiros ──────────────────────────────────────────────────────────────
 
-function FreeProfileScreen({
-  user, signOut,
-}: {
-  user: User; signOut: () => void;
-}) {
+interface SavedRoteiro {
+  id: string;
+  destination_name: string;
+  days_count: number;
+  items_count: number;
+  created_at: string;
+  share_slug: string | null;
+}
+
+function MeusRoteiros({ userId }: { userId: string }) {
+  const [roteiros, setRoteiros] = useState<SavedRoteiro[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase
+      .from("user_itineraries")
+      .select("id, destination_name, days_count, items_count, created_at, share_slug")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(10)
+      .then(({ data, error }) => {
+        if (!error && data) setRoteiros(data as SavedRoteiro[]);
+        setLoading(false);
+      });
+  }, [userId]);
+
+  return (
+    <>
+      <Text style={s.sectionLabel} suppressHighlighting>MEUS ROTEIROS</Text>
+      <View style={s.menuCard}>
+        {loading ? (
+          <ActivityIndicator color={GOLD} style={{ margin: 16 }} />
+        ) : roteiros.length === 0 ? (
+          <View style={s.roteiroEmpty}>
+            <Feather name="map" size={20} color="rgba(255,255,255,0.25)" />
+            <Text style={s.roteiroEmptyText}>Nenhum roteiro salvo ainda</Text>
+            <Pressable onPress={() => router.push("/(tabs)/roteiro")} style={s.roteiroCreateBtn}>
+              <Text style={s.roteiroCreateBtnText}>Criar meu primeiro roteiro</Text>
+              <Feather name="arrow-right" size={13} color={GOLD} />
+            </Pressable>
+          </View>
+        ) : (
+          <>
+            {roteiros.map((r, idx) => (
+              <React.Fragment key={r.id}>
+                {idx > 0 && <View style={s.menuDivider} />}
+                <Pressable
+                  style={({ pressed }) => [s.roteiroItem, pressed && { opacity: 0.75 }]}
+                  onPress={() => router.push("/(tabs)/roteiro")}
+                >
+                  <View style={s.roteiroIcon}>
+                    <Feather name="map" size={16} color={GOLD} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.roteiroItemTitle} numberOfLines={1}>{r.destination_name}</Text>
+                    <Text style={s.roteiroItemSub}>
+                      {r.days_count} {r.days_count === 1 ? "dia" : "dias"} · {r.items_count} {r.items_count === 1 ? "item" : "itens"}
+                    </Text>
+                  </View>
+                  <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.30)" />
+                </Pressable>
+              </React.Fragment>
+            ))}
+            <View style={s.menuDivider} />
+            <Pressable
+              style={({ pressed }) => [s.roteiroNewBtn, pressed && { opacity: 0.75 }]}
+              onPress={() => router.push("/(tabs)/roteiro")}
+            >
+              <Feather name="plus" size={15} color={GOLD} />
+              <Text style={s.roteiroNewBtnText}>Criar novo roteiro</Text>
+            </Pressable>
+          </>
+        )}
+      </View>
+    </>
+  );
+}
+
+// ── Free Profile ───────────────────────────────────────────────────────────────
+
+function FreeProfileScreen({ user, signOut }: { user: User; signOut: () => void }) {
   const insets = useSafeAreaInsets();
   const botPad = Platform.OS === "web" ? 32 : insets.bottom + 80;
 
   return (
     <View style={s.profileRoot}>
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: botPad }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
+      <ScrollView contentContainerStyle={{ paddingBottom: botPad }} showsVerticalScrollIndicator={false}>
         <ProfileHeader
           user={user}
           badge={
@@ -954,24 +965,17 @@ function FreeProfileScreen({
           }
         />
 
-        {/* Lucky Pro CTA */}
-        <TouchableOpacity
-          style={s.proCta}
-          onPress={() => router.push("/(tabs)/subscription")}
-          activeOpacity={0.85}
-          accessibilityRole="button"
-        >
+        <TouchableOpacity style={s.proCta} onPress={() => router.push("/(tabs)/subscription")} activeOpacity={0.85} accessibilityRole="button">
           <MaterialCommunityIcons name="crown-outline" size={20} color="#000" />
           <View style={{ flex: 1, marginLeft: 10 }}>
             <Text style={s.proCtaTitle} suppressHighlighting>Seja Lucky Pro</Text>
-            <Text style={s.proCtaSub} suppressHighlighting>
-              Desbloqueie 127 segredos do Rio
-            </Text>
+            <Text style={s.proCtaSub} suppressHighlighting>Desbloqueie 127 segredos do Rio</Text>
           </View>
           <Feather name="arrow-right" size={16} color="#000" />
         </TouchableOpacity>
 
-        {/* Seção: Minha Viagem */}
+        <MeusRoteiros userId={user.id} />
+
         <Text style={s.sectionLabel} suppressHighlighting>MINHA VIAGEM</Text>
         <View style={s.menuCard}>
           <MenuItem
@@ -989,66 +993,34 @@ function FreeProfileScreen({
           />
         </View>
 
-        {/* Seção: Conta */}
         <Text style={s.sectionLabel} suppressHighlighting>CONTA</Text>
         <View style={s.menuCard}>
-          <MenuItem
-            icon={<Feather name="user" size={18} color="rgba(255,255,255,0.60)" />}
-            label="Informações da conta"
-            onPress={() => {}}
-          />
+          <MenuItem icon={<Feather name="user" size={18} color="rgba(255,255,255,0.60)" />} label="Informações da conta" onPress={() => {}} />
           <View style={s.menuDivider} />
-          <MenuItem
-            icon={<Feather name="settings" size={18} color="rgba(255,255,255,0.60)" />}
-            label="Preferências"
-            onPress={() => {}}
-          />
+          <MenuItem icon={<Feather name="settings" size={18} color="rgba(255,255,255,0.60)" />} label="Preferências" onPress={() => {}} />
           <View style={s.menuDivider} />
-          <MenuItem
-            icon={<Feather name="help-circle" size={18} color="rgba(255,255,255,0.60)" />}
-            label="Ajuda e suporte"
-            onPress={() => Linking.openURL("mailto:contato@theluckytrip.com")}
-          />
+          <MenuItem icon={<Feather name="help-circle" size={18} color="rgba(255,255,255,0.60)" />} label="Ajuda e suporte" onPress={() => Linking.openURL("mailto:contato@theluckytrip.com")} />
           <View style={s.menuDivider} />
-          <MenuItem
-            icon={<Feather name="file-text" size={18} color="rgba(255,255,255,0.60)" />}
-            label="Termos e Privacidade"
-            onPress={() => {}}
-          />
+          <MenuItem icon={<Feather name="file-text" size={18} color="rgba(255,255,255,0.60)" />} label="Termos e Privacidade" onPress={() => {}} />
         </View>
 
-        {/* Sair */}
         <View style={[s.menuCard, { marginTop: 8 }]}>
-          <MenuItem
-            icon={<Feather name="log-out" size={18} color="#FF6B6B" />}
-            label="Sair"
-            onPress={signOut}
-            danger
-            rightContent={<View />}
-          />
+          <MenuItem icon={<Feather name="log-out" size={18} color="#FF6B6B" />} label="Sair" onPress={signOut} danger rightContent={<View />} />
         </View>
       </ScrollView>
     </View>
   );
 }
 
-// ── PRO PROFILE ───────────────────────────────────────────────────────────────
+// ── Pro Profile ────────────────────────────────────────────────────────────────
 
-function ProProfileScreen({
-  user, signOut,
-}: {
-  user: User; signOut: () => void;
-}) {
+function ProProfileScreen({ user, signOut }: { user: User; signOut: () => void }) {
   const insets = useSafeAreaInsets();
   const botPad = Platform.OS === "web" ? 32 : insets.bottom + 80;
 
   return (
     <View style={s.profileRoot}>
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: botPad }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
+      <ScrollView contentContainerStyle={{ paddingBottom: botPad }} showsVerticalScrollIndicator={false}>
         <ProfileHeader
           user={user}
           badge={
@@ -1059,7 +1031,6 @@ function ProProfileScreen({
           }
         />
 
-        {/* Assinatura card */}
         <View style={s.subscriptionCard}>
           <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
             <MaterialCommunityIcons name="crown" size={16} color={GOLD} />
@@ -1068,329 +1039,42 @@ function ProProfileScreen({
           <Text style={s.subscriptionSub} suppressHighlighting>
             Você tem acesso completo a todos os segredos do Rio de Janeiro.
           </Text>
-          <TouchableOpacity
-            style={s.manageBtn}
-            onPress={() => router.push("/(tabs)/subscription")}
-            activeOpacity={0.75}
-            accessibilityRole="button"
-          >
+          <TouchableOpacity style={s.manageBtn} onPress={() => router.push("/(tabs)/subscription")} activeOpacity={0.75} accessibilityRole="button">
             <Text style={s.manageBtnText} suppressHighlighting>Gerenciar assinatura</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Seção: Minha Viagem */}
+        <MeusRoteiros userId={user.id} />
+
         <Text style={s.sectionLabel} suppressHighlighting>MINHA VIAGEM</Text>
         <View style={s.menuCard}>
-          <MenuItem
-            icon={<Feather name="book-open" size={18} color={GOLD} />}
-            label="Diário de Viagem"
-            sublabel="Registre memórias e momentos"
-            onPress={() => router.navigate("/diario")}
-          />
+          <MenuItem icon={<Feather name="book-open" size={18} color={GOLD} />} label="Diário de Viagem" sublabel="Registre memórias e momentos" onPress={() => router.navigate("/diario")} />
           <View style={s.menuDivider} />
-          <MenuItem
-            icon={<Feather name="divide-circle" size={18} color={GOLD} />}
-            label="Divisão de Contas"
-            sublabel="Organize os gastos do grupo"
-            onPress={() => router.navigate("/contas")}
-          />
+          <MenuItem icon={<Feather name="divide-circle" size={18} color={GOLD} />} label="Divisão de Contas" sublabel="Organize os gastos do grupo" onPress={() => router.navigate("/contas")} />
         </View>
 
-        {/* Seção: Conta */}
         <Text style={s.sectionLabel} suppressHighlighting>CONTA</Text>
         <View style={s.menuCard}>
-          <MenuItem
-            icon={<Feather name="user" size={18} color="rgba(255,255,255,0.60)" />}
-            label="Informações da conta"
-            onPress={() => {}}
-          />
+          <MenuItem icon={<Feather name="user" size={18} color="rgba(255,255,255,0.60)" />} label="Informações da conta" onPress={() => {}} />
           <View style={s.menuDivider} />
-          <MenuItem
-            icon={<Feather name="settings" size={18} color="rgba(255,255,255,0.60)" />}
-            label="Preferências"
-            onPress={() => {}}
-          />
+          <MenuItem icon={<Feather name="settings" size={18} color="rgba(255,255,255,0.60)" />} label="Preferências" onPress={() => {}} />
           <View style={s.menuDivider} />
-          <MenuItem
-            icon={<Feather name="help-circle" size={18} color="rgba(255,255,255,0.60)" />}
-            label="Ajuda e suporte"
-            onPress={() => Linking.openURL("mailto:contato@theluckytrip.com")}
-          />
+          <MenuItem icon={<Feather name="help-circle" size={18} color="rgba(255,255,255,0.60)" />} label="Ajuda e suporte" onPress={() => Linking.openURL("mailto:contato@theluckytrip.com")} />
           <View style={s.menuDivider} />
-          <MenuItem
-            icon={<Feather name="file-text" size={18} color="rgba(255,255,255,0.60)" />}
-            label="Termos e Privacidade"
-            onPress={() => {}}
-          />
+          <MenuItem icon={<Feather name="file-text" size={18} color="rgba(255,255,255,0.60)" />} label="Termos e Privacidade" onPress={() => {}} />
         </View>
 
-        {/* Sair */}
         <View style={[s.menuCard, { marginTop: 8 }]}>
-          <MenuItem
-            icon={<Feather name="log-out" size={18} color="#FF6B6B" />}
-            label="Sair"
-            onPress={signOut}
-            danger
-            rightContent={<View />}
-          />
+          <MenuItem icon={<Feather name="log-out" size={18} color="#FF6B6B" />} label="Sair" onPress={signOut} danger rightContent={<View />} />
         </View>
       </ScrollView>
     </View>
   );
 }
 
-// ── STYLES ────────────────────────────────────────────────────────────────────
+// ── Styles ─────────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  // ── Auth screens ──
-  root: {
-    flex: 1,
-    backgroundColor: "#0a0a0a",
-  },
-  heroOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.55)",
-  },
-  kav:    { flex: 1 },
-  scroll: { flexGrow: 1, paddingHorizontal: 24 },
-
-  page: {
-    flex: 1,
-    alignItems: "center",
-    ...WNS,
-  },
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    ...WNS,
-  },
-
-  backBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    alignSelf: "flex-start",
-    paddingVertical: 10,
-    marginBottom: 4,
-    ...WNS,
-  },
-  backText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 15,
-    color: "rgba(255,255,255,0.80)",
-  },
-
-  logoWrap: {
-    alignItems: "center",
-    marginBottom: 12,
-    ...WNS,
-  },
-  logo: {
-    width: 68,
-    height: 68,
-    marginBottom: 4,
-  },
-  brand: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
-    color: "#FFFFFF",
-    letterSpacing: 3,
-  },
-
-  badge: {
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.35)",
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 4,
-    marginBottom: 16,
-    ...WNS,
-  },
-  badgeText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 10,
-    color: "rgba(255,255,255,0.75)",
-    letterSpacing: 2,
-  },
-
-  headline: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 28,
-    color: "#FFFFFF",
-    textAlign: "center",
-    marginBottom: 20,
-    lineHeight: 36,
-    ...WNS,
-  },
-
-  fieldWrap: {
-    width: "100%",
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.09)",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-    paddingHorizontal: 14,
-    paddingVertical: Platform.OS === "ios" ? 14 : 12,
-    marginBottom: 12,
-    gap: 10,
-  },
-  field: {
-    flex: 1,
-    fontFamily: "Inter_400Regular",
-    fontSize: 15,
-    color: "#FFFFFF",
-  },
-
-  checkRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "flex-start",
-    gap: 10,
-    marginBottom: 16,
-    ...WNS,
-  },
-  checkbox: {
-    width: 18,
-    height: 18,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    borderColor: "rgba(255,255,255,0.40)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  checkboxChecked: {
-    backgroundColor: GOLD,
-    borderColor: GOLD,
-  },
-  checkText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: "rgba(255,255,255,0.65)",
-    flexShrink: 1,
-  },
-  checkLink: {
-    color: GOLD,
-    fontFamily: "Inter_500Medium",
-  },
-
-  errorText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: "#FF6B6B",
-    marginBottom: 10,
-    textAlign: "center",
-    ...WNS,
-  },
-
-  cta: {
-    width: "100%",
-    backgroundColor: GOLD,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: "center",
-    marginBottom: 18,
-  },
-  ctaText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 16,
-    color: "#000000",
-    ...WNS,
-  },
-
-  dividerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    width: "100%",
-    marginBottom: 14,
-    gap: 10,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "rgba(255,255,255,0.16)",
-  },
-  dividerText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: "rgba(255,255,255,0.45)",
-    ...WNS,
-  },
-
-  socialRow: {
-    flexDirection: "row",
-    gap: 10,
-    width: "100%",
-    marginBottom: 20,
-  },
-  socialBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: "rgba(255,255,255,0.10)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.16)",
-    borderRadius: 12,
-    paddingVertical: 13,
-  },
-  socialBtnText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 13,
-    color: "#FFFFFF",
-    ...WNS,
-  },
-
-  footerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    ...WNS,
-  },
-  footerText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: "rgba(255,255,255,0.55)",
-  },
-  footerLink: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-    color: GOLD,
-  },
-
-  sentIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "rgba(212,175,55,0.12)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginVertical: 16,
-    ...WNS,
-  },
-  sub: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    color: "rgba(255,255,255,0.60)",
-    textAlign: "center",
-    marginBottom: 6,
-    lineHeight: 20,
-    ...WNS,
-  },
-  sentNote: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: "rgba(255,255,255,0.45)",
-    textAlign: "center",
-    lineHeight: 18,
-    marginTop: 6,
-    paddingHorizontal: 16,
-    ...WNS,
-  },
-
-  // ── Profile screens ──
   profileRoot: {
     flex: 1,
     backgroundColor: DARK,
@@ -1404,7 +1088,11 @@ const s = StyleSheet.create({
   },
   profileHeroOverlay: {
     ...StyleSheet.absoluteFillObject,
+<<<<<<< HEAD
     backgroundColor: "transparent",
+=======
+    backgroundColor: "rgba(0,0,0,0.45)",
+>>>>>>> claude/plan-app-architecture-73RnI
   },
   profileHeroGradient: {
     position: "absolute",
@@ -1572,5 +1260,65 @@ const s = StyleSheet.create({
     height: 1,
     backgroundColor: "rgba(255,255,255,0.07)",
     marginLeft: 56,
+  },
+  roteiroEmpty: {
+    alignItems: "center",
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  roteiroEmptyText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.35)",
+  },
+  roteiroCreateBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 4,
+  },
+  roteiroCreateBtnText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: GOLD,
+  },
+  roteiroItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 12,
+  },
+  roteiroIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: "rgba(212,175,55,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  roteiroItemTitle: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    color: "#FFFFFF",
+  },
+  roteiroItemSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: "rgba(255,255,255,0.40)",
+    marginTop: 2,
+  },
+  roteiroNewBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 10,
+  },
+  roteiroNewBtnText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: GOLD,
   },
 });

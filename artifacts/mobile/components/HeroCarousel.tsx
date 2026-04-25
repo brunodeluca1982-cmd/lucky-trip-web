@@ -12,6 +12,8 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
+import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import type { HeroComposedItem, HeroRoute } from "@/hooks/useHeroComposed";
 import { useBackground } from "@/context/BackgroundContext";
@@ -20,11 +22,30 @@ const C = Colors.light;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const HERO_HEIGHT = Math.round(SCREEN_WIDTH * 1.1);
 
+<<<<<<< HEAD
+=======
+export type HeroCardType = "destino" | "em_breve" | "guia" | "dica";
+
+export interface HeroItem {
+  id: string;
+  cidade: string;         // city name OR friend name
+  pais: string;           // country OR city (for guides)
+  badge: string;          // "DESTINO" | "EM BREVE" | "GUIA EXCLUSIVO" | category label
+  image: ImageSourcePropType;
+  type?: HeroCardType;    // determines tap behaviour
+  cityId?: string;        // for destino/em_breve
+  friendSlug?: string;    // for guia
+  route?: string;         // custom route override
+  comingSoonCopy?: string; // shown in Alert for EM BREVE cards
+}
+
+>>>>>>> claude/plan-app-architecture-73RnI
 interface HeroCarouselProps {
   items: HeroComposedItem[];
   onIndexChange?: (index: number) => void;
 }
 
+<<<<<<< HEAD
 // ── Navigation handler — one function per route type ─────────────────────────
 function navigateHeroRoute(route: HeroRoute) {
   switch (route.type) {
@@ -76,6 +97,45 @@ function HeroSlide({
     <Pressable
       style={({ pressed }) => [styles.slide, pressed && { opacity: 0.94 }]}
       onPress={() => navigateHeroRoute(item.route)}
+=======
+function handleSlidePress(item: HeroItem) {
+  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  const type = item.type ?? (item.cityId === "rio" ? "destino" : item.cityId ? "em_breve" : undefined);
+
+  if (type === "guia" && item.friendSlug) {
+    router.push({ pathname: "/friend/[slug]", params: { slug: item.friendSlug } });
+    return;
+  }
+
+  if (type === "em_breve") {
+    Alert.alert(
+      item.cidade,
+      item.comingSoonCopy ?? "Estamos preparando esse destino com o cuidado do The Lucky Trip.",
+      [{ text: "OK" }]
+    );
+    return;
+  }
+
+  if (type === "destino" || item.cityId === "rio") {
+    if (item.route) {
+      router.push(item.route as any);
+    } else if (item.cityId) {
+      router.push({ pathname: "/cidade/[id]", params: { id: item.cityId } });
+    }
+    return;
+  }
+
+  if (item.route) {
+    router.push(item.route as any);
+  }
+}
+
+function HeroSlide({ item }: { item: HeroItem }) {
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.slide, pressed && { opacity: 0.94 }]}
+      onPress={() => handleSlidePress(item)}
+>>>>>>> claude/plan-app-architecture-73RnI
     >
       {imageSource ? (
         <Image
@@ -105,8 +165,20 @@ function HeroSlide({
         <View style={styles.badgeContainer}>
           <Text style={styles.badgeText}>{item.badge}</Text>
         </View>
+<<<<<<< HEAD
         <Text style={styles.cidade}>{item.titulo}</Text>
         <Text style={styles.pais}>{item.localizacao}</Text>
+=======
+        <Text style={styles.cidade}>{item.cidade}</Text>
+        <Text style={styles.pais}>{item.pais}</Text>
+        {/* "Conferir agora" CTA — shown for actionable cards only */}
+        {(item.type === "destino" || item.type === "guia") && (
+          <View style={styles.ctaBtn}>
+            <Text style={styles.ctaBtnText}>Conferir agora</Text>
+            <Feather name="arrow-right" size={12} color="#000" style={{ marginLeft: 4 }} />
+          </View>
+        )}
+>>>>>>> claude/plan-app-architecture-73RnI
       </View>
     </Pressable>
   );
@@ -143,7 +215,7 @@ export function HeroCarousel({ items, onIndexChange }: HeroCarouselProps) {
         onIndexChangeRef.current?.(next);
         return next;
       });
-    }, 4000);
+    }, 11000);
     return () => {
       if (autoplayRef.current) clearInterval(autoplayRef.current);
     };
@@ -290,12 +362,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "rgba(255,255,255,0.80)",
     marginTop: 6,
-    marginBottom: 24,
+    marginBottom: 18,
     letterSpacing: 3,
     textTransform: "uppercase",
     textShadowColor: "rgba(0,0,0,0.70)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 6,
+  },
+  ctaBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#D4AF37",
+    borderRadius: 22,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  ctaBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: "#000000",
+    letterSpacing: 0.3,
   },
   dots: {
     position: "absolute",

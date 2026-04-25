@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import React, { memo, useCallback, useState } from "react";
+=======
+import React, { memo, useCallback, useState, useEffect } from "react";
+>>>>>>> claude/plan-app-architecture-73RnI
 import {
   Dimensions,
   Image,
@@ -16,6 +20,8 @@ import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useDestinos } from "@/hooks/useDestinos";
 import { RotatingBackground } from "@/components/RotatingBackground";
+import { useRioHeroMedia } from "@/hooks/useHeroMedia";
+import { useDestinoFoto } from "@/hooks/useDestinoFotos";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -25,6 +31,7 @@ const COLS = 2;
 const CARD_W = (SCREEN_WIDTH - H_PAD * 2 - GAP * (COLS - 1)) / COLS;
 const CARD_H = Math.round(CARD_W * 1.55); // portrait ratio
 
+<<<<<<< HEAD
 const SELECTED_ID = "rio";
 const MAX_ITEMS = 20;
 
@@ -34,33 +41,62 @@ function SkeletonCard() {
 }
 
 // ── Memoized card ──────────────────────────────────────────────────────────────
+=======
+const SELECTED_ID = "rio-de-janeiro";
+
+// ── Memoized card: uses bucket photos with fallback ──────────────────────────
+>>>>>>> claude/plan-app-architecture-73RnI
 interface DestCardProps {
   id: string;
+  slug: string;
   cidade: string;
   pais: string;
+<<<<<<< HEAD
   heroImageUrl?: string | null;
+=======
+  fallbackImage: ImageSourcePropType;
+>>>>>>> claude/plan-app-architecture-73RnI
   selected: boolean;
   lancado: boolean;
 }
 
 const DestCard = memo(function DestCard({
   id,
+  slug,
   cidade,
   pais,
+<<<<<<< HEAD
   heroImageUrl,
   selected,
   lancado,
 }: DestCardProps) {
+=======
+  fallbackImage,
+  selected,
+  lancado,
+}: DestCardProps) {
+  // Busca foto do bucket media/{slug}/hero/foto/ com fallbacks
+  const { foto, isPlaceholder } = useDestinoFoto(slug);
+
+  // Stable handler — created once per card id, never recreated on parent re-render
+>>>>>>> claude/plan-app-architecture-73RnI
   const handlePress = useCallback(() => {
     router.push({ pathname: "/cidade/[id]", params: { id } });
   }, [id]);
 
+<<<<<<< HEAD
   const [imageError, setImageError] = useState(false);
 
   const imageUri =
     heroImageUrl?.trim() || null;
 
   const showImage = !!imageUri && !imageError;
+=======
+  // Determina a fonte da imagem
+  const imageSource: ImageSourcePropType = foto
+    ? { uri: foto }
+    : fallbackImage;
+>>>>>>> claude/plan-app-architecture-73RnI
 
   return (
     <Pressable
@@ -72,6 +108,7 @@ const DestCard = memo(function DestCard({
         pressed && { opacity: 0.88, transform: [{ scale: 0.97 }] },
       ]}
     >
+<<<<<<< HEAD
       {showImage ? (
         <Image
           source={{ uri: imageUri! }}
@@ -84,6 +121,19 @@ const DestCard = memo(function DestCard({
         />
       ) : (
         <View style={{ width: "100%", height: "100%", backgroundColor: "#1c1c1e" }} />
+=======
+      {/* Image from bucket or fallback */}
+      {isPlaceholder && !fallbackImage ? (
+        <View style={[s.cardImage, s.placeholderBg]}>
+          <Text style={s.placeholderText}>{cidade}</Text>
+        </View>
+      ) : (
+        <Image
+          source={imageSource}
+          style={[s.cardImage, !lancado && { opacity: 0.72 }]}
+          resizeMode="cover"
+        />
+>>>>>>> claude/plan-app-architecture-73RnI
       )}
 
       {/* Bottom gradient — bottom 45% only */}
@@ -121,10 +171,24 @@ const DestCard = memo(function DestCard({
 });
 
 // ── Screen ─────────────────────────────────────────────────────────────────────
+<<<<<<< HEAD
+=======
+// Background com fotos do Rio em loop desfocado (igual home)
+const RIO_BG_PHOTOS = [
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero01.jpg" },
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero02.jpg" },
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero03.jpg" },
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero04.jpg" },
+  { uri: "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero05.jpg" },
+];
+const DESTINOS_BG_POOL = RIO_BG_PHOTOS;
+
+>>>>>>> claude/plan-app-architecture-73RnI
 export default function DestinosScreen() {
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === "web" ? 67 : insets.top + 12;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const rioHero = useRioHeroMedia("image");
 
   const { destinos, loading } = useDestinos();
   const [query, setQuery] = React.useState("");
@@ -150,7 +214,17 @@ export default function DestinosScreen() {
     <View style={s.root}>
       {/* Full-screen atmospheric background */}
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
+<<<<<<< HEAD
         <RotatingBackground />
+=======
+        <RotatingBackground
+          pool={rioHero && rioHero.length > 0
+            ? rioHero.map((item) => ({ uri: item.public_url }))
+            : DESTINOS_BG_POOL}
+          interval={15000}
+          blurRadius={0}
+        />
+>>>>>>> claude/plan-app-architecture-73RnI
         <LinearGradient
           colors={["rgba(0,0,0,0.74)", "rgba(0,0,0,0.66)", "rgba(0,0,0,0.86)"]}
           locations={[0, 0.5, 1]}
@@ -174,9 +248,14 @@ export default function DestinosScreen() {
               Descubra lugares autênticos vividos pelo Bruno
             </Text>
           </View>
-          <Pressable style={s.profileBtn} hitSlop={8}>
-            <Feather name="user" size={20} color="rgba(255,255,255,0.80)" />
-          </Pressable>
+          <View style={s.headerRight}>
+            <Pressable style={s.iconBtn} hitSlop={8}>
+              <Feather name="music" size={18} color="#FFF" />
+            </Pressable>
+            <Pressable style={s.iconBtn} hitSlop={8}>
+              <Feather name="play" size={16} color="#FFF" />
+            </Pressable>
+          </View>
         </View>
 
         {/* Search bar */}
@@ -215,9 +294,14 @@ export default function DestinosScreen() {
                   <DestCard
                     key={d.id}
                     id={d.id}
+                    slug={d.id}
                     cidade={d.cidade}
                     pais={d.pais}
+<<<<<<< HEAD
                     heroImageUrl={d.image}
+=======
+                    fallbackImage={d.image}
+>>>>>>> claude/plan-app-architecture-73RnI
                     selected={d.id === SELECTED_ID}
                     lancado={d.lancado}
                   />
@@ -275,16 +359,17 @@ const s = StyleSheet.create({
     color: "rgba(255,255,255,0.58)",
     lineHeight: 19,
   },
-  profileBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(255,255,255,0.13)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.22)",
+  headerRight: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.35)",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 2,
   },
 
   // Search
@@ -341,6 +426,22 @@ const s = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
+<<<<<<< HEAD
+=======
+  placeholderBg: {
+    backgroundColor: "#D4C5A9",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  placeholderText: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 11,
+    color: "#4A4844",
+    textAlign: "center",
+    paddingHorizontal: 6,
+  },
+  // Bottom-anchored: image top half is never covered
+>>>>>>> claude/plan-app-architecture-73RnI
   cardGradient: {
     position: "absolute",
     left: 0,

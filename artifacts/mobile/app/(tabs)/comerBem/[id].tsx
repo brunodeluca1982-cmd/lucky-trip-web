@@ -8,6 +8,7 @@
 
 import React, { useRef } from "react";
 import {
+  ActivityIndicator,
   Dimensions,
   Image,
   Platform,
@@ -23,9 +24,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { destinos } from "@/data/mockData";
-import { useRestaurants } from "@/hooks/useRestaurants";
+import { useRestaurantes } from "@/hooks/useRestaurantes";
+import { useBairros } from "@/hooks/useBairros";
 import RioMapView from "@/components/RioMapView";
 import { useGuia } from "@/context/GuiaContext";
+import { getImageForEntity } from "@/utils/getImageForEntity";
 
 const C = Colors.light;
 const GOLD = "#D4AF37";
@@ -46,6 +49,8 @@ const DEFAULT_DESCRICAO = [
   "Ingredientes locais, chefs comprometidos e ambientes que valem a visita.",
 ];
 
+const RIO_DESTINO_ID = "7f047742-427f-4b11-8286-781af899c57d";
+
 export default function ComerBemScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets    = useSafeAreaInsets();
@@ -55,16 +60,17 @@ export default function ComerBemScreen() {
   const destino   = destinos.find((d) => d.id === id) ?? destinos[0];
   const descricao = DESCRICOES[destino.id] ?? DEFAULT_DESCRICAO;
 
-  const { restaurantes: allRestaurantes, loading, error } = useRestaurants(destino.id);
+  const { restaurantes, loading, error } = useRestaurantes(RIO_DESTINO_ID);
+  const { bairros, loading: bairrosLoading } = useBairros(RIO_DESTINO_ID);
   const { save, unsave, isSaved } = useGuia();
 
   const listRef = useRef<ScrollView>(null);
 
-  function handleNeighborhoodPress(name: string | null) {
-    if (!name) return;
+  function handleBairroPress(bairro: any) {
+    if (!bairro) return;
     router.push({
       pathname: "/comerBem/bairro/[bairroNome]",
-      params: { bairroNome: name, cityId: destino.id },
+      params: { bairroNome: bairro.nome, cityId: destino.id },
     });
   }
 
@@ -75,8 +81,10 @@ export default function ComerBemScreen() {
       {/* ── Fixed map section ── */}
       <View style={s.mapSection}>
         <RioMapView
-          selectedNeighborhood={null}
-          onNeighborhoodPress={handleNeighborhoodPress}
+          bairros={bairros}
+          selectedBairroId={null}
+          onBairroPress={handleBairroPress}
+          loading={bairrosLoading}
           style={StyleSheet.absoluteFillObject}
         />
 
@@ -87,7 +95,7 @@ export default function ComerBemScreen() {
           <View style={s.pill}>
             <View style={s.badgeDot} />
             <Text style={s.pillText}>
-              {loading ? "carregando…" : `${allRestaurantes.length} restaurantes`}
+              {loading ? "carregando…" : `${restaurantes.length} restaurantes`}
             </Text>
           </View>
         </View>
@@ -120,12 +128,13 @@ export default function ComerBemScreen() {
           <View style={[s.intro, s.introAbsolute]}>
             <Text style={s.introTitle}>Onde comer em {destino.cidade}</Text>
             <Text style={s.introPara}>{descricao[0]}</Text>
+            <Text style={s.byline}>Por Bruno de Luca</Text>
             <View style={s.introMeta}>
               <View style={s.introDot} />
               <Text style={s.introMetaText}>
                 {loading
                   ? "Carregando seleção…"
-                  : `Seleção curada · ${allRestaurantes.length} restaurante${allRestaurantes.length !== 1 ? "s" : ""}`}
+                  : `Seleção curada · ${restaurantes.length} restaurante${restaurantes.length !== 1 ? "s" : ""}`}
               </Text>
             </View>
           </View>
@@ -153,8 +162,13 @@ export default function ComerBemScreen() {
             </View>
           )}
 
+<<<<<<< HEAD
           {!loading && !error && allRestaurantes.map((r, index) => {
             const imageSource = r.resolvedPhotoUri ? { uri: r.resolvedPhotoUri } : null;
+=======
+          {!loading && !error && restaurantes.map((r, index) => {
+            const imageSource = getImageForEntity("restaurant", r.nome, r.bairro_nome ?? "", r.hero_image_url);
+>>>>>>> claude/plan-app-architecture-73RnI
 
             return (
               <Pressable
@@ -163,7 +177,7 @@ export default function ComerBemScreen() {
                 onPress={() =>
                   router.push({
                     pathname: "/lugar/[cityId]/[placeId]",
-                    params: { cityId: destino.id, placeId: String(r.id), source_table: "restaurantes" },
+                    params: { cityId: destino.id, placeId: String(r.id), source_table: "lugares" },
                   })
                 }
               >
@@ -184,10 +198,10 @@ export default function ComerBemScreen() {
                       } else {
                         save({
                           id:           String(r.id),
-                          categoria:    "restaurante",
-                          source_table: "restaurantes",
+                          categoria:    r.categoria as any,
+                          source_table: "lugares",
                           titulo:       r.nome,
-                          localizacao:  r.bairro,
+                          localizacao:  r.bairro_nome ?? "",
                           image:        imageSource,
                         });
                       }
@@ -199,9 +213,9 @@ export default function ComerBemScreen() {
                       color={isSaved(String(r.id)) ? GOLD : C.white}
                     />
                   </Pressable>
-                  {r.perfil_publico ? (
+                  {r.preco_nivel ? (
                     <View style={s.priceBadge}>
-                      <Text style={s.priceText}>{r.perfil_publico}</Text>
+                      <Text style={s.priceText}>{"$".repeat(r.preco_nivel)}</Text>
                     </View>
                   ) : null}
                   <View style={s.orderBadge}>
@@ -214,7 +228,7 @@ export default function ComerBemScreen() {
                     <Text style={s.cardCategoria}>{r.categoria.toUpperCase()}</Text>
                     <View style={s.cardLocWrap}>
                       <Feather name="map-pin" size={10} color={C.warmGray} />
-                      <Text style={s.cardLocText}>{r.bairro}</Text>
+                      <Text style={s.cardLocText}>{r.bairro_nome ?? ""}</Text>
                     </View>
                   </View>
                   <Text style={s.cardTitulo}>{r.nome}</Text>
@@ -225,7 +239,7 @@ export default function ComerBemScreen() {
                       e.stopPropagation?.();
                       router.push({
                         pathname: "/lugar/[cityId]/[placeId]",
-                        params: { cityId: destino.id, placeId: String(r.id), source_table: "restaurantes", showMap: "true" },
+                        params: { cityId: destino.id, placeId: String(r.id), source_table: "lugares", showMap: "true" },
                       });
                     }}
                   >
@@ -353,6 +367,14 @@ const s = StyleSheet.create({
     fontSize: 12,
     color: "rgba(255,255,255,0.35)",
     letterSpacing: 0.5,
+  },
+  byline: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11.5,
+    color: "#D4AF37",
+    letterSpacing: 0.6,
+    marginBottom: 10,
+    opacity: 0.85,
   },
 
   listSection: {

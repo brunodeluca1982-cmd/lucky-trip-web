@@ -210,7 +210,7 @@ export default function PostPurchaseScreen() {
           router.push({ pathname: "/luckyList/[id]", params: { id: "rio" } })
         }
       >
-        <Text style={s.ctaText}>Explorar a Lucky List</Text>
+        <Text style={s.ctaText}>Ver a Lucky List</Text>
       </Pressable>
 
       <Pressable
