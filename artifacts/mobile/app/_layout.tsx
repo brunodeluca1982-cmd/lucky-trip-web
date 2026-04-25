@@ -17,17 +17,12 @@ import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
 import React, { useEffect } from "react";
 import { Platform, StyleSheet, View } from "react-native";
-<<<<<<< HEAD
-import { notifyFontsReady, notifyHeroReady } from "@/lib/splashGate";
-=======
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { notifyFontsReady } from "@/lib/splashGate";
->>>>>>> claude/plan-app-architecture-73RnI
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { BackgroundProvider } from "@/context/BackgroundContext";
 import { GuiaProvider } from "@/context/GuiaContext";
 import { SplashOverlay } from "@/components/SplashOverlay";
 
@@ -84,7 +79,6 @@ function RootLayoutNav() {
         <Stack.Screen name="diario"              options={{ headerShown: false, contentStyle: { backgroundColor: "#0D0D0D" }, animation: "slide_from_right" }} />
         <Stack.Screen name="contas"              options={{ headerShown: false, contentStyle: { backgroundColor: "#0D0D0D" }, animation: "slide_from_right" }} />
         <Stack.Screen name="comoChegar/[cityId]" options={{ headerShown: false, contentStyle: { backgroundColor: "#1A0E04" }, animation: "slide_from_right" }} />
-        <Stack.Screen name="roteiro/resultado"  options={{ headerShown: false, contentStyle: { backgroundColor: "#1A0E04" }, animation: "slide_from_right" }} />
       </Stack>
     </ThemeProvider>
   );
@@ -144,21 +138,6 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider style={{ backgroundColor: ROOT_BG }}>
       <ErrorBoundary>
-<<<<<<< HEAD
-        <BackgroundProvider onFirstImage={notifyHeroReady}>
-          <GuiaProvider>
-            <QueryClientProvider client={queryClient}>
-              <GestureHandlerRootView style={{ flex: 1, backgroundColor: ROOT_BG }}>
-                <KeyboardProvider>
-                  <RootLayoutNav />
-                </KeyboardProvider>
-                {/* Branded session splash — covers everything on first launch only */}
-                <SplashOverlay />
-              </GestureHandlerRootView>
-            </QueryClientProvider>
-          </GuiaProvider>
-        </BackgroundProvider>
-=======
         <GuiaProvider>
           <QueryClientProvider client={queryClient}>
             <GestureHandlerRootView style={{ flex: 1, backgroundColor: ROOT_BG }}>
@@ -168,7 +147,6 @@ export default function RootLayout() {
             </GestureHandlerRootView>
           </QueryClientProvider>
         </GuiaProvider>
->>>>>>> claude/plan-app-architecture-73RnI
       </ErrorBoundary>
     </SafeAreaProvider>
   );

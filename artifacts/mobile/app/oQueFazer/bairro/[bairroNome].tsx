@@ -27,7 +27,6 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { sanitizePhotoUrl } from "@/utils/getImageForEntity";
 import { destinos } from "@/data/mockData";
 import { useNeighborhoods } from "@/hooks/useNeighborhoods";
 import { useOQueFazer } from "@/hooks/useOQueFazer";
@@ -73,7 +72,11 @@ export default function OQueFazerBairroScreen() {
     (n) => n.neighborhood_name === bairroNome,
   ) ?? null;
 
-  const heroImage = getNeighborhoodHero(supabaseNeighborhood?.image_url);
+  const heroImage = getNeighborhoodHero(
+    supabaseNeighborhood?.image_url,
+    bairroNome,
+    destino.image,
+  );
 
   const [editorialOpen, setEditorialOpen] = useState(false);
 
@@ -87,13 +90,11 @@ export default function OQueFazerBairroScreen() {
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* ── Full-screen background (persists while scrolling) ── */}
-      {heroImage != null && (
-        <Image
-          source={heroImage}
-          style={StyleSheet.absoluteFillObject}
-          resizeMode="cover"
-        />
-      )}
+      <Image
+        source={heroImage}
+        style={StyleSheet.absoluteFillObject}
+        resizeMode="cover"
+      />
       <LinearGradient
         colors={["rgba(0,0,0,0.05)", "rgba(0,0,0,0.38)", "rgba(0,0,0,0.82)", "rgba(0,0,0,0.95)"]}
         locations={[0, 0.30, 0.54, 1.0]}
@@ -169,7 +170,7 @@ export default function OQueFazerBairroScreen() {
               .split("\n")
               .map((p, i) =>
                 p.trim() ? (
-                  <Text key={`para-${i}`} style={s.bodyText}>{p.trim()}</Text>
+                  <Text key={i} style={s.bodyText}>{p.trim()}</Text>
                 ) : null,
               )}
 
@@ -177,7 +178,7 @@ export default function OQueFazerBairroScreen() {
               <>
                 <Text style={[s.sectionLabel, { marginTop: 24 }]}>Como viver o bairro</Text>
                 {supabaseNeighborhood.how_to_live.map((tip, i) => (
-                  <View key={`tip-${i}`} style={s.tipRow}>
+                  <View key={i} style={s.tipRow}>
                     <View style={s.tipDot} />
                     <Text style={s.tipText}>{tip}</Text>
                   </View>
@@ -238,20 +239,12 @@ export default function OQueFazerBairroScreen() {
               onPress={() =>
                 router.push({
                   pathname: "/lugar/[cityId]/[placeId]",
-<<<<<<< HEAD
-                  params: { cityId: destino.id, placeId: place.id, source_table: "o_que_fazer_rio_v2" },
-=======
                   params: { cityId: destino.id, placeId: place.id, source_table: "lugares" },
->>>>>>> claude/plan-app-architecture-73RnI
                 })
               }
             >
               <View style={s.cardImageWrap}>
-                {sanitizePhotoUrl(place.photo_url) ? (
-                  <Image source={{ uri: sanitizePhotoUrl(place.photo_url)! }} style={s.cardImage} resizeMode="cover" />
-                ) : (
-                  <View style={[s.cardImage, { backgroundColor: "#1A0E04" }]} />
-                )}
+                <Image source={place.image} style={s.cardImage} resizeMode="cover" />
                 <LinearGradient
                   colors={["rgba(0,0,0,0.10)", "transparent"]}
                   locations={[0, 0.4]}
@@ -268,11 +261,7 @@ export default function OQueFazerBairroScreen() {
                       save({
                         id:           place.id,
                         categoria:    "oQueFazer",
-<<<<<<< HEAD
-                        source_table: "o_que_fazer_rio_v2",
-=======
                         source_table: "lugares",
->>>>>>> claude/plan-app-architecture-73RnI
                         titulo:       place.titulo,
                         localizacao:  place.localizacao,
                         image:        place.image ?? FALLBACK_IMG,
@@ -312,11 +301,7 @@ export default function OQueFazerBairroScreen() {
                     e.stopPropagation?.();
                     router.push({
                       pathname: "/lugar/[cityId]/[placeId]",
-<<<<<<< HEAD
-                      params: { cityId: destino.id, placeId: place.id, source_table: "o_que_fazer_rio_v2", showMap: "true" },
-=======
                       params: { cityId: destino.id, placeId: place.id, source_table: "lugares", showMap: "true" },
->>>>>>> claude/plan-app-architecture-73RnI
                     });
                   }}
                 >

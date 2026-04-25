@@ -1,22 +1,35 @@
 /**
- * getImageForEntity.ts — Unified image resolver for all entity types.
+ * getImageForEntity.ts — Unified, stable image resolver for all entity types.
  *
- * IMAGE PIPELINE:
- *   1. item.photo_url (Supabase column)         → source: supabase
- *   2. place_photos table (server-side cache)   → source: cache
- *   3. Google Places API (server-side only)     → source: google
+ * Priority chain (strict, never skipped):
+ *   1. Supabase image_url / photo_url  — if set and non-empty, always wins
+ *   2. Curated entity-specific web URI — Wikipedia Commons permalink (NATIVE ONLY)
+ *   3. Neighborhood-based image        — via getNeighborhoodImage(localizacao)
+ *      On native: Wikipedia Commons URI for the neighborhood zone.
+ *      On web:    Local bundled .png (CORS-safe, always visible).
+ *   4. Local asset fallback            — bundled .png, always available offline
  *
- * FRONTEND RULES:
- *   - Accept ANY url stored in Supabase photo_url (including cached Google)
- *   - NEVER call Google directly from the frontend
- *   - If photo_url is null → render premium placeholder
+ * PLATFORM RULE (critical):
+ *   Expo web cannot reliably load external image URIs — Wikipedia Commons
+ *   Special:FilePath URLs involve redirect chains that trigger CORS failures,
+ *   causing the Image component to render nothing (shows card background color).
+ *   On web: all external URI tiers are skipped; local bundled assets are used.
+ *   On native: external URIs work fine — higher quality images are preferred.
+ *
+ * Stability guarantee:
+ *   All resolutions are cached in a module-level Map keyed by
+ *   (type:name:localizacao:platform). Same entity → same image on every
+ *   screen, every render, every session.
  */
+
+import { Platform } from "react-native";
+import {
+  getNeighborhoodImage,
+  type NeighborhoodImageSource,
+} from "@/data/neighborhoodImages";
 
 export type EntityType = "neighborhood" | "restaurant" | "hotel" | "activity" | "city";
 
-<<<<<<< HEAD
-export type EntityImageSource = { uri: string } | null;
-=======
 // ─────────────────────────────────────────────────────────────────────────────
 // Module-level result cache — keyed by "type:name:localizacao:platform"
 // ─────────────────────────────────────────────────────────────────────────────
@@ -152,49 +165,80 @@ function upgradePhotoUrl(url: string): string {
 // ─────────────────────────────────────────────────────────────────────────────
 // Public resolver
 // ─────────────────────────────────────────────────────────────────────────────
->>>>>>> claude/plan-app-architecture-73RnI
 
 /**
- * Accepts any photo_url from Supabase (including cached Google CDN URLs).
- * Logs the source for debugging. Returns null only if url is empty/falsy.
- */
-export function sanitizePhotoUrl(url: string | null | undefined): string | null {
-  if (!url || !url.trim()) return null;
-  const cleaned = url.trim();
-
-  // ALLOW: Google image URLs (cached via Supabase) — valid for entity images
-  if (cleaned.includes("googleusercontent.com") || cleaned.includes("lh3.google")) {
-    console.log("[IMAGE PIPELINE] source: google", cleaned.slice(0, 80));
-    return cleaned;
-  }
-
-  // ALLOW: Cloudinary — first-class image source (video frames + hero images)
-  if (cleaned.includes("res.cloudinary.com")) {
-    console.log("[IMAGE PIPELINE] source: cloudinary:", cleaned.slice(0, 80));
-    return cleaned;
-  }
-
-  // ALLOW: Supabase Storage
-  if (cleaned.includes("supabase.co")) {
-    console.log("[IMAGE PIPELINE] source: supabase");
-    return cleaned;
-  }
-
-  // ALLOW: all other CDN sources (Unsplash, etc.)
-  return cleaned;
-}
-
-/**
- * Returns { uri: photoUrl } when a valid photo_url is present.
- * Returns null when no image exists — callers must show a premium placeholder.
+ * Returns the canonical image for any entity.
+ *
+ * @param type           - Entity category for correct fallback chain
+ * @param name           - Entity name (restaurant, hotel, city name, etc.)
+ * @param localizacao    - Neighborhood / bairro (used for neighborhood fallback)
+ * @param supabaseImageUrl - Direct Supabase photo_url; overrides everything if set
  */
 export function getImageForEntity(
-  _type: EntityType,
-  _name: string,
-  _localizacao?: string,
+  type: EntityType,
+  name: string,
+  localizacao?: string,
   supabaseImageUrl?: string | null,
-): EntityImageSource {
-  const safe = sanitizePhotoUrl(supabaseImageUrl);
-  if (safe) return { uri: safe };
-  return null;
+): NeighborhoodImageSource {
+  // ── Tier 1: Supabase/Wikipedia image — all platforms.
+  // Supabase Storage URLs are direct HTTPS (upload.wikimedia.org too) — no
+  // redirect chains, CORS-enabled. Safe to use on web and native alike.
+  // Google Places URLs are upgraded to maxwidth=800 here (system-wide rule).
+  if (supabaseImageUrl && supabaseImageUrl.trim().length > 0) {
+    return { uri: upgradePhotoUrl(supabaseImageUrl.trim()) };
+  }
+
+  // ── Check module cache for tiers 2-4 ──────────────────────────────────────
+  const key = cacheKey(type, name, localizacao);
+  const cached = _cache.get(key);
+  if (cached !== undefined) return cached;
+
+  // ── Tiers 2-4: resolve once, then cache ───────────────────────────────────
+  const resolved = _resolve(type, name, localizacao);
+  _cache.set(key, resolved);
+  return resolved;
+}
+
+function _resolve(
+  type: EntityType,
+  name: string,
+  localizacao?: string,
+): NeighborhoodImageSource {
+  const nameLower = name.toLowerCase().trim();
+  const loc = localizacao ?? "";
+  const isNative = Platform.OS !== "web";
+
+  switch (type) {
+    case "neighborhood":
+      return getNeighborhoodImage(name);
+
+    case "restaurant":
+      // No Supabase photo: show neighborhood image — clearly a placeholder,
+      // never another restaurant's photo.
+      return getNeighborhoodImage(loc || name);
+
+    case "hotel":
+      // No Supabase photo: show neighborhood image.
+      return getNeighborhoodImage(loc || name);
+
+    case "city": {
+      if (isNative) {
+        const uri = CITY_WEB_IMAGES[nameLower];
+        if (uri) return { uri };
+      }
+      // Web: use local bundled city asset (always visible)
+      return (
+        CITY_LOCAL_ASSETS[nameLower] ??
+        require("../assets/images/hero-rio.png")
+      );
+    }
+
+    case "activity": {
+      if (isNative) {
+        const uri = ACTIVITY_WEB_IMAGES[nameLower];
+        if (uri) return { uri };
+      }
+      return getNeighborhoodImage(loc || name);
+    }
+  }
 }

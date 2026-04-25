@@ -1,21 +1,10 @@
 /**
-<<<<<<< HEAD
- * useLuckyList.ts — Fetches lucky picks from Supabase `lucky_list_rio_v2` table.
- * Returns LugarPlace-compatible objects for use in Lucky List screens.
- * Photos: Supabase photo_url only. Returns null when no Supabase image exists.
-=======
  * useLuckyList.ts — Fetches Lucky List from Supabase with lugares and bairros.
  * Premium items (index >= 5) have blocked content (meu_olhar: null, como_aproveitar: []).
->>>>>>> claude/plan-app-architecture-73RnI
  */
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-<<<<<<< HEAD
-import type { LugarPlace } from "@/data/lugares";
-import { resolvePin } from "@/data/lugares";
-import { sanitizePhotoUrl } from "@/utils/getImageForEntity";
-=======
 
 export type LuckyListItem = {
   id: string;
@@ -49,7 +38,6 @@ export type LuckyList = {
   acesso: "free" | "premium";
   itens: LuckyListItem[];
 };
->>>>>>> claude/plan-app-architecture-73RnI
 
 type State = {
   luckyList: LuckyList | null;
@@ -69,13 +57,6 @@ export function useLuckyList(slug: string = "lucky-list-rio-de-janeiro"): State 
       setLoading(true);
       setError(null);
 
-<<<<<<< HEAD
-      const { data, error: err } = await supabase
-        .from("lucky_list_rio_v2")
-        .select("*")
-        .eq("ativo", true)
-        .order("nome");
-=======
       // 1. Buscar a lucklist
       const { data: listData, error: listError } = await supabase
         .from("lucklists")
@@ -118,7 +99,6 @@ export function useLuckyList(slug: string = "lucky-list-rio-de-janeiro"): State 
         `)
         .eq("lucklist_id", listData.id)
         .order("ordem");
->>>>>>> claude/plan-app-architecture-73RnI
 
       if (cancelled) return;
 
@@ -139,39 +119,6 @@ export function useLuckyList(slug: string = "lucky-list-rio-de-janeiro"): State 
         // Ou todos são premium se a lista for premium
         const bloqueado = isPremiumList || index >= 5;
 
-<<<<<<< HEAD
-      // ── Phase 1: Render immediately with Supabase / neighborhood fallbacks ──
-      const initial: LugarPlace[] = rows.map((row, idx) => {
-        const bairro    = (row.bairro as string | null) ?? "";
-        const pin       = resolvePin("rio", bairro, idx % 6);
-        const rawPhoto  = (row as any).photo_url as string | null ?? null;
-        const supaPhoto = sanitizePhotoUrl(rawPhoto);
-        if (rawPhoto && !supaPhoto) {
-          console.error(
-            `[useLuckyList][INVALID IMAGE SOURCE] Rejected photo for "${row.nome}": ${rawPhoto}`
-          );
-        }
-        const tipoItem  = (row as any).tipo_item as string | null;
-        const entityType =
-          tipoItem === "restaurante" ? "restaurant" :
-          tipoItem === "hotel"       ? "hotel"       :
-          "activity";
-        const resolvedTipo =
-          tipoItem === "restaurante" ? "restaurante" :
-          tipoItem === "hotel"       ? "hotel"       :
-          "experiencia";
-        return {
-          id:          String(row.id),
-          titulo:      (row.nome as string | null)     ?? "Lucky Pick",
-          localizacao: bairro                          || "Rio de Janeiro",
-          categoria:   "LUCKY LIST",
-          descricao:   "Um dos achados especiais da Lucky List — lugares que só quem sabe, sabe.",
-          photo_url:   supaPhoto,
-          image:       supaPhoto ? { uri: supaPhoto } : null,
-          xPct:        pin.xPct,
-          yPct:        pin.yPct,
-          tipo_item:   resolvedTipo,
-=======
         return {
           id: item.id,
           lugar_id: item.lugar_id,
@@ -192,7 +139,6 @@ export function useLuckyList(slug: string = "lucky-list-rio-de-janeiro"): State 
             bairro_nome: bairro?.nome ?? null,
           },
           bloqueado,
->>>>>>> claude/plan-app-architecture-73RnI
         };
       });
 

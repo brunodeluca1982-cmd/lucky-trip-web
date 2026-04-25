@@ -582,25 +582,6 @@ function SavedSection({
 
   return (
     <View style={ss.wrap}>
-<<<<<<< HEAD
-      <View style={ss.labelRow}>
-        <Text style={ss.label}>
-          {saved.length === 1 ? "1 lugar salvo" : `${saved.length} lugares salvos`}
-        </Text>
-        <View style={ss.dot} />
-        <Text style={ss.sublabel}>toque para ver</Text>
-      </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={ss.scroll}
-        decelerationRate="fast"
-      >
-        {saved.map((item) => (
-          <SavedCard key={`${item.source_table ?? item.categoria}_${item.id}`} item={item} onRemove={onRemove} />
-        ))}
-      </ScrollView>
-=======
       {groups.map((group, gi) => (
         <View key={gi} style={ss.group}>
           {/* Destination header */}
@@ -624,7 +605,6 @@ function SavedSection({
           </ScrollView>
         </View>
       ))}
->>>>>>> claude/plan-app-architecture-73RnI
     </View>
   );
 }
@@ -745,7 +725,7 @@ function PeriodoBlock({ periodo, items }: DiaPeriodo) {
         <Text style={rot.periodoLabel}>{label}</Text>
       </View>
       {items.map((item) => (
-        <View key={`${item.source_table ?? item.categoria}_${item.id}`} style={rot.itemRow}>
+        <View key={item.id} style={rot.itemRow}>
           <View style={rot.itemDot} />
           <Text style={rot.itemNome} numberOfLines={1}>{item.titulo}</Text>
         </View>
@@ -780,7 +760,7 @@ function RoteiroSection({ dias }: { dias: DiaRoteiro[] }) {
         </View>
       </View>
       {dias.map((dia) => (
-        <DiaCard key={`dia-${dia.numero}`} dia={dia} />
+        <DiaCard key={dia.bairro} dia={dia} />
       ))}
     </View>
   );

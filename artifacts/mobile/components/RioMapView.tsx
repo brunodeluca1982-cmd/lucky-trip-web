@@ -26,15 +26,9 @@ import type { Bairro } from "@/hooks/useBairros";
 
 // ── Leaflet HTML generator ────────────────────────────────────────────────────
 
-<<<<<<< HEAD
-export function buildLeafletHTML(
-  selected: string | null,
-  neighborhoods: RioNeighborhood[],
-=======
 function buildLeafletHTML(
   bairros: Bairro[],
   selectedId: string | null,
->>>>>>> claude/plan-app-architecture-73RnI
 ): string {
   const bairrosJSON = JSON.stringify(
     bairros.map((b) => ({

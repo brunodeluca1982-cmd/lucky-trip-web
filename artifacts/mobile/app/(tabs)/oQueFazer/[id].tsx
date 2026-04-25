@@ -26,12 +26,8 @@ import { destinos } from "@/data/mockData";
 import RioMapView from "@/components/RioMapView";
 import { useGuia } from "@/context/GuiaContext";
 import { useOQueFazer } from "@/hooks/useOQueFazer";
-<<<<<<< HEAD
-import { sanitizePhotoUrl } from "@/utils/getImageForEntity";
-=======
 import { useBairros } from "@/hooks/useBairros";
 import { getImageForEntity } from "@/utils/getImageForEntity";
->>>>>>> claude/plan-app-architecture-73RnI
 
 const C = Colors.light;
 const GOLD = "#D4AF37";
@@ -180,56 +176,9 @@ export default function OQueFazerScreen() {
           </Text>
 
           {descricao.slice(1).map((para, i) => (
-            <Text key={`para-${i}`} style={s.descPara}>{para}</Text>
+            <Text key={i} style={s.descPara}>{para}</Text>
           ))}
 
-<<<<<<< HEAD
-          {allLugares.map((place, index) => (
-            <Pressable
-              key={place.id}
-              style={s.card}
-              onPress={() =>
-                router.push({
-                  pathname: "/lugar/[cityId]/[placeId]",
-                  params: { cityId: destino.id, placeId: place.id, source_table: "o_que_fazer_rio_v2" },
-                })
-              }
-            >
-              <View style={s.cardImageWrap}>
-                {sanitizePhotoUrl(place.photo_url) ? (
-                  <Image source={{ uri: sanitizePhotoUrl(place.photo_url)! }} style={s.cardImage} resizeMode="cover" />
-                ) : (
-                  <View style={[s.cardImage, { backgroundColor: "#1A0E04" }]} />
-                )}
-                <LinearGradient
-                  colors={["rgba(0,0,0,0.12)", "transparent"]}
-                  locations={[0, 0.4]}
-                  style={StyleSheet.absoluteFill}
-                />
-                <Pressable
-                  style={[s.bookmarkBtn, isSaved(place.id) && s.bookmarkBtnSaved]}
-                  hitSlop={6}
-                  onPress={(e) => {
-                    e.stopPropagation?.();
-                    if (isSaved(place.id)) {
-                      unsave(place.id);
-                    } else {
-                      save({
-                        id:           place.id,
-                        categoria:    "oQueFazer",
-                        source_table: "o_que_fazer_rio_v2",
-                        titulo:       place.titulo,
-                        localizacao:  place.localizacao,
-                        image:        place.image,
-                      });
-                    }
-                  }}
-                >
-                  <Feather
-                    name="bookmark"
-                    size={15}
-                    color={isSaved(place.id) ? GOLD : C.white}
-=======
           {filtered.map((place, index) => {
             const imageSource = getImageForEntity("activity", place.nome, place.bairro_nome ?? "", place.hero_image_url);
             return (
@@ -249,7 +198,6 @@ export default function OQueFazerScreen() {
                     colors={["rgba(0,0,0,0.12)", "transparent"]}
                     locations={[0, 0.4]}
                     style={StyleSheet.absoluteFill}
->>>>>>> claude/plan-app-architecture-73RnI
                   />
                   <Pressable
                     style={[s.bookmarkBtn, isSaved(place.id) && s.bookmarkBtnSaved]}
@@ -310,30 +258,9 @@ export default function OQueFazerScreen() {
                     <Text style={s.verNoMapaText}>Ver no mapa</Text>
                   </Pressable>
                 </View>
-<<<<<<< HEAD
-                <Text style={s.cardTitulo}>{place.titulo}</Text>
-                <Text style={s.cardDesc}>{place.descricao}</Text>
-                <Pressable
-                  style={s.verNoMapaBtn}
-                  onPress={(e) => {
-                    e.stopPropagation?.();
-                    router.push({
-                      pathname: "/lugar/[cityId]/[placeId]",
-                      params: { cityId: destino.id, placeId: place.id, source_table: "o_que_fazer_rio_v2", showMap: "true" },
-                    });
-                  }}
-                >
-                  <Feather name="map-pin" size={13} color={C.terracotta} />
-                  <Text style={s.verNoMapaText}>Ver no mapa</Text>
-                </Pressable>
-              </View>
-            </Pressable>
-          ))}
-=======
               </Pressable>
             );
           })}
->>>>>>> claude/plan-app-architecture-73RnI
         </View>
 
         <View style={s.footer}>

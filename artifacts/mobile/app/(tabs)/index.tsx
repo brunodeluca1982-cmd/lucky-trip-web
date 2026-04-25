@@ -13,13 +13,8 @@ import {
   Text,
   View,
 } from "react-native";
-<<<<<<< HEAD
-import { RotatingBackground } from "@/components/RotatingBackground";
-
-=======
 import * as Haptics from "expo-haptics";
 import { BlurView } from "expo-blur";
->>>>>>> claude/plan-app-architecture-73RnI
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -28,26 +23,10 @@ import { supabase } from "@/lib/supabase";
 import { useDestaques, Destaque } from "@/hooks/useDestaques";
 import { useAmigos } from "@/hooks/useFriends";
 
-<<<<<<< HEAD
-import { AppHeader } from "@/components/AppHeader";
-import { HeroCarousel } from "@/components/HeroCarousel";
-import { HorizontalScroll } from "@/components/HorizontalScroll";
-import { PlaceCard } from "@/components/PlaceCard";
-import { RestauranteCard } from "@/components/RestauranteCard";
-import { SectionHeader } from "@/components/SectionHeader";
-import Colors from "@/constants/colors";
-import { useGuia } from "@/context/GuiaContext";
-import { useLuckyList } from "@/hooks/useLuckyList";
-import { useOQueFazer } from "@/hooks/useOQueFazer";
-import { useRestaurants } from "@/hooks/useRestaurants";
-import { useFriends, type FriendCard } from "@/hooks/useFriends";
-import { useHeroComposed } from "@/hooks/useHeroComposed";
-=======
 // ═══════════════════════════════════════════════════════════════════════════
 // LOGO ASSET
 // ═══════════════════════════════════════════════════════════════════════════
 const LOGO_WHITE = require("@/assets/images/logo_symbol_white.png");
->>>>>>> claude/plan-app-architecture-73RnI
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONSTANTS
@@ -82,11 +61,6 @@ function shuffleArray<T>(arr: T[]): T[] {
 function useHeroPhotos() {
   const [photos, setPhotos] = useState<string[]>([FALLBACK]);
 
-<<<<<<< HEAD
-// ── Thin hairline between sections ───────────────────────────────────────────
-function Divider() {
-  return <View style={s.divider} />;
-=======
   useEffect(() => {
     supabase.storage.from("media").list("rio-de-janeiro/hero/foto").then(({ data }) => {
       if (data && data.length > 0) {
@@ -99,7 +73,6 @@ function Divider() {
   }, []);
 
   return photos;
->>>>>>> claude/plan-app-architecture-73RnI
 }
 
 // Builds full Supabase storage URL from relative path
@@ -197,42 +170,6 @@ function TopBar({ top, onMusicPress, onGalleryPress }: { top: number; onMusicPre
           <Ionicons name="play" size={16} color="#FFF" />
         </Pressable>
       </View>
-<<<<<<< HEAD
-      <Text style={s.luckyHeadline}>Seu Rio mais Lucky</Text>
-      <Text style={s.luckySubtitle}>
-        Os segredos que poucos conhecem. Curadoria feita à mão, atualizada quando vale a pena.
-      </Text>
-      {loading ? (
-        <ActivityIndicator color="rgba(201,168,76,0.7)" style={{ marginVertical: 16 }} />
-      ) : (
-        <View style={s.luckyPicks}>
-          {picks.map((place) => (
-            <Pressable
-              key={place.id}
-              style={s.luckyPickRow}
-              onPress={() => router.push({
-                pathname: "/lugar/[cityId]/[placeId]",
-                params: { cityId: "rio", placeId: place.id, source_table: "lucky_list_rio_v2" },
-              })}
-            >
-              <Text style={s.luckyPickStar}>✦</Text>
-              <View style={s.luckyPickText}>
-                <Text style={s.luckyPickTitle}>{place.titulo}</Text>
-                <Text style={s.luckyPickLoc}>{place.localizacao}</Text>
-              </View>
-              <Feather name="arrow-right" size={13} color="rgba(201,168,76,0.50)" />
-            </Pressable>
-          ))}
-        </View>
-      )}
-      <Pressable
-        style={s.luckyBtn}
-        onPress={() => router.push({ pathname: "/luckyList/[id]", params: { id: "rio" } })}
-      >
-        <Text style={s.luckyBtnText}>✦  Ver Lucky List completa</Text>
-      </Pressable>
-=======
->>>>>>> claude/plan-app-architecture-73RnI
     </View>
   );
 }
@@ -616,27 +553,11 @@ export default function HomeScreen() {
   const top = Platform.OS === "web" ? 0 : insets.top;
   const bottom = Platform.OS === "web" ? 34 : insets.bottom;
 
-<<<<<<< HEAD
-  // ── Hero items — useHeroComposed (REAL Supabase data) ───────────────────────
-  // 5 slots: restaurante + o_que_fazer + lucky + friend + rio
-  // photo_url comes directly from each entity. Navigation per source_table.
-  const { items: heroItems } = useHeroComposed();
-
-  const filteredAtividades = React.useMemo(() => {
-    if (!atividades.length) return [];
-    const filtered = atividades.filter((a) => {
-      const m = a.momento_ideal;
-      return typeof m === "string" && m.toLowerCase() === momentoTab;
-    });
-    return filtered.length > 0 ? filtered : atividades.slice(0, 10);
-  }, [atividades, momentoTab]);
-=======
   const photos = useHeroPhotos();
   const { destaques } = useDestaques();
   const lucklistItems = useLucklists(RIO_DESTINO_ID);
   const [musicModalVisible, setMusicModalVisible] = useState(false);
   const [galleryModalVisible, setGalleryModalVisible] = useState(false);
->>>>>>> claude/plan-app-architecture-73RnI
 
   // ═══════════════════════════════════════════════════════════════════════════
   // SISTEMA 1 — BACKGROUND (13 segundos, todas as fotos do bucket hero/foto)
@@ -645,23 +566,6 @@ export default function HomeScreen() {
   const bgIdxRef = useRef(0);
   const bgFade = useRef(new Animated.Value(1)).current;
 
-<<<<<<< HEAD
-  function handleHeroDisplay() {
-    Animated.timing(overlayAnim, {
-      toValue: 1,
-      duration: 500,
-      useNativeDriver: true,
-    }).start();
-  }
-
-  return (
-    <View style={s.root}>
-      {/* ── Rotating background — editorial Rio pool ── */}
-      <View style={[s.bgImage, { backgroundColor: "#1A0E04" }]} pointerEvents="none">
-        <RotatingBackground
-          onFirstImageDisplay={handleHeroDisplay}
-        />
-=======
   useEffect(() => { bgIdxRef.current = bgIdx; }, [bgIdx]);
 
   useEffect(() => {
@@ -709,7 +613,6 @@ export default function HomeScreen() {
         <Animated.Image source={{ uri: currentBgPhoto }} style={[styles.bgImage, { opacity: bgFade }]} resizeMode="cover" />
         <View style={styles.overlay} />
         <LinearGradient colors={["transparent", "rgba(0,0,0,0.55)"]} locations={[0.3, 1]} style={StyleSheet.absoluteFill} />
->>>>>>> claude/plan-app-architecture-73RnI
       </View>
 
       {/* ═══ HERO DESTAQUE: primeiro terço com crossFade próprio ═══ */}
@@ -726,138 +629,6 @@ export default function HomeScreen() {
       {/* TopBar */}
       <TopBar top={top} onMusicPress={() => setMusicModalVisible(true)} onGalleryPress={() => setGalleryModalVisible(true)} />
 
-<<<<<<< HEAD
-        {/* ── 1. HERO CAROUSEL — Always rendered (Supabase + canonical fallback) ── */}
-        <HeroCarousel items={heroItems} />
-
-        {/* ── 2. O QUE FAZER NO RIO ── Supabase: o_que_fazer_rio */}
-        <View style={s.section}>
-          <SectionHeader
-            title={agoraTitle}
-            uppercase
-            subtitle="Experiências selecionadas para o Rio de Janeiro."
-            dark
-          />
-
-          {/* ── Manhã / Tarde / Noite tabs ── */}
-          <View style={s.momentoTabs}>
-            {MOMENTO_TABS.map((tab) => {
-              const active = momentoTab === tab.key;
-              return (
-                <View
-                  key={tab.key}
-                  style={[s.momentoTab, active && s.momentoTabActive]}
-                >
-                  <Ionicons
-                    name={tab.icon}
-                    size={14}
-                    color={active ? "#1a1a1a" : "rgba(255,255,255,0.60)"}
-                    style={{ marginRight: 5 }}
-                  />
-                  <Text style={[s.momentoTabText, active && s.momentoTabTextActive]}>
-                    {tab.label}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-
-          {loadingAtividades ? (
-            <ActivityIndicator color="rgba(255,255,255,0.4)" style={{ marginTop: 20, marginBottom: 8 }} />
-          ) : (
-            <HorizontalScroll>
-              {filteredAtividades.slice(0, 10).map((item) => (
-                <PlaceCard
-                  key={item.id}
-                  id={item.id}
-                  saveCategoria="oQueFazer"
-                  titulo={item.titulo}
-                  localizacao={item.localizacao}
-                  image={item.image}
-                  size="medium"
-                  onPress={() => router.push({
-                    pathname: "/lugar/[cityId]/[placeId]",
-                    params: { cityId: "rio", placeId: item.id, source_table: "o_que_fazer_rio_v2" },
-                  })}
-                />
-              ))}
-            </HorizontalScroll>
-          )}
-        </View>
-
-        <Divider />
-
-        {/* ── 3. ONDE COMER ── Supabase: restaurantes */}
-        <View style={s.section}>
-          <SectionHeader
-            title="Onde comer"
-            uppercase
-            subtitle="Os melhores restaurantes do Rio."
-            dark
-          />
-          {loadingRestos ? (
-            <ActivityIndicator color="rgba(255,255,255,0.4)" style={{ marginTop: 20, marginBottom: 8 }} />
-          ) : (
-            <HorizontalScroll>
-              {restos.slice(0, 10).map((r) => (
-                <RestauranteCard
-                  key={String(r.id)}
-                  id={String(r.id)}
-                  nome={r.nome}
-                  bairro={r.bairro ?? "Rio de Janeiro"}
-                  categoria={r.categoria ?? "Restaurante"}
-                  image={r.resolvedPhotoUri ? { uri: r.resolvedPhotoUri } : null}
-                  onPress={() => router.push({
-                    pathname: "/lugar/[cityId]/[placeId]",
-                    params: { cityId: "rio", placeId: String(r.id), source_table: "restaurantes" },
-                  })}
-                />
-              ))}
-            </HorizontalScroll>
-          )}
-        </View>
-
-        <Divider />
-
-        {/* ── 4. LUCKY LIST HIGHLIGHT ── Supabase: lucky_list_rio */}
-        <LuckyHighlight />
-
-        <Divider />
-
-        {/* ── 8. VIAJE COMO ELES — Supabase: friends ── */}
-        <View style={s.section}>
-          <SectionHeader
-            title="Viaje como eles"
-            uppercase
-            subtitle="Siga os passos de quem você admira. Acesse roteiros detalhados, segredos e dicas pessoais das nossas estrelas convidadas."
-            dark
-          />
-          {loadingFriends ? (
-            <ActivityIndicator color="rgba(201,168,76,0.7)" style={{ marginVertical: 16 }} />
-          ) : (
-            <View style={s.grid2}>
-              {friends.map((f) => (
-                <InfluencerCard key={f.id} influencer={f} />
-              ))}
-            </View>
-          )}
-        </View>
-
-        <Divider />
-
-        {/* ── 10. CTA: CRIAR ROTEIRO ── */}
-        <RoteiroCTA />
-
-        {/* ── EDITORIAL FOOTER ── */}
-        <View style={s.footer}>
-          <Image
-            source={require("../../assets/images/logo-symbol.png")}
-            style={s.footerLogo}
-            resizeMode="contain"
-          />
-          <Text style={s.footerTagline}>inteligência humana em viagens</Text>
-        </View>
-=======
       {/* Modals */}
       <MusicModal visible={musicModalVisible} onClose={() => setMusicModalVisible(false)} />
       <GalleryModal visible={galleryModalVisible} onClose={() => setGalleryModalVisible(false)} photos={photos} />
@@ -866,7 +637,6 @@ export default function HomeScreen() {
       <ScrollView style={styles.scroll} contentContainerStyle={{ paddingBottom: bottom + 90, paddingTop: H * 0.38 }} showsVerticalScrollIndicator={false}>
         {/* Input */}
         <InputBar />
->>>>>>> claude/plan-app-architecture-73RnI
 
         {/* Sections */}
         <ViajeComEles />

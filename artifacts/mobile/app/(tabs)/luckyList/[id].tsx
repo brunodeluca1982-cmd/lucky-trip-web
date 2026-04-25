@@ -26,13 +26,8 @@ import Colors from "@/constants/colors";
 import { destinos } from "@/data/mockData";
 import RioMapView from "@/components/RioMapView";
 import { useGuia } from "@/context/GuiaContext";
-<<<<<<< HEAD
-import { useLuckyList } from "@/hooks/useLuckyList";
-import { sanitizePhotoUrl } from "@/utils/getImageForEntity";
-=======
 import { useLuckyList, type LuckyListItem } from "@/hooks/useLuckyList";
 import { useBairros } from "@/hooks/useBairros";
->>>>>>> claude/plan-app-architecture-73RnI
 
 const FREE_ITEMS = 3;
 
@@ -136,7 +131,7 @@ export default function LuckyListScreen() {
           </View>
           <Text style={s.heroHeadline}>{editorial.headline}</Text>
           {editorial.paras.map((para, i) => (
-            <Text key={`para-${i}`} style={s.heroPara}>{para}</Text>
+            <Text key={i} style={s.heroPara}>{para}</Text>
           ))}
           <View style={s.curatorBadge}>
             <View style={s.curatorDot} />
@@ -181,33 +176,17 @@ export default function LuckyListScreen() {
                   }
                   router.push({
                     pathname: "/lugar/[cityId]/[placeId]",
-<<<<<<< HEAD
-                    params: { cityId: destino.id, placeId: place.id, source_table: "lucky_list_rio_v2" },
-=======
                     params: { cityId: destino.id, placeId: lugar.id, source_table: "lugares" },
->>>>>>> claude/plan-app-architecture-73RnI
                   });
                 }}
               >
                 <View style={s.cardImageWrap}>
-<<<<<<< HEAD
-                  {sanitizePhotoUrl(place.photo_url) ? (
-                    <Image
-                      source={{ uri: sanitizePhotoUrl(place.photo_url)! }}
-                      style={[s.cardImage, isLocked && s.cardImageLocked]}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View style={[s.cardImage, isLocked && s.cardImageLocked, { backgroundColor: "#1A0E04" }]} />
-                  )}
-=======
                   <LinearGradient
                     colors={["#1A1208", "#0F0A06"]}
                     style={[s.cardImage, { justifyContent: "center", alignItems: "center" }]}
                   >
                     <Text style={{ fontSize: 40, color: GOLD, opacity: 0.3 }}>✦</Text>
                   </LinearGradient>
->>>>>>> claude/plan-app-architecture-73RnI
                   <LinearGradient
                     colors={["rgba(0,0,0,0.22)", "rgba(0,0,0,0.05)", "rgba(0,0,0,0.55)"]}
                     locations={[0, 0.45, 1]}
@@ -269,11 +248,7 @@ export default function LuckyListScreen() {
                           e.stopPropagation?.();
                           router.push({
                             pathname: "/lugar/[cityId]/[placeId]",
-<<<<<<< HEAD
-                            params: { cityId: destino.id, placeId: place.id, source_table: "lucky_list_rio_v2", showMap: "true" },
-=======
                             params: { cityId: destino.id, placeId: lugar.id, source_table: "lugares", showMap: "true" },
->>>>>>> claude/plan-app-architecture-73RnI
                           });
                         }}
                       >
@@ -290,17 +265,10 @@ export default function LuckyListScreen() {
                             save({
                               id:           lugar.id,
                               categoria:    "lucky",
-<<<<<<< HEAD
-                              source_table: "lucky_list_rio_v2",
-                              titulo:       place.titulo,
-                              localizacao:  place.localizacao,
-                              image:        place.image,
-=======
                               source_table: "lugares",
                               titulo:       lugar.nome,
                               localizacao:  lugar.bairro_nome ?? "Rio de Janeiro",
                               image:        require("../../../assets/images/ipanema.png"),
->>>>>>> claude/plan-app-architecture-73RnI
                             });
                           }
                         }}

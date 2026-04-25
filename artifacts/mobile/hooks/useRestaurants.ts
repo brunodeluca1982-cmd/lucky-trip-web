@@ -2,16 +2,15 @@
  * useRestaurants.ts
  *
  * Fetches restaurants from Supabase `restaurantes` table.
- * Image: restaurantes.photo_url directly → null when absent.
+ * Image resolution strategy:
+ *   1. restaurantes.photo_url  (already present in most rows)
+ *   2. place_photos.photo_url  (fallback: item_type='restaurantes', item_id=String(id))
+ *   3. null                    (caller renders a neutral placeholder)
  */
 
 import { useEffect, useState } from "react";
 import { supabase, type Restaurante } from "@/lib/supabase";
-<<<<<<< HEAD
-import { sanitizePhotoUrl } from "@/utils/getImageForEntity";
-=======
 import { buildMediaUrl } from "@/lib/mediaUrl";
->>>>>>> claude/plan-app-architecture-73RnI
 
 type State = {
   restaurantes: Restaurante[];
@@ -51,26 +50,34 @@ export function useRestaurants(cidadeId?: string): State {
 
       const rawRows = (rows ?? []) as Omit<Restaurante, "resolvedPhotoUri">[];
 
+      // ── 2. Fetch place_photos fallbacks for rows missing photo_url ────────
+      const missingIds = rawRows
+        .filter((r) => !r.photo_url)
+        .map((r) => String(r.id));
+
+      let photoMap: Record<string, string> = {};
+
+      if (missingIds.length > 0) {
+        const { data: photos } = await supabase
+          .from("place_photos")
+          .select("item_id, photo_url")
+          .eq("item_type", "restaurantes")
+          .in("item_id", missingIds);
+
+        if (!cancelled && photos) {
+          for (const p of photos) {
+            if (p.photo_url) photoMap[p.item_id] = p.photo_url;
+          }
+        }
+      }
+
       if (cancelled) return;
 
-<<<<<<< HEAD
-      // ── 2. Map + sanitize photo_url (block Google CDN and invalid sources) ──
-      const merged: Restaurante[] = rawRows.map((r) => {
-        const safe = sanitizePhotoUrl(r.photo_url ?? null);
-        if (r.photo_url && !safe) {
-          console.error(
-            `[useRestaurants][INVALID IMAGE SOURCE] Rejected photo for "${r.nome}": ${r.photo_url}`
-          );
-        }
-        return { ...r, resolvedPhotoUri: safe };
-      });
-=======
       // ── 3. Render immediately with Supabase / place_photos ────────────────
       const merged: Restaurante[] = rawRows.map((r) => ({
         ...r,
         resolvedPhotoUri: buildMediaUrl(r.photo_url ?? photoMap[String(r.id)]) || null,
       }));
->>>>>>> claude/plan-app-architecture-73RnI
 
       setRestaurantes(merged);
       setLoading(false);

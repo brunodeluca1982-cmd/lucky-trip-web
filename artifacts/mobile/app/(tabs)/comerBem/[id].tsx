@@ -145,7 +145,7 @@ export default function ComerBemScreen() {
           <Text style={s.listLabel}>Restaurantes selecionados</Text>
 
           {descricao.slice(1).map((para, i) => (
-            <Text key={`para-${i}`} style={s.descPara}>{para}</Text>
+            <Text key={i} style={s.descPara}>{para}</Text>
           ))}
 
           {loading && (
@@ -162,13 +162,8 @@ export default function ComerBemScreen() {
             </View>
           )}
 
-<<<<<<< HEAD
-          {!loading && !error && allRestaurantes.map((r, index) => {
-            const imageSource = r.resolvedPhotoUri ? { uri: r.resolvedPhotoUri } : null;
-=======
           {!loading && !error && restaurantes.map((r, index) => {
             const imageSource = getImageForEntity("restaurant", r.nome, r.bairro_nome ?? "", r.hero_image_url);
->>>>>>> claude/plan-app-architecture-73RnI
 
             return (
               <Pressable

@@ -23,7 +23,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { useBairros, type Bairro } from "@/hooks/useBairros";
 import RioMapView from "@/components/RioMapView";
-import { HotelCard } from "@/components/HotelCard";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const MAP_H = Math.round(SCREEN_HEIGHT * 0.50);
@@ -38,15 +37,6 @@ const BG_DARK = "#0A0A0A";
 const RIO_DESTINO_ID = "7f047742-427f-4b11-8286-781af899c57d";
 const FALLBACK_IMAGE = "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero01.jpg";
 
-<<<<<<< HEAD
-type FlatHotel = Hotel & { localizacao: string; neighborhood: Neighborhood };
-
-function flattenHotels(neighborhoods: Neighborhood[]): FlatHotel[] {
-  const result: FlatHotel[] = [];
-  for (const n of neighborhoods) {
-    for (const h of n.hotels ?? []) {
-      result.push({ ...h, localizacao: n.neighborhood_name, neighborhood: n });
-=======
 // ── Pill builders with emojis ─────────────────────────────────────────────────
 
 function buildPills(bairro: Bairro): string[] {
@@ -61,7 +51,6 @@ function buildPills(bairro: Bairro): string[] {
       case "razoavel":
         pills.push("🚶 Caminhavel");
         break;
->>>>>>> claude/plan-app-architecture-73RnI
     }
   }
 
@@ -223,58 +212,6 @@ export default function OndeFicarScreen() {
               <Text style={s.chooseBtnText}>Escolher por mim</Text>
             </Pressable>
           </View>
-<<<<<<< HEAD
-        </View>
-
-        {/* List section */}
-        <View style={s.listSection}>
-          <Text style={s.listLabel}>Hospedagens selecionadas</Text>
-
-          {loading && (
-            <View style={s.centerWrap}>
-              <ActivityIndicator size="small" color={C.terracotta} />
-              <Text style={s.emptyText}>Carregando…</Text>
-            </View>
-          )}
-
-          {error && !loading && (
-            <View style={s.centerWrap}>
-              <Feather name="alert-circle" size={18} color="rgba(196,112,74,0.4)" />
-              <Text style={s.emptyText}>{error}</Text>
-            </View>
-          )}
-
-          {!loading && !error && allHotels.map((hotel) => {
-            const imageUrl = hotel.photo_url ?? null;
-            console.log("HOTEL CARD:", hotel.hotel_name, imageUrl);
-            return (
-              <HotelCard
-                key={hotel.id}
-                id={String(hotel.id)}
-                nome={hotel.hotel_name}
-                localizacao={hotel.localizacao}
-                tipo={hotel.hotel_category}
-                image={imageUrl ? { uri: imageUrl } : null}
-                onPress={() =>
-                  router.push({
-                    pathname: "/ondeFicar/hotel/[hotelId]",
-                    params: { hotelId: hotel.id },
-                  })
-                }
-              />
-            );
-          })}
-        </View>
-
-        {/* Footer */}
-        <View style={s.footer}>
-          <Text style={s.footerL}>L.</Text>
-          <Text style={s.footerText}>
-            Curadoria para quem quer descansar em {destino.cidade} com estilo.
-          </Text>
-        </View>
-      </ScrollView>
-=======
         ) : (
           /* ── Bairro preview card (square style matching mockup) ── */
           <Animated.View
@@ -315,7 +252,6 @@ export default function OndeFicarScreen() {
           </Animated.View>
         )}
       </View>
->>>>>>> claude/plan-app-architecture-73RnI
     </View>
   );
 }
@@ -453,50 +389,7 @@ const s = StyleSheet.create({
   },
   chooseAnotherText: {
     fontFamily: "Inter_500Medium",
-<<<<<<< HEAD
-    fontSize: 10,
-    color: C.warmGray,
-    letterSpacing: 2,
-    textTransform: "uppercase",
-    marginBottom: 20,
-  },
-  centerWrap: {
-    alignItems: "center",
-    paddingVertical: 40,
-    gap: 10,
-  },
-  emptyText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: "rgba(255,255,255,0.20)",
-    textAlign: "center",
-  },
-
-  footer: {
-    backgroundColor: "#000000",
-    marginTop: 4,
-    paddingVertical: 32,
-    paddingHorizontal: 24,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.06)",
-    alignItems: "center",
-    gap: 8,
-  },
-  footerL: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 32,
-    color: "rgba(255,255,255,0.25)",
-  },
-  footerText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: "rgba(255,255,255,0.35)",
-    textAlign: "center",
-    lineHeight: 20,
-    maxWidth: 240,
-=======
     fontSize: 14,
     color: TEAL,
->>>>>>> claude/plan-app-architecture-73RnI
   },
 });

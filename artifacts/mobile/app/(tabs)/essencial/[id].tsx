@@ -26,7 +26,6 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { sanitizePhotoUrl } from "@/utils/getImageForEntity";
 import { destinos } from "@/data/mockData";
 import { useOQueFazer, type Atividade } from "@/hooks/useOQueFazer";
 import { useLuckyList, type LuckyListItem } from "@/hooks/useLuckyList";
@@ -49,21 +48,10 @@ function ClassicoCard({ item }: { item: Atividade }) {
       ]}
       onPress={() => router.push({
         pathname: "/lugar/[cityId]/[placeId]",
-<<<<<<< HEAD
-        params: { cityId: "rio", placeId: item.id, source_table: "o_que_fazer_rio_v2" },
-      })}
-    >
-      {sanitizePhotoUrl(item.photo_url) ? (
-        <Image source={{ uri: sanitizePhotoUrl(item.photo_url)! }} style={s.classicoImage} resizeMode="cover" />
-      ) : (
-        <View style={[s.classicoImage, { backgroundColor: "#1A0E04" }]} />
-      )}
-=======
         params: { cityId: "rio", placeId: item.id, source_table: "lugares" },
       })}
     >
       <Image source={imgSrc} style={s.classicoImage} resizeMode="cover" />
->>>>>>> claude/plan-app-architecture-73RnI
       <LinearGradient
         colors={["rgba(0,0,0,0.02)", "rgba(0,0,0,0.82)"]}
         locations={[0.25, 1]}
@@ -98,24 +86,12 @@ function LuckyCard({
       ]}
       onPress={() => router.push({
         pathname: "/lugar/[cityId]/[placeId]",
-<<<<<<< HEAD
-        params: { cityId, placeId: item.id, source_table: "lucky_list_rio_v2" },
-=======
         params: { cityId, placeId: item.lugar.id, source_table: "lugares" },
->>>>>>> claude/plan-app-architecture-73RnI
       })}
     >
       {/* Image */}
       <View style={s.luckyImageWrap}>
-<<<<<<< HEAD
-        {sanitizePhotoUrl(item.photo_url) ? (
-          <Image source={{ uri: sanitizePhotoUrl(item.photo_url)! }} style={s.luckyImage} resizeMode="cover" />
-        ) : (
-          <View style={[s.luckyImage, { backgroundColor: "#1A0E04" }]} />
-        )}
-=======
         <Image source={FALLBACK_IMG} style={s.luckyImage} resizeMode="cover" />
->>>>>>> claude/plan-app-architecture-73RnI
         <LinearGradient
           colors={["rgba(0,0,0,0.06)", "rgba(0,0,0,0.55)"]}
           locations={[0.2, 1]}

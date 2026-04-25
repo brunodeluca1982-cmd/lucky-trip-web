@@ -27,6 +27,14 @@ const GOLD = "#D4AF37";
 
 const LOGO_MARK = require("@/assets/images/logo-symbol.png");
 
+const LUCKY_BG_POOL = [
+  require("@/assets/images/lapa.png"),
+  require("@/assets/images/secret1.png"),
+  require("@/assets/images/secret2.png"),
+  require("@/assets/images/hotel2.png"),
+  require("@/assets/images/rio-aerial-clean.png"),
+];
+
 const FREE_LIMIT         = 2;
 const RESPONSES_USED_KEY = "@luckytrip/lucky_responses_v2";
 const IS_PREMIUM_KEY     = "@luckytrip/lucky_premium_v2";
@@ -51,11 +59,8 @@ export default function LuckyScreen() {
   const insets    = useSafeAreaInsets();
   const topPad    = Platform.OS === "web" ? 67 : insets.top + 16;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
-<<<<<<< HEAD
-=======
   const rioHero   = useRioHeroMedia("image");
 
->>>>>>> claude/plan-app-architecture-73RnI
   const scrollRef = useRef<ScrollView>(null);
 
   const [messages,         setMessages]         = useState<Message[]>([]);
@@ -72,29 +77,12 @@ export default function LuckyScreen() {
   // ── Init: load count from AsyncStorage + sync from Supabase lucky_usage ──
   useEffect(() => {
     (async () => {
-      // BUG-FIX: wrap entire init in try/catch so deviceId is always set.
-      // If getDeviceId() throws, we fall back to a session-local UUID so
-      // sendQuery never hits the !deviceId guard and silently drops the request.
-      let id: string;
-      try {
-        id = await getDeviceId();
-      } catch (e) {
-        console.warn("[LuckyChat] getDeviceId failed, using fallback:", e);
-        id = `fallback-${Date.now()}`;
-      }
+      const [id, countStr, premiumStr] = await Promise.all([
+        getDeviceId(),
+        AsyncStorage.getItem(RESPONSES_USED_KEY),
+        AsyncStorage.getItem(IS_PREMIUM_KEY),
+      ]);
       setDeviceId(id);
-      console.log("[LuckyChat] deviceId set:", id.slice(0, 8) + "...");
-
-      let countStr: string | null = null;
-      let premiumStr: string | null = null;
-      try {
-        [countStr, premiumStr] = await Promise.all([
-          AsyncStorage.getItem(RESPONSES_USED_KEY),
-          AsyncStorage.getItem(IS_PREMIUM_KEY),
-        ]);
-      } catch (e) {
-        console.warn("[LuckyChat] AsyncStorage read failed:", e);
-      }
 
       const localCount = countStr ? parseInt(countStr, 10) : 0;
 
@@ -116,15 +104,11 @@ export default function LuckyScreen() {
           .maybeSingle(),
       ]);
 
-      // Premium check: read app_metadata set by the webhook handler.
-      // Identical logic to GuiaContext.checkPremiumStatus — must stay in sync.
+      // Premium check: read app_metadata set by the webhook handler
       if (premiumResult.status === "fulfilled") {
-        const meta       = premiumResult.value.data?.user?.app_metadata as Record<string, any> | undefined;
+        const meta = premiumResult.value.data?.user?.app_metadata as Record<string, any> | undefined;
         const validPlan  = meta?.plan_type === "premium" || meta?.plan_type === "vip";
-        // null access_until = lifetime / no expiry — treat as valid; deny only when explicitly expired.
-        // BUG-FIX: previously `meta?.access_until ? ... : false` treated null as expired (wrong).
-        const _until     = (() => { if (!meta?.access_until) return null; const d = new Date(meta.access_until); return isNaN(d.getTime()) ? null : d; })();
-        const notExpired = !meta?.access_until || (_until !== null && _until > new Date());
+        const notExpired = meta?.access_until ? new Date(meta.access_until) > new Date() : false;
         if (validPlan && notExpired) {
           setIsPremium(true);
           await AsyncStorage.setItem(IS_PREMIUM_KEY, "true");
@@ -140,9 +124,7 @@ export default function LuckyScreen() {
       const authoritative = Math.max(localCount, serverCount);
       setResponsesUsed(authoritative);
       if (authoritative !== localCount) {
-        try {
-          await AsyncStorage.setItem(RESPONSES_USED_KEY, String(authoritative));
-        } catch (_) {}
+        await AsyncStorage.setItem(RESPONSES_USED_KEY, String(authoritative));
       }
     })();
   }, []);
@@ -153,24 +135,7 @@ export default function LuckyScreen() {
 
   const sendQuery = useCallback(
     async (query: string) => {
-      // ── Guard: only block on real conditions — NEVER block on deviceId being null ──
-      // deviceId may still be loading when user clicks; we resolve it inline instead.
-      if (!query.trim() || loading || isAtLimit) return;
-
-      console.log("[LuckyChat] sending query", query);
-
-      // ── Resolve deviceId inline — never drop the request because id isn't ready ──
-      let effectiveDeviceId = deviceId;
-      if (!effectiveDeviceId) {
-        try {
-          effectiveDeviceId = await getDeviceId();
-          setDeviceId(effectiveDeviceId);
-        } catch (_) {
-          effectiveDeviceId = `session-${Date.now()}`;
-        }
-        console.log("[LuckyChat] deviceId resolved inline:", effectiveDeviceId.slice(0, 8) + "...");
-      }
-      console.log("[LuckyChat] deviceId", effectiveDeviceId);
+      if (!query.trim() || loading || isAtLimit || !deviceId) return;
 
       Keyboard.dismiss();
       const userMsg: Message = { role: "user", content: query.trim() };
@@ -182,94 +147,67 @@ export default function LuckyScreen() {
       scrollToBottom();
 
       try {
-        // Strip trailing slash from SUPABASE_URL — env var ends with "/" causing
-        // "//functions/v1/..." double-slash that Supabase routes incorrectly.
-        const supabaseUrl  = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? "").replace(/\/$/, "");
-        const supabaseAnon =  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
-        const endpoint     = `${supabaseUrl}/functions/v1/lucky-concierge`;
-
-        // ── Send user's JWT so backend can verify premium via app_metadata ──
-        // GuiaContext and the profile screen both read app_metadata from the auth
-        // user; the backend must receive the user's token to do the same check.
-        // Unauthenticated users fall back to the anon key — device limit applies.
-        const { data: sessionData } = await supabase.auth.getSession();
-        const authToken = sessionData.session?.access_token ?? supabaseAnon;
-        console.log("[LuckyChat] hasSession:", !!sessionData.session);
-
-        const payload = {
-          query:       userMsg.content,
-          history:     priorHistory.map((m) => ({ role: m.role, content: m.content })),
-          deviceId:    effectiveDeviceId,
-          destination: "Rio de Janeiro",
-        };
-
-        console.log("[LuckyChat] url", endpoint);
-        console.log("[LuckyChat] payload", payload);
-
-        const rawRes = await fetch(endpoint, {
+        // Call lucky-concierge with Supabase-grounded context
+        // Use raw fetch so we control status code handling ourselves.
+        // supabase.functions.invoke() throws on any non-2xx, hiding 402 limitReached.
+        const supabaseUrl  = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
+        const supabaseAnon = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
+        const rawRes = await fetch(`${supabaseUrl}/functions/v1/lucky-concierge`, {
           method:  "POST",
           headers: {
             "Content-Type":  "application/json",
-            "Authorization": `Bearer ${authToken}`,
+            "Authorization": `Bearer ${supabaseAnon}`,
             "apikey":        supabaseAnon,
           },
-          body: JSON.stringify(payload),
+          body: JSON.stringify({
+            query:       userMsg.content,
+            history:     priorHistory.map((m) => ({ role: m.role, content: m.content })),
+            deviceId,
+            destination: "Rio de Janeiro",
+          }),
         });
 
-        console.log("[LuckyChat] response status", rawRes.status);
-
         const data = await rawRes.json().catch(() => ({}));
-        console.log("[LuckyChat] response data", data);
-        console.log("[LuckyChat] reply",        data?.reply);
-        console.log("[LuckyChat] limitReached",  data?.limitReached);
+        console.log("[Lucky] status:", rawRes.status, "data keys:", Object.keys(data));
 
-        // 402 or limitReached = server-side gate reached
-        // BUG-FIX: add a visible assistant message explaining the limit BEFORE
-        // updating responsesUsed — previously the chat looked like "no response"
-        // because nothing was appended to the thread when limitReached fired.
+        // 402 = server-side limit reached (authoritative enforcement)
         if (rawRes.status === 402 || data?.limitReached) {
-          console.log("[LuckyChat] GATE: limit reached — appending paywall message");
-          setMessages((prev) => [
-            ...prev,
-            {
-              role:    "assistant",
-              content: "Você chegou ao limite de perguntas gratuitas. Continue com o Lucky Premium para perguntas ilimitadas.",
-            },
-          ]);
+          console.log("[Lucky] GATE: limit reached");
           const newCount = Math.max(responsesUsed, data?.questionCount ?? FREE_LIMIT);
           setResponsesUsed(newCount);
-          try { await AsyncStorage.setItem(RESPONSES_USED_KEY, String(newCount)); } catch (_) {}
+          await AsyncStorage.setItem(RESPONSES_USED_KEY, String(newCount));
+          setLoading(false);
+          scrollToBottom();
           return;
         }
 
         if (!rawRes.ok || data?.error) {
           const errMsg = data?.error ?? `HTTP ${rawRes.status}`;
-          console.error("[LuckyChat] server error:", errMsg);
+          console.error("[Lucky] server error:", errMsg);
           throw new Error(errMsg);
         }
 
-        console.log("[LuckyChat] append assistant message");
         const reply = data?.reply ?? "Desculpe, não consegui processar sua pergunta.";
         setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
 
         // Sync count: use server's authoritative count
         const newCount = data?.questionCount ?? responsesUsed + 1;
         setResponsesUsed(newCount);
-        try { await AsyncStorage.setItem(RESPONSES_USED_KEY, String(newCount)); } catch (_) {}
+        await AsyncStorage.setItem(RESPONSES_USED_KEY, String(newCount));
 
-        // Show subtle editorial hint after 2nd free answer
+        // Show subtle editorial hint after 2nd free answer (question 2 only, not blocked)
         if (!isPremium && newCount === FREE_LIMIT) {
           setShowSecondHint(true);
         }
 
-        // Update premium flag from server if changed
+        // Update premium status from server if changed
         if (data?.isPremium && !isPremium) {
           setIsPremium(true);
-          try { await AsyncStorage.setItem(IS_PREMIUM_KEY, "true"); } catch (_) {}
+          await AsyncStorage.setItem(IS_PREMIUM_KEY, "true");
         }
       } catch (err) {
         const errMsg = (err as Error)?.message ?? "unknown";
-        console.error("[LuckyChat] error", errMsg);
+        console.error("[Lucky] CATCH:", errMsg);
         setMessages((prev) => [
           ...prev,
           { role: "assistant", content: "Hmm, algo deu errado. Tente novamente em instantes." },
@@ -290,16 +228,12 @@ export default function LuckyScreen() {
 
   return (
     <View style={styles.bg}>
-<<<<<<< HEAD
-      <RotatingBackground />
-=======
       <RotatingBackground
         pool={rioHero && rioHero.length > 0
           ? rioHero.map((item) => ({ uri: item.public_url }))
           : LUCKY_BG_POOL}
         blurRadius={22}
       />
->>>>>>> claude/plan-app-architecture-73RnI
       <View style={styles.overlay}>
         <KeyboardAvoidingView
           style={{ flex: 1 }}
@@ -342,8 +276,8 @@ export default function LuckyScreen() {
               )}
             </View>
 
-            {/* ── Entry prompts — hidden when at limit (clicking would be silently blocked) ── */}
-            {!hasMessages && !isAtLimit && (
+            {/* ── Entry prompts ── */}
+            {!hasMessages && (
               <View style={styles.promptsSection}>
                 <Text style={styles.promptsLabel}>Sugestões</Text>
                 <View style={styles.promptsGrid}>
@@ -366,7 +300,7 @@ export default function LuckyScreen() {
 
             {/* ── Message thread ── */}
             {messages.map((msg, i) => (
-              <View key={`msg-${i}`} style={styles.messageBlock}>
+              <View key={i} style={styles.messageBlock}>
                 {msg.role === "user" ? (
                   <View style={styles.userBubbleRow}>
                     <View style={styles.userBubble}>

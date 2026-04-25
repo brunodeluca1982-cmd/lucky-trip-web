@@ -15,29 +15,10 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-<<<<<<< HEAD
-import { Feather } from "@expo/vector-icons";
-import Colors from "@/constants/colors";
-import { HorizontalScroll } from "@/components/HorizontalScroll";
-import { PlaceCard } from "@/components/PlaceCard";
-import { SectionHeader } from "@/components/SectionHeader";
-import { RotatingBackground } from "@/components/RotatingBackground";
-import {
-  destinos,
-  detectPeriodo,
-} from "@/data/mockData";
-import { RestauranteCard } from "@/components/RestauranteCard";
-import { HotelCard } from "@/components/HotelCard";
-import { useOQueFazer } from "@/hooks/useOQueFazer";
-import { useRestaurants } from "@/hooks/useRestaurants";
-import { useNeighborhoods } from "@/hooks/useNeighborhoods";
-import { sanitizePhotoUrl, getImageForEntity } from "@/utils/getImageForEntity";
-=======
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { destinos } from "@/data/mockData";
 import { useDestinoFotos } from "@/hooks/useDestinoFotos";
 import { useDestaquesDestino, type DestaqueDestino } from "@/hooks/useDestaquesDestino";
->>>>>>> claude/plan-app-architecture-73RnI
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const PETROL_BLUE = "#1B4F72";
@@ -114,45 +95,16 @@ export default function CidadeScreen() {
   const { essencial, agora, loading: loadingDestaques } = useDestaquesDestino(RIO_DESTINO_ID);
   const [dotIdx, setDotIdx] = useState(0);
 
-<<<<<<< HEAD
-  // Supabase data
-  const { lugares: atividades, loading: loadingAtiv } = useOQueFazer();
-  const { restaurantes: restos, loading: loadingRestos } = useRestaurants();
-  const { neighborhoods, loading: loadingHoteis } = useNeighborhoods();
-  const allHotels = neighborhoods.flatMap((n) =>
-    (n.hotels ?? []).map((h) => ({ ...h, localizacao: n.neighborhood_name }))
-  );
-  // Derive "Agora" label from Supabase atividades (first item with a matching momento_ideal)
-  const experience = React.useMemo(() => {
-    const match = atividades.find(
-      (a) => typeof a.momento_ideal === "string" && a.momento_ideal.toLowerCase() === periodo
-    );
-    return match?.titulo ?? atividades[0]?.titulo ?? "Descoberta local";
-  }, [atividades, periodo]);
-  const agoraLabel = AGORA_LABEL[destino.id] ?? `Agora em ${destino.cidade}`;
-  const essentialRef = ESSENTIALS[destino.id] ?? `de ${destino.cidade}`;
-=======
   useEffect(() => {
     if (fotos.length <= 1) return;
     const t = setInterval(() => setDotIdx((i) => (i + 1) % fotos.length), ROTATION_INTERVAL);
     return () => clearInterval(t);
   }, [fotos.length]);
->>>>>>> claude/plan-app-architecture-73RnI
 
   return (
     <View style={s.root}>
       <Stack.Screen options={{ headerShown: false }} />
 
-<<<<<<< HEAD
-      {/* ── Fullscreen background — Rio: global rotating pool; others: static image ── */}
-      {isRio ? (
-        <View style={s.bgImage} pointerEvents="none">
-          <RotatingBackground />
-        </View>
-      ) : (
-        <Image source={destino.image} style={s.bgImage} resizeMode="cover" />
-      )}
-=======
       {/* ══ FULLSCREEN HERO BACKGROUND ══ */}
       <View style={StyleSheet.absoluteFill}>
         <HeroBackground fotos={fotos} fallback={destino.image} />
@@ -162,7 +114,6 @@ export default function CidadeScreen() {
           style={StyleSheet.absoluteFill}
         />
       </View>
->>>>>>> claude/plan-app-architecture-73RnI
 
       {/* ══ TOP BAR ══ */}
       <View style={[s.topBar, { paddingTop: top + 8 }]}>
@@ -179,128 +130,6 @@ export default function CidadeScreen() {
         </View>
       </View>
 
-<<<<<<< HEAD
-        {/* ── Editorial content — cream section, scrolls naturally below ── */}
-        <View style={s.editorial}>
-          {isRio ? (
-            <>
-              {/* ── O que fazer — Supabase: o_que_fazer_rio ── */}
-              <View style={s.section}>
-                <SectionHeader
-                  title="O que fazer"
-                  subtitle={`Experiências imperdíveis em ${destino.cidade}.`}
-                />
-                {loadingAtiv ? (
-                  <ActivityIndicator color="#C9A84C" style={{ marginVertical: 16 }} />
-                ) : (
-                  <HorizontalScroll>
-                    {atividades.slice(0, 8).map((item) => (
-                      <PlaceCard
-                        key={item.id}
-                        id={item.id}
-                        saveCategoria="oQueFazer"
-                        titulo={item.titulo}
-                        localizacao={item.localizacao}
-                        image={item.image}
-                        size="medium"
-                        onPress={() => router.push({
-                          pathname: "/lugar/[cityId]/[placeId]",
-                          params: { cityId: "rio", placeId: item.id, source_table: "o_que_fazer_rio_v2" },
-                        })}
-                      />
-                    ))}
-                  </HorizontalScroll>
-                )}
-              </View>
-
-              <View style={s.divider} />
-
-              {/* ── Onde comer — Supabase: restaurantes ── */}
-              <View style={s.section}>
-                <SectionHeader
-                  title="Onde comer"
-                  subtitle={`Restaurantes com alma em ${destino.cidade}.`}
-                />
-                {loadingRestos ? (
-                  <ActivityIndicator color="#C9A84C" style={{ marginVertical: 16 }} />
-                ) : (
-                  <HorizontalScroll>
-                    {restos.slice(0, 8).map((r) => (
-                      <RestauranteCard
-                        key={String(r.id)}
-                        id={String(r.id)}
-                        nome={r.nome}
-                        bairro={r.bairro}
-                        categoria={r.categoria}
-                        image={r.resolvedPhotoUri ? { uri: r.resolvedPhotoUri } : null}
-                        onPress={() => router.push({
-                          pathname: "/lugar/[cityId]/[placeId]",
-                          params: { cityId: "rio", placeId: String(r.id), source_table: "restaurantes" },
-                        })}
-                      />
-                    ))}
-                  </HorizontalScroll>
-                )}
-              </View>
-
-              <View style={s.divider} />
-
-              {/* ── Onde ficar — Supabase: stay_hotels via stay_neighborhoods ── */}
-              {!loadingHoteis && allHotels.length > 0 && (
-                <>
-                  <View style={s.section}>
-                    <SectionHeader
-                      title="Onde ficar"
-                      subtitle={`Hospedagem com personalidade em ${destino.cidade}.`}
-                    />
-                    <HorizontalScroll>
-                      {allHotels.slice(0, 6).map((h) => (
-                        <HotelCard
-                          key={h.id}
-                          id={h.id}
-                          nome={h.hotel_name}
-                          localizacao={h.localizacao}
-                          tipo={h.hotel_category}
-                          image={
-                            getImageForEntity(
-                              "hotel",
-                              h.hotel_name ?? h.nome ?? "",
-                              h.localizacao ?? "",
-                              typeof h.photo_url === "string" ? h.photo_url : null
-                            )
-                          }
-                          onPress={() => router.push({
-                            pathname: "/lugar/[cityId]/[placeId]",
-                            params: { cityId: "rio", placeId: h.id, source_table: "stay_hotels" },
-                          })}
-                        />
-                      ))}
-                    </HorizontalScroll>
-                  </View>
-                  <View style={s.divider} />
-                </>
-              )}
-            </>
-          ) : (
-            /* ── Em breve — destinos ainda não lançados ── */
-            <View style={s.comingSoonBlock}>
-              <Text style={s.comingSoonEyebrow}>Em breve</Text>
-              <Text style={s.comingSoonCopy}>
-                {COMING_SOON_COPY[destino.id] ?? `${destino.cidade} está sendo preparada com o cuidado que ela merece.`}
-              </Text>
-              <Pressable
-                style={s.comingSoonCta}
-                onPress={() => router.replace({ pathname: "/cidade/[id]", params: { id: "rio" } })}
-              >
-                <Text style={s.comingSoonCtaText}>Explorar o Rio agora</Text>
-                <Feather name="arrow-right" size={14} color="#C9A84C" />
-              </Pressable>
-            </View>
-          )}
-
-          <View style={s.footer}>
-            <Text style={s.footerL}>L.</Text>
-=======
       {/* ══ SCROLLABLE CONTENT ══ */}
       <ScrollView style={s.scroll} contentContainerStyle={{ paddingBottom: bottom + 90 }} showsVerticalScrollIndicator={false}>
 
@@ -314,7 +143,6 @@ export default function CidadeScreen() {
             {[0, 1, 2, 3].map((i) => (
               <View key={i} style={[s.dot, dotIdx % 4 === i && s.dotActive]} />
             ))}
->>>>>>> claude/plan-app-architecture-73RnI
           </View>
         </View>
 

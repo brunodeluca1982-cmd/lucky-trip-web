@@ -27,32 +27,15 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-<<<<<<< HEAD
-import { Feather } from "@expo/vector-icons";
-import Colors from "@/constants/colors";
-import { destinos } from "@/data/mockData";
-import { useNeighborhoods } from "@/hooks/useNeighborhoods";
-import type { Hotel } from "@/lib/supabase";
-import { getNeighborhoodHero } from "@/utils/neighborhoodHero";
-import { HotelCard } from "@/components/HotelCard";
-=======
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { useBairro } from "@/hooks/useBairro";
 import { useHoteisByBairro } from "@/hooks/useHoteisByBairro";
->>>>>>> claude/plan-app-architecture-73RnI
 
 const { width: W, height: H } = Dimensions.get("window");
 const HERO_H = Math.round(H * 0.42);
 const HOTEL_CARD_W = 140;
 const HOTEL_CARD_H = 180;
 
-<<<<<<< HEAD
-function formatLevel(val: string): string {
-  const m: Record<string, string> = {
-    alto: "Alta", alta: "Alta", media: "Média", baixa: "Baixa", muito_alta: "Muito alta",
-  };
-  return m[val?.toLowerCase()] ?? val ?? "—";
-=======
 const PETROL = "#1B4F72";
 const FALLBACK_IMAGE = "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero01.jpg";
 
@@ -77,7 +60,6 @@ function ratingText(rating: number): string {
   if (rating >= 4.5) return "Muito bom";
   if (rating >= 4.0) return "Bom";
   return "Regular";
->>>>>>> claude/plan-app-architecture-73RnI
 }
 
 export default function BairroDetailScreen() {
@@ -92,12 +74,8 @@ export default function BairroDetailScreen() {
   const [saved, setSaved] = useState(false);
   const [aboutExpanded, setAboutExpanded] = useState(false);
 
-<<<<<<< HEAD
-  const heroImage = getNeighborhoodHero(neighborhood?.image_url);
-=======
   const tags = bairro ? buildTags(bairro) : [];
   const heroUrl = bairro?.hero_image_url || FALLBACK_IMAGE;
->>>>>>> claude/plan-app-architecture-73RnI
 
   // Loading state
   if (loadingBairro) {
@@ -130,22 +108,6 @@ export default function BairroDetailScreen() {
     <View style={s.root}>
       <Stack.Screen options={{ headerShown: false }} />
 
-<<<<<<< HEAD
-      {/* ── Full-screen background (persists while scrolling) ── */}
-      {heroImage != null && (
-        <Image
-          source={heroImage}
-          style={StyleSheet.absoluteFillObject}
-          resizeMode="cover"
-        />
-      )}
-      <LinearGradient
-        colors={["rgba(0,0,0,0.05)", "rgba(0,0,0,0.38)", "rgba(0,0,0,0.82)", "rgba(0,0,0,0.95)"]}
-        locations={[0, 0.30, 0.54, 1.0]}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
-=======
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: bottomPad + 40 }}
@@ -162,7 +124,6 @@ export default function BairroDetailScreen() {
             locations={[0, 0.3, 0.7, 1]}
             style={StyleSheet.absoluteFill}
           />
->>>>>>> claude/plan-app-architecture-73RnI
 
           {/* Top controls */}
           <View style={[s.heroControls, { top: topInset + 12 }]}>
@@ -203,138 +164,16 @@ export default function BairroDetailScreen() {
             {/* Tags */}
             {tags.length > 0 && (
               <View style={s.tagsRow}>
-<<<<<<< HEAD
-                {[neighborhood.best_for_1, neighborhood.best_for_2, neighborhood.best_for_3]
-                  .filter(Boolean)
-                  .map((b, i) => (
-                    <View key={`tag-${i}`} style={s.tag}>
-                      <Text style={s.tagText}>{b}</Text>
-                    </View>
-                  ))}
-              </View>
-            </View>
-          </View>
-
-          {/* ── Action buttons ── */}
-          <View style={s.actionRow}>
-            <Pressable
-              style={s.actionPrimary}
-              onPress={() =>
-                setTimeout(
-                  () => scrollRef.current?.scrollTo({ y: hotelsSectionY.current, animated: true }),
-                  60,
-                )
-              }
-            >
-              <Feather name="home" size={14} color="#18120C" />
-              <Text style={s.actionPrimaryText}>
-                Ver {hotelCount > 0 ? `${hotelCount} ` : ""}hotel{hotelCount !== 1 ? "s" : ""}
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[s.actionGhost, editorialOpen && s.actionGhostActive]}
-              onPress={() => setEditorialOpen((v) => !v)}
-            >
-              <Text style={s.actionGhostText}>Por dentro do bairro</Text>
-              <Feather
-                name={editorialOpen ? "chevron-up" : "chevron-down"}
-                size={13}
-                color="rgba(255,255,255,0.55)"
-              />
-            </Pressable>
-          </View>
-
-          {/* ── Collapsible editorial ── */}
-          {editorialOpen && (
-            <View style={s.editorial}>
-              <Text style={s.sectionLabel}>Por dentro do bairro</Text>
-              {neighborhood.my_view
-                .replace(/\r\n/g, "\n")
-                .split("\n")
-                .map((p, i) =>
-                  p.trim() ? (
-                    <Text key={`para-${i}`} style={s.bodyText}>{p.trim()}</Text>
-                  ) : null,
-                )}
-
-              {neighborhood.how_to_live && neighborhood.how_to_live.length > 0 && (
-                <>
-                  <Text style={[s.sectionLabel, { marginTop: 24 }]}>Como viver o bairro</Text>
-                  {neighborhood.how_to_live.map((tip, i) => (
-                    <View key={`tip-${i}`} style={s.tipRow}>
-                      <View style={s.tipDot} />
-                      <Text style={s.tipText}>{tip}</Text>
-                    </View>
-                  ))}
-                </>
-              )}
-
-              <Text style={[s.sectionLabel, { marginTop: 24 }]}>Perfil do bairro</Text>
-              <View style={s.statsGrid}>
-                <StatPill label="Vida noturna"  value={formatLevel(neighborhood.nightlife)} />
-                <StatPill label="Gastronomia"   value={formatLevel(neighborhood.gastronomy)} />
-                <StatPill label="Paisagem"      value={formatLevel(neighborhood.scenery)} />
-                <StatPill label="A pé"          value={formatLevel(neighborhood.walkable)} />
-                <StatPill label="Solo feminino" value={formatLevel(neighborhood.safety_solo_woman)} />
-              </View>
-            </View>
-          )}
-
-          {/* ── Hotels section ── */}
-          <View
-            style={s.hotelsSection}
-            onLayout={(e) => { hotelsSectionY.current = e.nativeEvent.layout.y; }}
-          >
-            <View style={s.hotelsSectionHeader}>
-              <Text style={s.sectionLabel}>
-                Hospedagens em {neighborhood.neighborhood_name}
-              </Text>
-              {hotelCount > 0 && (
-                <Text style={s.hotelCount}>
-                  {hotelCount} opção{hotelCount !== 1 ? "ões" : ""}
-                </Text>
-              )}
-            </View>
-
-            {hotelCount === 0 && (
-              <View style={s.emptyHotels}>
-                <Text style={s.emptyHotelsText}>
-                  Nenhuma hospedagem cadastrada neste bairro por enquanto.
-                </Text>
-=======
                 {tags.map((tag, i) => (
                   <View key={i} style={s.tag}>
                     <Text style={s.tagText}>{tag}</Text>
                   </View>
                 ))}
->>>>>>> claude/plan-app-architecture-73RnI
               </View>
             )}
           </View>
         </View>
 
-<<<<<<< HEAD
-            {(neighborhood.hotels ?? []).map((hotel) => {
-              const imageUrl = hotel.photo_url ?? null;
-              console.log("HOTEL CARD:", hotel.hotel_name, imageUrl);
-              return (
-                <HotelCard
-                  key={hotel.id}
-                  id={String(hotel.id)}
-                  nome={hotel.hotel_name}
-                  localizacao={neighborhood.neighborhood_name}
-                  tipo={hotel.hotel_category}
-                  image={imageUrl ? { uri: imageUrl } : null}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/ondeFicar/hotel/[hotelId]",
-                      params: { hotelId: hotel.id },
-                    })
-                  }
-                />
-              );
-            })}
-=======
         {/* ── ONDE FICAR Section ── */}
         <View style={s.section}>
           <View style={s.sectionHeader}>
@@ -344,7 +183,6 @@ export default function BairroDetailScreen() {
                 <Text style={s.sectionLink}>Ver todos</Text>
               </Pressable>
             )}
->>>>>>> claude/plan-app-architecture-73RnI
           </View>
 
           {loadingHoteis ? (
@@ -492,22 +330,6 @@ export default function BairroDetailScreen() {
   );
 }
 
-<<<<<<< HEAD
-// ── StatPill ──────────────────────────────────────────────────────────────────
-
-function StatPill({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={s.statPill}>
-      <Text style={s.statLabel}>{label}</Text>
-      <Text style={s.statValue}>{value}</Text>
-    </View>
-  );
-}
-
-// ── Styles ────────────────────────────────────────────────────────────────────
-
-=======
->>>>>>> claude/plan-app-architecture-73RnI
 const s = StyleSheet.create({
   root: {
     flex: 1,
@@ -851,33 +673,5 @@ const s = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 14,
     color: "rgba(255,255,255,0.55)",
-<<<<<<< HEAD
-    letterSpacing: 0.1,
-  },
-
-  footer: {
-    marginTop: 32,
-    paddingVertical: 32,
-    paddingHorizontal: 24,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.05)",
-    alignItems: "center",
-    gap: 8,
-  },
-  footerL: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 32,
-    color: "rgba(255,255,255,0.18)",
-  },
-  footerPhrase: {
-    fontFamily: "PlayfairDisplay_400Regular",
-    fontSize: 14,
-    color: "rgba(255,255,255,0.30)",
-    textAlign: "center",
-    lineHeight: 22,
-    maxWidth: 260,
-    fontStyle: "italic",
-=======
->>>>>>> claude/plan-app-architecture-73RnI
   },
 });

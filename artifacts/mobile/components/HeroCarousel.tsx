@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
+  Alert,
   Dimensions,
   FlatList,
   Image,
@@ -15,15 +16,11 @@ import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
-import type { HeroComposedItem, HeroRoute } from "@/hooks/useHeroComposed";
-import { useBackground } from "@/context/BackgroundContext";
 
 const C = Colors.light;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const HERO_HEIGHT = Math.round(SCREEN_WIDTH * 1.1);
 
-<<<<<<< HEAD
-=======
 export type HeroCardType = "destino" | "em_breve" | "guia" | "dica";
 
 export interface HeroItem {
@@ -39,65 +36,11 @@ export interface HeroItem {
   comingSoonCopy?: string; // shown in Alert for EM BREVE cards
 }
 
->>>>>>> claude/plan-app-architecture-73RnI
 interface HeroCarouselProps {
-  items: HeroComposedItem[];
+  items: HeroItem[];
   onIndexChange?: (index: number) => void;
 }
 
-<<<<<<< HEAD
-// ── Navigation handler — one function per route type ─────────────────────────
-function navigateHeroRoute(route: HeroRoute) {
-  switch (route.type) {
-    case "lugar":
-      router.push({
-        pathname: "/lugar/[cityId]/[placeId]",
-        params: {
-          cityId:       route.cityId,
-          placeId:      route.placeId,
-          source_table: route.source_table,
-        },
-      });
-      break;
-    case "friend":
-      router.push({
-        pathname: "/friend/[slug]",
-        params: { slug: route.slug },
-      });
-      break;
-    case "cidade":
-      router.push({
-        pathname: "/cidade/[id]",
-        params: { id: route.id },
-      });
-      break;
-    case "comingsoon":
-      router.push({
-        pathname: "/comingsoon/[slug]",
-        params: { slug: route.slug },
-      });
-      break;
-  }
-}
-
-// ── Single slide ──────────────────────────────────────────────────────────────
-function HeroSlide({
-  item,
-  overrideSource,
-}: {
-  item: HeroComposedItem;
-  overrideSource?: ImageSourcePropType;
-}) {
-  // overrideSource: used for the Rio card to sync with the background pool frame.
-  // Fallback: entity's own photo_url. null → premium dark placeholder.
-  const imageSource: ImageSourcePropType | null =
-    overrideSource ?? (item.photo_url ? { uri: item.photo_url } : null);
-
-  return (
-    <Pressable
-      style={({ pressed }) => [styles.slide, pressed && { opacity: 0.94 }]}
-      onPress={() => navigateHeroRoute(item.route)}
-=======
 function handleSlidePress(item: HeroItem) {
   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   const type = item.type ?? (item.cityId === "rio" ? "destino" : item.cityId ? "em_breve" : undefined);
@@ -135,40 +78,18 @@ function HeroSlide({ item }: { item: HeroItem }) {
     <Pressable
       style={({ pressed }) => [styles.slide, pressed && { opacity: 0.94 }]}
       onPress={() => handleSlidePress(item)}
->>>>>>> claude/plan-app-architecture-73RnI
     >
-      {imageSource ? (
-        <Image
-          source={imageSource}
-          style={styles.image}
-          resizeMode="cover"
-          onError={() =>
-            console.log(`[IMAGE] source: fallback (load error) | id: ${item.id}`)
-          }
-        />
-      ) : (
-        <View style={[styles.image, styles.placeholder]} />
-      )}
-
-      {/* Subtle dim layer */}
+      <Image source={item.image} style={styles.image} resizeMode="cover" />
       <View style={styles.dimOverlay} />
-
-      {/* Bottom gradient */}
       <LinearGradient
         colors={["transparent", "rgba(0,0,0,0.50)", "rgba(0,0,0,0.88)"]}
         style={styles.gradient}
         locations={[0.20, 0.58, 1]}
       />
-
-      {/* Text content */}
       <View style={styles.content}>
         <View style={styles.badgeContainer}>
           <Text style={styles.badgeText}>{item.badge}</Text>
         </View>
-<<<<<<< HEAD
-        <Text style={styles.cidade}>{item.titulo}</Text>
-        <Text style={styles.pais}>{item.localizacao}</Text>
-=======
         <Text style={styles.cidade}>{item.cidade}</Text>
         <Text style={styles.pais}>{item.pais}</Text>
         {/* "Conferir agora" CTA — shown for actionable cards only */}
@@ -178,27 +99,22 @@ function HeroSlide({ item }: { item: HeroItem }) {
             <Feather name="arrow-right" size={12} color="#000" style={{ marginLeft: 4 }} />
           </View>
         )}
->>>>>>> claude/plan-app-architecture-73RnI
       </View>
     </Pressable>
   );
 }
 
-// ── Carousel ──────────────────────────────────────────────────────────────────
 export function HeroCarousel({ items, onIndexChange }: HeroCarouselProps) {
-  const { pool, currentIdx } = useBackground();
   const [activeIndex, setActiveIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const autoplayRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const onIndexChangeRef = useRef(onIndexChange);
-  onIndexChangeRef.current = onIndexChange;
 
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      if (viewableItems.length > 0 && viewableItems[0].index != null) {
+      if (viewableItems.length > 0 && viewableItems[0].index !== null) {
         const idx = viewableItems[0].index;
         setActiveIndex(idx);
-        onIndexChangeRef.current?.(idx);
+        onIndexChange?.(idx);
       }
     }
   ).current;
@@ -206,13 +122,11 @@ export function HeroCarousel({ items, onIndexChange }: HeroCarouselProps) {
   const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
 
   useEffect(() => {
-    if (items.length <= 1) return;
-    const len = items.length;
     autoplayRef.current = setInterval(() => {
       setActiveIndex((prev) => {
-        const next = (prev + 1) % len;
+        const next = (prev + 1) % items.length;
         flatListRef.current?.scrollToIndex({ index: next, animated: true });
-        onIndexChangeRef.current?.(next);
+        onIndexChange?.(next);
         return next;
       });
     }, 11000);
@@ -221,59 +135,16 @@ export function HeroCarousel({ items, onIndexChange }: HeroCarouselProps) {
     };
   }, [items.length]);
 
-  if (items.length === 0) return null;
-
-  let safeItems = [...items];
-
-  const hasRio = safeItems.some(
-    item =>
-      item.source_table === "destinos" &&
-      item.titulo === "Rio de Janeiro"
-  );
-
-  if (!hasRio) {
-    safeItems.unshift({
-      id:           "rio-fixed",
-      titulo:       "Rio de Janeiro",
-      source_table: "destinos",
-      localizacao:  "Brasil",
-      badge:        "Destino",
-      photo_url:    null,
-      route:        { type: "cidade", id: "rio-de-janeiro" },
-    });
-    console.log("[HERO FIX] Rio injected manually");
-  }
-
-  const finalItems = [...safeItems];
-  const rioIndex = finalItems.findIndex(
-    item =>
-      item.source_table === "destinos" &&
-      item.titulo === "Rio de Janeiro"
-  );
-  if (rioIndex > -1) {
-    const [rioItem] = finalItems.splice(rioIndex, 1);
-    finalItems.unshift(rioItem);
-  }
-
   return (
     <View style={styles.container}>
       <FlatList
         ref={flatListRef}
-        data={finalItems}
-        keyExtractor={(item) => `${item.source_table}-${item.id}`}
+        data={items}
+        keyExtractor={(item) => item.id}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        renderItem={({ item, index }) => (
-          <HeroSlide
-            item={item}
-            overrideSource={
-              index === 0 && item.source_table === "destinos"
-                ? pool[currentIdx]
-                : undefined
-            }
-          />
-        )}
+        renderItem={({ item }) => <HeroSlide item={item} />}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         scrollEventThrottle={16}
@@ -284,9 +155,9 @@ export function HeroCarousel({ items, onIndexChange }: HeroCarouselProps) {
         })}
       />
       <View style={styles.dots}>
-        {finalItems.map((item, i) => (
+        {items.map((_, i) => (
           <View
-            key={`dot-${item.source_table}-${item.id}`}
+            key={i}
             style={[styles.dot, i === activeIndex && styles.dotActive]}
           />
         ))}
@@ -307,9 +178,6 @@ const styles = StyleSheet.create({
   image: {
     width: SCREEN_WIDTH,
     height: HERO_HEIGHT,
-  },
-  placeholder: {
-    backgroundColor: "#1A0E04",
   },
   dimOverlay: {
     ...StyleSheet.absoluteFillObject,

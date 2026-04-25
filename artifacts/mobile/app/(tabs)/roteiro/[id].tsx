@@ -1,18 +1,14 @@
 /**
- * roteiro/[id].tsx — Static template itineraries removed.
+ * roteiro/[id].tsx — Prebuilt itinerary detail screen.
  *
- * Pre-built roteiros (r1, r2, r3, r4) were fake mock data that violated
- * the "Supabase is the only source of truth" rule.
- * All itineraries must come from Supabase or be AI-generated.
- * This screen now redirects to the AI roteiro generator.
+ * Renders a curated base roteiro (from mockData.roteiros) using the exact
+ * same DiaCard / PeriodoBlock / RoteiroSection model as the generated
+ * itinerary in viagem.tsx. Same visual hierarchy, same day cards, same
+ * period labels, same design standard.
+ *
+ * Navigation target: from Home RoteiroCard onPress.
  */
-import { Redirect } from "expo-router";
 
-<<<<<<< HEAD
-export default function RoteiroStaticDetail() {
-  return <Redirect href="/roteiro" />;
-}
-=======
 import React, { useRef, useState } from "react";
 import {
   Animated,
@@ -567,4 +563,3 @@ const rot = StyleSheet.create({
     flex: 1,
   },
 });
->>>>>>> claude/plan-app-architecture-73RnI
