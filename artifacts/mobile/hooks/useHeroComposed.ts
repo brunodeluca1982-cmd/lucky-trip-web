@@ -13,7 +13,6 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { buildMediaUrl } from "@/lib/mediaUrl";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -159,7 +158,7 @@ async function fetchLugaresDestaque(): Promise<HeroComposedItem[]> {
     .eq("ativo", true)
     .eq("destaque", true)
     .not("hero_image_url", "is", null)
-    .limit(10);
+    .limit(3);
 
   if (error || !data) {
     console.warn("[HERO] lugares destaque fetch failed:", error?.message);
@@ -172,7 +171,7 @@ async function fetchLugaresDestaque(): Promise<HeroComposedItem[]> {
     titulo: l.nome,
     localizacao: l.bairros?.nome ?? "Rio de Janeiro",
     badge: formatCategoria(l.categoria),
-    photo_url: buildMediaUrl(l.hero_image_url),
+    photo_url: l.hero_image_url,
     route: {
       type: "lugar" as const,
       citySlug: l.destinos?.slug ?? "rio-de-janeiro",

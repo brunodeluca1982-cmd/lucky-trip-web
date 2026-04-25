@@ -232,16 +232,9 @@ function HeroDestaque({
     // Determinar kicker baseado no tipo
     const kicker = isAmigo ? "VIAJE COM" : item.badge.toUpperCase();
 
-    // Tamanho de fonte dinâmico baseado no comprimento do título
-    const titleFontSize = item.titulo.length > 18 ? 28 : item.titulo.length > 12 ? 34 : 38;
-
     return (
       <Pressable style={styles.heroSlide} onPress={handlePress}>
-        <Image
-          source={{ uri: photoUrl }}
-          style={styles.heroDestaqueImage}
-          resizeMode="cover"
-        />
+        <Image source={{ uri: photoUrl }} style={styles.heroDestaqueImage} />
         <LinearGradient
           colors={["rgba(0,0,0,0.2)", "rgba(0,0,0,0.5)", "rgba(10,10,10,1)"]}
           locations={[0, 0.6, 1]}
@@ -249,7 +242,7 @@ function HeroDestaque({
         />
         <View style={[styles.heroTitleContainer, { paddingTop: top + 70 }]}>
           <Text style={styles.heroKicker}>{kicker}</Text>
-          <Text style={[styles.heroTitleText, { fontSize: titleFontSize }]}>{item.titulo}</Text>
+          <Text style={styles.heroTitleText}>{item.titulo}</Text>
           <Text style={styles.heroSub}>{item.localizacao}</Text>
           {isDestino && <Text style={styles.heroPais}>{item.localizacao.toUpperCase()}</Text>}
         </View>
