@@ -1,37 +1,26 @@
 /**
- * useHeroComposed.ts
+ * useHeroComposed.ts — 100% Dinâmico
  *
- * Builds the Hero Carousel from mixed Supabase + curated data.
+ * Composição:
+ *   [0]     Rio de Janeiro (sempre primeiro)
+ *   [1..N]  Outros destinos com status='ativo' e foto
+ *   [N+1..] Amigos com foto_url
+ *   [...]   Lugares em destaque (categoria variada)
+ *   [...]   Lucky Lists com capa
  *
- * Composition (FIXED ORDER — mandatory first):
- *   [0] Rio de Janeiro  — destinos.hero_image_url — navigate: cidade
- *   [1] Kyoto           — curated static           — navigate: comingsoon
- *   [2] Santorini       — curated static           — navigate: comingsoon
- *   [3] Carolina        — friend_guides.photo_url  — navigate: friend
- *   [4] Restaurante     — restaurantes (dynamic)
- *   [5] O que fazer     — o_que_fazer_rio_v2 (dynamic)
- *   [6] Lucky Pick      — lucky_list_rio_v2 (dynamic)
- *
- * Rules:
- *   - Rio, Kyoto, Santorini, Carolina are ALWAYS present (injected if missing)
- *   - Kyoto + Santorini are curated canonical entries (NOT mocks — real destinations)
- *   - Dynamic slots appended after mandatory items
- *   - Image pipeline: sanitizePhotoUrl passes ALL Supabase-stored URLs
- *   - [HERO FIX] logs injection status of mandatory items
+ * ZERO hardcoded — tudo vem do Supabase
  */
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { sanitizePhotoUrl } from "@/utils/getImageForEntity";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 export type HeroSourceTable =
-  | "restaurantes"
-  | "o_que_fazer_rio_v2"
-  | "lucky_list_rio_v2"
-  | "friends"
-  | "friend_guides"
   | "destinos"
-  | "curated";
+  | "amigos"
+  | "lugares"
+  | "lucklists";
 
 export interface HeroComposedItem {
   id: string;
@@ -44,301 +33,196 @@ export interface HeroComposedItem {
 }
 
 export type HeroRoute =
-  | { type: "lugar"; cityId: string; placeId: string; source_table: string }
-  | { type: "friend"; slug: string }
-  | { type: "cidade"; id: string }
-  | { type: "comingsoon"; slug: string; nome: string };
+  | { type: "cidade"; slug: string }
+  | { type: "amigo"; slug: string }
+  | { type: "lugar"; citySlug: string; lugarId: string }
+  | { type: "lucklist"; slug: string };
 
-// ── Logging ───────────────────────────────────────────────────────────────────
+// ── Storage helper ────────────────────────────────────────────────────────────
 
-function logHeroItem(item: HeroComposedItem) {
-  console.log(
-    `[HERO ITEM] source_table: ${item.source_table} | id: ${item.id} | photo_url: ${item.photo_url ?? "null"}`
-  );
-}
+const STORAGE_BASE = "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media";
 
-// ── [0] Rio de Janeiro (MANDATORY — Supabase destinos) ───────────────────────
+async function getHeroPhotoFromStorage(slug: string): Promise<string | null> {
+  try {
+    // Try media/{slug}/hero/foto/ first
+    const { data, error } = await supabase.storage
+      .from("media")
+      .list(`${slug}/hero/foto`, { limit: 1, sortBy: { column: "name", order: "asc" } });
 
-async function fetchRio(): Promise<HeroComposedItem | null> {
-  const { data, error } = await supabase
-    .from("destinos")
-    .select("id, nome, slug, hero_image_url, photo_url")
-    .eq("slug", "rio")
-    .single();
+    if (!error && data && data.length > 0) {
+      const file = data.find(f => f.name.match(/\.(jpg|jpeg|png|webp)$/i));
+      if (file) {
+        return `${STORAGE_BASE}/${slug}/hero/foto/${file.name}`;
+      }
+    }
 
-  if (!error && data) return buildRio(data);
+    // Fallback: try media/{slug}/hero/ directly
+    const { data: d2 } = await supabase.storage
+      .from("media")
+      .list(`${slug}/hero`, { limit: 5, sortBy: { column: "name", order: "asc" } });
 
-  const { data: d2 } = await supabase
-    .from("destinos")
-    .select("id, nome, slug, hero_image_url, photo_url")
-    .eq("lancado", true)
-    .order("priority", { ascending: false })
-    .limit(1)
-    .single();
+    if (d2 && d2.length > 0) {
+      const file = d2.find(f => f.name.match(/\.(jpg|jpeg|png|webp)$/i));
+      if (file) {
+        return `${STORAGE_BASE}/${slug}/hero/${file.name}`;
+      }
+    }
 
-  if (d2) return buildRio(d2);
-  return null;
-}
-
-async function forceRio(): Promise<HeroComposedItem | null> {
-  const { data } = await supabase
-    .from("destinos")
-    .select("id, nome, slug, hero_image_url, photo_url")
-    .ilike("nome", "Rio de Janeiro")
-    .limit(1)
-    .single();
-  return data ? buildRio(data) : null;
-}
-
-function buildRio(row: any): HeroComposedItem {
-  const photo = sanitizePhotoUrl(row.hero_image_url ?? row.photo_url ?? null);
-  return {
-    id:           String(row.id ?? row.slug ?? "rio"),
-    source_table: "destinos",
-    titulo:       row.nome ?? "Rio de Janeiro",
-    localizacao:  "Brasil",
-    badge:        "Destino",
-    photo_url:    photo,
-    route: { type: "cidade", id: row.slug ?? "rio" },
-  };
-}
-
-// ── [1] Kyoto (CURATED STATIC — canonical coming-soon destination) ────────────
-
-const KYOTO_ITEM: HeroComposedItem = {
-  id:           "kyoto",
-  source_table: "curated",
-  titulo:       "Kyoto",
-  localizacao:  "Japão",
-  badge:        "Em Breve",
-  // Reliable Unsplash CDN — Fushimi Inari Taisha
-  photo_url:    sanitizePhotoUrl(
-    "https://images.unsplash.com/photo-1545569341-9eb8b30979d9?w=900&q=80"
-  ),
-  route: { type: "comingsoon", slug: "kyoto", nome: "Kyoto" },
-};
-
-// ── [2] Santorini (CURATED STATIC — canonical coming-soon destination) ────────
-
-const SANTORINI_ITEM: HeroComposedItem = {
-  id:           "santorini",
-  source_table: "curated",
-  titulo:       "Santorini",
-  localizacao:  "Grécia",
-  badge:        "Em Breve",
-  // Reliable Unsplash CDN — Oia village blue domes
-  photo_url:    sanitizePhotoUrl(
-    "https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?w=900&q=80"
-  ),
-  route: { type: "comingsoon", slug: "santorini", nome: "Santorini" },
-};
-
-// ── [3] Carolina Dieckmann (MANDATORY — friend_guides.cover_photo_url) ──────────
-//
-// SCHEMA REALITY (verified via Supabase API):
-//   friend_guides: cover_photo_url (TEXT) — the correct image column
-//                  hero_video_url (TEXT)   — also exists, may hold same url
-//                  NO "photo_url" column   — that column does NOT exist
-//   friends:       profile_photo_url (null), cover_photo_url (null) — both empty
-//
-// CORRECT STRATEGY:
-//   1. Fetch friend_guides WHERE status='published' + cover_photo_url IS NOT NULL
-//   2. Join to friends via friend_id to get slug (for navigation)
-//   3. Navigate to /friend/[friends.slug]
-
-async function fetchFriend(): Promise<HeroComposedItem | null> {
-  // Step 1: First published friend guide with a real image (cover_photo_url)
-  const { data: fg, error: fgErr } = await supabase
-    .from("friend_guides")
-    .select("id, friend_id, cover_photo_url")
-    .eq("status", "published")
-    .not("cover_photo_url", "is", null)
-    .order("sort_order")
-    .limit(1)
-    .single();
-
-  if (fgErr || !fg?.cover_photo_url) {
-    console.warn("[CAROLINA IMAGE] friend_guides query failed or no cover_photo_url:", fgErr?.message);
+    return null;
+  } catch {
     return null;
   }
+}
 
-  // Step 2: Get friend details (slug for navigation, display_name for title)
-  const { data: fr, error: frErr } = await supabase
-    .from("friends")
-    .select("id, slug, display_name")
-    .eq("id", fg.friend_id)
-    .single();
+// ── Fetch Destinos ────────────────────────────────────────────────────────────
 
-  if (frErr || !fr) {
-    console.warn("[CAROLINA IMAGE] could not resolve friend from friend_id:", fg.friend_id);
-    // Still render with the image, use a fallback slug
-    const photo = sanitizePhotoUrl(fg.cover_photo_url);
-    console.log(`[CAROLINA IMAGE] source: friend_guides | cover_photo_url: ${fg.cover_photo_url}`);
-    return {
-      id:           String(fg.id),
-      source_table: "friend_guides",
-      titulo:       "Guia exclusivo",
-      localizacao:  "Rio de Janeiro",
-      badge:        "Guia exclusivo",
-      photo_url:    photo,
-      route:        { type: "friend", slug: "carolina-dieckmann" },
-    };
+async function fetchDestinos(): Promise<HeroComposedItem[]> {
+  const { data, error } = await supabase
+    .from("destinos")
+    .select("id, slug, nome, hero_image_url, ordem, pais_id, paises(nome)")
+    .eq("status", "ativo")
+    .order("ordem", { ascending: true });
+
+  if (error || !data) {
+    console.warn("[HERO] destinos fetch failed:", error?.message);
+    return [];
   }
 
-  const photo = sanitizePhotoUrl(fg.cover_photo_url);
-  console.log(
-    `[CAROLINA IMAGE] source: friend_guides | cover_photo_url: ${fg.cover_photo_url}`
-  );
-  return {
-    id:           String(fr.id),
-    source_table: "friend_guides",
-    titulo:       fr.display_name ?? "Guia exclusivo",
-    localizacao:  "Rio de Janeiro",
-    badge:        "Guia exclusivo",
-    photo_url:    photo,
-    route:        { type: "friend", slug: fr.slug },
-  };
+  const items: HeroComposedItem[] = [];
+
+  for (const d of data) {
+    // Prioridade: storage > hero_image_url
+    let photo = await getHeroPhotoFromStorage(d.slug);
+    if (!photo && d.hero_image_url) {
+      photo = d.hero_image_url;
+    }
+
+    // Só incluir se tiver foto
+    if (!photo) {
+      console.log(`[HERO] destino ${d.slug} sem foto — ignorado`);
+      continue;
+    }
+
+    const pais = (d as any).paises?.nome ?? "Brasil";
+
+    items.push({
+      id: d.id,
+      source_table: "destinos",
+      titulo: d.nome,
+      localizacao: pais,
+      badge: "Destino",
+      photo_url: photo,
+      route: { type: "cidade", slug: d.slug },
+    });
+  }
+
+  return items;
 }
 
-async function forceCarolina(): Promise<HeroComposedItem | null> {
-  // Last-resort: try any friend_guides row regardless of status, with cover_photo_url
-  const { data: fg } = await supabase
-    .from("friend_guides")
-    .select("id, friend_id, cover_photo_url")
-    .not("cover_photo_url", "is", null)
-    .order("sort_order")
-    .limit(1)
-    .single();
+// ── Fetch Amigos ──────────────────────────────────────────────────────────────
 
-  if (!fg?.cover_photo_url) return null;
-
-  const { data: fr } = await supabase
-    .from("friends")
-    .select("id, slug, display_name")
-    .eq("id", fg.friend_id)
-    .single();
-
-  const photo = sanitizePhotoUrl(fg.cover_photo_url);
-  console.log(`[CAROLINA IMAGE] force-injected | cover_photo_url: ${fg.cover_photo_url}`);
-  return {
-    id:           String(fr?.id ?? fg.id),
-    source_table: "friend_guides",
-    titulo:       fr?.display_name ?? "Guia exclusivo",
-    localizacao:  "Rio de Janeiro",
-    badge:        "Guia exclusivo",
-    photo_url:    photo,
-    route:        { type: "friend", slug: fr?.slug ?? "carolina-dieckmann" },
-  };
-}
-
-// ── Dynamic supporting slots ──────────────────────────────────────────────────
-
-async function fetchRestaurante(): Promise<HeroComposedItem | null> {
+async function fetchAmigos(): Promise<HeroComposedItem[]> {
   const { data, error } = await supabase
-    .from("restaurantes")
-    .select("id, nome, bairro, categoria, photo_url")
+    .from("amigos")
+    .select("id, slug, nome, foto_url, tipo, ordem")
     .eq("ativo", true)
-    .not("photo_url", "is", null)
-    .order("ordem_bairro")
-    .limit(1)
-    .single();
+    .not("foto_url", "is", null)
+    .order("ordem", { ascending: true });
 
-  if (!error && data) return buildRestaurante(data);
+  if (error || !data) {
+    console.warn("[HERO] amigos fetch failed:", error?.message);
+    return [];
+  }
 
-  const { data: d2 } = await supabase
-    .from("restaurantes")
-    .select("id, nome, bairro, categoria, photo_url")
-    .eq("ativo", true)
-    .order("ordem_bairro")
-    .limit(1)
-    .single();
-
-  return d2 ? buildRestaurante(d2) : null;
+  return data.map((a) => ({
+    id: a.id,
+    source_table: "amigos" as const,
+    titulo: a.nome,
+    localizacao: "Viaje com",
+    badge: a.tipo === "fundador" ? "Fundador" : "Amigo de Viagem",
+    photo_url: a.foto_url,
+    route: { type: "amigo" as const, slug: a.slug },
+  }));
 }
 
-function buildRestaurante(row: any): HeroComposedItem {
-  return {
-    id:           String(row.id),
-    source_table: "restaurantes",
-    titulo:       row.nome ?? "Restaurante",
-    localizacao:  row.bairro ?? "Rio de Janeiro",
-    badge:        row.categoria ?? "Onde Comer",
-    photo_url:    sanitizePhotoUrl(row.photo_url),
-    route: { type: "lugar", cityId: "rio", placeId: String(row.id), source_table: "restaurantes" },
-  };
-}
+// ── Fetch Lugares em Destaque ─────────────────────────────────────────────────
 
-async function fetchOQueFazer(): Promise<HeroComposedItem | null> {
+async function fetchLugaresDestaque(): Promise<HeroComposedItem[]> {
   const { data, error } = await supabase
-    .from("o_que_fazer_rio_v2")
-    .select("id, nome, bairro, categoria, photo_url")
+    .from("lugares")
+    .select(`
+      id, nome, categoria, hero_image_url,
+      bairros(nome),
+      destinos(slug)
+    `)
     .eq("ativo", true)
-    .not("photo_url", "is", null)
-    .order("id", { ascending: false })
-    .limit(1)
-    .single();
+    .eq("destaque", true)
+    .not("hero_image_url", "is", null)
+    .limit(3);
 
-  if (!error && data) return buildOQueFazer(data);
+  if (error || !data) {
+    console.warn("[HERO] lugares destaque fetch failed:", error?.message);
+    return [];
+  }
 
-  const { data: d2 } = await supabase
-    .from("o_que_fazer_rio_v2")
-    .select("id, nome, bairro, categoria, photo_url")
-    .eq("ativo", true)
-    .order("id", { ascending: false })
-    .limit(1)
-    .single();
-
-  return d2 ? buildOQueFazer(d2) : null;
+  return data.map((l: any) => ({
+    id: l.id,
+    source_table: "lugares" as const,
+    titulo: l.nome,
+    localizacao: l.bairros?.nome ?? "Rio de Janeiro",
+    badge: formatCategoria(l.categoria),
+    photo_url: l.hero_image_url,
+    route: {
+      type: "lugar" as const,
+      citySlug: l.destinos?.slug ?? "rio-de-janeiro",
+      lugarId: l.id,
+    },
+  }));
 }
 
-function buildOQueFazer(row: any): HeroComposedItem {
-  return {
-    id:           String(row.id),
-    source_table: "o_que_fazer_rio_v2",
-    titulo:       row.nome ?? "Experiência",
-    localizacao:  row.bairro ?? "Rio de Janeiro",
-    badge:        row.categoria ?? "O que fazer",
-    photo_url:    sanitizePhotoUrl(row.photo_url),
-    route: { type: "lugar", cityId: "rio", placeId: String(row.id), source_table: "o_que_fazer_rio_v2" },
+function formatCategoria(cat: string): string {
+  const map: Record<string, string> = {
+    restaurante: "Onde Comer",
+    bar: "Vida Noturna",
+    cafe: "Café",
+    atracao: "O que Fazer",
+    experiencia: "Experiência",
+    praia: "Praia",
+    parque: "Natureza",
+    compras: "Compras",
+    cultura: "Cultura",
   };
+  return map[cat] || cat;
 }
 
-async function fetchLucky(): Promise<HeroComposedItem | null> {
+// ── Fetch Lucky Lists ─────────────────────────────────────────────────────────
+
+async function fetchLuckyLists(): Promise<HeroComposedItem[]> {
   const { data, error } = await supabase
-    .from("lucky_list_rio_v2")
-    .select("id, nome, bairro, photo_url")
+    .from("lucklists")
+    .select("id, slug, titulo, capa_url")
     .eq("ativo", true)
-    .not("photo_url", "is", null)
-    .order("nome")
-    .limit(1)
-    .single();
+    .not("capa_url", "is", null)
+    .order("ordem", { ascending: true })
+    .limit(2);
 
-  if (!error && data) return buildLucky(data);
+  if (error || !data) {
+    console.warn("[HERO] lucklists fetch failed:", error?.message);
+    return [];
+  }
 
-  const { data: d2 } = await supabase
-    .from("lucky_list_rio_v2")
-    .select("id, nome, bairro, photo_url")
-    .eq("ativo", true)
-    .order("nome")
-    .limit(1)
-    .single();
-
-  return d2 ? buildLucky(d2) : null;
+  return data.map((l) => ({
+    id: l.id,
+    source_table: "lucklists" as const,
+    titulo: l.titulo,
+    localizacao: "Curadoria",
+    badge: "Lucky List",
+    photo_url: l.capa_url,
+    route: { type: "lucklist" as const, slug: l.slug },
+  }));
 }
 
-function buildLucky(row: any): HeroComposedItem {
-  return {
-    id:           String(row.id),
-    source_table: "lucky_list_rio_v2",
-    titulo:       row.nome ?? "Lucky Pick",
-    localizacao:  row.bairro ?? "Rio de Janeiro",
-    badge:        "Lucky List",
-    photo_url:    sanitizePhotoUrl(row.photo_url),
-    route: { type: "lugar", cityId: "rio", placeId: String(row.id), source_table: "lucky_list_rio_v2" },
-  };
-}
-
-// ── Main hook ─────────────────────────────────────────────────────────────────
+// ── Main Hook ─────────────────────────────────────────────────────────────────
 
 type State = {
   items: HeroComposedItem[];
@@ -352,118 +236,53 @@ export function useHeroComposed(): State {
     let cancelled = false;
 
     async function load() {
-      // Fetch Supabase-dependent slots in parallel
-      const [rio, friend, restaurante, oQueFazer, lucky] = await Promise.allSettled([
-        fetchRio(),
-        fetchFriend(),
-        fetchRestaurante(),
-        fetchOQueFazer(),
-        fetchLucky(),
+      console.log("[HERO] Iniciando composição dinâmica...");
+
+      // Fetch all in parallel
+      const [destinos, amigos, lugares, lucklists] = await Promise.all([
+        fetchDestinos(),
+        fetchAmigos(),
+        fetchLugaresDestaque(),
+        fetchLuckyLists(),
       ]);
 
       if (cancelled) return;
 
-      const resolve = (r: PromiseSettledResult<HeroComposedItem | null>) => {
-        if (r.status === "rejected") {
-          console.warn("[HERO ITEM] slot failed:", r.reason);
-          return null;
-        }
-        return r.value;
-      };
-
-      let rioItem         = resolve(rio);
-      let carolinaItem    = resolve(friend);
-      const restauranteItem = resolve(restaurante);
-      const oQueFazerItem   = resolve(oQueFazer);
-      const luckyItem       = resolve(lucky);
-
-      // Force-inject mandatory Supabase items if missing
-      let rioInjected      = false;
-      let carolinaInjected = false;
-
-      if (!rioItem) {
-        rioItem = await forceRio();
-        rioInjected = !!rioItem;
-      }
-      if (!carolinaItem) {
-        carolinaItem = await forceCarolina();
-        carolinaInjected = !!carolinaItem;
-      }
-
-      console.log(
-        `[HERO FIX] rio_injected: ${rioInjected} | carolina_injected: ${carolinaInjected}`
+      // ── Ordenar: Rio primeiro, depois outros destinos, amigos, lugares, lucklists
+      const rioIndex = destinos.findIndex(
+        (d) => d.route.type === "cidade" &&
+          (d.route.slug === "rio-de-janeiro" || d.route.slug === "rio")
       );
 
-      // ── Build final ordered array ──────────────────────────────────────────
-      // [0] Rio  [1] Kyoto  [2] Santorini  [3] Carolina  [4+] dynamic
-      const items: HeroComposedItem[] = [];
-
-      if (rioItem)          items.push(rioItem);
-                            items.push(KYOTO_ITEM);
-                            items.push(SANTORINI_ITEM);
-      if (carolinaItem)     items.push(carolinaItem);
-      if (restauranteItem)  items.push(restauranteItem);
-      if (oQueFazerItem)    items.push(oQueFazerItem);
-      if (luckyItem)        items.push(luckyItem);
-
-      // ── FINAL ARRAY FIX: Rio ALWAYS first ─────────────────────────────────
-      // STEP 1 — check if Rio is present
-      let heroItems = items;
-      const hasRio = heroItems.some(
-        item =>
-          item.source_table === "destinos" &&
-          (item.titulo === "Rio de Janeiro" || item.id === "rio-de-janeiro")
-      );
-
-      if (!hasRio) {
-        // STEP 2 — fetch Rio from destinos
-        const { data: rioData } = await supabase
-          .from("destinos")
-          .select("*")
-          .eq("slug", "rio-de-janeiro")
-          .single();
-
-        if (rioData) {
-          // STEP 3 — map to hero item  STEP 4 — force insert at front
-          heroItems = [buildRio(rioData), ...heroItems];
-          console.log("[HERO FIX] Rio force-inserted via final array check");
-        }
-      } else if (heroItems[0]?.source_table !== "destinos") {
-        // STEP 5 — Rio exists but not first — move it
-        const found = heroItems.find(item => item.source_table === "destinos");
-        if (found) {
-          heroItems = [found, ...heroItems.filter(item => item !== found)];
-          console.log("[HERO FIX] Rio moved to first position");
-        }
-      }
-      // ── End final array fix ────────────────────────────────────────────────
-
-      for (const item of heroItems) logHeroItem(item);
-
-      console.log(
-        `[HERO] composed ${heroItems.length} slots — Rio:${!!rioItem} Kyoto:✓ Santorini:✓ Carolina:${!!carolinaItem}`
-      );
-
-      console.log("[HERO DEBUG]", heroItems.map(i => ({
-        titulo: i.titulo,
-        source: i.source_table,
-        slug:   (i as any).slug,
-      })));
-
-      // FINAL ENFORCEMENT — DO NOT REMOVE
-      const rioIndex = heroItems.findIndex(
-        item =>
-          item.source_table === "destinos" &&
-          item.titulo === "Rio de Janeiro"
-      );
-
-      if (rioIndex > -1) {
-        const [rioItem] = heroItems.splice(rioIndex, 1);
-        heroItems.unshift(rioItem);
-        console.log("[HERO FINAL FIX] Rio forced to index 0");
+      let orderedDestinos = [...destinos];
+      if (rioIndex > 0) {
+        const [rio] = orderedDestinos.splice(rioIndex, 1);
+        orderedDestinos.unshift(rio);
+        console.log("[HERO] Rio movido para posição 0");
       }
 
-      if (!cancelled) setState({ items: heroItems, loading: false });
+      const items: HeroComposedItem[] = [
+        ...orderedDestinos,
+        ...amigos,
+        ...lugares,
+        ...lucklists,
+      ];
+
+      console.log(`[HERO] Composição final: ${items.length} items`);
+      console.log("[HERO] Breakdown:", {
+        destinos: orderedDestinos.length,
+        amigos: amigos.length,
+        lugares: lugares.length,
+        lucklists: lucklists.length,
+      });
+
+      items.forEach((item, i) => {
+        console.log(`[HERO ${i}] ${item.source_table}: ${item.titulo} | photo: ${item.photo_url ? "✓" : "✗"}`);
+      });
+
+      if (!cancelled) {
+        setState({ items, loading: false });
+      }
     }
 
     load();

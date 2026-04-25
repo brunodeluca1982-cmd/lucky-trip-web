@@ -20,7 +20,7 @@ import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
-import { useDestaques, Destaque } from "@/hooks/useDestaques";
+import { useHeroComposed, HeroComposedItem } from "@/hooks/useHeroComposed";
 import { useAmigos } from "@/hooks/useFriends";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -179,7 +179,7 @@ function TopBar({ top, onMusicPress, onGalleryPress }: { top: number; onMusicPre
 // ═══════════════════════════════════════════════════════════════════════════
 function HeroDestaque({
   top,
-  destaques,
+  items,
   carouselIdx,
   setCarouselIdx,
   flatListRef,
@@ -187,7 +187,7 @@ function HeroDestaque({
   rioBgIdx,
 }: {
   top: number;
-  destaques: Destaque[];
+  items: HeroComposedItem[];
   carouselIdx: number;
   setCarouselIdx: (idx: number) => void;
   flatListRef: React.RefObject<FlatList | null>;
@@ -197,41 +197,40 @@ function HeroDestaque({
   // Handle swipe end — update carouselIdx
   const onMomentumScrollEnd = (e: any) => {
     const idx = Math.round(e.nativeEvent.contentOffset.x / W);
-    if (idx !== carouselIdx && idx >= 0 && idx < destaques.length) {
+    if (idx !== carouselIdx && idx >= 0 && idx < items.length) {
       setCarouselIdx(idx);
     }
   };
 
-  // Render each destaque slide
-  const renderItem = ({ item, index }: { item: Destaque; index: number }) => {
-    const isAmigo = item.tipo === "amigo";
-    const isRio = item.tipo === "destino" && item.titulo === "Rio de Janeiro";
-    const photoUrl = isRio ? (rioPhotos[rioBgIdx] || FALLBACK) : (item.photo_url || FALLBACK);
+  // Render each hero slide
+  const renderItem = ({ item, index }: { item: HeroComposedItem; index: number }) => {
+    const isAmigo = item.source_table === "amigos";
+    const isDestino = item.source_table === "destinos";
+    const isRio = isDestino && item.route.type === "cidade" &&
+                  (item.route.slug === "rio-de-janeiro" || item.route.slug === "rio");
+
+    // Para Rio, usar foto rotativa do bucket; para outros, usar photo_url do item
+    const photoUrl = isRio ? (rioPhotos[rioBgIdx] || item.photo_url || FALLBACK) : (item.photo_url || FALLBACK);
 
     const handlePress = () => {
-      switch (item.tipo) {
-        case "destino":
-          // Navega para /cidade/[id] - mesma página do menu "Pra onde?"
-          router.push({ pathname: "/cidade/[id]", params: { id: item.destino_slug } });
+      switch (item.route.type) {
+        case "cidade":
+          router.push({ pathname: "/cidade/[id]", params: { id: item.route.slug } });
           break;
         case "amigo":
-          // Navega para /amigo/[slug] usando entity_id para buscar o amigo
-          if (item.entity_id) {
-            router.push(`/amigo/${item.entity_id}`);
-          }
+          router.push({ pathname: "/amigo/[slug]", params: { slug: item.route.slug } });
           break;
         case "lugar":
-        case "restaurante":
-        case "bar":
-        case "atividade":
-        case "evento":
-        case "luckylist":
-          if (item.entity_id) {
-            router.push(`/lugar/${item.entity_id}`);
-          }
+          router.push({ pathname: "/lugar/[id]", params: { id: item.route.lugarId } });
+          break;
+        case "lucklist":
+          router.push({ pathname: "/(tabs)/luckyList/[id]", params: { id: item.route.slug } });
           break;
       }
     };
+
+    // Determinar kicker baseado no tipo
+    const kicker = isAmigo ? "VIAJE COM" : item.badge.toUpperCase();
 
     return (
       <Pressable style={styles.heroSlide} onPress={handlePress}>
@@ -242,16 +241,16 @@ function HeroDestaque({
           style={StyleSheet.absoluteFill}
         />
         <View style={[styles.heroTitleContainer, { paddingTop: top + 70 }]}>
-          <Text style={styles.heroKicker}>{isAmigo ? "VIAJE COM" : "DESTINO"}</Text>
+          <Text style={styles.heroKicker}>{kicker}</Text>
           <Text style={styles.heroTitleText}>{item.titulo}</Text>
-          <Text style={styles.heroSub}>{item.subtitulo}</Text>
-          {!isAmigo && <Text style={styles.heroPais}>BRASIL</Text>}
+          <Text style={styles.heroSub}>{item.localizacao}</Text>
+          {isDestino && <Text style={styles.heroPais}>{item.localizacao.toUpperCase()}</Text>}
         </View>
       </Pressable>
     );
   };
 
-  if (destaques.length === 0) {
+  if (items.length === 0) {
     return (
       <View style={styles.heroDestaque}>
         <Image source={{ uri: FALLBACK }} style={styles.heroDestaqueImage} />
@@ -269,7 +268,7 @@ function HeroDestaque({
     <View style={styles.heroDestaque}>
       <FlatList
         ref={flatListRef}
-        data={destaques}
+        data={items}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         horizontal
@@ -281,7 +280,7 @@ function HeroDestaque({
       />
       {/* Dots indicator */}
       <View style={styles.dotsContainer}>
-        {destaques.slice(0, 8).map((_, i) => (
+        {items.slice(0, 8).map((_, i) => (
           <View key={i} style={[styles.dot, i === carouselIdx && styles.dotActive]} />
         ))}
       </View>
@@ -554,7 +553,7 @@ export default function HomeScreen() {
   const bottom = Platform.OS === "web" ? 34 : insets.bottom;
 
   const photos = useHeroPhotos();
-  const { destaques } = useDestaques();
+  const { items: heroItems, loading: heroLoading } = useHeroComposed();
   const lucklistItems = useLucklists(RIO_DESTINO_ID);
   const [musicModalVisible, setMusicModalVisible] = useState(false);
   const [galleryModalVisible, setGalleryModalVisible] = useState(false);
@@ -592,19 +591,19 @@ export default function HomeScreen() {
 
   // Auto-advance every 5 seconds
   useEffect(() => {
-    if (destaques.length <= 1) return;
+    if (heroItems.length <= 1) return;
     const interval = setInterval(() => {
-      const nextIdx = (carouselIdxRef.current + 1) % destaques.length;
+      const nextIdx = (carouselIdxRef.current + 1) % heroItems.length;
       setCarouselIdx(nextIdx);
       // Scroll FlatList to the new index
       heroFlatListRef.current?.scrollToIndex({ index: nextIdx, animated: true });
     }, 5000);
     return () => clearInterval(interval);
-  }, [destaques.length]);
+  }, [heroItems.length]);
 
   // Nome do destino atual (para seções dinâmicas)
-  const currentDestino = destaques[carouselIdx];
-  const destinoNome = currentDestino?.tipo === "destino" ? currentDestino.titulo : "Rio de Janeiro";
+  const currentItem = heroItems[carouselIdx];
+  const destinoNome = currentItem?.source_table === "destinos" ? currentItem.titulo : "Rio de Janeiro";
 
   return (
     <View style={styles.root}>
@@ -618,7 +617,7 @@ export default function HomeScreen() {
       {/* ═══ HERO DESTAQUE: primeiro terço com crossFade próprio ═══ */}
       <HeroDestaque
         top={top}
-        destaques={destaques}
+        items={heroItems}
         carouselIdx={carouselIdx}
         setCarouselIdx={setCarouselIdx}
         flatListRef={heroFlatListRef}
