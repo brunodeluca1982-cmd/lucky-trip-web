@@ -13,11 +13,14 @@
  */
 
 import React, { useEffect, useRef, useState } from "react";
-import { Animated, Image, StyleSheet, View } from "react-native";
+import { Animated, Image, StyleSheet, Text, View } from "react-native";
 
-const SPLASH_ASSET = require("../assets/images/splash-branded.jpeg");
-const HOLD_MS      = 1500;   // how long the splash stays at full opacity
-const FADE_MS      = 400;    // fade-out duration
+const LOGO_ASSET = require("../assets/images/logo_symbol_white.png");
+const HOLD_MS    = 1500;   // how long the splash stays at full opacity
+const FADE_MS    = 400;    // fade-out duration
+
+// Azul Petróleo (Petroleum Blue)
+const AZUL_PETROLEO = "#1B6B6B";
 
 // Module-level flag — lives in the JS process lifetime only.
 // Automatically false on every fresh app launch; never touches AsyncStorage.
@@ -48,7 +51,14 @@ export function SplashOverlay() {
   return (
     <Animated.View style={[styles.overlay, { opacity }]} pointerEvents="none">
       <View style={styles.bg}>
-        <Image source={SPLASH_ASSET} style={styles.image} resizeMode="cover" />
+        <Image
+          source={LOGO_ASSET}
+          style={styles.logo}
+          resizeMode="contain"
+          tintColor={AZUL_PETROLEO}
+        />
+        <Text style={styles.title}>THE LUCKY TRIP</Text>
+        <Text style={styles.tagline}>INTELIGÊNCIA HUMANA EM VIAGENS</Text>
       </View>
     </Animated.View>
   );
@@ -61,10 +71,26 @@ const styles = StyleSheet.create({
   },
   bg: {
     flex: 1,
-    backgroundColor: "#EDEAE3",   // matches the cream background of the image
+    backgroundColor: "#F5F0E8",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  image: {
-    width:  "100%",
-    height: "100%",
+  logo: {
+    width: 80,
+    height: 80,
+    marginBottom: 24,
+  },
+  title: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 18,
+    letterSpacing: 6,
+    color: "#2C2C2C",
+    marginBottom: 8,
+  },
+  tagline: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    letterSpacing: 3,
+    color: "#8A8A8A",
   },
 });
