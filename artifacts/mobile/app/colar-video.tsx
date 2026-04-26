@@ -19,8 +19,9 @@ import {
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, Feather } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
+import { useGuia, type SavedItem } from "@/context/GuiaContext";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // CONSTANTS
@@ -29,11 +30,21 @@ import { supabase } from "@/lib/supabase";
 const AREIA = "#F5F0E8";
 const PETROLEO = "#1B4F72";
 const EDGE_FUNCTION_URL = "https://bkwlximkadmlnbgjcrdp.supabase.co/functions/v1/parse-social-caption";
+const FALLBACK_IMAGE = require("@/assets/images/hero-rio.png");
 
-type Platform = "youtube" | "tiktok" | "instagram";
+type PlatformTab = "youtube" | "tiktok" | "instagram";
+
+interface PlaceFound {
+  id: string;
+  nome: string;
+  categoria: string;
+  bairro: string | null;
+  hero_image_url: string | null;
+  slug: string;
+}
 
 type ResultType =
-  | { type: "places_found"; places: Array<{ nome: string; tipo: string; confianca: number }> }
+  | { type: "place_found"; place: PlaceFound }
   | { type: "destination_recognized"; message: string; destination: string }
   | { type: "nothing_found"; message: string };
 
@@ -45,8 +56,9 @@ export default function ColarVideoScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ destinoSlug?: string }>();
   const destinoSlug = params.destinoSlug || "rio-de-janeiro";
+  const { save } = useGuia();
 
-  const [activeTab, setActiveTab] = useState<Platform>("youtube");
+  const [activeTab, setActiveTab] = useState<PlatformTab>("youtube");
   const [inputValue, setInputValue] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ResultType | null>(null);
@@ -161,12 +173,12 @@ export default function ColarVideoScreen() {
         >
           {/* Show result or form */}
           {result ? (
-            <ResultView result={result} onReset={resetForm} />
+            <ResultView result={result} onReset={resetForm} onSave={save} />
           ) : (
             <>
               {/* Tabs */}
               <View style={styles.tabs}>
-                {(["youtube", "tiktok", "instagram"] as Platform[]).map((tab) => (
+                {(["youtube", "tiktok", "instagram"] as PlatformTab[]).map((tab) => (
                   <Pressable
                     key={tab}
                     style={[styles.tab, activeTab === tab && styles.tabActive]}
@@ -243,83 +255,106 @@ export default function ColarVideoScreen() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// RESULT VIEW COMPONENT
+// RESULT VIEW COMPONENT — Editorial Design
 // ══════════════════════════════════════════════════════════════════════════════
 
-function ResultView({ result, onReset }: { result: ResultType; onReset: () => void }) {
-  if (result.type === "places_found") {
+function ResultView({
+  result,
+  onReset,
+  onSave,
+}: {
+  result: ResultType;
+  onReset: () => void;
+  onSave: (item: SavedItem) => boolean;
+}) {
+  // ── place_found: salva e mostra tela editorial ──
+  if (result.type === "place_found") {
+    const { place } = result;
+
+    // Converte para SavedItem e salva no contexto
+    useEffect(() => {
+      const savedItem: SavedItem = {
+        id: place.id,
+        titulo: place.nome,
+        categoria:
+          place.categoria === "restaurante" ? "restaurante"
+          : place.categoria === "hotel" ? "hotel"
+          : place.categoria === "lucky" ? "lucky"
+          : "oQueFazer",
+        localizacao: place.bairro || "Rio de Janeiro",
+        image: place.hero_image_url
+          ? { uri: place.hero_image_url }
+          : FALLBACK_IMAGE,
+        source_table: "lugares",
+      };
+      onSave(savedItem);
+    }, [place.id]);
+
     return (
       <View style={styles.resultContainer}>
-        <View style={styles.successIcon}>
-          <Ionicons name="checkmark-circle" size={48} color="#27AE60" />
-        </View>
-        <Text style={styles.resultTitle}>Adicionado à sua viagem!</Text>
+        <Feather name="check-circle" size={32} color={PETROLEO} style={{ marginBottom: 24 }} />
+
+        <Text style={styles.resultTitle}>Encontrei o {place.nome}</Text>
         <Text style={styles.resultSubtitle}>
-          {result.places.length} {result.places.length === 1 ? "lugar encontrado" : "lugares encontrados"}
+          Já adicionei à sua viagem.{"\n"}Quer um roteiro com ele?
         </Text>
 
-        {/* Places list */}
-        <View style={styles.placesList}>
-          {result.places.map((place, idx) => (
-            <View key={idx} style={styles.placeItem}>
-              <View style={styles.placeIcon}>
-                <Ionicons name="location" size={16} color={PETROLEO} />
-              </View>
-              <View style={styles.placeInfo}>
-                <Text style={styles.placeName}>{place.nome}</Text>
-                <Text style={styles.placeType}>{place.tipo}</Text>
-              </View>
-              <View style={styles.confidenceBadge}>
-                <Text style={styles.confidenceText}>
-                  {Math.round(place.confianca * 100)}%
-                </Text>
-              </View>
-            </View>
-          ))}
-        </View>
-
-        {/* Actions */}
         <Pressable
-          style={styles.primaryBtn}
-          onPress={() => router.push("/(tabs)/viagem")}
+          style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.7 }]}
+          onPress={() => router.push("/(tabs)/roteiro")}
         >
-          <Text style={styles.primaryBtnText}>Ver minha viagem</Text>
+          <Text style={styles.primaryBtnText}>Montar roteiro com este lugar →</Text>
         </Pressable>
 
-        <Pressable style={styles.secondaryBtn} onPress={onReset}>
-          <Text style={styles.secondaryBtnText}>Adicionar outro vídeo</Text>
+        <Pressable
+          style={({ pressed }) => [styles.secondaryBtn, pressed && { opacity: 0.6 }]}
+          onPress={onReset}
+        >
+          <Text style={styles.secondaryBtnText}>Adicionar outro vídeo →</Text>
         </Pressable>
       </View>
     );
   }
 
+  // ── destination_recognized: editorial message ──
   if (result.type === "destination_recognized") {
     return (
       <View style={styles.resultContainer}>
-        {/* Editorial card */}
-        <View style={styles.editorialCard}>
-          <Text style={styles.editorialDestination}>{result.destination}</Text>
-          <Text style={styles.editorialMessage}>{result.message}</Text>
-        </View>
+        <Feather name="map-pin" size={32} color={PETROLEO} style={{ marginBottom: 24 }} />
 
-        <Pressable style={styles.secondaryBtn} onPress={onReset}>
-          <Text style={styles.secondaryBtnText}>Tentar outro vídeo</Text>
+        <Text style={styles.resultTitle}>{result.destination}</Text>
+        <Text style={styles.resultSubtitle}>{result.message}</Text>
+
+        <Pressable
+          style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.7 }]}
+          onPress={() => router.push("/(tabs)/roteiro")}
+        >
+          <Text style={styles.primaryBtnText}>Explorar {result.destination} →</Text>
+        </Pressable>
+
+        <Pressable
+          style={({ pressed }) => [styles.secondaryBtn, pressed && { opacity: 0.6 }]}
+          onPress={onReset}
+        >
+          <Text style={styles.secondaryBtnText}>Tentar outro vídeo →</Text>
         </Pressable>
       </View>
     );
   }
 
-  // nothing_found
+  // ── nothing_found ──
   return (
     <View style={styles.resultContainer}>
-      <View style={styles.emptyIcon}>
-        <Ionicons name="search-outline" size={48} color="#999" />
-      </View>
-      <Text style={styles.emptyTitle}>Nenhum lugar encontrado</Text>
-      <Text style={styles.emptyMessage}>{result.message}</Text>
+      <Feather name="search" size={32} color={PETROLEO} style={{ marginBottom: 24, opacity: 0.5 }} />
 
-      <Pressable style={styles.primaryBtn} onPress={onReset}>
-        <Text style={styles.primaryBtnText}>Tentar outro vídeo</Text>
+      <Text style={styles.resultTitle}>Não encontrei lugares</Text>
+      <Text style={styles.resultSubtitle}>{result.message}</Text>
+
+      <Pressable
+        style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.7 }]}
+        onPress={onReset}
+      >
+        <Text style={styles.primaryBtnText}>Tentar outro vídeo →</Text>
       </Pressable>
     </View>
   );
@@ -435,86 +470,45 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 
-  // Result styles
+  // Result styles — Editorial Design
   resultContainer: {
     alignItems: "center",
-    paddingVertical: 20,
-  },
-  successIcon: {
-    marginBottom: 16,
+    paddingVertical: 48,
+    paddingHorizontal: 8,
   },
   resultTitle: {
     fontFamily: "PlayfairDisplay_600SemiBold",
-    fontSize: 24,
+    fontSize: 22,
     color: PETROLEO,
-    marginBottom: 8,
+    marginBottom: 12,
     textAlign: "center",
+    lineHeight: 30,
   },
   resultSubtitle: {
     fontFamily: "Inter_400Regular",
     fontSize: 15,
-    color: "#666",
-    marginBottom: 24,
+    color: PETROLEO,
+    opacity: 0.6,
+    marginBottom: 32,
+    textAlign: "center",
+    lineHeight: 22,
   },
-  placesList: {
-    width: "100%",
-    marginBottom: 24,
-  },
-  placeItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFF",
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
-  },
-  placeIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(27, 79, 114, 0.1)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-  placeInfo: {
-    flex: 1,
-  },
-  placeName: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
-    color: "#333",
-  },
-  placeType: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: "#888",
-    marginTop: 2,
-  },
-  confidenceBadge: {
-    backgroundColor: "rgba(39, 174, 96, 0.1)",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  confidenceText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 11,
-    color: "#27AE60",
-  },
+  // Option A: transparent bg, petroleo border
   primaryBtn: {
-    backgroundColor: PETROLEO,
+    backgroundColor: "transparent",
+    borderWidth: 1.5,
+    borderColor: PETROLEO,
     borderRadius: 12,
     paddingVertical: 16,
-    paddingHorizontal: 32,
+    paddingHorizontal: 24,
     width: "100%",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 16,
   },
   primaryBtnText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 16,
-    color: "#FFF",
+    fontFamily: "PlayfairDisplay_600SemiBold",
+    fontSize: 15,
+    color: PETROLEO,
   },
   secondaryBtn: {
     paddingVertical: 12,
@@ -523,47 +517,6 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 14,
     color: PETROLEO,
-  },
-
-  // Editorial card (destination_recognized)
-  editorialCard: {
-    backgroundColor: "#FFF",
-    borderRadius: 16,
-    padding: 24,
-    marginBottom: 24,
-    width: "100%",
-  },
-  editorialDestination: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
-    color: PETROLEO,
-    letterSpacing: 1,
-    textTransform: "uppercase",
-    marginBottom: 12,
-  },
-  editorialMessage: {
-    fontFamily: "PlayfairDisplay_400Regular",
-    fontSize: 18,
-    color: "#333",
-    lineHeight: 28,
-  },
-
-  // Empty state (nothing_found)
-  emptyIcon: {
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontFamily: "PlayfairDisplay_600SemiBold",
-    fontSize: 20,
-    color: "#333",
-    marginBottom: 8,
-  },
-  emptyMessage: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    color: "#666",
-    textAlign: "center",
-    marginBottom: 24,
-    lineHeight: 20,
+    textDecorationLine: "underline",
   },
 });
