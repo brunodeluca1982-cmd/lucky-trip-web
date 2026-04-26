@@ -288,8 +288,16 @@ function HeroDestaque({
 }
 
 function InputBar() {
+  const handlePress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push({
+      pathname: "/colar-video",
+      params: { destinoSlug: "rio-de-janeiro" },
+    } as any);
+  };
+
   return (
-    <View style={styles.inputWrap}>
+    <Pressable style={styles.inputWrap} onPress={handlePress}>
       <View style={styles.inputBar}>
         <View style={styles.socialIcons}>
           <View style={[styles.socialIcon, { backgroundColor: "#E1306C" }]}>
@@ -304,7 +312,7 @@ function InputBar() {
         </View>
         <Text style={styles.inputPlaceholder}>Cole um link do Instagram, TikTok...</Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
