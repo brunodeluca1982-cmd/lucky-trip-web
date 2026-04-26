@@ -30,6 +30,7 @@ import { useGuia, type SavedItem } from "@/context/GuiaContext";
 const AREIA = "#F5F0E8";
 const PETROLEO = "#1B4F72";
 const EDGE_FUNCTION_URL = "https://bkwlximkadmlnbgjcrdp.supabase.co/functions/v1/parse-social-caption";
+const STORAGE_BASE = "https://bkwlximkadmlnbgjcrdp.supabase.co/storage/v1/object/public/media/";
 const FALLBACK_IMAGE = require("@/assets/images/hero-rio.png");
 
 type PlatformTab = "youtube" | "tiktok" | "instagram";
@@ -267,28 +268,38 @@ function ResultView({
   onReset: () => void;
   onSave: (item: SavedItem) => boolean;
 }) {
-  // ── place_found: salva e mostra tela editorial ──
+  // Extrair place se for place_found (para useEffect incondicional)
+  const placeFound = result.type === "place_found" ? result.place : null;
+
+  // Salva no contexto quando place_found (hook incondicional)
+  useEffect(() => {
+    if (!placeFound) return;
+
+    // Construir URL completa se for path relativo
+    const heroUri = placeFound.hero_image_url
+      ? placeFound.hero_image_url.startsWith("http")
+        ? placeFound.hero_image_url
+        : `${STORAGE_BASE}${placeFound.hero_image_url}`
+      : null;
+
+    const savedItem: SavedItem = {
+      id: placeFound.id,
+      titulo: placeFound.nome,
+      categoria:
+        placeFound.categoria === "restaurante" ? "restaurante"
+        : placeFound.categoria === "hotel" ? "hotel"
+        : placeFound.categoria === "lucky" ? "lucky"
+        : "oQueFazer",
+      localizacao: placeFound.bairro || "Rio de Janeiro",
+      image: heroUri ? { uri: heroUri } : FALLBACK_IMAGE,
+      source_table: "lugares",
+    };
+    onSave(savedItem);
+  }, [placeFound?.id, onSave]);
+
+  // ── place_found: tela editorial ──
   if (result.type === "place_found") {
     const { place } = result;
-
-    // Converte para SavedItem e salva no contexto
-    useEffect(() => {
-      const savedItem: SavedItem = {
-        id: place.id,
-        titulo: place.nome,
-        categoria:
-          place.categoria === "restaurante" ? "restaurante"
-          : place.categoria === "hotel" ? "hotel"
-          : place.categoria === "lucky" ? "lucky"
-          : "oQueFazer",
-        localizacao: place.bairro || "Rio de Janeiro",
-        image: place.hero_image_url
-          ? { uri: place.hero_image_url }
-          : FALLBACK_IMAGE,
-        source_table: "lugares",
-      };
-      onSave(savedItem);
-    }, [place.id]);
 
     return (
       <View style={styles.resultContainer}>
