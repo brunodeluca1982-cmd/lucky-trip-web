@@ -16,24 +16,25 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, Ionicons } from "@expo/vector-icons";
-import { destinos } from "@/data/mockData";
+import { supabase } from "@/lib/supabase";
 import { useDestinoFotos } from "@/hooks/useDestinoFotos";
 import { useDestaquesDestino, type DestaqueDestino } from "@/hooks/useDestaquesDestino";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const PETROL_BLUE = "#1B4F72";
+const SAND = "#F5F0E8";
 const GLASS_BG = "rgba(20,20,20,0.35)";
 const SAND_BORDER = "rgba(232,220,200,0.35)"; // Tom areia para bordas
+
+// Status type for screen states
+type ScreenStatus = "loading" | "not_found" | "success";
 
 // Hero carousel - 13s interval, 400ms fade
 const CROSSFADE_DURATION = 400;
 const ROTATION_INTERVAL = 13000;
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-const RIO_DESTINO_ID = "7f047742-427f-4b11-8286-781af899c57d";
-
 // Navigation helper - routes to proper entity page based on categoria
-function getEntityRoute(destaque: DestaqueDestino): { pathname: string; params: Record<string, string> } | null {
+function getEntityRoute(destaque: DestaqueDestino, citySlug: string): { pathname: string; params: Record<string, string> } | null {
   if (!destaque.entity_id || !destaque.lugar) return null;
 
   const { id, slug, categoria } = destaque.lugar;
@@ -42,16 +43,16 @@ function getEntityRoute(destaque: DestaqueDestino): { pathname: string; params: 
   switch (categoria) {
     case "restaurante":
     case "bar":
-      return { pathname: "/lugar/[cityId]/[placeId]", params: { cityId: "rio", placeId: id, source_table: "lugares" } };
+      return { pathname: "/lugar/[cityId]/[placeId]", params: { cityId: citySlug, placeId: id, source_table: "lugares" } };
     case "atividade":
     case "praia":
     case "dica_secreta":
     case "compras":
-      return { pathname: "/lugar/[cityId]/[placeId]", params: { cityId: "rio", placeId: id, source_table: "lugares" } };
+      return { pathname: "/lugar/[cityId]/[placeId]", params: { cityId: citySlug, placeId: id, source_table: "lugares" } };
     case "hotel":
       return { pathname: "/hotel/[id]", params: { id } };
     default:
-      return { pathname: "/lugar/[cityId]/[placeId]", params: { cityId: "rio", placeId: id, source_table: "lugares" } };
+      return { pathname: "/lugar/[cityId]/[placeId]", params: { cityId: citySlug, placeId: id, source_table: "lugares" } };
   }
 }
 
@@ -83,17 +84,89 @@ function HeroBackground({ fotos, fallback }: { fotos: string[]; fallback: ImageS
   );
 }
 
+// ── Destino type ──────────────────────────────────────────────────────────────
+type DestinoData = {
+  id: string;
+  slug: string;
+  nome: string;
+  descricao_curta: string | null;
+  hero_image_url: string | null;
+  pais: string;
+};
+
 // ── Main Screen ───────────────────────────────────────────────────────────────
 export default function CidadeScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
-  const destino = destinos.find((d) => d.id === id) ?? destinos[0];
   const top = Platform.OS === "web" ? 20 : insets.top;
   const bottom = Platform.OS === "web" ? 34 : insets.bottom;
 
-  const { fotos, loading } = useDestinoFotos(destino.id);
-  const { essencial, agora, loading: loadingDestaques } = useDestaquesDestino(RIO_DESTINO_ID);
+  // Buscar destino do Supabase pelo slug
+  const [destino, setDestino] = useState<DestinoData | null>(null);
+  const [status, setStatus] = useState<ScreenStatus>("loading");
+
+  useEffect(() => {
+    if (!id) {
+      setStatus("not_found");
+      return;
+    }
+    setStatus("loading");
+    supabase
+      .from("destinos")
+      .select("id, slug, nome, descricao_curta, hero_image_url, pais")
+      .eq("slug", id)
+      .single()
+      .then(({ data, error }) => {
+        if (data) {
+          setDestino(data);
+          setStatus("success");
+        } else {
+          setStatus("not_found");
+        }
+      });
+  }, [id]);
+
+  // ── LOADING STATE ──
+  if (status === "loading") {
+    return (
+      <View style={s.stateScreen}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <Text style={s.stateText}>Buscando destino...</Text>
+      </View>
+    );
+  }
+
+  // ── NOT FOUND STATE ──
+  if (status === "not_found") {
+    return (
+      <View style={s.stateScreen}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={s.stateContent}>
+          <Text style={s.stateHeadline}>Esse destino ainda não está no Lucky Trip</Text>
+          <Text style={s.stateSubtext}>Mas em breve a gente chega lá.</Text>
+          <Pressable
+            style={s.stateCta}
+            onPress={() => router.replace("/(tabs)")}
+          >
+            <Text style={s.stateCtaText}>Ver destinos disponíveis</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  // ── SUCCESS STATE (destino exists) ──
+
+  // Fotos do hero carousel usando slug do destino
+  const { fotos, loading } = useDestinoFotos(destino?.slug || id || "");
+  // Destaques usando ID do destino (UUID)
+  const { essencial, agora, loading: loadingDestaques } = useDestaquesDestino(destino?.id || "");
   const [dotIdx, setDotIdx] = useState(0);
+
+  // Fallback image
+  const fallbackImage = destino?.hero_image_url
+    ? { uri: destino.hero_image_url }
+    : require("@/assets/images/hero-rio.png");
 
   useEffect(() => {
     if (fotos.length <= 1) return;
@@ -107,7 +180,7 @@ export default function CidadeScreen() {
 
       {/* ══ FULLSCREEN HERO BACKGROUND ══ */}
       <View style={StyleSheet.absoluteFill}>
-        <HeroBackground fotos={fotos} fallback={destino.image} />
+        <HeroBackground fotos={fotos} fallback={fallbackImage} />
         <LinearGradient
           colors={["rgba(0,0,0,0.3)", "rgba(0,0,0,0.05)", "rgba(0,0,0,0.1)", "rgba(0,0,0,0.6)"]}
           locations={[0, 0.25, 0.5, 1]}
@@ -136,9 +209,9 @@ export default function CidadeScreen() {
         {/* ── Hero Text ── */}
         <View style={[s.heroText, { paddingTop: top + 60 }]}>
           <Text style={s.label}>DESTINO</Text>
-          <Text style={s.title}>Rio de Janeiro</Text>
-          <Text style={s.subtitle}>Três dias entre o mar e a montanha.</Text>
-          <Text style={s.country}>BRASIL</Text>
+          <Text style={s.title}>{destino?.nome || "Carregando..."}</Text>
+          <Text style={s.subtitle}>{destino?.descricao_curta || ""}</Text>
+          <Text style={s.country}>{destino?.pais?.toUpperCase() || ""}</Text>
           <View style={s.dots}>
             {[0, 1, 2, 3].map((i) => (
               <View key={i} style={[s.dot, dotIdx % 4 === i && s.dotActive]} />
@@ -152,16 +225,16 @@ export default function CidadeScreen() {
             <View style={s.header}>
               <View>
                 <Text style={s.eyebrow}>COMECE POR AQUI</Text>
-                <Text style={s.headerTitle}>O essencial do Rio</Text>
+                <Text style={s.headerTitle}>O essencial de {destino?.nome || "..."}</Text>
               </View>
-              <Pressable style={s.linkRow} onPress={() => router.push({ pathname: "/oQueFazer/categorias/[id]", params: { id: destino.id } })}>
+              <Pressable style={s.linkRow} onPress={() => router.push({ pathname: "/oQueFazer/categorias/[id]", params: { id: destino?.slug || id || "" } })}>
                 <Text style={s.link}>Ver todos</Text>
                 <Feather name="chevron-right" size={12} color="rgba(255,255,255,0.5)" />
               </Pressable>
             </View>
             <View style={s.cardsRow}>
               {essencial.map((item) => {
-                const route = getEntityRoute(item);
+                const route = getEntityRoute(item, destino?.slug || id || "");
                 return (
                   <Pressable
                     key={item.id}
@@ -178,15 +251,15 @@ export default function CidadeScreen() {
           </View>
         </View>
 
-        {/* ── AGORA NO RIO ── */}
+        {/* ── AGORA NO DESTINO ── */}
         <View style={s.section}>
           <View style={s.glass}>
             <View style={s.header}>
               <View>
-                <Text style={s.eyebrow}>AGORA NO RIO</Text>
+                <Text style={s.eyebrow}>AGORA EM {destino?.nome?.toUpperCase() || "..."}</Text>
                 <Text style={s.headerSub}>Atualizado agora</Text>
               </View>
-              <Pressable style={s.linkRow} onPress={() => router.push({ pathname: "/oQueFazer/categorias/[id]", params: { id: destino.id } })}>
+              <Pressable style={s.linkRow} onPress={() => router.push({ pathname: "/oQueFazer/categorias/[id]", params: { id: destino?.slug || id || "" } })}>
                 <Text style={s.link}>Ver todos</Text>
                 <Feather name="chevron-right" size={12} color="rgba(255,255,255,0.5)" />
               </Pressable>
@@ -203,7 +276,7 @@ export default function CidadeScreen() {
               </View>
               {/* Events - clickable, navigate to entity */}
               {agora.map((ev) => {
-                const route = getEntityRoute(ev);
+                const route = getEntityRoute(ev, destino?.slug || id || "");
                 const cor = ev.cor || "#4CAF50";
                 return (
                   <Pressable
@@ -232,17 +305,17 @@ export default function CidadeScreen() {
           <View style={s.glass}>
             <Text style={s.eyebrow}>PLANEJE SUA VIAGEM</Text>
             <View style={s.planRow}>
-              <Pressable style={s.planBtn} onPress={() => router.push({ pathname: "/ondeFicar/[id]", params: { id: destino.id } })}>
+              <Pressable style={s.planBtn} onPress={() => router.push({ pathname: "/ondeFicar/[id]", params: { id: destino?.slug || id || "" } })}>
                 <View style={s.planIcon}><Feather name="moon" size={24} color="#fff" /></View>
                 <Text style={s.planTitle} numberOfLines={2}>ONDE FICAR</Text>
                 <Feather name="arrow-right" size={14} color="rgba(255,255,255,0.5)" style={{ marginTop: 8 }} />
               </Pressable>
-              <Pressable style={s.planBtn} onPress={() => router.push({ pathname: "/comerBem/[id]", params: { id: destino.id } })}>
+              <Pressable style={s.planBtn} onPress={() => router.push({ pathname: "/comerBem/[id]", params: { id: destino?.slug || id || "" } })}>
                 <View style={s.planIcon}><Feather name="coffee" size={24} color="#fff" /></View>
                 <Text style={s.planTitle} numberOfLines={2}>ONDE COMER</Text>
                 <Feather name="arrow-right" size={14} color="rgba(255,255,255,0.5)" style={{ marginTop: 8 }} />
               </Pressable>
-              <Pressable style={s.planBtn} onPress={() => router.push({ pathname: "/oQueFazer/categorias/[id]", params: { id: destino.id } })}>
+              <Pressable style={s.planBtn} onPress={() => router.push({ pathname: "/oQueFazer/categorias/[id]", params: { id: destino?.slug || id || "" } })}>
                 <View style={s.planIcon}><Feather name="compass" size={24} color="#fff" /></View>
                 <Text style={s.planTitle} numberOfLines={2}>O QUE FAZER</Text>
                 <Feather name="arrow-right" size={14} color="rgba(255,255,255,0.5)" style={{ marginTop: 8 }} />
@@ -253,7 +326,7 @@ export default function CidadeScreen() {
 
         {/* ── LUCKY LIST ── */}
         <View style={s.section}>
-          <Pressable style={s.lucky} onPress={() => router.push({ pathname: "/luckyList/[id]", params: { id: destino.id } })}>
+          <Pressable style={s.lucky} onPress={() => router.push({ pathname: "/luckyList/[id]", params: { id: destino?.slug || id || "" } })}>
             <Text style={s.luckyStar}>✦</Text>
             <Text style={s.luckyTitle}>LUCKY LIST</Text>
             <Text style={s.luckyDesc} numberOfLines={1}>O que só os locais sabem</Text>
@@ -263,7 +336,7 @@ export default function CidadeScreen() {
 
         {/* ── COMO CHEGAR ── */}
         <View style={s.section}>
-          <Pressable style={s.comoChegar} onPress={() => router.push({ pathname: "/comoChegar/[cityId]", params: { cityId: destino.id } })}>
+          <Pressable style={s.comoChegar} onPress={() => router.push({ pathname: "/comoChegar/[cityId]", params: { cityId: destino?.slug || id || "" } })}>
             <View style={s.ccLeft}>
               <View style={s.ccIcon}><Ionicons name="airplane" size={16} color="rgba(255,255,255,0.8)" /></View>
               <View>
@@ -357,4 +430,13 @@ const s = StyleSheet.create({
   ccIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.1)", alignItems: "center", justifyContent: "center" },
   ccTitle: { fontFamily: "Inter_600SemiBold", fontSize: 10, color: "rgba(255,255,255,0.85)", letterSpacing: 1.2 },
   ccSub: { fontFamily: "Inter_400Regular", fontSize: 10, color: "rgba(255,255,255,0.5)", marginTop: 1 },
+
+  // State screens (loading / not_found)
+  stateScreen: { flex: 1, backgroundColor: SAND, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
+  stateText: { fontFamily: "PlayfairDisplay_400Regular", fontSize: 18, color: PETROL_BLUE, opacity: 0.6 },
+  stateContent: { alignItems: "center", gap: 12 },
+  stateHeadline: { fontFamily: "PlayfairDisplay_700Bold", fontSize: 24, color: PETROL_BLUE, textAlign: "center", lineHeight: 32 },
+  stateSubtext: { fontFamily: "Inter_400Regular", fontSize: 15, color: PETROL_BLUE, opacity: 0.7, textAlign: "center" },
+  stateCta: { marginTop: 24, backgroundColor: PETROL_BLUE, paddingHorizontal: 24, paddingVertical: 14, borderRadius: 12 },
+  stateCtaText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: "#fff" },
 });
