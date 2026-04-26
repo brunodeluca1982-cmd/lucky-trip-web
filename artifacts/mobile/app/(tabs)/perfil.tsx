@@ -48,8 +48,8 @@ const BORDER    = "rgba(255,255,255,0.12)";
 
 interface SubscriptionData {
   status: string;
-  plan: string;
-  current_period_end: string;
+  plano: string;
+  periodo_atual_fim: string;
 }
 
 // ── Root Screen ────────────────────────────────────────────────────────────────
@@ -67,8 +67,8 @@ export default function PerfilScreen() {
     }
 
     supabase
-      .from("subscriptions")
-      .select("status, plan, current_period_end")
+      .from("assinaturas")
+      .select("status, plano, periodo_atual_fim")
       .eq("user_id", user.id)
       .eq("status", "active")
       .limit(1)
@@ -399,9 +399,9 @@ function ProProfileScreen({
           }
         />
 
-        {subscription?.current_period_end && (
+        {subscription?.periodo_atual_fim && (
           <Text style={s.renewalText} suppressHighlighting>
-            Premium até {formatRenewalDate(subscription.current_period_end)}
+            Premium até {formatRenewalDate(subscription.periodo_atual_fim)}
           </Text>
         )}
 
