@@ -26,7 +26,7 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import * as Linking from "expo-linking";
 import { supabase } from "@/lib/supabase";
 
-const GOLD = "#D4AF37";
+const GOLD = "#1B4F72";
 
 type Mode = "loading" | "recovery" | "confirmed" | "error";
 

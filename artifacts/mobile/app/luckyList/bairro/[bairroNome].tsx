@@ -37,9 +37,9 @@ import { getNeighborhoodHero } from "@/utils/neighborhoodHero";
 import { useGuia } from "@/context/GuiaContext";
 
 const C    = Colors.light;
-const GOLD = "#D4AF37";
-const GOLD_DIM    = "rgba(201,168,76,0.18)";
-const GOLD_BORDER = "rgba(201,168,76,0.28)";
+const GOLD = "#1B4F72";
+const GOLD_DIM    = "rgba(27,79,114,0.18)";
+const GOLD_BORDER = "rgba(27,79,114,0.28)";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const HERO_H      = Math.round(SCREEN_HEIGHT * 0.46);
@@ -161,7 +161,7 @@ export default function LuckyListBairroScreen() {
               <Feather
                 name={editorialOpen ? "chevron-up" : "chevron-down"}
                 size={13}
-                color="rgba(201,168,76,0.60)"
+                color="rgba(27,79,114,0.60)"
               />
             </Pressable>
           )}
@@ -395,7 +395,7 @@ const s = StyleSheet.create({
   heroContent: { paddingHorizontal: 24, paddingBottom: 28 },
   categoryBadge: {
     alignSelf: "flex-start",
-    backgroundColor: "rgba(201,168,76,0.12)",
+    backgroundColor: "rgba(27,79,114,0.12)",
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 5,
@@ -456,20 +456,20 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    backgroundColor: "rgba(201,168,76,0.06)",
+    backgroundColor: "rgba(27,79,114,0.06)",
     borderRadius: 50,
     paddingVertical: 13,
     borderWidth: 1,
     borderColor: GOLD_BORDER,
   },
   actionGhostActive: {
-    backgroundColor: "rgba(201,168,76,0.12)",
-    borderColor: "rgba(201,168,76,0.40)",
+    backgroundColor: "rgba(27,79,114,0.12)",
+    borderColor: "rgba(27,79,114,0.40)",
   },
   actionGhostText: {
     fontFamily: "Inter_500Medium",
     fontSize: 13,
-    color: "rgba(201,168,76,0.80)",
+    color: "rgba(27,79,114,0.80)",
     letterSpacing: 0.1,
   },
 
@@ -478,7 +478,7 @@ const s = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 16,
     borderTopWidth: 1,
-    borderTopColor: "rgba(201,168,76,0.12)",
+    borderTopColor: "rgba(27,79,114,0.12)",
     marginTop: 16,
   },
   editorialHeader: {
@@ -528,25 +528,25 @@ const s = StyleSheet.create({
   },
   statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   statPill: {
-    backgroundColor: "rgba(201,168,76,0.05)",
+    backgroundColor: "rgba(27,79,114,0.05)",
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderWidth: 1,
-    borderColor: "rgba(201,168,76,0.12)",
+    borderColor: "rgba(27,79,114,0.12)",
     minWidth: 110,
   },
   statLabel: {
     fontFamily: "Inter_400Regular",
     fontSize: 10,
-    color: "rgba(201,168,76,0.45)",
+    color: "rgba(27,79,114,0.45)",
     letterSpacing: 0.8,
     marginBottom: 4,
   },
   statValue: {
     fontFamily: "Inter_500Medium",
     fontSize: 13,
-    color: "rgba(201,168,76,0.85)",
+    color: "rgba(27,79,114,0.85)",
   },
 
   listSection: {
@@ -554,7 +554,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 8,
     borderTopWidth: 1,
-    borderTopColor: "rgba(201,168,76,0.10)",
+    borderTopColor: "rgba(27,79,114,0.10)",
     marginTop: 16,
   },
   listHeader: {
@@ -604,7 +604,7 @@ const s = StyleSheet.create({
     overflow: "hidden",
     marginBottom: 28,
     borderWidth: 1,
-    borderColor: "rgba(201,168,76,0.10)",
+    borderColor: "rgba(27,79,114,0.10)",
   },
   cardImageWrap: {
     height: CARD_IMAGE_H,
@@ -676,7 +676,7 @@ const s = StyleSheet.create({
   cardLocText: {
     fontFamily: "Inter_400Regular",
     fontSize: 11,
-    color: "rgba(201,168,76,0.72)",
+    color: "rgba(27,79,114,0.72)",
   },
   cardTitulo: {
     fontFamily: "PlayfairDisplay_700Bold",
@@ -741,7 +741,7 @@ const s = StyleSheet.create({
     paddingVertical: 36,
     paddingHorizontal: 24,
     borderTopWidth: 1,
-    borderTopColor: "rgba(201,168,76,0.12)",
+    borderTopColor: "rgba(27,79,114,0.12)",
     alignItems: "center",
     gap: 6,
   },
@@ -759,7 +759,7 @@ const s = StyleSheet.create({
   footerSub: {
     fontFamily: "Inter_400Regular",
     fontSize: 13,
-    color: "rgba(201,168,76,0.50)",
+    color: "rgba(27,79,114,0.50)",
     textAlign: "center",
     lineHeight: 20,
     maxWidth: 260,

@@ -1,5 +1,5 @@
 /**
- * subscription.tsx — Lucky Pro subscription screen.
+ * subscription.tsx — Lucky Premium subscription screen.
  *
  * Shows annual (highlighted), monthly, and weekly (small link) plans.
  * CTA → create-checkout → post-purchase.
@@ -28,9 +28,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { useGuia } from "@/context/GuiaContext";
 import { supabase } from "@/lib/supabase";
 
-const GOLD      = "#D4AF37";
-const GOLD_DIM  = "rgba(212,175,55,0.14)";
-const GOLD_BDR  = "rgba(212,175,55,0.30)";
+const GOLD      = "#1B4F72";
+const GOLD_DIM  = "rgba(27,79,114,0.14)";
+const GOLD_BDR  = "rgba(27,79,114,0.30)";
 const LOGO_MARK = require("@/assets/images/logo-symbol.png");
 
 type Plan = "annual" | "monthly" | "weekly" | "one_time";
@@ -160,7 +160,7 @@ export default function SubscriptionScreen() {
       if (data.synced) {
         await supabase.auth.refreshSession();
         await markPremium();
-        setRestoreMsg("Acesso restaurado! Você já é Lucky Pro.");
+        setRestoreMsg("Acesso restaurado! Você já é Lucky Premium.");
         setTimeout(() => router.replace("/(tabs)/"), 1800);
       } else if (data.reason === "no_customer") {
         setRestoreMsg("Nenhuma compra encontrada nesta conta.");
@@ -193,7 +193,7 @@ export default function SubscriptionScreen() {
           <View style={s.logoWrap}>
             <Image source={LOGO_MARK} style={s.logo} resizeMode="contain" />
           </View>
-          <Text style={s.eyebrow}>LUCKY PRO</Text>
+          <Text style={s.eyebrow}>LUCKY PREMIUM</Text>
           <Text style={s.title}>Veja o Rio como{"\n"}quem mora aqui</Text>
           <Text style={s.subtitle}>
             Uma curadoria editorial feita à mão — agora com IA, roteiros e acesso total.
@@ -419,7 +419,7 @@ const s = StyleSheet.create({
   },
   planCardSelected: {
     borderColor:     GOLD,
-    backgroundColor: "rgba(212,175,55,0.06)",
+    backgroundColor: "rgba(27,79,114,0.06)",
   },
   planCardInner: {
     flexDirection:  "row",

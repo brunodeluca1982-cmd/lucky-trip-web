@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 
-const GOLD = "#D4AF37";
+const GOLD = "#1B4F72";
 
 export default function ContasScreen() {
   const insets = useSafeAreaInsets();
@@ -82,9 +82,9 @@ const s = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "rgba(212,175,55,0.10)",
+    backgroundColor: "rgba(27,79,114,0.10)",
     borderWidth: 1,
-    borderColor: "rgba(212,175,55,0.30)",
+    borderColor: "rgba(27,79,114,0.30)",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 20,

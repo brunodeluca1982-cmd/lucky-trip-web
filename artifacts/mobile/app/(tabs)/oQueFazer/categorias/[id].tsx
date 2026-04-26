@@ -31,7 +31,7 @@ import { useRioHeroMedia } from "@/hooks/useHeroMedia";
 import { destinos } from "@/data/mockData";
 
 const { width: W } = Dimensions.get("window");
-const GOLD = "#D4AF37";
+const GOLD = "#1B4F72";
 
 const BG_POOL = [
   require("@/assets/images/rio-aerial-clean.png"),

@@ -20,7 +20,7 @@ import { getImageForEntity } from "@/utils/getImageForEntity";
 import { useGuia } from "@/context/GuiaContext";
 
 const C = Colors.light;
-const GOLD = "#D4AF37";
+const GOLD = "#1B4F72";
 
 const CATEGORY_LABEL: Record<string, string> = {
   luxo:     "LUXO",
@@ -135,7 +135,7 @@ export default function HotelDetailScreen() {
               <Text style={s.heroName}>{hotel.hotel_name}</Text>
               {hotel.featured_restaurant && (
                 <View style={s.restaurantBadge}>
-                  <Feather name="coffee" size={10} color="rgba(201,168,76,0.7)" />
+                  <Feather name="coffee" size={10} color="rgba(27,79,114,0.7)" />
                   <Text style={s.restaurantText}>{hotel.featured_restaurant}</Text>
                 </View>
               )}
@@ -381,19 +381,19 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "rgba(201,168,76,0.10)",
+    backgroundColor: "rgba(27,79,114,0.10)",
     borderRadius: 20,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderWidth: 1,
-    borderColor: "rgba(201,168,76,0.22)",
+    borderColor: "rgba(27,79,114,0.22)",
     alignSelf: "flex-start",
     marginTop: 4,
   },
   restaurantText: {
     fontFamily: "Inter_400Regular",
     fontSize: 11,
-    color: "rgba(201,168,76,0.80)",
+    color: "rgba(27,79,114,0.80)",
     letterSpacing: 0.2,
   },
 
@@ -436,7 +436,7 @@ const s = StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: 2.5,
-    backgroundColor: "rgba(201,168,76,0.55)",
+    backgroundColor: "rgba(27,79,114,0.55)",
     marginTop: 9,
     flexShrink: 0,
   },
@@ -526,8 +526,8 @@ const s = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.06)",
   },
   salvarBtnSaved: {
-    backgroundColor: "rgba(201,168,76,0.12)",
-    borderColor: "rgba(201,168,76,0.30)",
+    backgroundColor: "rgba(27,79,114,0.12)",
+    borderColor: "rgba(27,79,114,0.30)",
   },
   salvarText: {
     fontFamily: "Inter_500Medium",

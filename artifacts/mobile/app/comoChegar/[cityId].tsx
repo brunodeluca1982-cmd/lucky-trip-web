@@ -32,7 +32,7 @@ const HERO_IMAGE = require("@/assets/images/pao-acucar.png");
 // ── Transport mode labels and display config ──────────────────────────────────
 const MODO_META: Record<string, { label: string; icon: string; color: string }> = {
   aeroporto: { label: "Aeroportos",          icon: "navigation", color: "#8AB4D4" },
-  taxi_app:  { label: "Táxi & Aplicativos",  icon: "smartphone", color: "#C9A84C" },
+  taxi_app:  { label: "Táxi & Aplicativos",  icon: "smartphone", color: "#1B4F72" },
   onibus:    { label: "Ônibus",              icon: "map",        color: "#82C49D" },
   metro:     { label: "Metrô",              icon: "grid",       color: "#C07C40" },
   vlt:       { label: "VLT",               icon: "navigation", color: "#A07CC0" },
@@ -84,7 +84,7 @@ function TransporteCard({ item, modoColor }: { item: TransporteItem; modoColor: 
           <View style={s.metaRow}>
             {item.custo_estimado ? (
               <View style={s.metaChip}>
-                <Feather name="tag" size={11} color="#C9A84C" style={{ marginRight: 4 }} />
+                <Feather name="tag" size={11} color="#1B4F72" style={{ marginRight: 4 }} />
                 <Text style={s.metaText}>{item.custo_estimado}</Text>
               </View>
             ) : null}
@@ -169,13 +169,13 @@ export default function ComoChegar() {
 
         {/* ── Groups ─────────────────────────────────────────────────────── */}
         {loading ? (
-          <ActivityIndicator color="#C9A84C" style={{ marginTop: 48 }} />
+          <ActivityIndicator color="#1B4F72" style={{ marginTop: 48 }} />
         ) : error ? (
           <Text style={s.errorText}>Erro ao carregar: {error}</Text>
         ) : (
           <View style={s.content}>
             {groups.map(({ modo, items: groupItems }) => {
-              const meta     = MODO_META[modo] ?? { label: modo, icon: "info", color: "#C9A84C" };
+              const meta     = MODO_META[modo] ?? { label: modo, icon: "info", color: "#1B4F72" };
               const modoColor = meta.color;
               return (
                 <View key={modo} style={s.section}>
@@ -200,7 +200,7 @@ export default function ComoChegar() {
             style={s.footerBtn}
             onPress={() => Linking.openURL("https://maps.app.goo.gl/RioDeJaneiro")}
           >
-            <Feather name="map-pin" size={15} color="#C9A84C" />
+            <Feather name="map-pin" size={15} color="#1B4F72" />
             <Text style={s.footerBtnText}>Abrir no Google Maps</Text>
           </Pressable>
         </View>
@@ -239,7 +239,7 @@ const s = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 10,
     letterSpacing: 2.4,
-    color: "#C9A84C",
+    color: "#1B4F72",
     marginBottom: 6,
   },
   heroTitle: {
@@ -335,22 +335,22 @@ const s = StyleSheet.create({
   metaText: {
     fontFamily: "Inter_500Medium",
     fontSize: 11,
-    color: "#C9A84C",
+    color: "#1B4F72",
   },
   tipRow: {
     flexDirection: "row",
     gap: 6,
     marginTop: 4,
     padding: 10,
-    backgroundColor: "rgba(201,168,76,0.08)",
+    backgroundColor: "rgba(27,79,114,0.08)",
     borderRadius: 10,
     borderLeftWidth: 2,
-    borderLeftColor: "#C9A84C",
+    borderLeftColor: "#1B4F72",
   },
   tipStar: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 10,
-    color: "#C9A84C",
+    color: "#1B4F72",
     marginTop: 1,
   },
   tipText: {
@@ -378,7 +378,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     borderWidth: 1,
-    borderColor: "rgba(201,168,76,0.35)",
+    borderColor: "rgba(27,79,114,0.35)",
     borderRadius: 24,
     paddingHorizontal: 20,
     paddingVertical: 12,
@@ -386,6 +386,6 @@ const s = StyleSheet.create({
   footerBtnText: {
     fontFamily: "Inter_500Medium",
     fontSize: 13,
-    color: "#C9A84C",
+    color: "#1B4F72",
   },
 });

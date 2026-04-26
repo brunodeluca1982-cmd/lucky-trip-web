@@ -202,7 +202,7 @@ export default function EssencialScreen() {
           </View>
 
           {loadingAtiv ? (
-            <ActivityIndicator color="rgba(201,168,76,0.7)" style={{ marginVertical: 24 }} />
+            <ActivityIndicator color="rgba(27,79,114,0.7)" style={{ marginVertical: 24 }} />
           ) : (
             <View style={s.grid2}>
               {classicos.map((item) => (
@@ -226,7 +226,7 @@ export default function EssencialScreen() {
           </View>
 
           {loadingLucky ? (
-            <ActivityIndicator color="rgba(201,168,76,0.7)" style={{ marginVertical: 24 }} />
+            <ActivityIndicator color="rgba(27,79,114,0.7)" style={{ marginVertical: 24 }} />
           ) : (
             <View style={s.luckyList}>
               {luckyPicks.map((item, i) => (
@@ -298,7 +298,7 @@ const s = StyleSheet.create({
   heroEyebrow: {
     fontFamily: "Inter_500Medium",
     fontSize: 10,
-    color: "rgba(201,168,76,0.78)",
+    color: "rgba(27,79,114,0.78)",
     letterSpacing: 2.5,
   },
   heroTitle: {
@@ -434,7 +434,7 @@ const s = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "rgba(255,255,255,0.04)",
     borderWidth: 1,
-    borderColor: "rgba(201,168,76,0.16)",
+    borderColor: "rgba(27,79,114,0.16)",
   },
 
   luckyImageWrap: {
@@ -454,7 +454,7 @@ const s = StyleSheet.create({
   luckyNumText: {
     fontFamily: "PlayfairDisplay_400Regular",
     fontSize: 28,
-    color: "rgba(201,168,76,0.55)",
+    color: "rgba(27,79,114,0.55)",
     letterSpacing: -0.5,
   },
   luckyCatPill: {
@@ -466,7 +466,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: "rgba(201,168,76,0.25)",
+    borderColor: "rgba(27,79,114,0.25)",
   },
   luckyCatText: {
     fontFamily: "Inter_500Medium",
@@ -492,7 +492,7 @@ const s = StyleSheet.create({
   luckyLoc: {
     fontFamily: "Inter_400Regular",
     fontSize: 11,
-    color: "rgba(201,168,76,0.65)",
+    color: "rgba(27,79,114,0.65)",
     letterSpacing: 0.3,
   },
   luckyTitulo: {

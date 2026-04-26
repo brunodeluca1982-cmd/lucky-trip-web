@@ -27,9 +27,9 @@ import { Feather } from "@expo/vector-icons";
 import { useGuia } from "@/context/GuiaContext";
 import { supabase } from "@/lib/supabase";
 
-const GOLD      = "#D4AF37";
-const GOLD_DIM  = "rgba(212,175,55,0.14)";
-const GOLD_BDR  = "rgba(212,175,55,0.30)";
+const GOLD      = "#1B4F72";
+const GOLD_DIM  = "rgba(27,79,114,0.14)";
+const GOLD_BDR  = "rgba(27,79,114,0.30)";
 const LOGO_MARK = require("@/assets/images/logo-symbol.png");
 
 const UNLOCKS = [
@@ -185,11 +185,11 @@ export default function PostPurchaseScreen() {
         </View>
         <View style={s.starBadge}>
           <Feather name="star" size={12} color={GOLD} />
-          <Text style={s.starText}>Lucky Pro</Text>
+          <Text style={s.starText}>Lucky Premium</Text>
         </View>
       </View>
 
-      <Text style={s.title}>Você agora é Lucky Pro</Text>
+      <Text style={s.title}>Você agora é Lucky Premium</Text>
       <Text style={s.tagline}>Agora você vê o Rio como quem mora aqui.</Text>
       <Text style={s.body}>
         Os lugares que não aparecem no mapa comum agora estão abertos para você.
@@ -297,7 +297,7 @@ const s = StyleSheet.create({
     padding:         18,
     gap:             12,
     borderWidth:     1,
-    borderColor:     "rgba(212,175,55,0.15)",
+    borderColor:     "rgba(27,79,114,0.15)",
     marginBottom:    32,
     width:           "100%",
   },

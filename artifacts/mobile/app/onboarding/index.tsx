@@ -29,7 +29,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Feather } from "@expo/vector-icons";
 
 const { width: W, height: H } = Dimensions.get("window");
-const GOLD  = "#D4AF37";
+const GOLD  = "#1B4F72";
 const KEY   = "@luckytrip/onboarding_seen";
 
 // ─── Data ────────────────────────────────────────────────────────────────────
@@ -214,10 +214,10 @@ const sv = StyleSheet.create({
   },
   badgeWrap: {
     alignSelf: "flex-start",
-    backgroundColor: "rgba(212,175,55,0.14)",
+    backgroundColor: "rgba(27,79,114,0.14)",
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "rgba(212,175,55,0.32)",
+    borderColor: "rgba(27,79,114,0.32)",
     paddingHorizontal: 13,
     paddingVertical: 5,
     marginBottom: 18,

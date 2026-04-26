@@ -26,7 +26,7 @@ import { useLugarFotos } from "@/hooks/useLugarFotos";
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const FALLBACK_IMG = require("../../../assets/images/ipanema.png");
 
-const GOLD = "#C9A84C";
+const GOLD = "#1B4F72";
 
 // ── Badge labels por tipo ────────────────────────────────────────────────────
 const TIPO_LABELS: Record<string, string> = {
@@ -532,9 +532,9 @@ const styles = StyleSheet.create({
   // ── Badge ──
   badge: {
     alignSelf: "flex-start",
-    backgroundColor: "rgba(201,168,76,0.15)",
+    backgroundColor: "rgba(27,79,114,0.15)",
     borderWidth: 1,
-    borderColor: "rgba(201,168,76,0.35)",
+    borderColor: "rgba(27,79,114,0.35)",
     borderRadius: 6,
     paddingHorizontal: 10,
     paddingVertical: 4,

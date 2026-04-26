@@ -219,7 +219,7 @@ export default function DestinosScreen() {
 
         {/* 3-column grid */}
         {loading && destinos.length === 0 ? (
-          <ActivityIndicator color="rgba(212,175,55,0.7)" style={{ marginTop: 40 }} />
+          <ActivityIndicator color="rgba(27,79,114,0.7)" style={{ marginTop: 40 }} />
         ) : rows.length > 0 ? (
           <View style={s.grid}>
             {rows.map((row, ri) => (

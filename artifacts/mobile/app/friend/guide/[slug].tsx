@@ -36,7 +36,7 @@ import { Feather } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
 import { useGuia } from "@/context/GuiaContext";
 
-const GOLD  = "#C9A84C";
+const GOLD  = "#1B4F72";
 const CREAM = "#F5EDD6";
 const RIO_BG = require("../../../assets/images/hero-rio.png");
 
@@ -475,7 +475,7 @@ function ItemRow({ item, isLast, guideCtx }: { item: ItineraryItem; isLast: bool
           ) : null}
           <View style={ir.lockedBadge}>
             <Feather name="star" size={9} color={GOLD} />
-            <Text style={ir.lockedBadgeText}>Exclusivo Lucky Pro</Text>
+            <Text style={ir.lockedBadgeText}>Exclusivo Lucky Premium</Text>
           </View>
         </View>
       </Pressable>

@@ -22,7 +22,7 @@ import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { usePlaceSearch, type PlaceDetails, type PlacePrediction } from "@/hooks/usePlaceSearch";
 
-const GOLD = "#C9A84C";
+const GOLD = "#1B4F72";
 const CREAM = "#F5EDD6";
 
 export interface SelectedPlace {
@@ -176,7 +176,7 @@ function PredictionRow({
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [p.row, pressed && { backgroundColor: "rgba(201,168,76,0.10)" }]}
+      style={({ pressed }) => [p.row, pressed && { backgroundColor: "rgba(27,79,114,0.10)" }]}
     >
       <View style={p.iconWrap}>
         <Feather name="map-pin" size={14} color={GOLD} />
@@ -187,7 +187,7 @@ function PredictionRow({
           <Text style={p.secondary} numberOfLines={1}>{prediction.secondary_text}</Text>
         ) : null}
       </View>
-      <Feather name="plus-circle" size={16} color="rgba(201,168,76,0.55)" />
+      <Feather name="plus-circle" size={16} color="rgba(27,79,114,0.55)" />
     </Pressable>
   );
 }
@@ -210,7 +210,7 @@ const s = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     borderTopWidth: 1,
-    borderColor: "rgba(201,168,76,0.18)",
+    borderColor: "rgba(27,79,114,0.18)",
     maxHeight: "85%",
   },
   header: {

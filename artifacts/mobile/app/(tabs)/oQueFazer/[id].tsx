@@ -30,7 +30,7 @@ import { useBairros } from "@/hooks/useBairros";
 import { getImageForEntity } from "@/utils/getImageForEntity";
 
 const C = Colors.light;
-const GOLD = "#D4AF37";
+const GOLD = "#1B4F72";
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const MAP_H = Math.round(SCREEN_HEIGHT * 0.50);
 const CARD_IMAGE_H = 210;
@@ -371,7 +371,7 @@ const s = StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: 2.5,
-    backgroundColor: "rgba(201,168,76,0.55)",
+    backgroundColor: "rgba(27,79,114,0.55)",
   },
   introMetaText: {
     fontFamily: "Inter_500Medium",
@@ -382,7 +382,7 @@ const s = StyleSheet.create({
   byline: {
     fontFamily: "Inter_500Medium",
     fontSize: 11.5,
-    color: "#D4AF37",
+    color: "#1B4F72",
     letterSpacing: 0.6,
     marginBottom: 10,
     opacity: 0.85,
@@ -444,8 +444,8 @@ const s = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.20)",
   },
   bookmarkBtnSaved: {
-    backgroundColor: "rgba(201,168,76,0.22)",
-    borderColor: "rgba(201,168,76,0.40)",
+    backgroundColor: "rgba(27,79,114,0.22)",
+    borderColor: "rgba(27,79,114,0.40)",
   },
   priceBadge: {
     position: "absolute",
@@ -534,12 +534,12 @@ const s = StyleSheet.create({
     marginBottom: 14,
   },
   filterBadge: {
-    backgroundColor: "rgba(212,175,55,0.14)",
+    backgroundColor: "rgba(27,79,114,0.14)",
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderWidth: 1,
-    borderColor: "rgba(212,175,55,0.35)",
+    borderColor: "rgba(27,79,114,0.35)",
   },
   filterBadgeText: {
     fontFamily: "Inter_600SemiBold",

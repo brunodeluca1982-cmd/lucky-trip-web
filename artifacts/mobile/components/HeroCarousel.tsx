@@ -207,16 +207,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   badgeContainer: {
-    backgroundColor: "rgba(212,175,55,0.14)",
+    backgroundColor: "rgba(27,79,114,0.14)",
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 5,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: "rgba(212,175,55,0.35)",
+    borderColor: "rgba(27,79,114,0.35)",
   },
   badgeText: {
-    color: "#D4AF37",
+    color: "#1B4F72",
     fontFamily: "Inter_500Medium",
     fontSize: 11,
     letterSpacing: 1.5,
@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
   ctaBtn: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#D4AF37",
+    backgroundColor: "#1B4F72",
     borderRadius: 22,
     paddingHorizontal: 20,
     paddingVertical: 10,
@@ -276,7 +276,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.38)",
   },
   dotActive: {
-    backgroundColor: "#D4AF37",
+    backgroundColor: "#1B4F72",
     width: 26,
     height: 5,
     borderRadius: 2.5,

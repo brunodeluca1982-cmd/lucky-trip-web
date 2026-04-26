@@ -27,7 +27,7 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
 
 const { width: W, height: H } = Dimensions.get("window");
-const GOLD = "#C9A84C";
+const GOLD = "#1B4F72";
 const SAND = "#E8DFD0";
 
 // Background do Rio para todos os amigos

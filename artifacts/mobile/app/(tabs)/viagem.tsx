@@ -29,7 +29,7 @@ import {
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
@@ -40,8 +40,9 @@ import type { DiaRoteiro, DiaPeriodo } from "@/utils/buildRoteiro";
 import { supabase } from "@/lib/supabase";
 import { getNeighborhoodImage } from "@/data/neighborhoodImages";
 
-const C    = Colors.light;
-const GOLD = "#D4AF37";
+const C      = Colors.light;
+const AREIA  = "#F5F0E8";
+const PETROL = "#1B4F72";
 const { width: SCREEN_W } = Dimensions.get("window");
 
 // Rio photos for rotating background
@@ -219,7 +220,7 @@ function UrlPasteSheet({
           <Feather
             name={source === "instagram" ? "instagram" : "video"}
             size={16}
-            color={GOLD}
+            color={PETROL}
           />
           <Text style={up.title}>
             {source === "instagram" ? "Colar link do Instagram" : "Colar link do TikTok"}
@@ -277,7 +278,7 @@ const up = StyleSheet.create({
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
     borderTopWidth: 1,
-    borderColor: "rgba(212,175,55,0.22)",
+    borderColor: "rgba(27,79,114,0.22)",
     paddingTop: 10,
     paddingHorizontal: 20,
     paddingBottom: 32,
@@ -323,7 +324,7 @@ const up = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    backgroundColor: GOLD,
+    backgroundColor: PETROL,
     paddingVertical: 14,
     borderRadius: 14,
   },
@@ -377,14 +378,14 @@ function ActionArea({
       >
         <View style={act.aiLeft}>
           <View style={act.aiIconWrap}>
-            <Feather name="zap" size={15} color={GOLD} />
+            <Feather name="zap" size={15} color={PETROL} />
           </View>
           <View>
             <Text style={act.aiLabel}>Criar roteiro inteligente</Text>
             <Text style={act.aiSub}>Baseado nos seus lugares salvos</Text>
           </View>
         </View>
-        <Feather name="arrow-right" size={15} color={`${GOLD}90`} />
+        <Feather name="arrow-right" size={15} color={`${PETROL}90`} />
       </Pressable>
     </View>
   );
@@ -429,8 +430,8 @@ const act = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: "rgba(0,0,0,0.26)",
     borderWidth: 1,
-    borderColor: `${GOLD}28`,
-    boxShadow: `0px 4px 20px rgba(201,168,76,0.12)`,
+    borderColor: `${PETROL}28`,
+    boxShadow: `0px 4px 20px rgba(27,79,114,0.12)`,
   },
   aiLeft: {
     flexDirection: "row",
@@ -442,9 +443,9 @@ const act = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: `${GOLD}14`,
+    backgroundColor: `${PETROL}14`,
     borderWidth: 1,
-    borderColor: `${GOLD}30`,
+    borderColor: `${PETROL}30`,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -550,7 +551,7 @@ const sc = StyleSheet.create({
   catLabel: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 8,
-    color: GOLD,
+    color: PETROL,
     letterSpacing: 1.2,
   },
   name: {
@@ -586,7 +587,7 @@ function SavedSection({
         <View key={gi} style={ss.group}>
           {/* Destination header */}
           <View style={ss.destRow}>
-            <Feather name="map-pin" size={11} color={GOLD} />
+            <Feather name="map-pin" size={11} color={PETROL} />
             <Text style={ss.destLabel}>{group.label}</Text>
             <View style={ss.dot} />
             <Text style={ss.sublabel}>
@@ -652,7 +653,7 @@ function EmptyHint() {
   return (
     <View style={eh.wrap}>
       <View style={eh.iconRing}>
-        <Feather name="bookmark" size={20} color={GOLD} />
+        <Feather name="bookmark" size={20} color={PETROL} />
       </View>
       <View style={eh.body}>
         <Text style={eh.title}>Nenhum lugar salvo ainda</Text>
@@ -682,9 +683,9 @@ const eh = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: `${GOLD}12`,
+    backgroundColor: `${PETROL}12`,
     borderWidth: 1,
-    borderColor: `${GOLD}28`,
+    borderColor: `${PETROL}28`,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
@@ -707,7 +708,7 @@ const eh = StyleSheet.create({
   },
   bold: {
     fontFamily: "Inter_600SemiBold",
-    color: GOLD,
+    color: PETROL,
   },
 });
 
@@ -721,7 +722,7 @@ function PeriodoBlock({ periodo, items }: DiaPeriodo) {
   return (
     <View style={rot.periodoWrap}>
       <View style={rot.periodoHeader}>
-        <Feather name={icon} size={10} color={GOLD} />
+        <Feather name={icon} size={10} color={PETROL} />
         <Text style={rot.periodoLabel}>{label}</Text>
       </View>
       {items.map((item) => (
@@ -784,23 +785,23 @@ const rot = StyleSheet.create({
     textTransform: "uppercase",
   },
   pill: {
-    backgroundColor: `${GOLD}10`,
+    backgroundColor: `${PETROL}10`,
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderWidth: 1,
-    borderColor: `${GOLD}24`,
+    borderColor: `${PETROL}24`,
   },
   pillText: {
     fontFamily: "Inter_500Medium",
     fontSize: 10,
-    color: GOLD,
+    color: PETROL,
   },
   diaCard: {
     borderRadius: 16,
     backgroundColor: "rgba(0,0,0,0.22)",
     borderWidth: 1,
-    borderColor: `${GOLD}18`,
+    borderColor: `${PETROL}18`,
     paddingHorizontal: 18,
     paddingVertical: 16,
     boxShadow: `0px 2px 12px rgba(0,0,0,0.20)`,
@@ -812,7 +813,7 @@ const rot = StyleSheet.create({
   diaNum: {
     fontFamily: "Inter_700Bold",
     fontSize: 10,
-    color: GOLD,
+    color: PETROL,
     letterSpacing: 1.6,
     textTransform: "uppercase",
   },
@@ -824,7 +825,7 @@ const rot = StyleSheet.create({
   },
   separator: {
     height: 1,
-    backgroundColor: `${GOLD}14`,
+    backgroundColor: `${PETROL}14`,
     marginBottom: 12,
   },
   periodoWrap: {
@@ -839,7 +840,7 @@ const rot = StyleSheet.create({
   periodoLabel: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 9,
-    color: GOLD,
+    color: PETROL,
     letterSpacing: 1.4,
     textTransform: "uppercase",
   },
@@ -872,6 +873,7 @@ export default function MinhaViagemScreen() {
   const insets    = useSafeAreaInsets();
   const topPad    = Platform.OS === "web" ? 67 : insets.top + 12;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const params    = useLocalSearchParams<{ highlightLast?: string }>();
 
   const { saved, unsave, save } = useGuia();
   const totalSaved              = saved.length;
@@ -880,6 +882,28 @@ export default function MinhaViagemScreen() {
 
   // URL paste sheet — "instagram" | "tiktok" | null
   const [pasteSource, setPasteSource] = useState<"instagram" | "tiktok" | null>(null);
+
+  // Highlight last added item (from video link feature)
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const highlightFade = useRef(new Animated.Value(0)).current;
+  const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    if (params.highlightLast === "true" && saved.length > 0) {
+      const lastItem = saved[saved.length - 1];
+      setHighlightId(lastItem.id);
+
+      // Fade in the badge
+      Animated.sequence([
+        Animated.timing(highlightFade, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.delay(3000),
+        Animated.timing(highlightFade, { toValue: 0, duration: 300, useNativeDriver: true }),
+      ]).start(() => setHighlightId(null));
+
+      // Clear the param to avoid re-triggering
+      router.setParams({ highlightLast: undefined } as any);
+    }
+  }, [params.highlightLast, saved.length]);
 
   return (
     <View style={s.root}>
@@ -970,7 +994,7 @@ const s = StyleSheet.create({
   eyebrow: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 11,
-    color: GOLD,
+    color: PETROL,
     letterSpacing: 2.5,
   },
   titleRow: {
@@ -985,7 +1009,7 @@ const s = StyleSheet.create({
     lineHeight: 42,
   },
   countBadge: {
-    backgroundColor: `${GOLD}22`,
+    backgroundColor: `${PETROL}22`,
     borderRadius: 14,
     minWidth: 28,
     height: 28,
@@ -994,12 +1018,12 @@ const s = StyleSheet.create({
     justifyContent: "center",
     marginTop: 4,
     borderWidth: 1,
-    borderColor: `${GOLD}40`,
+    borderColor: `${PETROL}40`,
   },
   countText: {
     fontFamily: "Inter_700Bold",
     fontSize: 13,
-    color: GOLD,
+    color: PETROL,
   },
   subtitle: {
     fontFamily: "Inter_400Regular",

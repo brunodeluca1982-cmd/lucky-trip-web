@@ -25,11 +25,11 @@ import { RotatingBackground } from "@/components/RotatingBackground";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const GOLD       = "#D4AF37";
+const GOLD       = "#1B4F72";
 const BG         = "#1A0E04";
 const GLASS_CARD = "rgba(255,255,255,0.07)";
 const GLASS_ITEM = "rgba(255,255,255,0.05)";
-const BORDER     = "rgba(212,175,55,0.15)";
+const BORDER     = "rgba(27,79,114,0.15)";
 const ITINERARY_KEY = "@luckytrip/current_itinerary";
 
 // ── Cinematic background (shared with all premium screens) ────────────────────
@@ -135,7 +135,7 @@ function DeslocamentoRow({
 function PlaceholderImage() {
   return (
     <View style={[StyleSheet.absoluteFill, sc.thumbPlaceholder]}>
-      <Feather name="map-pin" size={14} color="rgba(212,175,55,0.22)" />
+      <Feather name="map-pin" size={14} color="rgba(27,79,114,0.22)" />
     </View>
   );
 }
@@ -419,7 +419,7 @@ export default function ResultadoScreen() {
           </Pressable>
         </View>
         <View style={sc.centerContent}>
-          <Feather name="map" size={40} color="rgba(212,175,55,0.40)" />
+          <Feather name="map" size={40} color="rgba(27,79,114,0.40)" />
           <Text style={sc.emptyText}>Nenhum roteiro disponível.</Text>
           <Text style={sc.emptySubtext}>Gere um novo roteiro para começar.</Text>
           <Pressable style={sc.emptyBtn} onPress={handleBack}>
@@ -598,8 +598,8 @@ const sc = StyleSheet.create({
     paddingVertical:   6,
     borderRadius:      20,
     borderWidth:       1,
-    borderColor:       "rgba(212,175,55,0.30)",
-    backgroundColor:   "rgba(212,175,55,0.06)",
+    borderColor:       "rgba(27,79,114,0.30)",
+    backgroundColor:   "rgba(27,79,114,0.06)",
   },
   chipActive: {
     backgroundColor: GOLD,
@@ -631,7 +631,7 @@ const sc = StyleSheet.create({
     paddingVertical:   14,
   },
   dayBadge: {
-    backgroundColor:   "rgba(212,175,55,0.15)",
+    backgroundColor:   "rgba(27,79,114,0.15)",
     borderRadius:      6,
     paddingHorizontal: 8,
     paddingVertical:   3,
@@ -720,7 +720,7 @@ const sc = StyleSheet.create({
   connectorLine: {
     flex:            1,
     width:           1,
-    backgroundColor: "rgba(212,175,55,0.25)",
+    backgroundColor: "rgba(27,79,114,0.25)",
     marginTop:       4,
     minHeight:       32,
   },
@@ -807,7 +807,7 @@ const sc = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     alignItems:      "center",
     justifyContent:  "center",
-    backgroundColor: "rgba(212,175,55,0.04)",
+    backgroundColor: "rgba(27,79,114,0.04)",
   },
 
   // Hotel block — rendered above period sections inside dayBody
@@ -817,10 +817,10 @@ const sc = StyleSheet.create({
     marginHorizontal:  16,
     marginTop:         2,
     marginBottom:      8,
-    backgroundColor:   "rgba(212,175,55,0.07)",
+    backgroundColor:   "rgba(27,79,114,0.07)",
     borderRadius:      10,
     borderWidth:       1,
-    borderColor:       "rgba(212,175,55,0.22)",
+    borderColor:       "rgba(27,79,114,0.22)",
     overflow:          "hidden",
     gap:               10,
     paddingRight:      10,

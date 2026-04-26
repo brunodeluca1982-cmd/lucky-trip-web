@@ -234,7 +234,7 @@ export default function BairroDetailScreen() {
                   <Text style={s.hotelBairro} numberOfLines={1}>{hotel.bairro_nome}</Text>
                   {hotel.rating && (
                     <View style={s.ratingRow}>
-                      <Ionicons name="star" size={11} color="#D4AF37" />
+                      <Ionicons name="star" size={11} color="#1B4F72" />
                       <Text style={s.ratingText}>
                         {hotel.rating.toFixed(1)} {ratingText(hotel.rating)}
                       </Text>
@@ -507,7 +507,7 @@ const s = StyleSheet.create({
     position: "absolute",
     top: 8,
     left: 8,
-    backgroundColor: "#D4AF37",
+    backgroundColor: "#1B4F72",
     borderRadius: 4,
     paddingHorizontal: 6,
     paddingVertical: 3,

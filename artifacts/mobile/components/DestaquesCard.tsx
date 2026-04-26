@@ -221,7 +221,7 @@ const lb = StyleSheet.create({
   },
   rule: {
     height: 1,
-    backgroundColor: "rgba(201,168,76,0.45)",
+    backgroundColor: "rgba(27,79,114,0.45)",
     marginBottom: 6,
     width: 36,
   },

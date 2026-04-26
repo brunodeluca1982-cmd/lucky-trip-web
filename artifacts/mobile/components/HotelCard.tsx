@@ -26,7 +26,7 @@ interface HotelCardProps {
 }
 
 const TIPO_COLORS: Record<string, string> = {
-  Luxo: "#C9A84C",
+  Luxo: "#1B4F72",
   Boutique: "#2D5A3D",
   Conforto: "#C4704A",
 };

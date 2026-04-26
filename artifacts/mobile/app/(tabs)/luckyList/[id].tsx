@@ -32,9 +32,9 @@ import { useBairros } from "@/hooks/useBairros";
 const FREE_ITEMS = 3;
 
 const C    = Colors.light;
-const GOLD = "#D4AF37";
-const GOLD_DIM    = "rgba(201,168,76,0.18)";
-const GOLD_BORDER = "rgba(201,168,76,0.28)";
+const GOLD = "#1B4F72";
+const GOLD_DIM    = "rgba(27,79,114,0.18)";
+const GOLD_BORDER = "rgba(27,79,114,0.28)";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const MAP_H       = Math.round(SCREEN_HEIGHT * 0.50);
@@ -157,7 +157,7 @@ export default function LuckyListScreen() {
 
           {error && !lugaresLoading && (
             <View style={s.loadingWrap}>
-              <Feather name="alert-circle" size={18} color="rgba(201,168,76,0.4)" />
+              <Feather name="alert-circle" size={18} color="rgba(27,79,114,0.4)" />
               <Text style={s.loadingText}>{error}</Text>
             </View>
           )}
@@ -341,7 +341,7 @@ const s = StyleSheet.create({
   },
   pillGold: {
     borderColor: GOLD_BORDER,
-    backgroundColor: "rgba(201,168,76,0.12)",
+    backgroundColor: "rgba(27,79,114,0.12)",
   },
   pillGoldText: {
     fontFamily: "Inter_500Medium",
@@ -360,7 +360,7 @@ const s = StyleSheet.create({
   mapHintText: {
     fontFamily: "Inter_400Regular",
     fontSize: 11,
-    color: "rgba(201,168,76,0.55)",
+    color: "rgba(27,79,114,0.55)",
     letterSpacing: 0.4,
   },
 
@@ -372,7 +372,7 @@ const s = StyleSheet.create({
     paddingTop: 30,
     paddingBottom: 32,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(201,168,76,0.12)",
+    borderBottomColor: "rgba(27,79,114,0.12)",
   },
   heroAccent: {
     flexDirection: "row",
@@ -422,7 +422,7 @@ const s = StyleSheet.create({
   curatorText: {
     fontFamily: "Inter_400Regular",
     fontSize: 11,
-    color: "rgba(201,168,76,0.60)",
+    color: "rgba(27,79,114,0.60)",
     letterSpacing: 0.4,
     flexShrink: 1,
   },
@@ -441,7 +441,7 @@ const s = StyleSheet.create({
   loadingText: {
     fontFamily: "Inter_400Regular",
     fontSize: 13,
-    color: "rgba(201,168,76,0.50)",
+    color: "rgba(27,79,114,0.50)",
     textAlign: "center",
   },
   sectionHeader: {
@@ -468,7 +468,7 @@ const s = StyleSheet.create({
     overflow: "hidden",
     marginBottom: 28,
     borderWidth: 1,
-    borderColor: "rgba(201,168,76,0.10)",
+    borderColor: "rgba(27,79,114,0.10)",
   },
   cardImageWrap: {
     height: CARD_IMAGE_H,
@@ -493,7 +493,7 @@ const s = StyleSheet.create({
     flexDirection:     "row",
     alignItems:        "center",
     gap:               6,
-    backgroundColor:   "rgba(201,168,76,0.16)",
+    backgroundColor:   "rgba(27,79,114,0.16)",
     borderRadius:      20,
     paddingHorizontal: 14,
     paddingVertical:   6,
@@ -573,7 +573,7 @@ const s = StyleSheet.create({
   cardLocText: {
     fontFamily: "Inter_400Regular",
     fontSize: 11,
-    color: "rgba(201,168,76,0.72)",
+    color: "rgba(27,79,114,0.72)",
   },
   cardTitulo: {
     fontFamily: "PlayfairDisplay_700Bold",
@@ -656,7 +656,7 @@ const s = StyleSheet.create({
     paddingVertical: 36,
     paddingHorizontal: 24,
     borderTopWidth: 1,
-    borderTopColor: "rgba(201,168,76,0.12)",
+    borderTopColor: "rgba(27,79,114,0.12)",
     alignItems: "center",
     gap: 6,
   },
@@ -674,7 +674,7 @@ const s = StyleSheet.create({
   footerSub: {
     fontFamily: "Inter_400Regular",
     fontSize: 13,
-    color: "rgba(201,168,76,0.50)",
+    color: "rgba(27,79,114,0.50)",
     textAlign: "center",
     lineHeight: 20,
     maxWidth: 250,

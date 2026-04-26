@@ -95,18 +95,18 @@ const s = StyleSheet.create({
     marginTop: -40,
   },
   badge: {
-    backgroundColor: "rgba(212,175,55,0.14)",
+    backgroundColor: "rgba(27,79,114,0.14)",
     borderRadius: 20,
     paddingHorizontal: 18,
     paddingVertical: 6,
     marginBottom: 28,
     borderWidth: 1,
-    borderColor: "rgba(212,175,55,0.40)",
+    borderColor: "rgba(27,79,114,0.40)",
   },
   badgeText: {
     fontFamily: "Inter_500Medium",
     fontSize: 11,
-    color: "#D4AF37",
+    color: "#1B4F72",
     letterSpacing: 2.5,
   },
   cidade: {
@@ -138,9 +138,9 @@ const s = StyleSheet.create({
     marginBottom: 48,
   },
   btn: {
-    backgroundColor: "rgba(212,175,55,0.16)",
+    backgroundColor: "rgba(27,79,114,0.16)",
     borderWidth: 1,
-    borderColor: "rgba(212,175,55,0.45)",
+    borderColor: "rgba(27,79,114,0.45)",
     borderRadius: 28,
     paddingHorizontal: 32,
     paddingVertical: 14,
@@ -148,7 +148,7 @@ const s = StyleSheet.create({
   btnText: {
     fontFamily: "Inter_500Medium",
     fontSize: 14,
-    color: "#D4AF37",
+    color: "#1B4F72",
     letterSpacing: 0.5,
   },
 });

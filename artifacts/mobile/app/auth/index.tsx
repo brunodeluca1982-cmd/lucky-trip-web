@@ -30,7 +30,8 @@ import { useRioHeroMedia } from "@/hooks/useHeroMedia";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-const GOLD = "#D4AF37";
+const AREIA = "#F5F0E8";
+const PETROL = "#1B4F72";
 const LOGO = require("@/assets/images/logo-symbol.png");
 
 const HERO_IMAGES = [
@@ -468,14 +469,14 @@ function EmailSentState({
     <View style={s.center}>
       <Image source={LOGO} style={s.logo} resizeMode="contain" />
       <View style={s.sentIcon}>
-        <Feather name="mail" size={28} color={GOLD} />
+        <Feather name="mail" size={28} color={PETROL} />
       </View>
       <Text style={s.headline} suppressHighlighting>
         {isReset ? "Verifique seu e-mail" : "Confirme seu e-mail"}
       </Text>
       <Text style={s.sub} suppressHighlighting>
         {isReset ? "Enviamos o link de redefinição para" : "Enviamos um e-mail de confirmação para"}{"\n"}
-        <Text style={{ color: GOLD, fontFamily: "Inter_500Medium" }}>{email}</Text>
+        <Text style={{ color: PETROL, fontFamily: "Inter_500Medium" }}>{email}</Text>
       </Text>
       <Text style={s.sentNote} suppressHighlighting>
         {isReset
@@ -771,8 +772,8 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   checkboxChecked: {
-    backgroundColor: GOLD,
-    borderColor: GOLD,
+    backgroundColor: AREIA,
+    borderColor: PETROL,
   },
   checkText: {
     fontFamily: "Inter_400Regular",
@@ -781,7 +782,7 @@ const s = StyleSheet.create({
     flexShrink: 1,
   },
   checkLink: {
-    color: GOLD,
+    color: PETROL,
     fontFamily: "Inter_500Medium",
   },
 
@@ -796,7 +797,7 @@ const s = StyleSheet.create({
 
   cta: {
     width: "100%",
-    backgroundColor: GOLD,
+    backgroundColor: AREIA,
     borderRadius: 12,
     paddingVertical: 10,
     alignItems: "center",
@@ -805,7 +806,7 @@ const s = StyleSheet.create({
   ctaText: {
     fontFamily: "Inter_700Bold",
     fontSize: 14,
-    color: "#000000",
+    color: PETROL,
     ...WNS,
   },
 
@@ -866,14 +867,14 @@ const s = StyleSheet.create({
   footerLink: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 13,
-    color: GOLD,
+    color: PETROL,
   },
 
   sentIcon: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: "rgba(212,175,55,0.12)",
+    backgroundColor: "rgba(27,79,114,0.12)",
     alignItems: "center",
     justifyContent: "center",
     marginVertical: 16,

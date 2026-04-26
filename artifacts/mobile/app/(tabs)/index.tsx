@@ -1,6 +1,7 @@
 // app/(tabs)/index.tsx — HomeScreen v3 (features completas)
 import React, { useState, useRef, useEffect } from "react";
 import {
+  ActivityIndicator,
   Animated,
   Dimensions,
   FlatList,
@@ -11,8 +12,10 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
@@ -32,10 +35,48 @@ const LOGO_WHITE = require("@/assets/images/logo_symbol_white.png");
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════════════════════
 const PETROL = "#1B4F72";
+const AREIA = "#F5F0E8";
 const { width: W, height: H } = Dimensions.get("window");
 const SUPABASE = "https://bkwlximkadmlnbgjcrdp.supabase.co";
 const FALLBACK = `${SUPABASE}/storage/v1/object/public/media/rio-de-janeiro/hero/foto/imagehero01.jpg`;
 const RIO_DESTINO_ID = "7f047742-427f-4b11-8286-781af899c57d";
+const EDGE_FUNCTION_URL = `${SUPABASE}/functions/v1/parse-social-caption`;
+const PENDING_PLACES_KEY = "@luckytrip/pending_places";
+
+// ═══════════════════════════════════════════════════════════════════════════
+// VIDEO LINK TYPES & UTILS
+// ═══════════════════════════════════════════════════════════════════════════
+type VideoPlatform = "youtube" | "tiktok" | "instagram" | "invalid";
+
+type VideoLinkState =
+  | { status: "idle" }
+  | { status: "needs_caption"; platform: "tiktok" | "instagram"; url: string }
+  | { status: "loading" }
+  | { status: "success"; places: Array<{ nome: string; tipo: string; confianca: number }> }
+  | { status: "lucky_message"; message: string; destination?: string }
+  | { status: "error"; message: string };
+
+function detectPlatform(input: string): { platform: VideoPlatform; url?: string } {
+  const text = input.trim();
+
+  // YouTube (watch, shorts, youtu.be)
+  if (/youtube\.com\/(watch|shorts)|youtu\.be\//.test(text)) {
+    return { platform: "youtube", url: text };
+  }
+
+  // TikTok
+  if (/tiktok\.com|vm\.tiktok/.test(text)) {
+    return { platform: "tiktok", url: text };
+  }
+
+  // Instagram
+  if (/instagram\.com|instagr\.am/.test(text)) {
+    return { platform: "instagram", url: text };
+  }
+
+  // Invalid
+  return { platform: "invalid" };
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -288,31 +329,243 @@ function HeroDestaque({
 }
 
 function InputBar() {
-  const handlePress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push({
-      pathname: "/colar-video",
-      params: { destinoSlug: "rio-de-janeiro" },
-    } as any);
+  const [linkValue, setLinkValue] = useState("");
+  const [captionValue, setCaptionValue] = useState("");
+  const [state, setState] = useState<VideoLinkState>({ status: "idle" });
+  const [modalVisible, setModalVisible] = useState(false);
+  const shakeAnim = useRef(new Animated.Value(0)).current;
+
+  const shake = () => {
+    Animated.sequence([
+      Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
+    ]).start();
   };
 
+  const handleSubmitLink = () => {
+    const { platform, url } = detectPlatform(linkValue);
+
+    if (platform === "invalid") {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      shake();
+      setState({ status: "error", message: "Cole um link de vídeo do YouTube, TikTok ou Instagram" });
+      setTimeout(() => setState({ status: "idle" }), 3000);
+      return;
+    }
+
+    if (platform === "youtube") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      processVideo("youtube", url!);
+    } else {
+      // TikTok ou Instagram → precisa de caption
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setState({ status: "needs_caption", platform, url: url! });
+    }
+  };
+
+  const handleSubmitWithCaption = () => {
+    if (state.status !== "needs_caption") return;
+    if (!captionValue.trim()) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      shake();
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    processVideo(state.platform, state.url, captionValue.trim());
+  };
+
+  const processVideo = async (platform: "youtube" | "tiktok" | "instagram", url: string, caption?: string) => {
+    setState({ status: "loading" });
+    setModalVisible(true);
+
+    try {
+      // Get session if exists (for userId), but don't require it
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const body: Record<string, any> = {
+        platform,
+        url,
+        destinoSlug: "rio-de-janeiro",
+        userId: session?.user?.id ?? null, // null if not logged in
+      };
+
+      if (caption) {
+        body.caption = caption;
+      }
+
+      const response = await fetch(EDGE_FUNCTION_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token && { "Authorization": `Bearer ${session.access_token}` }),
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(errText || `Erro ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.type === "places_found") {
+        // Save locally for anonymous users
+        if (!session) {
+          const existing = await AsyncStorage.getItem(PENDING_PLACES_KEY);
+          const pending = existing ? JSON.parse(existing) : [];
+          pending.push(...data.places.map((p: any) => ({ ...p, addedAt: Date.now() })));
+          await AsyncStorage.setItem(PENDING_PLACES_KEY, JSON.stringify(pending));
+        }
+        setState({ status: "success", places: data.places });
+      } else if (data.type === "destination_recognized") {
+        setState({ status: "lucky_message", message: data.message, destination: data.destination });
+      } else {
+        setState({ status: "error", message: data.message || "Nenhum lugar encontrado" });
+      }
+    } catch (err: any) {
+      console.error("[VideoLink] Error:", err);
+      setState({ status: "error", message: err.message || "Erro ao processar. Tente novamente." });
+    }
+  };
+
+  const resetState = () => {
+    setLinkValue("");
+    setCaptionValue("");
+    setState({ status: "idle" });
+    setModalVisible(false);
+  };
+
+  const goToViagem = () => {
+    resetState();
+    router.push({ pathname: "/(tabs)/viagem", params: { highlightLast: "true" } } as any);
+  };
+
+  const detectedPlatform = detectPlatform(linkValue).platform;
+
   return (
-    <Pressable style={styles.inputWrap} onPress={handlePress}>
-      <View style={styles.inputBar}>
-        <View style={styles.socialIcons}>
-          <View style={[styles.socialIcon, { backgroundColor: "#E1306C" }]}>
-            <Ionicons name="logo-instagram" size={14} color="#FFF" />
+    <>
+      <Animated.View style={[styles.inputWrap, { transform: [{ translateX: shakeAnim }] }]}>
+        <View style={styles.inputBar}>
+          <View style={styles.socialIcons}>
+            <View style={[styles.socialIcon, { backgroundColor: "#E1306C" }, detectedPlatform === "instagram" && styles.socialIconActive]}>
+              <Ionicons name="logo-instagram" size={14} color="#FFF" />
+            </View>
+            <View style={[styles.socialIcon, { backgroundColor: "#000" }, detectedPlatform === "tiktok" && styles.socialIconActive]}>
+              <Ionicons name="logo-tiktok" size={14} color="#FFF" />
+            </View>
+            <View style={[styles.socialIcon, { backgroundColor: "#FF0000" }, detectedPlatform === "youtube" && styles.socialIconActive]}>
+              <Ionicons name="logo-youtube" size={14} color="#FFF" />
+            </View>
           </View>
-          <View style={[styles.socialIcon, { backgroundColor: "#000" }]}>
-            <Ionicons name="logo-tiktok" size={14} color="#FFF" />
+          <TextInput
+            style={styles.inputText}
+            placeholder="Cole um link do YouTube, TikTok ou Instagram"
+            placeholderTextColor="rgba(255,255,255,0.5)"
+            value={linkValue}
+            onChangeText={setLinkValue}
+            onSubmitEditing={handleSubmitLink}
+            returnKeyType="go"
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={state.status === "idle" || state.status === "error"}
+          />
+          {state.status === "loading" && (
+            <ActivityIndicator size="small" color="#FFF" style={{ marginLeft: 8 }} />
+          )}
+        </View>
+
+        {/* Error message */}
+        {state.status === "error" && (
+          <Text style={styles.inputError}>{state.message}</Text>
+        )}
+
+        {/* Caption input for TikTok/Instagram */}
+        {state.status === "needs_caption" && (
+          <View style={styles.captionContainer}>
+            <Text style={styles.captionHint}>
+              ℹ️ Pra ler esse vídeo, cola também a legenda:
+            </Text>
+            <TextInput
+              style={styles.captionInput}
+              placeholder="Cole a legenda do post aqui..."
+              placeholderTextColor="rgba(255,255,255,0.4)"
+              value={captionValue}
+              onChangeText={setCaptionValue}
+              multiline
+              numberOfLines={4}
+              autoFocus
+            />
+            <Pressable style={styles.captionSubmitBtn} onPress={handleSubmitWithCaption}>
+              <Text style={styles.captionSubmitText}>Encontrar lugares</Text>
+            </Pressable>
           </View>
-          <View style={[styles.socialIcon, { backgroundColor: "#FF0000" }]}>
-            <Ionicons name="logo-youtube" size={14} color="#FFF" />
+        )}
+      </Animated.View>
+
+      {/* Loading/Result Modal */}
+      <Modal visible={modalVisible} animationType="fade" transparent>
+        <View style={styles.videoModalOverlay}>
+          <View style={styles.videoModalContent}>
+            {state.status === "loading" && (
+              <>
+                <Text style={styles.videoModalTitle}>Olhando esse vídeo</Text>
+                <Text style={styles.videoModalTitleLine2}>pra você...</Text>
+                <ActivityIndicator size="large" color={PETROL} style={{ marginTop: 24 }} />
+              </>
+            )}
+
+            {state.status === "success" && (
+              <>
+                <Ionicons name="checkmark-circle" size={48} color="#27AE60" />
+                <Text style={styles.videoModalSuccessTitle}>
+                  {state.places.length} {state.places.length === 1 ? "lugar encontrado" : "lugares encontrados"}!
+                </Text>
+                <View style={styles.videoModalPlacesList}>
+                  {state.places.slice(0, 5).map((place, idx) => (
+                    <View key={idx} style={styles.videoModalPlaceItem}>
+                      <Ionicons name="location" size={16} color={PETROL} />
+                      <Text style={styles.videoModalPlaceName}>{place.nome}</Text>
+                    </View>
+                  ))}
+                </View>
+                <Pressable style={styles.videoModalPrimaryBtn} onPress={goToViagem}>
+                  <Text style={styles.videoModalPrimaryBtnText}>Ver minha viagem</Text>
+                </Pressable>
+                <Pressable style={styles.videoModalSecondaryBtn} onPress={resetState}>
+                  <Text style={styles.videoModalSecondaryBtnText}>Adicionar outro vídeo</Text>
+                </Pressable>
+              </>
+            )}
+
+            {state.status === "lucky_message" && (
+              <>
+                {state.destination && (
+                  <Text style={styles.videoModalDestination}>{state.destination}</Text>
+                )}
+                <Text style={styles.videoModalLuckyMessage}>{state.message}</Text>
+                <Pressable style={styles.videoModalSecondaryBtn} onPress={resetState}>
+                  <Text style={styles.videoModalSecondaryBtnText}>Tentar outro vídeo</Text>
+                </Pressable>
+              </>
+            )}
+
+            {state.status === "error" && modalVisible && (
+              <>
+                <Ionicons name="close-circle" size={48} color="#E74C3C" />
+                <Text style={styles.videoModalErrorTitle}>Ops!</Text>
+                <Text style={styles.videoModalErrorMessage}>{state.message}</Text>
+                <Pressable style={styles.videoModalPrimaryBtn} onPress={resetState}>
+                  <Text style={styles.videoModalPrimaryBtnText}>Tentar novamente</Text>
+                </Pressable>
+              </>
+            )}
           </View>
         </View>
-        <Text style={styles.inputPlaceholder}>Cole um link do Instagram, TikTok...</Text>
-      </View>
-    </Pressable>
+      </Modal>
+    </>
   );
 }
 
@@ -694,8 +947,36 @@ const styles = StyleSheet.create({
   inputWrap: { paddingHorizontal: 16, marginBottom: 12 },
   inputBar: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 12, height: 44, paddingHorizontal: 10, borderWidth: 1, borderColor: "rgba(255,255,255,0.3)" },
   socialIcons: { flexDirection: "row", gap: 4 },
-  socialIcon: { width: 28, height: 28, borderRadius: 6, alignItems: "center", justifyContent: "center" },
+  socialIcon: { width: 28, height: 28, borderRadius: 6, alignItems: "center", justifyContent: "center", opacity: 0.6 },
+  socialIconActive: { opacity: 1, transform: [{ scale: 1.1 }] },
   inputPlaceholder: { flex: 1, marginLeft: 10, fontFamily: "Inter_400Regular", fontSize: 13, color: "rgba(255,255,255,0.6)" },
+  inputText: { flex: 1, marginLeft: 10, fontFamily: "Inter_400Regular", fontSize: 13, color: "#FFF" },
+  inputError: { fontFamily: "Inter_400Regular", fontSize: 12, color: "#E74C3C", marginTop: 6, marginLeft: 4 },
+
+  // Caption input for TikTok/Instagram
+  captionContainer: { marginTop: 12, backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 12, padding: 12, borderWidth: 1, borderColor: "rgba(255,255,255,0.2)" },
+  captionHint: { fontFamily: "Inter_400Regular", fontSize: 12, color: "rgba(255,255,255,0.7)", marginBottom: 8 },
+  captionInput: { backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 8, padding: 12, fontFamily: "Inter_400Regular", fontSize: 14, color: "#FFF", minHeight: 80, textAlignVertical: "top" },
+  captionSubmitBtn: { backgroundColor: PETROL, borderRadius: 10, paddingVertical: 12, alignItems: "center", marginTop: 12 },
+  captionSubmitText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: "#FFF" },
+
+  // Video Link Modal
+  videoModalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" },
+  videoModalContent: { backgroundColor: AREIA, borderRadius: 20, padding: 28, width: W - 48, alignItems: "center" },
+  videoModalTitle: { fontFamily: "PlayfairDisplay_600SemiBold", fontSize: 24, color: PETROL, textAlign: "center" },
+  videoModalTitleLine2: { fontFamily: "PlayfairDisplay_400Regular_Italic", fontSize: 24, color: PETROL, textAlign: "center", marginBottom: 8 },
+  videoModalSuccessTitle: { fontFamily: "PlayfairDisplay_600SemiBold", fontSize: 20, color: PETROL, marginTop: 16, textAlign: "center" },
+  videoModalPlacesList: { width: "100%", marginTop: 16, marginBottom: 20 },
+  videoModalPlaceItem: { flexDirection: "row", alignItems: "center", paddingVertical: 8, gap: 8 },
+  videoModalPlaceName: { fontFamily: "Inter_500Medium", fontSize: 14, color: "#333" },
+  videoModalDestination: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: PETROL, letterSpacing: 1, textTransform: "uppercase", marginBottom: 12 },
+  videoModalLuckyMessage: { fontFamily: "PlayfairDisplay_400Regular", fontSize: 17, color: "#333", lineHeight: 26, textAlign: "center", marginBottom: 20 },
+  videoModalErrorTitle: { fontFamily: "PlayfairDisplay_600SemiBold", fontSize: 20, color: "#333", marginTop: 12 },
+  videoModalErrorMessage: { fontFamily: "Inter_400Regular", fontSize: 14, color: "#666", textAlign: "center", marginTop: 8, marginBottom: 20, lineHeight: 20 },
+  videoModalPrimaryBtn: { backgroundColor: PETROL, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 32, width: "100%", alignItems: "center" },
+  videoModalPrimaryBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: "#FFF" },
+  videoModalSecondaryBtn: { paddingVertical: 12, marginTop: 8 },
+  videoModalSecondaryBtnText: { fontFamily: "Inter_500Medium", fontSize: 14, color: PETROL },
 
   // Sections - compact
   sectionCompact: { marginBottom: 8 },

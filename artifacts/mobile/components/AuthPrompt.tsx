@@ -22,9 +22,9 @@ import { Feather } from "@expo/vector-icons";
 import { useGuia } from "@/context/GuiaContext";
 import { useAuth } from "@/hooks/useAuth";
 
-const GOLD     = "#D4AF37";
-const GOLD_DIM = "rgba(212,175,55,0.12)";
-const GOLD_BDR = "rgba(212,175,55,0.28)";
+const GOLD     = "#1B4F72";
+const GOLD_DIM = "rgba(27,79,114,0.12)";
+const GOLD_BDR = "rgba(27,79,114,0.28)";
 
 export default function AuthPrompt() {
   const { authPromptVisible, hideAuthPrompt } = useGuia();

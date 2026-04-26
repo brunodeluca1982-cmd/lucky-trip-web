@@ -43,7 +43,7 @@ import {
 import type { SavedItem, SavedCategory } from "@/context/GuiaContext";
 
 const C    = Colors.light;
-const GOLD = "#D4AF37";
+const GOLD = "#1B4F72";
 
 // ── Category mapping: RoteiroCategory → SavedCategory ─────────────────────────
 const CAT_MAP: Record<RoteiroCategory, SavedCategory> = {

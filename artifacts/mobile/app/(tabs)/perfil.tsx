@@ -3,7 +3,7 @@
  *
  * STATE A — Visitante (não logado)  : delega para AuthScreen (app/auth/index.tsx)
  * STATE B — Usuário Free            : FreeProfileScreen
- * STATE C — Usuário Lucky Pro       : ProProfileScreen
+ * STATE C — Usuário Lucky Premium       : ProProfileScreen
  *
  * Regra de sessão: sessão persiste via Supabase onAuthStateChange.
  * Usuário volta a ver login APENAS se clicar em "Sair" ou sessão expirar.
@@ -38,9 +38,9 @@ import { supabase } from "@/lib/supabase";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-const GOLD      = "#D4AF37";
-const GOLD_DIM  = "rgba(212,175,55,0.15)";
-const GOLD_BDR  = "rgba(212,175,55,0.45)";
+const GOLD      = "#1B4F72";
+const GOLD_DIM  = "rgba(27,79,114,0.15)";
+const GOLD_BDR  = "rgba(27,79,114,0.45)";
 const DARK      = "#0D0D0D";
 const SURFACE   = "rgba(255,255,255,0.07)";
 const BORDER    = "rgba(255,255,255,0.12)";
@@ -286,7 +286,7 @@ function FreeProfileScreen({ user, signOut }: { user: User; signOut: () => void 
         <TouchableOpacity style={s.proCta} onPress={() => router.push("/(tabs)/subscription")} activeOpacity={0.85} accessibilityRole="button">
           <MaterialCommunityIcons name="crown-outline" size={20} color="#000" />
           <View style={{ flex: 1, marginLeft: 10 }}>
-            <Text style={s.proCtaTitle} suppressHighlighting>Seja Lucky Pro</Text>
+            <Text style={s.proCtaTitle} suppressHighlighting>Seja Lucky Premium</Text>
             <Text style={s.proCtaSub} suppressHighlighting>Desbloqueie 127 segredos do Rio</Text>
           </View>
           <Feather name="arrow-right" size={16} color="#000" />
@@ -344,7 +344,7 @@ function ProProfileScreen({ user, signOut }: { user: User; signOut: () => void }
           badge={
             <View style={s.proBadge}>
               <MaterialCommunityIcons name="crown" size={12} color="#000" style={{ marginRight: 5 }} />
-              <Text style={s.proBadgeText} suppressHighlighting>Lucky Pro</Text>
+              <Text style={s.proBadgeText} suppressHighlighting>Lucky Premium</Text>
             </View>
           }
         />
@@ -352,7 +352,7 @@ function ProProfileScreen({ user, signOut }: { user: User; signOut: () => void }
         <View style={s.subscriptionCard}>
           <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
             <MaterialCommunityIcons name="crown" size={16} color={GOLD} />
-            <Text style={s.subscriptionTitle} suppressHighlighting> Lucky Pro ativo</Text>
+            <Text style={s.subscriptionTitle} suppressHighlighting> Lucky Premium ativo</Text>
           </View>
           <Text style={s.subscriptionSub} suppressHighlighting>
             Você tem acesso completo a todos os segredos do Rio de Janeiro.
@@ -419,7 +419,7 @@ const s = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: "rgba(212,175,55,0.12)",
+    backgroundColor: "rgba(27,79,114,0.12)",
     borderWidth: 1.5,
     borderColor: GOLD_BDR,
     alignItems: "center",
@@ -523,7 +523,7 @@ const s = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: GOLD_BDR,
-    backgroundColor: "rgba(212,175,55,0.08)",
+    backgroundColor: "rgba(27,79,114,0.08)",
   },
   manageBtnText: {
     fontFamily: "Inter_500Medium",
@@ -608,7 +608,7 @@ const s = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: "rgba(212,175,55,0.12)",
+    backgroundColor: "rgba(27,79,114,0.12)",
     alignItems: "center",
     justifyContent: "center",
   },

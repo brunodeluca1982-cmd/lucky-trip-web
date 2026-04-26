@@ -35,7 +35,7 @@ import { getNeighborhoodHero } from "@/utils/neighborhoodHero";
 import { useGuia } from "@/context/GuiaContext";
 
 const C = Colors.light;
-const GOLD = "#D4AF37";
+const GOLD = "#1B4F72";
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const HERO_H = Math.round(SCREEN_HEIGHT * 0.46);
 const CARD_IMAGE_H = 200;
@@ -593,8 +593,8 @@ const s = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.20)",
   },
   bookmarkBtnSaved: {
-    backgroundColor: "rgba(201,168,76,0.22)",
-    borderColor: "rgba(201,168,76,0.40)",
+    backgroundColor: "rgba(27,79,114,0.22)",
+    borderColor: "rgba(27,79,114,0.40)",
   },
   priceBadge: {
     position: "absolute",

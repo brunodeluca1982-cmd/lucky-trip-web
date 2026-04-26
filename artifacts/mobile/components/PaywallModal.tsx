@@ -23,9 +23,9 @@ import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useGuia, type PaywallType } from "@/context/GuiaContext";
 
-const GOLD       = "#D4AF37";
-const GOLD_ALPHA = "rgba(212,175,55,0.14)";
-const GOLD_BDR   = "rgba(212,175,55,0.28)";
+const GOLD       = "#1B4F72";
+const GOLD_ALPHA = "rgba(27,79,114,0.14)";
+const GOLD_BDR   = "rgba(27,79,114,0.28)";
 const LOGO_MARK  = require("@/assets/images/logo-symbol.png");
 
 // ── Content per paywall type ───────────────────────────────────────────────────
@@ -54,7 +54,7 @@ const CONTENT: Record<PaywallType, PaywallContent> = {
   },
   depth: {
     title:    "Organize sua viagem completa",
-    body:     "Desbloqueie o Lucky Pro para salvar, planejar e personalizar sua experiência.",
+    body:     "Desbloqueie o Lucky Premium para salvar, planejar e personalizar sua experiência.",
     cta:      "Desbloquear agora",
   },
 };

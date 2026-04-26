@@ -512,7 +512,7 @@ const s = StyleSheet.create({
     backgroundColor: C.terracotta,
   },
   badgeDotActive: {
-    backgroundColor: "#C9A84C",
+    backgroundColor: "#1B4F72",
   },
 });
 

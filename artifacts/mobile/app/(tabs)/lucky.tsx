@@ -23,7 +23,7 @@ import Colors from "@/constants/colors";
 import { getDeviceId } from "@/utils/deviceId";
 
 const C    = Colors.light;
-const GOLD = "#D4AF37";
+const GOLD = "#1B4F72";
 
 const LOGO_MARK = require("@/assets/images/logo-symbol.png");
 
@@ -475,12 +475,12 @@ const styles = StyleSheet.create({
     alignItems:        "center",
     gap:               5,
     alignSelf:         "flex-start",
-    backgroundColor:   "rgba(212,175,55,0.12)",
+    backgroundColor:   "rgba(27,79,114,0.12)",
     borderRadius:      20,
     paddingHorizontal: 10,
     paddingVertical:   5,
     borderWidth:       1,
-    borderColor:       "rgba(212,175,55,0.22)",
+    borderColor:       "rgba(27,79,114,0.22)",
   },
   premiumBadgeText: {
     fontFamily: "Inter_600SemiBold",
@@ -516,7 +516,7 @@ const styles = StyleSheet.create({
   } as never,
   promptChipPressed: {
     backgroundColor: "rgba(255,255,255,0.13)",
-    borderColor:     "rgba(212,175,55,0.45)",
+    borderColor:     "rgba(27,79,114,0.45)",
   },
   promptChipText: {
     fontFamily: "Inter_500Medium",
@@ -633,7 +633,7 @@ const styles = StyleSheet.create({
     gap:             14,
     marginTop:       8,
     borderWidth:     1,
-    borderColor:     "rgba(212,175,55,0.30)",
+    borderColor:     "rgba(27,79,114,0.30)",
   },
   paywallTop: {
     flexDirection:  "row",
@@ -650,12 +650,12 @@ const styles = StyleSheet.create({
     flexDirection:     "row",
     alignItems:        "center",
     gap:               5,
-    backgroundColor:   "rgba(212,175,55,0.16)",
+    backgroundColor:   "rgba(27,79,114,0.16)",
     borderRadius:      20,
     paddingHorizontal: 10,
     paddingVertical:   5,
     borderWidth:       1,
-    borderColor:       "rgba(212,175,55,0.30)",
+    borderColor:       "rgba(27,79,114,0.30)",
   },
   paywallBadgeText: {
     fontFamily: "Inter_600SemiBold",

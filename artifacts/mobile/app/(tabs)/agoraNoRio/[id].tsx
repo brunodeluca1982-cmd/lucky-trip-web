@@ -221,7 +221,7 @@ export default function AgoraNoRioScreen() {
 
           {loading ? (
             <ActivityIndicator
-              color="rgba(201,168,76,0.7)"
+              color="rgba(27,79,114,0.7)"
               style={{ marginTop: 40 }}
             />
           ) : error ? (
