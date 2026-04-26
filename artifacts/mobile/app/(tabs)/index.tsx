@@ -243,8 +243,7 @@ function HeroDestaque({
         <View style={[styles.heroTitleContainer, { paddingTop: top + 70 }]}>
           <Text style={styles.heroKicker}>{kicker}</Text>
           <Text style={styles.heroTitleText}>{item.titulo}</Text>
-          <Text style={styles.heroSub}>{item.localizacao}</Text>
-          {isDestino && <Text style={styles.heroPais}>{item.localizacao.toUpperCase()}</Text>}
+          <Text style={styles.heroSub}>{item.localizacao.toUpperCase()}</Text>
         </View>
       </Pressable>
     );

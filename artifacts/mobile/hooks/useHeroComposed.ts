@@ -95,7 +95,7 @@ async function fetchDestinos(): Promise<HeroComposedItem[]> {
     // Prioridade: storage > hero_image_url
     let photo = await getHeroPhotoFromStorage(d.slug);
     if (!photo && d.hero_image_url) {
-      photo = d.hero_image_url;
+      photo = buildMediaUrl(d.hero_image_url);
     }
 
     // Só incluir se tiver foto
