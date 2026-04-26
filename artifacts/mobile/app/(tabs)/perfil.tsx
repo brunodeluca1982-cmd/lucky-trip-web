@@ -30,7 +30,6 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useAuth } from "@/hooks/useAuth";
-import { useGuia } from "@/context/GuiaContext";
 import { useRioHeroMedia } from "@/hooks/useHeroMedia";
 import type { User } from "@supabase/supabase-js";
 import AuthScreen from "@/app/auth";
@@ -45,13 +44,48 @@ const DARK      = "#0D0D0D";
 const SURFACE   = "rgba(255,255,255,0.07)";
 const BORDER    = "rgba(255,255,255,0.12)";
 
+// ── Subscription types ─────────────────────────────────────────────────────────
+
+interface SubscriptionData {
+  status: string;
+  plan: string;
+  current_period_end: string;
+}
+
 // ── Root Screen ────────────────────────────────────────────────────────────────
 
 export default function PerfilScreen() {
   const { user, loading: authLoading, signOut } = useAuth();
-  const { isPremium } = useGuia();
+  const [isPremium, setIsPremium] = useState(false);
+  const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
+  const [subLoading, setSubLoading] = useState(true);
 
-  if (authLoading) {
+  useEffect(() => {
+    if (!user) {
+      setSubLoading(false);
+      return;
+    }
+
+    supabase
+      .from("subscriptions")
+      .select("status, plan, current_period_end")
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .limit(1)
+      .single()
+      .then(({ data, error }) => {
+        if (!error && data) {
+          setIsPremium(true);
+          setSubscription(data as SubscriptionData);
+        } else {
+          setIsPremium(false);
+          setSubscription(null);
+        }
+        setSubLoading(false);
+      });
+  }, [user]);
+
+  if (authLoading || subLoading) {
     return (
       <View style={[s.profileRoot, { justifyContent: "center", alignItems: "center" }]}>
         <ActivityIndicator color={GOLD} />
@@ -61,7 +95,7 @@ export default function PerfilScreen() {
 
   if (user) {
     return isPremium
-      ? <ProProfileScreen user={user} signOut={signOut} />
+      ? <ProProfileScreen user={user} signOut={signOut} subscription={subscription} />
       : <FreeProfileScreen user={user} signOut={signOut} />;
   }
 
@@ -278,18 +312,13 @@ function FreeProfileScreen({ user, signOut }: { user: User; signOut: () => void 
           user={user}
           badge={
             <View style={s.freeBadge}>
-              <Text style={s.freeBadgeText} suppressHighlighting>Plano Free</Text>
+              <Text style={s.freeBadgeText} suppressHighlighting>Lucky Free</Text>
             </View>
           }
         />
 
-        <TouchableOpacity style={s.proCta} onPress={() => router.push("/(tabs)/subscription")} activeOpacity={0.85} accessibilityRole="button">
-          <MaterialCommunityIcons name="crown-outline" size={20} color="#000" />
-          <View style={{ flex: 1, marginLeft: 10 }}>
-            <Text style={s.proCtaTitle} suppressHighlighting>Seja Lucky Premium</Text>
-            <Text style={s.proCtaSub} suppressHighlighting>Desbloqueie 127 segredos do Rio</Text>
-          </View>
-          <Feather name="arrow-right" size={16} color="#000" />
+        <TouchableOpacity style={s.upgradeBtn} onPress={() => router.push("/(tabs)/subscription")} activeOpacity={0.85} accessibilityRole="button">
+          <Text style={s.upgradeBtnText} suppressHighlighting>Virar Lucky Premium</Text>
         </TouchableOpacity>
 
         <MeusRoteiros userId={user.id} />
@@ -330,9 +359,31 @@ function FreeProfileScreen({ user, signOut }: { user: User; signOut: () => void 
   );
 }
 
+// ── Helper: format date in Portuguese ─────────────────────────────────────────
+
+function formatRenewalDate(isoDate: string): string {
+  const date = new Date(isoDate);
+  const months = [
+    "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+    "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"
+  ];
+  const day = date.getDate();
+  const month = months[date.getMonth()];
+  const year = date.getFullYear();
+  return `${day} de ${month} de ${year}`;
+}
+
 // ── Pro Profile ────────────────────────────────────────────────────────────────
 
-function ProProfileScreen({ user, signOut }: { user: User; signOut: () => void }) {
+function ProProfileScreen({
+  user,
+  signOut,
+  subscription
+}: {
+  user: User;
+  signOut: () => void;
+  subscription: SubscriptionData | null;
+}) {
   const insets = useSafeAreaInsets();
   const botPad = Platform.OS === "web" ? 32 : insets.bottom + 80;
 
@@ -343,11 +394,16 @@ function ProProfileScreen({ user, signOut }: { user: User; signOut: () => void }
           user={user}
           badge={
             <View style={s.proBadge}>
-              <MaterialCommunityIcons name="crown" size={12} color="#000" style={{ marginRight: 5 }} />
-              <Text style={s.proBadgeText} suppressHighlighting>Lucky Premium</Text>
+              <Text style={s.proBadgeText} suppressHighlighting>✦ Lucky Premium</Text>
             </View>
           }
         />
+
+        {subscription?.current_period_end && (
+          <Text style={s.renewalText} suppressHighlighting>
+            Premium até {formatRenewalDate(subscription.current_period_end)}
+          </Text>
+        )}
 
         <View style={s.subscriptionCard}>
           <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
@@ -445,54 +501,51 @@ const s = StyleSheet.create({
   },
 
   freeBadge: {
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(27,79,114,0.1)",
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
   },
   freeBadgeText: {
     fontFamily: "Inter_500Medium",
-    fontSize: 11,
-    color: "rgba(255,255,255,0.55)",
-    letterSpacing: 0.5,
+    fontSize: 12,
+    color: GOLD,
+    letterSpacing: 0.3,
   },
 
   proBadge: {
-    flexDirection: "row",
-    alignItems: "center",
     backgroundColor: GOLD,
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 5,
   },
   proBadgeText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 11,
-    color: "#000000",
-    letterSpacing: 0.5,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: "#FFFFFF",
+    letterSpacing: 0.3,
   },
 
-  proCta: {
-    flexDirection: "row",
-    alignItems: "center",
+  upgradeBtn: {
     backgroundColor: GOLD,
     marginHorizontal: 20,
     marginTop: 20,
-    borderRadius: 14,
-    padding: 16,
+    borderRadius: 100,
+    paddingVertical: 14,
+    alignItems: "center",
   },
-  proCtaTitle: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 15,
-    color: "#000",
+  upgradeBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: "#FFFFFF",
   },
-  proCtaSub: {
+
+  renewalText: {
     fontFamily: "Inter_400Regular",
     fontSize: 12,
-    color: "rgba(0,0,0,0.65)",
-    marginTop: 1,
+    color: "rgba(255,255,255,0.5)",
+    textAlign: "center",
+    marginTop: 8,
   },
 
   subscriptionCard: {
