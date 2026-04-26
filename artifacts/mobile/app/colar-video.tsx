@@ -5,7 +5,7 @@
  * mencionados em vídeos do YouTube, TikTok e Instagram.
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -52,23 +52,30 @@ export default function ColarVideoScreen() {
   const [result, setResult] = useState<ResultType | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // ── Check auth and redirect if needed ───────────────────────────────────────
-  const checkAuthAndSubmit = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
+  // ── Auto-detect platform and submit when pasting URL ────────────────────────
+  useEffect(() => {
+    const trimmed = inputValue.trim();
+    if (!trimmed) return;
 
-    if (!session) {
-      router.push({
-        pathname: "/auth",
-        params: { returnTo: "/colar-video" },
-      } as any);
-      return;
+    const isYouTube = /(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)/i.test(trimmed);
+    const isTikTok = /tiktok\.com\//i.test(trimmed);
+    const isInstagram = /instagram\.com\//i.test(trimmed);
+
+    if (isYouTube || isTikTok || isInstagram) {
+      if (isYouTube) setActiveTab("youtube");
+      else if (isTikTok) setActiveTab("tiktok");
+      else setActiveTab("instagram");
+
+      const timer = setTimeout(() => {
+        submitToEdgeFunction();
+      }, 400);
+
+      return () => clearTimeout(timer);
     }
-
-    await submitToEdgeFunction(session.access_token, session.user.id);
-  };
+  }, [inputValue]);
 
   // ── Submit to Edge Function ─────────────────────────────────────────────────
-  const submitToEdgeFunction = async (accessToken: string, userId: string) => {
+  const submitToEdgeFunction = async () => {
     if (!inputValue.trim()) {
       setError("Cole um link ou legenda primeiro");
       return;
@@ -79,10 +86,18 @@ export default function ColarVideoScreen() {
     setResult(null);
 
     try {
+      // Pega sessão SE existir, mas não bloqueia se não tiver
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id || null;
+
+      // Token: do user logado OU anon key como fallback
+      const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
+      const accessToken = session?.access_token || anonKey;
+
       const body: Record<string, any> = {
         platform: activeTab,
         destinoSlug,
-        userId,
+        userId, // pode ser null se não logado
       };
 
       if (activeTab === "youtube") {
@@ -96,21 +111,21 @@ export default function ColarVideoScreen() {
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${accessToken}`,
-          "apikey": process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "",
+          "apikey": anonKey,
         },
         body: JSON.stringify(body),
       });
 
       if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(errText || `Erro ${response.status}`);
+        const text = await response.text();
+        throw new Error(`HTTP ${response.status}: ${text}`);
       }
 
       const data = await response.json();
-      setResult(data as ResultType);
+      setResult(data);
     } catch (err: any) {
-      console.error("[ColarVideo] Error:", err);
-      setError(err.message || "Erro ao processar. Tente novamente.");
+      console.error("Edge function error:", err);
+      setError(err.message || "Erro ao processar");
     } finally {
       setLoading(false);
     }
@@ -203,7 +218,7 @@ export default function ColarVideoScreen() {
               {/* Submit Button */}
               <Pressable
                 style={[styles.submitBtn, loading && styles.submitBtnDisabled]}
-                onPress={checkAuthAndSubmit}
+                onPress={submitToEdgeFunction}
                 disabled={loading}
               >
                 {loading ? (
