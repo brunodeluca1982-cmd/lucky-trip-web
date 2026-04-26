@@ -58,8 +58,8 @@ function RootLayoutNav() {
   // AsyncStorage is fast (<50ms) and the SplashOverlay covers the UI anyway.
   useEffect(() => {
     // AsyncStorage.getItem(ONBOARDING_KEY).then((seen) => {
-      // if (!seen) router.replace("/onboarding" as any);
-    });
+    //   if (!seen) router.replace("/onboarding" as any);
+    // });
   }, []);
 
   return (
