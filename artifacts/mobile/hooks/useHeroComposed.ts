@@ -13,6 +13,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { buildMediaUrl } from "@/lib/mediaUrl";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -124,7 +125,7 @@ async function fetchDestinos(): Promise<HeroComposedItem[]> {
 async function fetchAmigos(): Promise<HeroComposedItem[]> {
   const { data, error } = await supabase
     .from("amigos")
-    .select("id, slug, nome, foto_url, tipo, ordem")
+    .select("id, slug, nome, foto_url, tipo, ordem, cidade")
     .eq("ativo", true)
     .not("foto_url", "is", null)
     .order("ordem", { ascending: true });
@@ -134,11 +135,11 @@ async function fetchAmigos(): Promise<HeroComposedItem[]> {
     return [];
   }
 
-  return data.map((a) => ({
+  return data.map((a: any) => ({
     id: a.id,
     source_table: "amigos" as const,
     titulo: a.nome,
-    localizacao: "Viaje com",
+    localizacao: a.cidade ?? "Guia Exclusivo",
     badge: a.tipo === "fundador" ? "Fundador" : "Amigo de Viagem",
     photo_url: a.foto_url,
     route: { type: "amigo" as const, slug: a.slug },
@@ -158,26 +159,40 @@ async function fetchLugaresDestaque(): Promise<HeroComposedItem[]> {
     .eq("ativo", true)
     .eq("destaque", true)
     .not("hero_image_url", "is", null)
-    .limit(3);
+    .limit(10);
 
   if (error || !data) {
     console.warn("[HERO] lugares destaque fetch failed:", error?.message);
     return [];
   }
 
-  return data.map((l: any) => ({
-    id: l.id,
-    source_table: "lugares" as const,
-    titulo: l.nome,
-    localizacao: l.bairros?.nome ?? "Rio de Janeiro",
-    badge: formatCategoria(l.categoria),
-    photo_url: l.hero_image_url,
-    route: {
-      type: "lugar" as const,
-      citySlug: l.destinos?.slug ?? "rio-de-janeiro",
-      lugarId: l.id,
-    },
-  }));
+  const items: HeroComposedItem[] = [];
+
+  for (const l of data as any[]) {
+    const photo = buildMediaUrl(l.hero_image_url);
+
+    // Validar se a URL é válida
+    if (!photo || !l.hero_image_url) {
+      console.log(`[HERO] lugar "${l.nome}" descartado — hero_image_url inválido`);
+      continue;
+    }
+
+    items.push({
+      id: l.id,
+      source_table: "lugares" as const,
+      titulo: l.nome,
+      localizacao: l.bairros?.nome ?? "Rio de Janeiro",
+      badge: formatCategoria(l.categoria),
+      photo_url: photo,
+      route: {
+        type: "lugar" as const,
+        citySlug: l.destinos?.slug ?? "rio-de-janeiro",
+        lugarId: l.id,
+      },
+    });
+  }
+
+  return items;
 }
 
 function formatCategoria(cat: string): string {

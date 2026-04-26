@@ -73,6 +73,14 @@ function handleSlidePress(item: HeroItem) {
   }
 }
 
+function getAdaptiveFontSize(text: string): number {
+  const len = text.length;
+  if (len <= 8) return 44;
+  if (len <= 14) return 36;
+  if (len <= 22) return 28;
+  return 24;
+}
+
 function HeroSlide({ item }: { item: HeroItem }) {
   return (
     <Pressable
@@ -90,7 +98,7 @@ function HeroSlide({ item }: { item: HeroItem }) {
         <View style={styles.badgeContainer}>
           <Text style={styles.badgeText}>{item.badge}</Text>
         </View>
-        <Text style={styles.cidade}>{item.cidade}</Text>
+        <Text style={[styles.cidade, { fontSize: getAdaptiveFontSize(item.cidade) }]}>{item.cidade}</Text>
         <Text style={styles.pais}>{item.pais}</Text>
         {/* "Conferir agora" CTA — shown for actionable cards only */}
         {(item.type === "destino" || item.type === "guia") && (
@@ -216,10 +224,9 @@ const styles = StyleSheet.create({
   },
   cidade: {
     fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 46,
+    // fontSize dinâmico via getAdaptiveFontSize()
     color: C.white,
     textAlign: "center",
-    lineHeight: 54,
     letterSpacing: -0.5,
     textShadowColor: "rgba(0,0,0,0.90)",
     textShadowOffset: { width: 0, height: 2 },
