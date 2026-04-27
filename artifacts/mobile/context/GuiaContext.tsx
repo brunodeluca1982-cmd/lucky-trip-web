@@ -201,6 +201,10 @@ function extractImageUrl(image: ImageSourcePropType): string | null {
  * Fire-and-forget — errors are logged but never surfaced to the user.
  */
 function syncSaveToServer(userId: string, item: SavedItem): void {
+  if (!item.id) {
+    console.error("[GuiaContext] syncSave BLOCKED: item.id is missing", { titulo: item.titulo });
+    return;
+  }
   supabase
     .from("user_saved_places")
     .upsert(
