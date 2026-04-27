@@ -5,7 +5,7 @@
  * mencionados em vídeos do YouTube, TikTok e Instagram.
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -271,8 +271,12 @@ function ResultView({
   // Extrair place se for place_found (para useEffect incondicional)
   const placeFound = result.type === "place_found" ? result.place : null;
 
+  // Guard: garantir que onSave seja chamado apenas UMA VEZ
+  const savedOnceRef = useRef(false);
+
   // Salva no contexto quando place_found (hook incondicional)
   useEffect(() => {
+    if (savedOnceRef.current) return;
     if (!placeFound) return;
 
     // Construir URL completa se for path relativo
@@ -294,8 +298,9 @@ function ResultView({
       image: heroUri ? { uri: heroUri } : FALLBACK_IMAGE,
       source_table: "lugares",
     };
+    savedOnceRef.current = true;
     onSave(savedItem);
-  }, [placeFound?.id, onSave]);
+  }, [placeFound?.id]);
 
   // ── place_found: tela editorial ──
   if (result.type === "place_found") {
