@@ -63,7 +63,7 @@ function handleSlidePress(item: HeroItem) {
     if (item.route) {
       router.push(item.route as any);
     } else if (item.cityId) {
-      router.push({ pathname: "/cidade/[id]", params: { id: item.cityId } });
+      router.push({ pathname: "/(tabs)/cidade/[id]", params: { id: item.cityId } });
     }
     return;
   }
