@@ -26,10 +26,16 @@ export class ErrorBoundary extends Component<
   };
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    console.error("🔴 [ErrorBoundary] getDerivedStateFromError:", error.message);
     return { error };
   }
 
   componentDidCatch(error: Error, info: { componentStack: string }): void {
+    console.error("🔴 [ErrorBoundary] ERRO CAPTURADO:");
+    console.error("🔴 [ErrorBoundary] Message:", error.message);
+    console.error("🔴 [ErrorBoundary] Name:", error.name);
+    console.error("🔴 [ErrorBoundary] Stack:", error.stack);
+    console.error("🔴 [ErrorBoundary] Component Stack:", info.componentStack);
     if (typeof this.props.onError === "function") {
       this.props.onError(error, info.componentStack);
     }
