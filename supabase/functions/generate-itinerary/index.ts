@@ -309,7 +309,6 @@ async function enrichPlaces(
   // Parallel fetch from all three sources
   const [oqResult, luckyResult, restResult] = await Promise.all([
     oqIds.length > 0
-<<<<<<< HEAD
       ? supa
           .from("o_que_fazer_rio_v2")
           .select(
@@ -323,15 +322,6 @@ async function enrichPlaces(
           .select(
             "id,nome,bairro,tipo,tags_ia,momento_ideal,photo_url,meu_olhar",
           )
-=======
-      ? supa.from("o_que_fazer_rio_v2")
-          .select("id,nome,bairro,categoria,tags_ia,momento_ideal,vibe,energia,duracao_media,photo_url,meu_olhar")
-          .in("id", oqIds)
-      : Promise.resolve({ data: [] }),
-    luckyIds.length > 0
-      ? supa.from("lucky_list_rio_v2")
-          .select("id,nome,bairro,tipo,tags_ia,momento_ideal,photo_url,meu_olhar")
->>>>>>> claude/plan-app-architecture-73RnI
           .in("id", luckyIds)
       : Promise.resolve({ data: [] }),
     restIds.length > 0
@@ -564,14 +554,7 @@ async function fetchComplementaryContent(
   // Fix: fetch both in parallel unconditionally, merge candidates, score the
   // combined pool, take top needActs. Both tables always reach the scoring stage.
   if (needActs > 0) {
-<<<<<<< HEAD
     const fetchLimit = Math.min(80, needActs * 3 + 15);
-=======
-    const { data: luckyRows } = await supa
-      .from("lucky_list_rio_v2")
-      .select("id,nome,bairro,tipo,tags_ia,momento_ideal,photo_url,meu_olhar")
-      .limit(Math.min(60, (needActs + 5) * 3));
->>>>>>> claude/plan-app-architecture-73RnI
 
     const [luckyResult, oqResult] = await Promise.all([
       supa
@@ -680,7 +663,6 @@ async function fetchComplementaryContent(
     }
   }
 
-<<<<<<< HEAD
   // ── 3. Restaurantes — 1 breakfast + 1 lunch + 1 dinner/bar per day ─────────
   // Fetches a broad pool, classifies into 3 slots, scores + picks independently.
   // Guarantees noite always has a bar/dinner anchor and manha always has breakfast.
@@ -688,18 +670,6 @@ async function fetchComplementaryContent(
   if (totalRestNeeded > 0) {
     const budget = preferences.budget ?? null;
     const restLimit = Math.min(150, totalRestNeeded * 6 + 30);
-=======
-  // ── 2. O que fazer Rio — core anchors & broader activities ───────────────
-  // Step C: same 3× pool pattern as the lucky block above.
-  const stillNeedActs = Math.max(
-    0, needActs - complement.filter((p) => p.categoria !== "restaurante").length,
-  );
-  if (stillNeedActs > 0) {
-    const { data: oqRows } = await supa
-      .from("o_que_fazer_rio_v2")
-      .select("id,nome,bairro,tags_ia,momento_ideal,vibe,energia,duracao_media,photo_url,meu_olhar")
-      .limit(Math.min(75, (stillNeedActs + 8) * 3));
->>>>>>> claude/plan-app-architecture-73RnI
 
     // Build budget-constrained query first, fallback to unrestricted if empty
     let budgetQuery = supa
@@ -1925,7 +1895,6 @@ const NOITE_CAP: Record<string, number> = {
 
 function categoriaToTable(cat: SavedCategory): string {
   switch (cat) {
-<<<<<<< HEAD
     case "restaurante":
       return "restaurantes";
     case "hotel":
@@ -2289,12 +2258,6 @@ function applyDayNarrative(periodMap: Map<PeriodoDia, EnrichedPlace[]>): void {
     const strongest = items.splice(strongestIdx, 1)[0]!;
     items.push(strongest);
     periodMap.set(lastPeriodo, items);
-=======
-    case "restaurante": return "restaurantes";
-    case "hotel":       return "stay_hotels";
-    case "oQueFazer":   return "o_que_fazer_rio_v2";
-    case "lucky":       return "lucky_list_rio_v2";
->>>>>>> claude/plan-app-architecture-73RnI
   }
 }
 
