@@ -903,8 +903,9 @@ export default function HomeScreen() {
         rioBgIdx={bgIdx}
       />
       <TopBar top={top} onMusicPress={() => setMusicModalVisible(true)} onGalleryPress={() => setGalleryModalVisible(true)} />
-      {/* Modals comentados para bissecção:
+      {/* ═══ BISSECÇÃO FINAL: testando MusicModal ═══ */}
       <MusicModal visible={musicModalVisible} onClose={() => setMusicModalVisible(false)} />
+      {/* GalleryModal comentado:
       <GalleryModal visible={galleryModalVisible} onClose={() => setGalleryModalVisible(false)} photos={photos} />
       */}
 
