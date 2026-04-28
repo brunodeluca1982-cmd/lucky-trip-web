@@ -883,6 +883,15 @@ export default function HomeScreen() {
   const currentItem = heroItems[carouselIdx];
   const destinoNome = currentItem?.source_table === "destinos" ? currentItem.titulo : "Rio de Janeiro";
 
+  // DEBUG: Early return para bissecção React #310
+  return (
+    <View style={{ flex: 1, backgroundColor: "#F5F0E8", padding: 40, paddingTop: 100 }}>
+      <Text style={{ fontSize: 24, color: "#1B4F72" }}>
+        Home mínima — bisseccionando React #310
+      </Text>
+    </View>
+  );
+
   return (
     <View style={styles.root}>
       {/* ═══ BACKGROUND: só visível abaixo do primeiro terço ═══ */}
