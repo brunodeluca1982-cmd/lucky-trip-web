@@ -883,15 +883,6 @@ export default function HomeScreen() {
   const currentItem = heroItems[carouselIdx];
   const destinoNome = currentItem?.source_table === "destinos" ? currentItem.titulo : "Rio de Janeiro";
 
-  // DEBUG: Early return para bissecção React #310
-  return (
-    <View style={{ flex: 1, backgroundColor: "#F5F0E8", padding: 40, paddingTop: 100 }}>
-      <Text style={{ fontSize: 24, color: "#1B4F72" }}>
-        Home mínima — bisseccionando React #310
-      </Text>
-    </View>
-  );
-
   return (
     <View style={styles.root}>
       {/* ═══ BACKGROUND: só visível abaixo do primeiro terço ═══ */}
@@ -901,7 +892,7 @@ export default function HomeScreen() {
         <LinearGradient colors={["transparent", "rgba(0,0,0,0.55)"]} locations={[0.3, 1]} style={StyleSheet.absoluteFill} />
       </View>
 
-      {/* ═══ HERO DESTAQUE: primeiro terço com crossFade próprio ═══ */}
+      {/* ═══ BISSECÇÃO: primeira metade comentada ═══
       <HeroDestaque
         top={top}
         items={heroItems}
@@ -911,13 +902,10 @@ export default function HomeScreen() {
         rioPhotos={photos}
         rioBgIdx={bgIdx}
       />
-
-      {/* TopBar */}
       <TopBar top={top} onMusicPress={() => setMusicModalVisible(true)} onGalleryPress={() => setGalleryModalVisible(true)} />
-
-      {/* Modals */}
       <MusicModal visible={musicModalVisible} onClose={() => setMusicModalVisible(false)} />
       <GalleryModal visible={galleryModalVisible} onClose={() => setGalleryModalVisible(false)} photos={photos} />
+      ═══ FIM BISSECÇÃO ═══ */}
 
       {/* Content */}
       <ScrollView style={styles.scroll} contentContainerStyle={{ paddingBottom: bottom + 90, paddingTop: H * 0.38 }} showsVerticalScrollIndicator={false}>
