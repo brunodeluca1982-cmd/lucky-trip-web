@@ -25,6 +25,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
 import { useHeroComposed, HeroComposedItem } from "@/hooks/useHeroComposed";
 import { useAmigos } from "@/hooks/useFriends";
+import { useGuia, type SavedItem } from "@/context/GuiaContext";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // LOGO ASSET
@@ -329,6 +330,7 @@ function HeroDestaque({
 }
 
 function InputBar() {
+  const { save } = useGuia();
   const [linkValue, setLinkValue] = useState("");
   const [captionValue, setCaptionValue] = useState("");
   const [state, setState] = useState<VideoLinkState>({ status: "idle" });
@@ -420,10 +422,26 @@ function InputBar() {
           await AsyncStorage.setItem(PENDING_PLACES_KEY, JSON.stringify(pending));
         }
         setState({ status: "success", places: data.places });
+      } else if (data.type === "place_found" && data.place) {
+        // Lugar único reconhecido: salvar e navegar para Viagem
+        const p = data.place;
+        const savedItem: SavedItem = {
+          id: p.id,
+          titulo: p.nome,
+          categoria: p.categoria === "restaurante" ? "restaurante" : "oQueFazer",
+          localizacao: p.bairro || "Rio de Janeiro",
+          image: p.hero_image_url ? { uri: p.hero_image_url } : undefined,
+          source_table: "lugares",
+        };
+        save(savedItem);
+        setModalVisible(false);
+        router.push("/(tabs)/viagem");
+        return;
       } else if (data.type === "destination_recognized") {
         setState({ status: "lucky_message", message: data.message, destination: data.destination });
       } else {
-        setState({ status: "error", message: data.message || "Nenhum lugar encontrado" });
+        // Não reconhecido: mensagem amigável
+        setState({ status: "lucky_message", message: "Em breve teremos! Estamos expandindo nossa curadoria." });
       }
     } catch (err: any) {
       console.error("[VideoLink] Error:", err);
