@@ -892,7 +892,7 @@ export default function HomeScreen() {
         <LinearGradient colors={["transparent", "rgba(0,0,0,0.55)"]} locations={[0.3, 1]} style={StyleSheet.absoluteFill} />
       </View>
 
-      {/* ═══ BISSECÇÃO: primeira metade comentada ═══
+      {/* ═══ BISSECÇÃO RODADA 2: testando HeroDestaque + TopBar ═══ */}
       <HeroDestaque
         top={top}
         items={heroItems}
@@ -903,9 +903,10 @@ export default function HomeScreen() {
         rioBgIdx={bgIdx}
       />
       <TopBar top={top} onMusicPress={() => setMusicModalVisible(true)} onGalleryPress={() => setGalleryModalVisible(true)} />
+      {/* Modals comentados para bissecção:
       <MusicModal visible={musicModalVisible} onClose={() => setMusicModalVisible(false)} />
       <GalleryModal visible={galleryModalVisible} onClose={() => setGalleryModalVisible(false)} photos={photos} />
-      ═══ FIM BISSECÇÃO ═══ */}
+      */}
 
       {/* Content */}
       <ScrollView style={styles.scroll} contentContainerStyle={{ paddingBottom: bottom + 90, paddingTop: H * 0.38 }} showsVerticalScrollIndicator={false}>
