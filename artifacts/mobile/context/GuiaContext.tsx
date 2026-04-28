@@ -478,7 +478,7 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
 
   const save = useCallback((item: SavedItem): boolean => {
     const key = savedItemKey(item.id, item.source_table, item.categoria);
-    if (saved.some((s) => savedItemKey(s.id, s.source_table, s.categoria) === key)) return true;
+    if (savedRef.current.some((s) => savedItemKey(s.id, s.source_table, s.categoria) === key)) return true;
 
     // Auth gate: unauthenticated users see login prompt
     if (!user) {
@@ -495,7 +495,7 @@ export function GuiaProvider({ children }: { children: React.ReactNode }) {
     syncSaveToServer(user.id, item);
 
     return true;
-  }, [saved, user]);
+  }, [user]);
 
   const unsave = useCallback((id: string) => {
     // Delete ALL server rows that map to this place_id — mirrors the local filter
