@@ -126,6 +126,19 @@ export default function CidadeScreen() {
       });
   }, [id]);
 
+  // ══ TODOS OS HOOKS ANTES DOS EARLY RETURNS (Rules of Hooks) ══
+  // Fotos do hero carousel usando slug do destino
+  const { fotos, loading: loadingFotos } = useDestinoFotos(destino?.slug || id || "");
+  // Destaques usando ID do destino (UUID)
+  const { essencial, agora, loading: loadingDestaques } = useDestaquesDestino(destino?.id || "");
+  const [dotIdx, setDotIdx] = useState(0);
+
+  useEffect(() => {
+    if (fotos.length <= 1) return;
+    const t = setInterval(() => setDotIdx((i) => (i + 1) % fotos.length), ROTATION_INTERVAL);
+    return () => clearInterval(t);
+  }, [fotos.length]);
+
   // ── LOADING STATE ──
   if (status === "loading") {
     return (
@@ -157,22 +170,10 @@ export default function CidadeScreen() {
 
   // ── SUCCESS STATE (destino exists) ──
 
-  // Fotos do hero carousel usando slug do destino
-  const { fotos, loading } = useDestinoFotos(destino?.slug || id || "");
-  // Destaques usando ID do destino (UUID)
-  const { essencial, agora, loading: loadingDestaques } = useDestaquesDestino(destino?.id || "");
-  const [dotIdx, setDotIdx] = useState(0);
-
   // Fallback image
   const fallbackImage = destino?.hero_image_url
     ? { uri: destino.hero_image_url }
     : require("@/assets/images/hero-rio.png");
-
-  useEffect(() => {
-    if (fotos.length <= 1) return;
-    const t = setInterval(() => setDotIdx((i) => (i + 1) % fotos.length), ROTATION_INTERVAL);
-    return () => clearInterval(t);
-  }, [fotos.length]);
 
   return (
     <View style={s.root}>
