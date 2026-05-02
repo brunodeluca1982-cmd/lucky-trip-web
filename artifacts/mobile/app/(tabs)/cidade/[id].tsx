@@ -126,44 +126,15 @@ export default function CidadeScreen() {
       });
   }, [id]);
 
-  // ── LOADING STATE ──
-  if (status === "loading") {
-    return (
-      <View style={s.stateScreen}>
-        <Stack.Screen options={{ headerShown: false }} />
-        <Text style={s.stateText}>Buscando destino...</Text>
-      </View>
-    );
-  }
+  // ── DERIVADOS SEGUROS ──
+  const destinoSlug = destino?.slug ?? id ?? "";
+  const destinoId = destino?.id ?? "";
 
-  // ── NOT FOUND STATE ──
-  if (status === "not_found") {
-    return (
-      <View style={s.stateScreen}>
-        <Stack.Screen options={{ headerShown: false }} />
-        <View style={s.stateContent}>
-          <Text style={s.stateHeadline}>Esse destino ainda não está no Lucky Trip</Text>
-          <Text style={s.stateSubtext}>Mas em breve a gente chega lá.</Text>
-          <Pressable
-            style={s.stateCta}
-            onPress={() => router.replace("/(tabs)")}
-          >
-            <Text style={s.stateCtaText}>Ver destinos disponíveis</Text>
-          </Pressable>
-        </View>
-      </View>
-    );
-  }
-
-  // ── SUCCESS STATE (destino exists) ──
-
-  // Fotos do hero carousel usando slug do destino
-  const { fotos, loading } = useDestinoFotos(destino?.slug || id || "");
-  // Destaques usando ID do destino (UUID)
-  const { essencial, agora, loading: loadingDestaques } = useDestaquesDestino(destino?.id || "");
+  // ── TODOS OS HOOKS NO TOPO (Rules of Hooks) ──
+  const { fotos = [], loading } = useDestinoFotos(destinoSlug);
+  const { essencial = [], agora = [], loading: loadingDestaques } = useDestaquesDestino(destinoId);
   const [dotIdx, setDotIdx] = useState(0);
 
-  // Fallback image
   const fallbackImage = destino?.hero_image_url
     ? { uri: destino.hero_image_url }
     : require("@/assets/images/hero-rio.png");
@@ -173,6 +144,33 @@ export default function CidadeScreen() {
     const t = setInterval(() => setDotIdx((i) => (i + 1) % fotos.length), ROTATION_INTERVAL);
     return () => clearInterval(t);
   }, [fotos.length]);
+
+  // ── EARLY RETURNS APENAS DEPOIS DOS HOOKS ──
+  if (status === "loading") {
+    return (
+      <View style={s.stateScreen}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <Text style={s.stateText}>Buscando destino...</Text>
+      </View>
+    );
+  }
+
+  if (status === "not_found") {
+    return (
+      <View style={s.stateScreen}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={s.stateContent}>
+          <Text style={s.stateHeadline}>Esse destino ainda não está no Lucky Trip</Text>
+          <Text style={s.stateSubtext}>Mas em breve a gente chega lá.</Text>
+          <Pressable style={s.stateCta} onPress={() => router.replace("/(tabs)")}>
+            <Text style={s.stateCtaText}>Ver destinos disponíveis</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  // ── SUCCESS STATE — render abaixo (não duplicar declarações de hooks) ──
 
   return (
     <View style={s.root}>

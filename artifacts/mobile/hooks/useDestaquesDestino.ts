@@ -51,6 +51,13 @@ export function useDestaquesDestino(destinoId: string): State {
       setLoading(true);
       setError(null);
 
+      if (!destinoId) {
+        setEssencial([]);
+        setAgora([]);
+        setLoading(false);
+        return;
+      }
+
       try {
         // Fetch destaques with lugar join
         const { data, error: err } = await supabase
